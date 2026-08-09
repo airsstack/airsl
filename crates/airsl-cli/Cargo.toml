@@ -1,0 +1,33 @@
+[package]
+name        = "airsl-cli"
+description = "Command-line runner for airsl Lua scripts, used by the airsstack plugin hooks"
+version     = "0.1.0"
+
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+authors.workspace      = true
+publish.workspace      = true
+
+readme     = "README.md"
+keywords   = ["lua", "scripting", "cli", "hooks"]
+categories = ["command-line-utilities"]
+
+[[bin]]
+name = "airsl"
+path = "src/main.rs"
+# The binary shares its name with the `airsl` library, so rustdoc would write both to
+# target/doc/airsl and warn about the collision. The binary has no documentation surface
+# of its own — every public item lives in the library — so it opts out.
+doc  = false
+
+[lints]
+workspace = true
+
+[dependencies]
+airsl = { workspace = true }
+clap  = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
