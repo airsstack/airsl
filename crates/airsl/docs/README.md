@@ -12,20 +12,20 @@ script can touch.
 
 ## Status: read this first
 
-Most of what these documents describe is **designed, not built**. The runtime foundation ships; the
-capability surface largely does not. Every document marks each piece, and the table below is the
-summary.
+The runtime foundation ships. The capability *surface* — the modules a script would actually call —
+largely does not. Every document marks each piece, and the table below is the summary.
 
 | Area | State |
 |---|---|
 | Embedded Lua 5.4 VM, statically linked | **implemented** |
 | `Engine`, type-state builder, `Script`, `FailurePolicy` | **implemented** |
-| `HostModule` extension seam | **implemented** |
+| `HostModule` extension seam — `Send + Sync`, `mlua` re-exported, per-engine root table | **implemented** |
+| Policy — language surface, three presets, memory and instruction ceilings | **implemented** |
+| Confined `require` | **implemented** |
 | `airsstack.json` | **implemented** (two known gaps — see [stdlib](stdlib.md)) |
 | `airsl` CLI — `run`, `doctor` | **implemented** |
+| Parameterised capability grants | **proposed** — the axis is typed and empty until `fs` exists to constrain it |
 | Host standard library — `path`, `fs`, `env`, `proc`, `regex`, `hash`, `time`, `glob`, `stdio` | **proposed** |
-| Capability policy — parameterised grants, resource limits | **proposed** |
-| Confined `require` | **half-built** — the field exists and nothing reads it |
 | Extension host — manifests, ceilings, approval, dispatch | **proposed** |
 | `airsl test` | **proposed** |
 
@@ -37,7 +37,7 @@ exists, it carries a `file:line`. Where it is about code that does not, it says 
 - **[Architecture](architecture.md)** — the three layers, what each owns, what ships today, and the
   structural decisions worth understanding before changing anything.
 - **[Sandbox](sandbox.md)** — the capability and policy model: what a grant is, where enforcement
-  lives, what the resource limits can and cannot promise, and the honest comparison with WASM.
+  lives, what the resource ceilings can and cannot promise, and the honest comparison with WASM.
 - **[Host standard library](stdlib.md)** — the module roster, the reasoning behind each, and the
   design principles every module follows.
 - **[Extension system](extensions.md)** — manifests, capability negotiation, the host API, and the
@@ -57,21 +57,32 @@ cargo doc -p airsl --no-deps --open
 
 ## Measurements quoted in these documents
 
-Taken on this repository, on the commit these documents were written against. Reproduce them before
-relying on them; they are a snapshot, not a guarantee.
+Taken on one machine, with the benchmark target in this crate — `cargo bench -p airsl`, median of
+several runs at 1000 iterations. Reproduce them before relying on them; they are a snapshot, not a
+guarantee, and an earlier snapshot taken elsewhere was roughly twice as slow across the board.
+
+| What | Ceilings armed | No ceilings |
+|---|---|---|
+| `Engine` construction | 40 µs | 33 µs |
+| In-process eval, engine reused, trivial chunk | 4.2 µs | 3.4 µs |
+| In-process eval, engine reused, 1000 host-function calls | 910 µs | 710 µs |
+| In-process eval, fresh engine per call, trivial chunk | 48 µs | 42 µs |
 
 | What | Result |
 |---|---|
-| CLI, release build, trivial script | 2.2 ms per run |
-| CLI, debug build, same script | 3.1 ms per run |
+| CLI, release build, trivial script | 2.3 ms per run |
 | `python3 -c 'print("hi")'`, same loop | 11.9 ms per run |
 | `sh -c 'echo hi'`, same loop | 1.7 ms per run |
-| In-process, engine constructed once | 5.5 µs per eval |
-| In-process, fresh engine per eval | 47.1 µs per eval |
-| `Engine` construction alone | 92 µs |
 
-The gap between the last three rows is the single most consequential performance fact in the crate,
-and [architecture](architecture.md) explains what follows from it.
+Two things follow, and [architecture](architecture.md) develops both.
+
+**Reuse against rebuild is an order of magnitude**, which makes engine lifetime an API-shape question
+rather than an optimisation.
+
+**The ceilings are not free.** Arming the instruction hook costs roughly a quarter of the eval path,
+because the hook fires on the VM's hot path. That is the price of being able to stop a script that
+never terminates, and it is opt-out per policy — but it should be a decision rather than a surprise.
+For the CLI none of it signifies: a 2.3 ms process spawn dwarfs every row above.
 
 ## Related
 

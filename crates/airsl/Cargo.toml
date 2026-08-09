@@ -17,6 +17,10 @@ categories = ["development-tools"]
 [lints]
 workspace = true
 
+[[bench]]
+name    = "eval"
+harness = false
+
 [dependencies]
 mlua       = { workspace = true }
 serde      = { workspace = true }

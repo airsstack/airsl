@@ -8,7 +8,7 @@ Rust. This document is the roster, the reasoning, and the rules every module fol
 ## Why a host stdlib at all
 
 The answer that sounds right and is wrong: "because the sandbox removes Lua's own libraries." Under
-`--unrestricted`, `io.open`, `os.getenv`, `io.popen` and `require` all work today, so a script can
+`--policy trusted`, `io.open`, `os.getenv`, `io.popen` and `require` all work today, so a script can
 already do these things.
 
 The real reason is that **Lua's own standard library is thin, and the parts it does have are the
@@ -130,8 +130,8 @@ its dependencies into a single distributable.
 ## What is deliberately absent
 
 `fs`, `env` and `proc` are on this list even though `io.open`, `os.getenv` and `io.popen` already
-work under `Trusted`. That is intentional: the Lua originals cannot be granted, cannot be confined,
-and in `io.popen`'s case take a shell string. A script that must run under `Confined` has no
+work under `trusted`. That is intentional: the Lua originals cannot be granted, cannot be confined,
+and in `io.popen`'s case take a shell string. A script that must run under `confined` has no
 alternative to the host module.
 
 A `text` module is deliberately *not* proposed. Lua's `string` library is adequate, and a module that
@@ -143,8 +143,9 @@ duplicates it would add surface without adding capability.
 the test harness at the lowest possible cost.
 
 Then `fs` and `env`, which unblock most of the plugin corpus and are where the grant machinery gets
-designed against something real. The `Policy` model should be settled before `fs`, because `fs` is
-the first module whose signature depends on it.
+designed against something real. `Policy` is settled, so `fs` is unblocked: its composing type ships
+with the grant axis typed and empty, waiting for the first module that needs a grant to give the
+vocabulary something to constrain.
 
 Then `proc`, `regex`, `hash`, `glob`, then `stdio` and `hook` to finish the migration. `airsl test`
 should land early enough to test the modules that follow it rather than last.

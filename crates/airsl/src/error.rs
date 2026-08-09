@@ -30,6 +30,44 @@ pub enum Error {
         source: Box<mlua::Error>,
     },
 
+    /// The Lua state could not be created or configured before any script ran.
+    #[error("cannot configure the Lua state ({stage}): {source}")]
+    EngineSetup {
+        /// Which part of construction failed, for example `memory limit`.
+        stage: &'static str,
+        /// The underlying VM failure.
+        #[source]
+        source: Box<mlua::Error>,
+    },
+
+    /// A script allocated past the memory ceiling its policy set.
+    ///
+    /// Distinct from [`Error::Lua`] because a script stopped for consuming the host's memory is an
+    /// operational event rather than a defect in the script, and a caller that discards ordinary
+    /// script failures usually still wants to hear about this one.
+    #[error("script `{chunk}` exceeded its memory limit of {limit} bytes")]
+    MemoryLimit {
+        /// Chunk name the failure was attributed to.
+        chunk: String,
+        /// The ceiling that was passed, in bytes.
+        limit: usize,
+        /// The underlying VM error.
+        #[source]
+        source: Box<mlua::Error>,
+    },
+
+    /// A script executed past the instruction ceiling its policy set.
+    ///
+    /// Ordinarily means the script did not terminate. As with [`Error::MemoryLimit`], this says
+    /// something about the host's resources rather than about the script's logic.
+    #[error("script `{chunk}` exceeded its instruction limit of {limit}")]
+    InstructionLimit {
+        /// Chunk name the failure was attributed to.
+        chunk: String,
+        /// The ceiling that was passed.
+        limit: u64,
+    },
+
     /// A host module could not be installed into the Lua state.
     #[error("failed to install host module `{module}`: {reason}")]
     ModuleInstall {
@@ -76,6 +114,15 @@ pub enum Error {
         root: String,
     },
 
+    /// A `require` formed a loop, directly or through a chain of modules.
+    #[error("module `{module}` requires itself, directly or indirectly, under `{root}`")]
+    RequireCycle {
+        /// The module that was required while it was still loading.
+        module: String,
+        /// The directory `require` is confined to.
+        root: String,
+    },
+
     /// A `require` target does not exist under the script directory.
     #[error("module `{module}` not found under `{root}`")]
     RequireNotFound {
@@ -86,6 +133,16 @@ pub enum Error {
     },
 }
 
+/// Which resource ceiling a script exhausted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ExhaustedLimit {
+    /// The memory ceiling.
+    Memory,
+    /// The instruction ceiling.
+    Instructions,
+}
+
 impl Error {
     /// Wraps an [`mlua::Error`] with the chunk name it came from.
     #[must_use]
@@ -93,6 +150,19 @@ impl Error {
         Self::Lua {
             chunk: chunk.into(),
             source: Box::new(source),
+        }
+    }
+
+    /// Which ceiling this failure exhausted, if it exhausted one.
+    ///
+    /// Lets a caller that discards ordinary script failures still surface a resource breach, which
+    /// is a fact about the host rather than a diagnostic the script chose to emit.
+    #[must_use]
+    pub const fn exhausted_limit(&self) -> Option<ExhaustedLimit> {
+        match self {
+            Self::MemoryLimit { .. } => Some(ExhaustedLimit::Memory),
+            Self::InstructionLimit { .. } => Some(ExhaustedLimit::Instructions),
+            _ => None,
         }
     }
 }

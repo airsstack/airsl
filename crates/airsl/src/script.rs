@@ -1,11 +1,11 @@
 //! A unit of Lua source the engine can run.
 //!
 //! Its own type because a script is more than its text: it carries the name errors are reported
-//! under, and the directory that `require` is confined to. Bundling the three means the engine
-//! never has to guess a chunk name or infer a root, and a script loaded from memory behaves the
-//! same as one loaded from disk.
+//! under, the directory that `require` is confined to, and the arguments it was invoked with.
+//! Bundling them means the engine never has to guess a chunk name or infer a root, and a script
+//! loaded from memory behaves the same as one loaded from disk.
 //!
-//! Responsibilities: [`Script`], its constructors, and access to source, name and root.
+//! Responsibilities: [`Script`], its constructors, and access to source, name, root and arguments.
 //!
 //! Non-responsibilities: execution. [`crate::Engine`] runs the script; [`Script::root`] only
 //! records where `require` is permitted to look.
@@ -15,12 +15,14 @@ use std::path::{Path, PathBuf};
 use crate::error::{Error, Result};
 use crate::types::ChunkName;
 
-/// Lua source together with the name it reports and the directory it may `require` from.
+/// Lua source together with the name it reports, the directory it may `require` from, and the
+/// arguments it was invoked with.
 #[derive(Debug, Clone)]
 pub struct Script {
     source: String,
     name: ChunkName,
     root: Option<PathBuf>,
+    args: Vec<String>,
 }
 
 impl Script {
@@ -37,6 +39,7 @@ impl Script {
             source: source.into(),
             name: ChunkName::new(name)?,
             root: None,
+            args: Vec::new(),
         })
     }
 
@@ -62,6 +65,7 @@ impl Script {
             source,
             name: ChunkName::from_path(path),
             root,
+            args: Vec::new(),
         })
     }
 
@@ -69,6 +73,22 @@ impl Script {
     #[must_use]
     pub fn with_root(mut self, root: impl Into<PathBuf>) -> Self {
         self.root = Some(root.into());
+        self
+    }
+
+    /// Supplies the arguments the script sees in Lua's global `arg` table.
+    ///
+    /// Lua's own convention for a standalone script, so a ported shell script reads `arg[1]` where
+    /// it previously read `$1`. Carrying them on the script rather than installing them into the
+    /// state means a host does not need the raw VM to pass an argument, and an engine running two
+    /// scripts gives each the arguments it was built with.
+    #[must_use]
+    pub fn with_args<I, S>(mut self, args: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        self.args = args.into_iter().map(Into::into).collect();
         self
     }
 
@@ -88,6 +108,12 @@ impl Script {
     #[must_use]
     pub fn root(&self) -> Option<&Path> {
         self.root.as_deref()
+    }
+
+    /// The arguments this script reports in the global `arg` table.
+    #[must_use]
+    pub fn args(&self) -> &[String] {
+        &self.args
     }
 }
 
@@ -141,6 +167,33 @@ mod tests {
     fn a_missing_file_reports_the_path_it_tried() {
         let err = Script::from_file("/nonexistent/hook.lua").unwrap_err();
         assert!(err.to_string().contains("/nonexistent/hook.lua"), "{err}");
+    }
+
+    #[test]
+    fn a_script_has_no_arguments_unless_given_some() {
+        assert!(
+            Script::from_source("return 1", "inline")
+                .unwrap()
+                .args()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn with_args_records_the_arguments_in_order() {
+        let script = Script::from_source("return 1", "inline")
+            .unwrap()
+            .with_args(["one", "two"]);
+        assert_eq!(script.args(), ["one", "two"]);
+    }
+
+    #[test]
+    fn with_args_replaces_rather_than_appends() {
+        let script = Script::from_source("return 1", "inline")
+            .unwrap()
+            .with_args(["one"])
+            .with_args(["two", "three"]);
+        assert_eq!(script.args(), ["two", "three"]);
     }
 
     #[test]

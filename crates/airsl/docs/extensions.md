@@ -1,7 +1,8 @@
 # Extension system
 
-**Status: proposed in full.** No part of this exists. The `HostModule` seam it builds on does — see
-[architecture.md](architecture.md).
+**Status: proposed.** No part of the negotiation exists — no manifest, no ceiling, no approver, no
+dispatcher. What it builds on does: the `HostModule` seam, a per-engine root table, confined
+`require`, and resource ceilings all ship. See [architecture.md](architecture.md).
 
 An extension is third-party code that runs inside a host program with capabilities it *requested* and
 the host *granted*. That negotiation is the whole difference between an extension system and a
@@ -117,9 +118,10 @@ end)
 return ext
 ```
 
-`require("lib.index")` resolves only under the extension root. That confinement is exactly what
-`Script::root` was designed for and does not yet do — see [architecture.md](architecture.md).
-Multi-file extensions are blocked on it.
+`require("lib.index")` resolves only under the extension root. That confinement ships: a target
+cannot spell a path separator or a `..` component, the resolved path is canonicalised and checked
+for containment, and a cycle raises rather than recursing. Multi-file extensions are no longer
+blocked on it.
 
 ## Two extension shapes
 
@@ -131,21 +133,26 @@ events occur. This is the Redis model and what "extension system" normally means
 things that do not exist: the `ext.on` registration API, a host-side dispatcher, and a **persistent
 engine across calls**.
 
-That last requirement is where the measurements matter: 5.5 µs per call on a reused engine against
-47.1 µs constructing a fresh one, with 92 µs to build the state. A registered extension pays setup
-once and then dispatches in microseconds. It also means a long-lived engine accumulates global state
-between invocations, and `mlua`'s one-call environment restore is Luau-only
-(`mlua-0.12.0/src/state.rs:675`), so isolation between successive dispatches has to be built.
+That last requirement is where the measurements matter: 4.2 µs per call on a reused engine against
+48 µs constructing a fresh one, with 40 µs to build the state. A registered extension pays setup
+once and then dispatches in microseconds. Engine reuse is now correct in the places it would
+otherwise have been wrong — the instruction counter resets per evaluation, and `require` re-points
+at the current script's root — but a long-lived engine still accumulates global state between
+invocations, and `mlua`'s one-call environment restore is Luau-only
+(`mlua-0.12.0/src/state.rs:673`), so isolation between successive dispatches has to be built.
 
 ## What exists versus what is new
 
 | Piece | State |
 |---|---|
 | `HostModule`, `ModuleSet`, `Engine` | implemented — verified from a downstream crate |
+| Per-engine root table, so an extension does not land in someone else's namespace | implemented |
+| Confined `require` | implemented |
+| Resource ceilings, the `[limits]` block's counterpart | implemented |
+| `Policy` composing the axes | implemented — the grant axis is typed and empty |
+| Parameterised grants | new — `fs`'s signature depends on them |
 | Manifest format and parser | new |
-| `Policy` with parameterised grants | new — `fs`'s signature depends on it |
 | Ceiling and `Approver` | new |
-| Confined `require` | half-built — `Script::root` is recorded and never read |
 | `ext.on` registration and host dispatcher | new |
 | Capability introspection (`ext.granted`) | new |
 

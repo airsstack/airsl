@@ -1,7 +1,7 @@
 //! `airsl` — runs Lua scripts on the embedded `airsl` runtime.
 //!
 //! The binary the airsstack plugin hooks invoke. It stays deliberately thin: parse arguments,
-//! pick a failure policy and a sandbox, hand off. Every decision it makes is visible in
+//! resolve a policy and a failure policy, hand off. Every decision it makes is visible in
 //! [`cli::Command`], so what a hook gets is readable from the command line it was given.
 //!
 //! Responsibilities: wiring the subcommands to their implementations and setting the exit code.
@@ -14,31 +14,29 @@ mod cli;
 mod doctor;
 mod run;
 
-use airsl::{FailurePolicy, Sandbox};
+use airsl::{FailurePolicy, Policy};
 use clap::Parser as _;
 
 fn main() -> std::process::ExitCode {
     let code = match cli::Cli::parse().command {
         cli::Command::Run {
             fail_open,
-            unrestricted,
+            policy,
+            memory_limit,
+            instruction_limit,
             script,
             args,
         } => {
-            let policy = if fail_open {
+            let failure = if fail_open {
                 FailurePolicy::FailOpen
             } else {
                 FailurePolicy::Report
             };
-            let sandbox = if unrestricted {
-                Sandbox::Full
-            } else {
-                Sandbox::Restricted
-            };
-            run::run(&script, &args, policy, sandbox)
+            let policy = cli::resolve_policy(policy, memory_limit, instruction_limit);
+            run::run(&script, &args, failure, &policy)
         }
-        cli::Command::Doctor => {
-            print!("{}", doctor::report());
+        cli::Command::Doctor { policy } => {
+            print!("{}", doctor::report(&Policy::from(policy)));
             0
         }
     };

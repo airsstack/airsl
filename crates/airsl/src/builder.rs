@@ -1,79 +1,64 @@
 //! Type-state construction of an [`Engine`].
 //!
 //! A builder rather than a constructor because building an engine has one decision that must not
-//! be defaulted silently — the sandbox policy — and several that should be. The type-state
-//! parameter makes the required one a compile error rather than a runtime check: there is no
-//! `build` method until [`EngineBuilder::sandbox`] has been called.
+//! be defaulted silently — the policy — and several that should be. The type-state parameter makes
+//! the required one a compile error rather than a runtime check: there is no `build` method until
+//! [`EngineBuilder::policy`] has been called.
 //!
 //! Responsibilities:
 //!
 //! - [`EngineBuilder`] and the [`Missing`] / [`Present`] state markers.
-//! - Applying the sandbox to a fresh [`mlua::Lua`] and installing the host modules.
+//! - Applying a policy to a fresh [`mlua::Lua`] and installing the host modules.
 //!
 //! Non-responsibilities: running scripts. That is [`Engine`]'s job.
 
-use mlua::{StdLib, Table};
+use mlua::Table;
 
-use crate::engine::{Engine, ROOT_TABLE};
+use crate::engine::Engine;
 use crate::error::{Error, Result};
 use crate::modules::{ModuleSet, stdlib};
-use crate::policy::Sandbox;
+use crate::sandbox::Policy;
+use crate::sandbox::language_surface::{CHUNK_LOADERS, UNSAFE_OS_FUNCTIONS};
+use crate::types::RootTable;
 
-/// Type-state marker: the sandbox policy has not been chosen yet.
+/// Type-state marker: the policy has not been chosen yet.
 #[derive(Debug)]
 pub struct Missing;
 
-/// Type-state marker: the sandbox policy has been chosen.
+/// Type-state marker: the policy has been chosen.
 #[derive(Debug)]
 pub struct Present;
-
-/// Base-library globals that hand a script a second way to load code, bypassing the sandbox and
-/// the confined `require`. Removed under [`Sandbox::Restricted`].
-const CHUNK_LOADERS: [&str; 4] = ["load", "loadstring", "dofile", "loadfile"];
-
-/// `os` functions that reach outside the process or change how the process behaves. Every
-/// capability they provide is available through a host module instead, where the host controls it.
-///
-/// `setlocale` is on the list for a subtler reason than the rest: Lua compares strings with
-/// `strcoll`, so a script that changes the locale changes the sort order of every subsequent
-/// `table.sort` — which would silently break output the tooling asserts byte-for-byte.
-const UNSAFE_OS_FUNCTIONS: [&str; 7] = [
-    "execute",
-    "exit",
-    "getenv",
-    "remove",
-    "rename",
-    "tmpname",
-    "setlocale",
-];
 
 /// Configures and builds an [`Engine`].
 #[derive(Debug)]
 pub struct EngineBuilder<S> {
-    sandbox: Sandbox,
+    policy: Policy,
     modules: Option<ModuleSet>,
+    root: RootTable,
     state: core::marker::PhantomData<S>,
 }
 
 impl EngineBuilder<Missing> {
-    /// Starts with no sandbox policy chosen.
+    /// Starts with no policy chosen.
     #[must_use]
-    pub(crate) const fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
-            sandbox: Sandbox::Restricted,
+            policy: Policy::confined(),
             modules: None,
+            root: RootTable::default(),
             state: core::marker::PhantomData,
         }
     }
 
-    /// Chooses what Lua standard libraries scripts may reach.
+    /// Chooses what scripts may reach and what they may consume.
     ///
     /// This is the one required step; [`EngineBuilder::build`] does not exist until it is called.
     #[must_use]
-    pub fn sandbox(self, policy: Sandbox) -> EngineBuilder<Present> {
+    pub fn policy(self, policy: Policy) -> EngineBuilder<Present> {
         EngineBuilder {
-            sandbox: policy,
+            policy,
             modules: self.modules,
+            root: self.root,
             state: core::marker::PhantomData,
         }
     }
@@ -90,45 +75,62 @@ impl EngineBuilder<Present> {
         self
     }
 
-    /// Builds the engine: creates the Lua state, applies the sandbox, and installs the modules.
+    /// Replaces the global the host modules are installed under.
+    ///
+    /// Defaults to `airsstack`. An embedding host should set its own, so that a module contributed
+    /// by a third party does not land in a namespace named after somebody else's system.
+    #[must_use]
+    pub fn root_table(mut self, root: RootTable) -> Self {
+        self.root = root;
+        self
+    }
+
+    /// Builds the engine: creates the Lua state, applies the policy, and installs the modules.
+    ///
+    /// The resource ceilings are armed before the modules are installed, so no caller can ever
+    /// hold an engine whose limits are not yet in force.
     ///
     /// # Errors
     ///
-    /// Returns [`Error::ModuleInstall`] when the root table cannot be created or a host module
-    /// fails to install.
+    /// Returns [`Error::EngineSetup`] when the state cannot be created or capped, and
+    /// [`Error::ModuleInstall`] when the root table cannot be created or a host module fails to
+    /// install.
     pub fn build(self) -> Result<Engine> {
-        let libs = match self.sandbox {
-            Sandbox::Restricted => {
-                StdLib::STRING | StdLib::TABLE | StdLib::MATH | StdLib::COROUTINE | StdLib::OS
-            }
-            Sandbox::Full => StdLib::ALL_SAFE,
-        };
-        let lua = mlua::Lua::new_with(libs, mlua::LuaOptions::default()).map_err(|e| {
-            Error::ModuleInstall {
-                module: String::from("<lua state>"),
-                reason: e.to_string(),
-            }
+        let lua = mlua::Lua::new_with(
+            self.policy.language().libraries(),
+            mlua::LuaOptions::default(),
+        )
+        .map_err(|source| Error::EngineSetup {
+            stage: "creating the state",
+            source: Box::new(source),
         })?;
 
-        if self.sandbox.is_restricted() {
-            restrict_globals(&lua)?;
+        if self.policy.language().withholds_unsafe_globals() {
+            withhold_unsafe_globals(&lua)?;
         }
+        let budget = self.policy.limits().apply(&lua)?;
 
         let modules = match self.modules {
             Some(set) => set,
             None => stdlib()?,
         };
-        install_modules(&lua, &modules)?;
+        install_modules(&lua, &modules, &self.root)?;
 
-        Ok(Engine::from_parts(lua, modules))
+        Ok(Engine::from_parts(
+            lua,
+            modules,
+            self.policy,
+            budget,
+            self.root,
+        ))
     }
 }
 
 /// Removes the chunk loaders and the unsafe `os` functions from the globals table.
-fn restrict_globals(lua: &mlua::Lua) -> Result<()> {
-    let fail = |e: mlua::Error| Error::ModuleInstall {
-        module: String::from("<sandbox>"),
-        reason: e.to_string(),
+fn withhold_unsafe_globals(lua: &mlua::Lua) -> Result<()> {
+    let fail = |source: mlua::Error| Error::EngineSetup {
+        stage: "withholding unsafe globals",
+        source: Box::new(source),
     };
 
     let globals = lua.globals();
@@ -145,10 +147,10 @@ fn restrict_globals(lua: &mlua::Lua) -> Result<()> {
     Ok(())
 }
 
-/// Creates the `airsstack` root table and installs every module into it.
-fn install_modules(lua: &mlua::Lua, modules: &ModuleSet) -> Result<()> {
+/// Creates the root table and installs every module into it.
+fn install_modules(lua: &mlua::Lua, modules: &ModuleSet, root_table: &RootTable) -> Result<()> {
     let fail = |e: mlua::Error| Error::ModuleInstall {
-        module: String::from(ROOT_TABLE),
+        module: root_table.to_string(),
         reason: e.to_string(),
     };
 
@@ -158,7 +160,7 @@ fn install_modules(lua: &mlua::Lua, modules: &ModuleSet) -> Result<()> {
         module.install(lua, &table)?;
         root.set(module.name().as_str(), table).map_err(fail)?;
     }
-    lua.globals().set(ROOT_TABLE, root).map_err(fail)?;
+    lua.globals().set(root_table.as_str(), root).map_err(fail)?;
     Ok(())
 }
 
@@ -170,35 +172,35 @@ mod tests {
     )]
 
     use crate::modules::ModuleSet;
-    use crate::{Engine, Sandbox, Script};
+    use crate::{Engine, LanguageSurface, Policy, Script};
 
-    fn probe(sandbox: Sandbox, source: &str) -> String {
-        let engine = Engine::builder().sandbox(sandbox).build().unwrap();
+    fn probe(policy: Policy, source: &str) -> String {
+        let engine = Engine::builder().policy(policy).build().unwrap();
         engine
             .eval_to::<String>(&Script::from_source(source, "probe").unwrap())
             .unwrap()
     }
 
     #[test]
-    fn a_restricted_engine_withholds_the_chunk_loaders() {
+    fn a_confined_engine_withholds_the_chunk_loaders() {
         for name in ["load", "loadstring", "dofile", "loadfile"] {
-            let found = probe(Sandbox::Restricted, &format!("return type({name})"));
+            let found = probe(Policy::confined(), &format!("return type({name})"));
             assert_eq!(found, "nil", "{name} should be withheld");
         }
     }
 
     #[test]
-    fn a_restricted_engine_withholds_io_and_debug_entirely() {
+    fn a_confined_engine_withholds_io_and_debug_entirely() {
         for name in ["io", "debug", "package"] {
             assert_eq!(
-                probe(Sandbox::Restricted, &format!("return type({name})")),
+                probe(Policy::confined(), &format!("return type({name})")),
                 "nil"
             );
         }
     }
 
     #[test]
-    fn a_restricted_engine_withholds_the_unsafe_os_functions() {
+    fn a_confined_engine_withholds_the_unsafe_os_functions() {
         for name in [
             "execute",
             "exit",
@@ -208,38 +210,66 @@ mod tests {
             "tmpname",
             "setlocale",
         ] {
-            let found = probe(Sandbox::Restricted, &format!("return type(os.{name})"));
+            let found = probe(Policy::confined(), &format!("return type(os.{name})"));
             assert_eq!(found, "nil", "os.{name} should be withheld");
         }
     }
 
     #[test]
-    fn a_restricted_engine_keeps_the_pure_os_functions() {
+    fn a_confined_engine_keeps_the_pure_os_functions() {
         for name in ["time", "date", "clock", "difftime"] {
-            let found = probe(Sandbox::Restricted, &format!("return type(os.{name})"));
+            let found = probe(Policy::confined(), &format!("return type(os.{name})"));
             assert_eq!(found, "function", "os.{name} should be available");
         }
     }
 
     #[test]
-    fn a_restricted_engine_keeps_string_table_and_math() {
+    fn a_confined_engine_keeps_string_table_and_math() {
         for name in ["string", "table", "math"] {
             assert_eq!(
-                probe(Sandbox::Restricted, &format!("return type({name})")),
+                probe(Policy::confined(), &format!("return type({name})")),
                 "table"
             );
         }
     }
 
     #[test]
-    fn a_full_engine_exposes_io() {
-        assert_eq!(probe(Sandbox::Full, "return type(io)"), "table");
+    fn a_trusted_engine_exposes_io() {
+        assert_eq!(probe(Policy::trusted(), "return type(io)"), "table");
+    }
+
+    #[test]
+    fn a_pure_engine_withholds_os_and_coroutine_as_well() {
+        for name in ["os", "coroutine"] {
+            assert_eq!(
+                probe(Policy::pure(), &format!("return type({name})")),
+                "nil"
+            );
+        }
+    }
+
+    #[test]
+    fn a_pure_engine_still_has_the_pure_computation_libraries() {
+        for name in ["string", "table", "math"] {
+            assert_eq!(
+                probe(Policy::pure(), &format!("return type({name})")),
+                "table"
+            );
+        }
+    }
+
+    #[test]
+    fn a_memory_ceiling_is_armed_before_any_script_runs() {
+        let engine = Engine::builder().policy(Policy::pure()).build().unwrap();
+        let script =
+            Script::from_source("local t = {} for i = 1, 1e9 do t[i] = i end", "greedy").unwrap();
+        assert!(engine.eval(&script).is_err());
     }
 
     #[test]
     fn an_empty_module_set_still_creates_the_root_table() {
         let engine = Engine::builder()
-            .sandbox(Sandbox::Restricted)
+            .policy(Policy::confined())
             .stdlib(ModuleSet::new())
             .build()
             .unwrap();
@@ -248,5 +278,11 @@ mod tests {
             .unwrap();
         assert_eq!(found, "table");
         assert!(engine.module_names().is_empty());
+    }
+
+    #[test]
+    fn the_engine_keeps_the_policy_it_was_built_with() {
+        let engine = Engine::builder().policy(Policy::pure()).build().unwrap();
+        assert_eq!(engine.policy().language(), LanguageSurface::Minimal);
     }
 }

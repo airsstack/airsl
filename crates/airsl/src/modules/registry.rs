@@ -41,7 +41,13 @@ use crate::types::ModuleName;
 ///     }
 /// }
 /// ```
-pub trait HostModule {
+/// # Thread safety
+///
+/// The supertraits make an [`Engine`](crate::Engine) shareable between threads. They cost an
+/// implementation nothing in practice — a module holds its name and whatever authority the host
+/// granted it, and the functions it installs capture the same — but they are part of the contract:
+/// a module holding a `Rc` or a `RefCell` will not compile.
+pub trait HostModule: Send + Sync {
     /// The key this module is installed under in the `airsstack` table.
     fn name(&self) -> &ModuleName;
 
@@ -60,6 +66,8 @@ pub trait HostModule {
 /// available modules reads the same way every run.
 #[derive(Default)]
 pub struct ModuleSet {
+    // dyn: the set is the extension seam — its members are chosen at runtime by the host and
+    // contributed by crates this one never imports, so there is no closed set to enumerate.
     modules: Vec<Box<dyn HostModule>>,
 }
 

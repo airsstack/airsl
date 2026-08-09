@@ -88,11 +88,11 @@ mod tests {
     )]
 
     use super::Json;
-    use crate::{Engine, HostModule as _, Sandbox, Script};
+    use crate::{Engine, HostModule as _, Policy, Script};
 
     fn eval(source: &str) -> String {
         let engine = Engine::builder()
-            .sandbox(Sandbox::Restricted)
+            .policy(Policy::confined())
             .build()
             .unwrap();
         let script = Script::from_source(source, "test").unwrap();

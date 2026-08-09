@@ -13,7 +13,7 @@
 //! - [`mod@stdlib`] — the default module set the engine installs.
 //!
 //! Non-responsibilities: sandboxing. Which Lua standard libraries a script sees is
-//! [`crate::Sandbox`]'s decision, applied by the engine before any of these are installed.
+//! [`crate::Policy`]'s decision, applied by the engine before any of these are installed.
 
 pub mod json;
 pub mod registry;

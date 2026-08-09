@@ -7,9 +7,9 @@
 //! standard library.
 //!
 //! ```no_run
-//! use airsl::{Engine, FailurePolicy, Sandbox, Script};
+//! use airsl::{Engine, FailurePolicy, Policy, Script};
 //!
-//! let engine = Engine::builder().sandbox(Sandbox::Restricted).build()?;
+//! let engine = Engine::builder().policy(Policy::confined()).build()?;
 //! let script = Script::from_file("hooks/enforce.lua")?;
 //!
 //! if let Err(error) = engine.eval(&script) {
@@ -30,16 +30,31 @@ mod builder;
 mod convert;
 mod engine;
 mod error;
-mod policy;
+mod failure_policy;
+mod instruction_budget;
+mod require_loader;
 mod script;
 
 pub mod modules;
+pub mod sandbox;
 pub mod types;
 
+/// The Lua binding this crate is built on.
+///
+/// Re-exported because it is part of the public contract rather than an implementation detail:
+/// [`HostModule::install`] receives an `&mlua::Lua` and an `&mlua::Table`, so a module cannot be
+/// written without naming these types. Depending on `airsl::mlua` rather than declaring `mlua`
+/// separately keeps a contributor on the same version the engine was built with — a mismatch
+/// otherwise produces type errors that never mention the real cause.
+pub use mlua;
+
 pub use builder::{EngineBuilder, Missing, Present};
-pub use engine::{Engine, ROOT_TABLE};
-pub use error::{Error, Result};
+pub use engine::Engine;
+pub use error::{Error, ExhaustedLimit, Result};
+pub use failure_policy::FailurePolicy;
 pub use modules::{HostModule, ModuleSet};
-pub use policy::{FailurePolicy, Sandbox};
+pub use sandbox::{
+    GrantSet, InstructionLimit, LanguageSurface, MemoryLimit, Policy, ResourceLimits,
+};
 pub use script::Script;
-pub use types::{ChunkName, ModuleName};
+pub use types::{ChunkName, ModuleName, RequireTarget, RootTable};
