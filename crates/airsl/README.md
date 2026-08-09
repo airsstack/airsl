@@ -54,4 +54,10 @@ rather than a diagnostic. `FailurePolicy::FailOpen` says so in the type system;
 Implement `HostModule` and add it to a `ModuleSet`. The module becomes a subtable of `airsstack`
 alongside the built-ins, and the host crate never has to modify `airsl` to contribute one.
 
+## Documentation
+
+[`docs/`](docs/README.md) covers the architecture, the capability and sandbox model, the host
+standard library roster, and the extension system. Most of it is design rather than shipped code;
+each document says which is which.
+
 [`mlua`]: https://crates.io/crates/mlua
