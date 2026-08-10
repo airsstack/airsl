@@ -50,14 +50,19 @@ impl ChunkName {
         Ok(Self(raw))
     }
 
-    /// Builds a chunk name from a filesystem path, falling back to a placeholder when the path is
-    /// not usable as a name.
+    /// Builds a chunk name from a filesystem path, repairing it rather than refusing it.
     ///
     /// Unlike [`ChunkName::new`] this never fails, so a script can always be compiled under *some*
-    /// name — a path that is empty or contains a newline yields `?` rather than aborting the run.
+    /// name. A path too long for the limit keeps its tail — the filename and the directories
+    /// nearest it are what identifies a script in a traceback, and collapsing the whole thing to a
+    /// placeholder discarded exactly the informative part.
     #[must_use]
     pub fn from_path(path: &std::path::Path) -> Self {
-        Self::new(path.display().to_string()).unwrap_or_else(|_| Self(String::from("?")))
+        let sanitised = path
+            .display()
+            .to_string()
+            .replace(['\n', '\r', '\0'], "\u{fffd}");
+        Self::new(elide(&sanitised)).unwrap_or_else(|_| Self(String::from("?")))
     }
 
     /// The name as written, without the Lua format marker.
@@ -71,6 +76,25 @@ impl ChunkName {
     pub fn as_lua(&self) -> String {
         format!("@{}", self.0)
     }
+}
+
+/// Trims an over-long name to its last [`ChunkName::MAX_LEN`] bytes, marking what was dropped.
+///
+/// Splits on a character boundary, so a multi-byte path component is never cut in half — the
+/// result has to survive into a Lua traceback as valid UTF-8.
+fn elide(text: &str) -> String {
+    const MARK: &str = "…";
+
+    if text.len() <= ChunkName::MAX_LEN {
+        return text.to_owned();
+    }
+    let budget = ChunkName::MAX_LEN - MARK.len();
+    let start = text
+        .char_indices()
+        .map(|(index, _)| index)
+        .find(|&index| text.len() - index <= budget)
+        .unwrap_or(text.len());
+    format!("{MARK}{}", &text[start..])
 }
 
 impl core::fmt::Display for ChunkName {
@@ -112,6 +136,35 @@ mod tests {
     fn rejects_names_longer_than_the_limit() {
         assert!(ChunkName::new("a".repeat(240)).is_ok());
         assert!(ChunkName::new("a".repeat(241)).is_err());
+    }
+
+    #[test]
+    fn an_over_long_path_keeps_the_tail_that_identifies_it() {
+        let path = format!("/{}/plugins/hooks/enforce.lua", "deep".repeat(90));
+        let name = ChunkName::from_path(Path::new(&path));
+        assert!(name.as_str().len() <= 240, "{}", name.as_str().len());
+        assert!(
+            name.as_str().ends_with("/plugins/hooks/enforce.lua"),
+            "{}",
+            name.as_str()
+        );
+        assert!(name.as_str().starts_with('…'), "{}", name.as_str());
+    }
+
+    #[test]
+    fn an_over_long_path_is_never_cut_through_a_character() {
+        // Every component is multi-byte, so a byte-wise split would produce invalid UTF-8 — which
+        // has to reach a Lua traceback intact.
+        let path = format!("/{}/ünïcøde.lua", "påth".repeat(90));
+        let name = ChunkName::from_path(Path::new(&path));
+        assert!(name.as_str().len() <= 240);
+        assert!(name.as_str().ends_with("/ünïcøde.lua"), "{}", name.as_str());
+    }
+
+    #[test]
+    fn a_path_within_the_limit_is_left_exactly_as_it_is() {
+        let name = ChunkName::from_path(Path::new("/plugins/hooks/enforce.lua"));
+        assert_eq!(name.as_str(), "/plugins/hooks/enforce.lua");
     }
 
     #[test]

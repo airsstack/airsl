@@ -27,11 +27,22 @@ On 5.1 a JSON `3` and a JSON `3.0` are the same value, which breaks byte-stable 
 
 ## What scripts can see
 
-| Module | Purpose |
-|---|---|
-| `airsstack.json` | `encode`, `encode_pretty`, `decode` |
+| Module | Purpose | Needs a grant |
+|---|---|---|
+| `airsstack.json` | `encode`, `encode_pretty`, `decode` — keys always sort | no |
+| `airsstack.path` | join, split, normalise, relativise — pure string arithmetic | no |
+| `airsstack.fs` | read, write, walk, stat, atomic and exclusive writes | read roots, write roots |
+| `airsstack.env` | read and overlay environment variables | name allowlist |
+| `airsstack.proc` | run a program from an argv array; no shell, ever | executable allowlist |
+| `airsstack.regex` | real regular expressions, one-shot or compiled | no |
+| `airsstack.hash` | SHA-256 and SHA-1, over strings or files | only `hash_file` |
+| `airsstack.time` | timestamps, formatting and parsing, in UTC | no |
+| `airsstack.glob` | glob matching, and walking a tree by pattern | only `walk` |
+| `airsstack.stdio` | the process's own standard streams | no |
+| `airsstack.hook` | the agent-hook payload and output contract | no |
 
-More modules are added as the tooling that drives this crate needs them.
+Every module is installed under every preset. One the policy has granted nothing is present and
+refuses each call — the authority is in the grant, not in whether the table is there.
 
 ## Policy
 
@@ -62,8 +73,20 @@ let policy = Policy::confined()
     .with_limits(ResourceLimits::none().with_instructions(Some(InstructionLimit::count(1_000))));
 ```
 
-Grants are typed but currently empty — no host module takes one yet, because the grant vocabulary is
-the module list and `json` needs no authority.
+Nothing is granted by default below `trusted`. A host says what a script may reach:
+
+```rust
+let policy = Policy::confined().with_grants(
+    GrantSet::declared()
+        .with_fs(|fs| fs.read("/repo").write("/repo/.index"))
+        .with_env(|env| env.read(["HOME"]))
+        .with_proc(|proc| proc.allow(["git"])),
+);
+```
+
+A grant is checked inside the Rust function before the operation it guards, never in Lua. `fs`
+canonicalises the deepest existing part of a path and accepts only ordinary names below it, so a
+symlink inside a granted root that points outside is caught.
 
 ## Ceilings
 
@@ -120,16 +143,28 @@ root table alongside the built-ins, and the host crate never has to modify `airs
 one. `mlua` is re-exported as `airsl::mlua`, so a contributor stays on the version the engine was
 built with.
 
+`install` receives an `InstallContext` carrying the policy the engine was built with, so a module
+that guards an operation reads its authority from the same object `airsl doctor` reports — rather
+than from a copy that could disagree with it.
+
 An engine's root table defaults to `airsstack` and can be named per engine, so a module contributed
 by a third party need not land in a namespace named after somebody else's system.
 
-`Engine` is `Send + Sync`, so it can be shared between threads. One caveat: `require` is a global,
-so give a shared engine scripts under a single root.
+`Engine` is `Send + Sync`, so it can be shared between threads. Evaluations on one engine are
+serialised, so each gets its own arguments, its own `require` root and the whole instruction
+budget — a shared engine is a way to avoid rebuilding a state, not a way to get parallelism, since
+one Lua state cannot execute in parallel anyway.
 
 ## Documentation
 
-[`docs/`](docs/README.md) covers the architecture, the capability and sandbox model, the host
-standard library roster, and the extension system. Each document says which parts are shipped and
-which are design.
+[`docs/`](docs/README.md) is organised on [Diátaxis](https://diataxis.fr/):
+
+- **[Tutorial](docs/tutorial.md)** — from installing the binary to a working agent hook.
+- **[How-to](docs/how-to.md)** — recipes for a specific job, from Lua and from Rust.
+- **[Architecture](docs/architecture.md)**, **[Sandbox](docs/sandbox.md)**,
+  **[Host stdlib](docs/stdlib.md)**, **[Extensions](docs/extensions.md)** — the explanation layer.
+- Reference is the rustdoc: `cargo doc -p airsl --no-deps --open`.
+
+Each document says which parts are shipped and which are design.
 
 [`mlua`]: https://crates.io/crates/mlua

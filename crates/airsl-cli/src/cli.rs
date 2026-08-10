@@ -15,7 +15,7 @@
 
 use std::path::PathBuf;
 
-use airsl::{InstructionLimit, MemoryLimit, Policy};
+use airsl::{GrantSet, InstructionLimit, MemoryLimit, Policy};
 use clap::{Parser, Subcommand, ValueEnum};
 
 /// The argument that switches a ceiling off entirely.
@@ -75,6 +75,45 @@ impl From<PolicyName> for Policy {
     }
 }
 
+/// The authority a caller grants on the command line.
+///
+/// Nothing is granted by default, on any preset below `trusted`. That is deliberate: a hook
+/// launcher states what its script may reach, in the same place it states the script, so the
+/// authority is visible to whoever reads the command rather than buried in a policy file.
+#[derive(Debug, Default, clap::Args)]
+pub(crate) struct Grants {
+    /// Directory the script may read under. Repeat for several.
+    #[arg(long = "allow-read", value_name = "DIR")]
+    pub read: Vec<PathBuf>,
+
+    /// Directory the script may write under. Repeat for several.
+    ///
+    /// Not implicitly readable: grant both if the script reads back what it wrote.
+    #[arg(long = "allow-write", value_name = "DIR")]
+    pub write: Vec<PathBuf>,
+
+    /// Environment variable the script may read. Repeat for several.
+    #[arg(long = "allow-env", value_name = "NAME")]
+    pub env: Vec<String>,
+
+    /// Executable the script may run. Repeat for several.
+    #[arg(long = "allow-exec", value_name = "PROGRAM")]
+    pub exec: Vec<String>,
+}
+
+impl Grants {
+    /// The grant set these flags describe.
+    fn into_grant_set(self) -> GrantSet {
+        GrantSet::declared()
+            .with_fs(|fs| {
+                let fs = self.read.into_iter().fold(fs, airsl::FsGrant::read);
+                self.write.into_iter().fold(fs, airsl::FsGrant::write)
+            })
+            .with_env(|env| env.read(self.env))
+            .with_proc(|proc| proc.allow(self.exec))
+    }
+}
+
 /// The available subcommands.
 #[derive(Debug, Subcommand)]
 pub(crate) enum Command {
@@ -104,6 +143,10 @@ pub(crate) enum Command {
         #[arg(long, value_name = "COUNT|none", value_parser = parse_instruction_limit)]
         instruction_limit: Option<Ceiling<InstructionLimit>>,
 
+        /// What the script may reach.
+        #[command(flatten)]
+        grants: Grants,
+
         /// Path to the `.lua` file.
         script: PathBuf,
 
@@ -114,6 +157,25 @@ pub(crate) enum Command {
         /// handed to the script, which is exactly what the ported shell scripts pass.
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
+    },
+
+    /// Run the Lua test files under a directory.
+    ///
+    /// A test file is one named `*_test.lua` or `test_*.lua`. It returns a table of named
+    /// functions; each is a test, and a test passes by returning without raising — so Lua's own
+    /// `assert` is the whole assertion surface and there is nothing new to learn.
+    Test {
+        /// Which policy preset the tests run under.
+        #[arg(long, value_enum, default_value_t = PolicyName::Confined)]
+        policy: PolicyName,
+
+        /// What the tests may reach.
+        #[command(flatten)]
+        grants: Grants,
+
+        /// Directory to search, or a single test file. Defaults to the working directory.
+        #[arg(default_value = ".")]
+        path: PathBuf,
     },
 
     /// Report the runtime version and the policy a script would run under.
@@ -133,6 +195,7 @@ pub(crate) fn resolve_policy(
     preset: PolicyName,
     memory: Option<Ceiling<MemoryLimit>>,
     instructions: Option<Ceiling<InstructionLimit>>,
+    grants: Grants,
 ) -> Policy {
     let policy = Policy::from(preset);
     let mut limits = *policy.limits();
@@ -142,7 +205,15 @@ pub(crate) fn resolve_policy(
     if let Some(instructions) = instructions {
         limits = limits.with_instructions(instructions.into_limit());
     }
-    policy.with_limits(limits)
+
+    // `trusted` waives containment entirely, so adding declared grants to it would narrow nothing
+    // and would make `airsl doctor` report a list that means nothing.
+    let policy = policy.with_limits(limits);
+    if policy.grants().is_unrestricted() {
+        policy
+    } else {
+        policy.with_grants(grants.into_grant_set())
+    }
 }
 
 /// Parses a memory ceiling in bytes, or `none`.
@@ -177,7 +248,7 @@ mod tests {
     )]
 
     use super::{
-        Ceiling, Cli, Command, PolicyName, parse_instruction_limit, parse_memory_limit,
+        Ceiling, Cli, Command, Grants, PolicyName, parse_instruction_limit, parse_memory_limit,
         resolve_policy,
     };
     use airsl::{InstructionLimit, LanguageSurface, MemoryLimit, Policy};
@@ -200,6 +271,7 @@ mod tests {
             instruction_limit,
             script,
             args,
+            ..
         } = run_command(&["airsl", "run", "hook.lua"])
         else {
             panic!("expected the run subcommand");
@@ -315,7 +387,7 @@ mod tests {
 
     #[test]
     fn no_override_leaves_the_presets_ceilings_alone() {
-        let policy = resolve_policy(PolicyName::Confined, None, None);
+        let policy = resolve_policy(PolicyName::Confined, None, None, Grants::default());
         assert!(policy.limits().memory().is_some());
         assert!(policy.limits().instructions().is_some());
     }
@@ -326,6 +398,7 @@ mod tests {
             PolicyName::Confined,
             Some(Ceiling::Of(MemoryLimit::bytes(512))),
             None,
+            Grants::default(),
         );
         assert_eq!(policy.limits().memory().map(MemoryLimit::get), Some(512));
         assert!(policy.limits().instructions().is_some());
@@ -337,6 +410,7 @@ mod tests {
             PolicyName::Confined,
             Some(Ceiling::Unlimited),
             Some(Ceiling::Unlimited),
+            Grants::default(),
         );
         assert!(policy.limits().memory().is_none());
         assert!(policy.limits().instructions().is_none());
@@ -348,6 +422,7 @@ mod tests {
             PolicyName::Trusted,
             None,
             Some(Ceiling::Of(InstructionLimit::count(10))),
+            Grants::default(),
         );
         assert_eq!(
             policy.limits().instructions().map(InstructionLimit::get),

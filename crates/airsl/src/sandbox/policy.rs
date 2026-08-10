@@ -100,8 +100,11 @@ impl Policy {
     }
 
     /// The same policy with different grants.
+    ///
+    /// Not `const`, unlike its siblings: a [`GrantSet`] owns its allowlists, so replacing one
+    /// drops the old value and a const context cannot run a destructor.
     #[must_use]
-    pub const fn with_grants(mut self, grants: GrantSet) -> Self {
+    pub fn with_grants(mut self, grants: GrantSet) -> Self {
         self.grants = grants;
         self
     }

@@ -18,8 +18,8 @@ independent, they fail differently, and they are at different stages of completi
 
 ```mermaid
 graph TD
-    L3["Layer 3 — Capability surface<br/>host modules under the root table<br/>json ships; the rest are proposed"]
-    L2["Layer 2 — Policy<br/>language surface, grants, resource ceilings<br/>surface and ceilings ship; grants proposed"]
+    L3["Layer 3 — Capability surface<br/>host modules under the root table<br/>complete: 11 modules"]
+    L2["Layer 2 — Policy<br/>language surface, grants, resource ceilings<br/>complete"]
     L1["Layer 1 — The VM<br/>Lua 5.4, compiled from C, statically linked<br/>complete"]
     L3 --> L2 --> L1
 ```
@@ -43,21 +43,32 @@ listed beside the variants that withhold them (`sandbox/language_surface.rs:20-3
 (`sandbox/resource_limits.rs:143-165`), so no caller can hold an engine whose ceilings are not yet
 in force.
 
-`GrantSet` answers the second and is the piece that does not ship. It carries two states —
-unrestricted, or declared-and-currently-empty — because the presets need that much, and no more,
-until a module exists that takes a grant. [sandbox.md](sandbox.md) has the model it grows into.
+`GrantSet` answers the second. It is either unrestricted or a set of parameterised allowlists —
+directory roots split by read and write, environment variable names, executable names — reached by a
+module through the `InstallContext` its `install` receives. [sandbox.md](sandbox.md) has the model.
 
 **Layer 3 — the capability surface.** Rust functions installed as subtables of a single Lua global,
-named per engine and defaulting to `airsstack`. One module ships (`airsstack.json`); the rest of the
-roster is in [stdlib.md](stdlib.md).
+named per engine and defaulting to `airsstack`. Eleven modules ship: `json`, `path`, `fs`, `env`,
+`proc`, `regex`, `hash`, `time`, `glob`, `stdio` and `hook`. [stdlib.md](stdlib.md) has the roster.
+
+The split that matters is which of them need authority. `path`, `regex`, `time` and `stdio` reach
+nothing and are installed under every preset including `pure`. `fs`, `env` and `proc` each take a
+grant. `hash` and `glob` are the interesting case: most of what they do is pure, but `hash_file` and
+`glob.walk` read the filesystem, so those two functions alone go through the same guard `fs` uses.
+A module is a capability, and sometimes the boundary runs through the middle of one.
 
 ## What a script sees today
 
 | Preset | Lua libraries | `require` | Ceilings | Host modules |
 |---|---|---|---|---|
-| `trusted` | everything except `debug` — including `io`, `os`, `package` | Lua's own, unconfined | none | `airsstack.json` |
-| `confined` (default) | `string`, `table`, `math`, `coroutine`, pure `os` | confined to the script directory | 64 MiB, 100M instructions | `airsstack.json` |
-| `pure` | `string`, `table`, `math` | none | 16 MiB, 10M instructions | `airsstack.json` |
+| `trusted` | everything except `debug` — including `io`, `os`, `package` | Lua's own, unconfined | none | all 11, unrestricted |
+| `confined` (default) | `string`, `table`, `math`, `utf8`, `coroutine`, pure `os` | confined to the script directory | 64 MiB, 100M instructions | all 11, granted nothing by default |
+| `pure` | `string`, `table`, `math`, `utf8` | none | 16 MiB, 10M instructions | all 11, granted nothing by default |
+
+Every module is installed under every preset. A module the policy has granted nothing is present and
+refuses each call with a message naming what *was* granted — rather than being absent, which would
+make a script's `if airsstack.fs then` mean "am I allowed" instead of "does this runtime have it".
+The authority is in the grant, not in the presence of the table.
 
 The practical consequence, and it is easy to miss: **under `--policy trusted`, `airsl` already runs
 arbitrary Lua today.** `io.open`, `os.getenv`, `io.popen` and `require` all work. The host standard
@@ -65,14 +76,15 @@ library is not what makes Lua scripts runnable — it is what makes them *portab
 grantable*. Those are different goals, and conflating them leads to the wrong conclusion about what
 is blocking what.
 
-`utf8` is absent below `trusted`, and that is worth knowing because it was originally an accident
-rather than a decision — the bit was simply never included in the library set. It needs no authority
-and hazards no determinism, so the argument for adding it is strong; it stays out for now only
-because it would widen the surface, and gets decided with the standard library.
+`utf8` is on every surface, including `pure`. It was absent below `trusted` for a while, by accident
+rather than decision — the bit was simply never named in the library set — and the criterion for
+withholding something has always been authority or nondeterminism rather than size. `utf8` has
+neither. Without it `#s` counts bytes and nothing counts characters, so a confined script could not
+truncate text without risking a cut through the middle of one.
 
 ## The extension seam
 
-`HostModule` (`registry.rs:44-55`) is a public trait; `ModuleSet` and `stdlib()` are public. A
+`HostModule` is a public trait; `ModuleSet`, `InstallContext` and `stdlib()` are public. A
 downstream crate contributes capabilities without modifying `airsl`:
 
 ```rust
@@ -85,8 +97,14 @@ let engine = Engine::builder()
     .build()?;
 ```
 
-This was verified from a separate crate outside the workspace: the custom module installed under the
-root table, and the built-in `json` module remained available alongside it. The seam works.
+This was verified from a separate crate outside the workspace, and re-verified after `install`
+gained its context argument: the custom module installed under a root table named `myapp`, read its
+authority from the `InstallContext`, and all eleven built-ins remained available alongside it.
+
+`install` also receives an `InstallContext` carrying the policy the engine was built with, which is
+what keeps the authority a module enforces and the authority `airsl doctor` reports the same object.
+A module constructed with its own copy could disagree with the engine it was installed into, and the
+report would then describe the policy while the module enforced something else.
 
 Four gaps used to stand between it and an extension system proper. All four are closed, and what
 each cost is worth recording, because the same trade-offs recur:
@@ -111,40 +129,60 @@ each cost is worth recording, because the same trade-offs recur:
   filesystem to catch is a symlink pointing out of the root. Cycles raise rather than recursing,
   which matters because the alternative is a C stack overflow that aborts the process.
 
-One property `Engine: Sync` does not buy: `require` is a global, so two threads evaluating scripts
-with different roots on one engine contend for it. Give a shared engine scripts under one root.
+What `Engine: Sync` buys is a *shared* engine, not a *parallel* one. `mlua` locks its state per
+operation (`mlua-0.12.0/src/state.rs:58`), and an evaluation is four of them — reset the budget,
+write `arg`, install `require`, run the chunk. That was enough for memory safety and not enough for
+correctness: eight threads evaluating `return arg[1]` on one engine got another thread's argument
+12,247 times out of 16,000. `Engine` now holds a lock spanning the whole sequence
+(`engine.rs:142-161`), which takes that to zero. Lua on one state cannot execute in parallel
+whatever we do, so the lock costs an uncontended acquisition and no throughput — a shared engine is
+a way to avoid rebuilding a state, never a way to get parallelism.
 
 ## Engine lifecycle, and why it is an architectural decision
 
 Measured on this repository:
 
 ```
-Engine construction:            40 µs
-eval, engine reused:           4.2 µs
-eval, fresh engine each time:   48 µs
+Engine construction:           128 µs
+eval, engine reused:           4.6 µs
+eval, fresh engine each time:  136 µs
 ```
 
-An order of magnitude between reusing a state and rebuilding one. For the CLI it is irrelevant — a
-process spawn costs 2.3 ms, which dwarfs everything above and is itself within 40% of a bare `sh`
-spawn. For an embedded consumer it is the difference between a viable dispatch path and a wasteful
+Thirty-fold between reusing a state and rebuilding one, and the gap widened as the standard library
+grew — construction installs eleven modules now rather than one. For the CLI it is irrelevant — a
+process spawn costs 3.2 ms, which dwarfs everything above and is itself within half again of a bare
+`sh` spawn. For an embedded consumer it is the difference between a viable dispatch path and a wasteful
 one, and for a registered extension called on every event it is the whole design.
 
-Roughly a quarter of the eval figure is the instruction hook, which fires on the VM's hot path.
-Lifting the ceiling brings the reused path to 3.4 µs. That is the price of being able to stop a
+Roughly a quarter of the reused-eval figure is the instruction hook, which fires on the VM's hot
+path. Lifting the ceiling brings the reused path to 3.4 µs. That is the price of being able to stop a
 script that never terminates, and it is a policy choice rather than a fixed cost.
 
-So **engine reuse is an API-shape question, not an optimisation**, and the crate now takes reuse
-seriously in the places it would otherwise have been wrong: the instruction counter resets before
-each evaluation, the `arg` table is written per script rather than once, and `require` is installed
-against the root of the script about to run. Each of those would have been invisible in a
-one-script-per-process CLI and a bug in a dispatcher.
+So **engine reuse is an API-shape question, not an optimisation**, and each thing that has to be
+per-evaluation is one the CLI could never have caught, because it runs one script per process:
+
+| Per evaluation | Kept across evaluations |
+|---|---|
+| the instruction counter, reset before each run | the `require` module cache, keyed by canonical path |
+| the `arg` table, including `arg[0]` | the Lua globals a script wrote |
+| `require`, pointed at the current script's root | whatever garbage the collector has not taken |
+
+The right-hand column is not symmetrical with the left by accident, and one row of it used to be on
+the wrong side: the module cache was rebuilt per evaluation, so a reused engine re-ran every module
+it required — three evaluations of a script requiring a counter returned 1, 2, 3 where Lua's own
+`package.loaded` would give 1, 1, 1. Cached state was being discarded and leaked state was being
+kept, which is exactly inverted for a dispatch path.
 
 What remains unsolved is the rest of the global state a reused engine accumulates. `mlua`'s one-call
 environment restore (`Lua::sandbox(bool)`) is Luau-only —
 `#[cfg(any(feature = "luau", doc))]` at `mlua-0.12.0/src/state.rs:673` — so isolation between
 successive scripts on one engine has to be built rather than borrowed. Nothing needs it until
-registered extensions exist. The memory ceiling has the same shape: it caps the state, not the
-script, so an engine carries earlier scripts' garbage until the collector runs.
+registered extensions exist. One instance of it is closed rather than merely documented: the shared
+string metatable is hidden behind `__metatable` below `Full` (`builder.rs`,
+`protect_string_metatable`), because a script that reached it could replace a method for every
+string in the state — and the next script would call `('x'):upper()` and have no way to notice. The
+memory ceiling has the same shape as the general problem: it caps the state, not the script, so an
+engine carries earlier scripts' garbage until the collector runs.
 
 ## Failure policy
 

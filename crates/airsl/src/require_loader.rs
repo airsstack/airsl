@@ -64,9 +64,18 @@ impl RequireLoader {
             source: Box::new(source),
         };
 
-        let loaded = lua.create_table().map_err(fail)?;
-        lua.set_named_registry_value(LOADED_KEY, loaded)
-            .map_err(fail)?;
+        // Created once and kept, matching what `package.loaded` does for Lua's own `require`.
+        // Recreating it per evaluation made a reused engine re-run every module it required,
+        // which is the opposite of what a dispatch path wants and is invisible in a CLI that
+        // runs one script per process.
+        if !lua
+            .named_registry_value::<Value>(LOADED_KEY)
+            .is_ok_and(|v| v.is_table())
+        {
+            let loaded = lua.create_table().map_err(fail)?;
+            lua.set_named_registry_value(LOADED_KEY, loaded)
+                .map_err(fail)?;
+        }
 
         let root = self.root.clone();
         let require = lua
@@ -79,19 +88,22 @@ impl RequireLoader {
         lua.globals().set(REQUIRE, require).map_err(fail)
     }
 
-    /// Removes `require` and its cache, for a script that is not entitled to one.
+    /// Removes `require`, for a script that is not entitled to one.
+    ///
+    /// The cache is left in place. It is unreachable without `require` to consult it, and keeping
+    /// it means an engine that alternates between scripts from source and scripts on disk does not
+    /// re-run the modules the latter share.
     ///
     /// # Errors
     ///
     /// Returns [`Error::EngineSetup`] when the global cannot be cleared.
     pub(crate) fn remove(lua: &mlua::Lua) -> Result<()> {
-        let fail = |source: mlua::Error| Error::EngineSetup {
-            stage: "confined require",
-            source: Box::new(source),
-        };
-
-        lua.globals().set(REQUIRE, Value::Nil).map_err(fail)?;
-        lua.unset_named_registry_value(LOADED_KEY).map_err(fail)
+        lua.globals()
+            .set(REQUIRE, Value::Nil)
+            .map_err(|source| Error::EngineSetup {
+                stage: "confined require",
+                source: Box::new(source),
+            })
     }
 }
 
@@ -120,27 +132,39 @@ fn load(lua: &mlua::Lua, root: &Path, target: &RequireTarget) -> Result<Value> {
     let in_progress = Value::LightUserData(mlua::LightUserData(std::ptr::null_mut()));
     loaded.set(key.as_str(), in_progress).map_err(fail)?;
 
-    let source = std::fs::read_to_string(&path).map_err(|source| Error::ScriptRead {
+    // The marker must not survive a failure. The cache outlives the evaluation that filled it, so
+    // a module that raised once would afterwards be reported as a cycle — a wrong diagnosis of a
+    // real error, and a permanent one for as long as the engine lives.
+    match run(lua, &path, target) {
+        Ok(value) => {
+            // A module that returns nothing is still loaded; record that, matching Lua's own
+            // convention, so a second require does not run it again.
+            let recorded = if matches!(value, Value::Nil) {
+                Value::Boolean(true)
+            } else {
+                value.clone()
+            };
+            loaded.set(key.as_str(), recorded).map_err(fail)?;
+            Ok(value)
+        }
+        Err(error) => {
+            loaded.set(key.as_str(), Value::Nil).map_err(fail)?;
+            Err(error)
+        }
+    }
+}
+
+/// Reads and evaluates the module at `path`.
+fn run(lua: &mlua::Lua, path: &Path, target: &RequireTarget) -> Result<Value> {
+    let source = std::fs::read_to_string(path).map_err(|source| Error::ScriptRead {
         path: path.display().to_string(),
         source,
     })?;
 
-    let value = lua
-        .load(&source)
+    lua.load(&source)
         .set_name(format!("@{}", path.display()))
         .eval::<Value>()
-        .map_err(fail)?;
-
-    // A module that returns nothing is still loaded; record that, matching Lua's own convention,
-    // so a second require does not run it again.
-    let recorded = if matches!(value, Value::Nil) {
-        Value::Boolean(true)
-    } else {
-        value.clone()
-    };
-    loaded.set(key.as_str(), recorded).map_err(fail)?;
-
-    Ok(value)
+        .map_err(|source| Error::lua(target.as_str(), source))
 }
 
 /// Finds the file `target` names under `root`, refusing anything outside it.

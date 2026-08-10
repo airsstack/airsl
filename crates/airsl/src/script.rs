@@ -48,6 +48,10 @@ impl Script {
     /// The chunk name is the path as given, and the root is the path's parent directory — so a
     /// script may `require` its siblings but nothing above them.
     ///
+    /// A bare filename has an empty parent, which means the current directory rather than no
+    /// directory. Reading it as the latter is why `airsl run main.lua` and `airsl run ./main.lua`
+    /// used to differ: the same file got `require` under one spelling and not the other.
+    ///
     /// # Errors
     ///
     /// Returns [`Error::ScriptRead`] when the file cannot be read.
@@ -57,10 +61,7 @@ impl Script {
             path: path.display().to_string(),
             source,
         })?;
-        let root = path
-            .parent()
-            .filter(|p| !p.as_os_str().is_empty())
-            .map(Path::to_path_buf);
+        let root = Some(require_root(path));
         Ok(Self {
             source,
             name: ChunkName::from_path(path),
@@ -117,6 +118,18 @@ impl Script {
     }
 }
 
+/// The directory a script read from `path` may `require` from.
+///
+/// A bare filename's parent is the empty path, which denotes the current directory rather than no
+/// directory at all. Treating it as the latter meant `main.lua` and `./main.lua` named the same
+/// file but only one of them got `require`.
+fn require_root(path: &Path) -> PathBuf {
+    path.parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."))
+        .to_path_buf()
+}
+
 #[cfg(test)]
 mod tests {
     #![expect(
@@ -124,8 +137,9 @@ mod tests {
         reason = "tests unwrap known-valid fixtures; a panic is the intended failure signal"
     )]
 
-    use super::Script;
+    use super::{Script, require_root};
     use std::io::Write as _;
+    use std::path::Path;
 
     #[test]
     fn a_source_script_keeps_its_text_and_name() {
@@ -201,6 +215,23 @@ mod tests {
         let script = Script::from_source("return 1", "inline")
             .unwrap()
             .with_root("/plugins");
-        assert_eq!(script.root(), Some(std::path::Path::new("/plugins")));
+        assert_eq!(script.root(), Some(Path::new("/plugins")));
+    }
+
+    #[test]
+    fn a_bare_filename_roots_at_the_current_directory_like_its_dotted_spelling() {
+        // Two spellings of the same file used to differ: `main.lua` got no root and therefore no
+        // `require`, while `./main.lua` got one.
+        assert_eq!(require_root(Path::new("main.lua")), Path::new("."));
+        assert_eq!(require_root(Path::new("./main.lua")), Path::new("."));
+    }
+
+    #[test]
+    fn a_path_with_directories_roots_at_its_parent() {
+        assert_eq!(
+            require_root(Path::new("/plugins/hooks/enforce.lua")),
+            Path::new("/plugins/hooks")
+        );
+        assert_eq!(require_root(Path::new("/main.lua")), Path::new("/"));
     }
 }

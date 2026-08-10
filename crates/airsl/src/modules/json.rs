@@ -12,7 +12,7 @@
 
 use crate::convert;
 use crate::error::{Error, Result};
-use crate::modules::HostModule;
+use crate::modules::{HostModule, InstallContext};
 use crate::types::ModuleName;
 
 /// Installs `airsstack.json`.
@@ -48,7 +48,12 @@ impl HostModule for Json {
         &self.name
     }
 
-    fn install(&self, lua: &mlua::Lua, table: &mlua::Table) -> Result<()> {
+    fn install(
+        &self,
+        lua: &mlua::Lua,
+        table: &mlua::Table,
+        _context: &InstallContext<'_>,
+    ) -> Result<()> {
         let fail = |e: mlua::Error| Error::ModuleInstall {
             module: String::from("json"),
             reason: e.to_string(),

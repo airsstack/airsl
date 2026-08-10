@@ -8,13 +8,60 @@
 //! Responsibilities:
 //!
 //! - [`HostModule`], the trait a contributor implements.
+//! - [`InstallContext`], what the engine tells a module about the policy it is being installed under.
 //! - [`ModuleSet`], an ordered collection of modules with name uniqueness enforced on insert.
 //!
 //! Non-responsibilities: installation order effects. Modules are installed in insertion order and
 //! must not depend on one another's presence.
 
 use crate::error::{Error, Result};
-use crate::types::ModuleName;
+use crate::sandbox::{GrantSet, Policy};
+use crate::types::{ModuleName, RootTable};
+
+/// What the engine tells a module while installing it.
+///
+/// The authority a module enforces has to be the same object the policy reports, so it arrives at
+/// installation rather than at construction. A module built with its own copy of the grants could
+/// disagree with the engine it was installed into, and `airsl doctor` would describe the policy
+/// while the module quietly enforced something else — which would make the report worthless
+/// exactly where it matters. Handing the policy to `install` makes that disagreement unspellable.
+///
+/// A module that needs no authority ignores this. One that does captures what it needs into the
+/// functions it creates, since the check belongs at the call, not at installation.
+#[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
+pub struct InstallContext<'a> {
+    policy: &'a Policy,
+    root_table: &'a RootTable,
+}
+
+impl<'a> InstallContext<'a> {
+    /// Builds the context the engine passes to each module.
+    pub(crate) const fn new(policy: &'a Policy, root_table: &'a RootTable) -> Self {
+        Self { policy, root_table }
+    }
+
+    /// The policy the engine was built with.
+    #[must_use]
+    pub const fn policy(&self) -> &Policy {
+        self.policy
+    }
+
+    /// The authority this policy extends to host modules.
+    #[must_use]
+    pub const fn grants(&self) -> &GrantSet {
+        self.policy.grants()
+    }
+
+    /// The global the modules are being installed under.
+    ///
+    /// Not `airsstack` for every engine — an embedding host sets its own — so a module that wants
+    /// to name its own path in an error message has to ask rather than assume.
+    #[must_use]
+    pub const fn root_table(&self) -> &RootTable {
+        self.root_table
+    }
+}
 
 /// A group of Lua functions installed as one subtable of `airsstack`.
 ///
@@ -24,7 +71,7 @@ use crate::types::ModuleName;
 /// # Examples
 ///
 /// ```
-/// use airsl::{HostModule, ModuleName, Result};
+/// use airsl::{HostModule, InstallContext, ModuleName, Result};
 ///
 /// struct Greeter(ModuleName);
 ///
@@ -33,7 +80,7 @@ use crate::types::ModuleName;
 ///         &self.0
 ///     }
 ///
-///     fn install(&self, lua: &mlua::Lua, table: &mlua::Table) -> Result<()> {
+///     fn install(&self, lua: &mlua::Lua, table: &mlua::Table, _cx: &InstallContext<'_>) -> Result<()> {
 ///         let hello = lua
 ///             .create_function(|_, who: String| Ok(format!("hello, {who}")))
 ///             .map_err(|e| airsl::Error::lua("greeter", e))?;
@@ -53,11 +100,20 @@ pub trait HostModule: Send + Sync {
 
     /// Populates `table` with this module's functions.
     ///
+    /// `context` carries the policy the engine was built with. A module needing no authority — a
+    /// pure computation like `path` — ignores it; one that guards an operation captures the grants
+    /// it needs into the functions it creates, and checks them there rather than here.
+    ///
     /// # Errors
     ///
     /// Returns an error when a function cannot be created or set, which the engine reports as
     /// [`Error::ModuleInstall`].
-    fn install(&self, lua: &mlua::Lua, table: &mlua::Table) -> Result<()>;
+    fn install(
+        &self,
+        lua: &mlua::Lua,
+        table: &mlua::Table,
+        context: &InstallContext<'_>,
+    ) -> Result<()>;
 }
 
 /// An ordered set of host modules with unique names.
@@ -140,7 +196,7 @@ mod tests {
         reason = "tests unwrap known-valid fixtures; a panic is the intended failure signal"
     )]
 
-    use super::{HostModule, ModuleSet};
+    use super::{HostModule, InstallContext, ModuleSet};
     use crate::error::Result;
     use crate::types::ModuleName;
 
@@ -157,7 +213,12 @@ mod tests {
             &self.0
         }
 
-        fn install(&self, _lua: &mlua::Lua, _table: &mlua::Table) -> Result<()> {
+        fn install(
+            &self,
+            _lua: &mlua::Lua,
+            _table: &mlua::Table,
+            _context: &InstallContext<'_>,
+        ) -> Result<()> {
             Ok(())
         }
     }

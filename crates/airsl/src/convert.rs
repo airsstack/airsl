@@ -21,7 +21,17 @@ use crate::error::{Error, Result};
 /// Chunk name used when a conversion failure has no script context of its own.
 const CHUNK: &str = "<json>";
 
-/// Encodes a Lua value as JSON text.
+/// Prepares `value` for serialisation with object keys in sorted order.
+///
+/// Lua table iteration is hash order, which varies between runs, so encoding a table straight into
+/// `serde_json` produced a different byte string each time. Anything that writes an index, a
+/// lockfile or a cached artifact needs the opposite, and a caller cannot recover insertion order
+/// afterwards because Lua never had it. Sorting is therefore the behaviour rather than an option.
+fn sorted(value: &mlua::Value) -> mlua::SerializableValue<'_> {
+    value.to_serializable().sort_keys(true)
+}
+
+/// Encodes a Lua value as JSON text, with object keys in sorted order.
 ///
 /// Lua tables become objects unless they are sequences, which become arrays. Because Lua has no
 /// distinct empty-sequence value, an empty table encodes as `{}`.
@@ -31,7 +41,7 @@ const CHUNK: &str = "<json>";
 /// Returns [`Error::Lua`] when the value contains something JSON cannot represent, such as a
 /// function, a userdata, or a table with a cycle.
 pub(crate) fn to_json(value: &mlua::Value) -> Result<String> {
-    serde_json::to_string(value).map_err(|e| Error::Lua {
+    serde_json::to_string(&sorted(value)).map_err(|e| Error::Lua {
         chunk: CHUNK.to_owned(),
         source: Box::new(mlua::Error::external(e)),
     })
@@ -43,7 +53,7 @@ pub(crate) fn to_json(value: &mlua::Value) -> Result<String> {
 ///
 /// As [`to_json`].
 pub(crate) fn to_json_pretty(value: &mlua::Value) -> Result<String> {
-    let mut text = serde_json::to_string_pretty(value).map_err(|e| Error::Lua {
+    let mut text = serde_json::to_string_pretty(&sorted(value)).map_err(|e| Error::Lua {
         chunk: CHUNK.to_owned(),
         source: Box::new(mlua::Error::external(e)),
     })?;
@@ -116,6 +126,55 @@ mod tests {
         let lua = lua();
         let value = from_json(&lua, r#"{"a":{"b":1}}"#).unwrap();
         assert_eq!(to_json(&value).unwrap(), r#"{"a":{"b":1}}"#);
+    }
+
+    #[test]
+    fn object_keys_are_emitted_in_sorted_order() {
+        let lua = lua();
+        let table: mlua::Value = lua
+            .load("return {kappa=1,alpha=1,beta=1,gamma=1,zeta=1,omega=1,mid=1,delta=1}")
+            .eval()
+            .unwrap();
+        assert_eq!(
+            to_json(&table).unwrap(),
+            r#"{"alpha":1,"beta":1,"delta":1,"gamma":1,"kappa":1,"mid":1,"omega":1,"zeta":1}"#
+        );
+    }
+
+    #[test]
+    fn the_same_table_encodes_to_the_same_bytes_every_time() {
+        let lua = lua();
+        let source = "return {kappa=1,alpha=1,beta=1,gamma=1,zeta=1,omega=1,mid=1,delta=1}";
+        let first = to_json(&lua.load(source).eval::<mlua::Value>().unwrap()).unwrap();
+        for _ in 0..16 {
+            let table: mlua::Value = lua.load(source).eval().unwrap();
+            assert_eq!(to_json(&table).unwrap(), first);
+        }
+    }
+
+    #[test]
+    fn pretty_output_is_sorted_too() {
+        let lua = lua();
+        let table: mlua::Value = lua.load("return {b=1,a=1}").eval().unwrap();
+        assert_eq!(
+            to_json_pretty(&table).unwrap(),
+            "{\n  \"a\": 1,\n  \"b\": 1\n}\n"
+        );
+    }
+
+    #[test]
+    fn a_cyclic_table_is_refused_rather_than_recursing() {
+        let lua = lua();
+        let table: mlua::Value = lua.load("local t = {} t.self = t return t").eval().unwrap();
+        let err = to_json(&table).unwrap_err();
+        assert!(err.to_string().contains("recursive"), "{err}");
+    }
+
+    #[test]
+    fn arrays_keep_their_order_rather_than_being_sorted() {
+        let lua = lua();
+        let table: mlua::Value = lua.load("return {'c','a','b'}").eval().unwrap();
+        assert_eq!(to_json(&table).unwrap(), r#"["c","a","b"]"#);
     }
 
     #[test]

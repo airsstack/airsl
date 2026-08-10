@@ -52,9 +52,10 @@ pub use builder::{EngineBuilder, Missing, Present};
 pub use engine::Engine;
 pub use error::{Error, ExhaustedLimit, Result};
 pub use failure_policy::FailurePolicy;
-pub use modules::{HostModule, ModuleSet};
+pub use modules::{HostModule, InstallContext, ModuleSet};
 pub use sandbox::{
-    GrantSet, InstructionLimit, LanguageSurface, MemoryLimit, Policy, ResourceLimits,
+    EnvGrant, FsGrant, GrantSet, InstructionLimit, LanguageSurface, MemoryLimit, Policy, ProcGrant,
+    ResourceLimits,
 };
 pub use script::Script;
 pub use types::{ChunkName, ModuleName, RequireTarget, RootTable};

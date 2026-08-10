@@ -1,8 +1,9 @@
 # Extension system
 
 **Status: proposed.** No part of the negotiation exists — no manifest, no ceiling, no approver, no
-dispatcher. What it builds on does: the `HostModule` seam, a per-engine root table, confined
-`require`, and resource ceilings all ship. See [architecture.md](architecture.md).
+dispatcher. Everything it builds on does: the `HostModule` seam, a per-engine root table, confined
+`require`, resource ceilings, the parameterised grants a manifest would parse into, and the whole
+host standard library a manifest names capabilities from. See [architecture.md](architecture.md).
 
 An extension is third-party code that runs inside a host program with capabilities it *requested* and
 the host *granted*. That negotiation is the whole difference between an extension system and a
@@ -77,9 +78,11 @@ end
 
 ```rust
 let host = ExtensionHost::builder()
-    .ceiling(Policy::confined()                  // no manifest may exceed this
-        .allow(Fs::under("$AIRSSTACK_HOME"))
-        .allow(Proc::allow(["git", "tar"])))
+    .ceiling(Policy::confined().with_grants(     // no manifest may exceed this
+        GrantSet::declared()
+            .with_fs(|fs| fs.read(home).write(home_index))
+            .with_proc(|proc| proc.allow(["git", "tar"])),
+    ))
     .approver(Approver::manifest())              // or ::interactive(), ::deny_all()
     .build()?;
 
@@ -103,13 +106,13 @@ get `Approver::manifest()`, locally-developed ones get `Approver::interactive()`
 local ext = airsstack.ext
 
 ext.on("session_start", function(payload)
-  local root  = airsstack.env.get("AIRSSTACK_HOME") .. "/journal"
-  local notes = airsstack.fs.walk(root, { pattern = "*.md" })
+  local root  = airsstack.path.join(airsstack.env.get("AIRSSTACK_HOME"), "journal")
+  local notes = airsstack.glob.walk(root, "**/*.md")
   local index = require("lib.index").build(notes)
 
   airsstack.fs.atomic_write(
     airsstack.path.join(root, ".index", "index.json"),
-    airsstack.json.encode_pretty(index, { sort_keys = true })
+    airsstack.json.encode_pretty(index)   -- keys always sort
   )
 
   return { additionalContext = require("lib.index").card(index) }
@@ -133,24 +136,29 @@ events occur. This is the Redis model and what "extension system" normally means
 things that do not exist: the `ext.on` registration API, a host-side dispatcher, and a **persistent
 engine across calls**.
 
-That last requirement is where the measurements matter: 4.2 µs per call on a reused engine against
-48 µs constructing a fresh one, with 40 µs to build the state. A registered extension pays setup
+That last requirement is where the measurements matter: 4.6 µs per call on a reused engine against
+136 µs constructing a fresh one. The gap widened as the standard library grew — a fresh engine now
+installs eleven modules — so the case for a persistent engine is stronger than when it was first
+made. A registered extension pays setup
 once and then dispatches in microseconds. Engine reuse is now correct in the places it would
-otherwise have been wrong — the instruction counter resets per evaluation, and `require` re-points
-at the current script's root — but a long-lived engine still accumulates global state between
-invocations, and `mlua`'s one-call environment restore is Luau-only
-(`mlua-0.12.0/src/state.rs:673`), so isolation between successive dispatches has to be built.
+otherwise have been wrong — the instruction counter and the `arg` table are per evaluation,
+`require` re-points at the current script's root, its module cache persists as `package.loaded`
+does, and evaluations are serialised so threads sharing an engine cannot set each other's arguments.
+A long-lived engine still accumulates global state between invocations, and `mlua`'s one-call
+environment restore is Luau-only (`mlua-0.12.0/src/state.rs:673`), so isolation between successive
+dispatches has to be built.
 
 ## What exists versus what is new
 
 | Piece | State |
 |---|---|
-| `HostModule`, `ModuleSet`, `Engine` | implemented — verified from a downstream crate |
+| `HostModule`, `ModuleSet`, `InstallContext`, `Engine` | implemented — verified from a downstream crate |
 | Per-engine root table, so an extension does not land in someone else's namespace | implemented |
 | Confined `require` | implemented |
 | Resource ceilings, the `[limits]` block's counterpart | implemented |
-| `Policy` composing the axes | implemented — the grant axis is typed and empty |
-| Parameterised grants | new — `fs`'s signature depends on them |
+| `Policy` composing all three axes | implemented |
+| Parameterised grants — `FsGrant`, `EnvGrant`, `ProcGrant` | implemented |
+| The host standard library a manifest names capabilities from | implemented |
 | Manifest format and parser | new |
 | Ceiling and `Approver` | new |
 | `ext.on` registration and host dispatcher | new |
@@ -160,7 +168,9 @@ invocations, and `mlua`'s one-call environment restore is Luau-only
 
 **The extension host should come after the standard library, not before.** The grant vocabulary *is*
 the module list — a manifest cannot say `fs.read = [...]` before `fs` exists — so building the host
-first means designing grants for capabilities that have no implementation to constrain them.
+first would have meant designing grants for capabilities with no implementation to constrain them.
+That ordering is now satisfied: every capability a manifest can name exists, and the grant types a
+manifest would parse into are the ones the modules already enforce.
 
 **Versioning needs a decision before the first third-party extension ships.** An extension pins
 `api = 1`; modules will grow functions and occasionally change semantics. Whether the guarantee is

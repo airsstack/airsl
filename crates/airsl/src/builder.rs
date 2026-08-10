@@ -16,7 +16,7 @@ use mlua::Table;
 
 use crate::engine::Engine;
 use crate::error::{Error, Result};
-use crate::modules::{ModuleSet, stdlib};
+use crate::modules::{InstallContext, ModuleSet, stdlib};
 use crate::sandbox::Policy;
 use crate::sandbox::language_surface::{CHUNK_LOADERS, UNSAFE_OS_FUNCTIONS};
 use crate::types::RootTable;
@@ -107,6 +107,7 @@ impl EngineBuilder<Present> {
 
         if self.policy.language().withholds_unsafe_globals() {
             withhold_unsafe_globals(&lua)?;
+            protect_string_metatable(&lua)?;
         }
         let budget = self.policy.limits().apply(&lua)?;
 
@@ -114,7 +115,7 @@ impl EngineBuilder<Present> {
             Some(set) => set,
             None => stdlib()?,
         };
-        install_modules(&lua, &modules, &self.root)?;
+        install_modules(&lua, &modules, &self.policy, &self.root)?;
 
         Ok(Engine::from_parts(
             lua,
@@ -147,17 +148,55 @@ fn withhold_unsafe_globals(lua: &mlua::Lua) -> Result<()> {
     Ok(())
 }
 
+/// Hides the string metatable behind `__metatable`, so a script cannot reach it.
+///
+/// Every Lua string shares one metatable whose `__index` is the `string` library. A script that
+/// reaches it can replace a method for every string in the state — including for scripts that run
+/// afterwards on the same engine, which never touch a global and would have no way to notice:
+///
+/// ```lua
+/// getmetatable('').__index.upper = function() return 'PWNED' end
+/// ```
+///
+/// Setting `__metatable` makes `getmetatable('')` return that value instead of the real table and
+/// makes `setmetatable` on a string raise. Method calls are unaffected — `('x'):upper()` resolves
+/// through the metatable directly rather than through `getmetatable`.
+///
+/// Not applied on [`LanguageSurface::Full`](crate::LanguageSurface::Full): a first-party script
+/// there already has `io` and `os`, so withholding this would cost it a legitimate technique and
+/// deny it nothing it could not do anyway.
+fn protect_string_metatable(lua: &mlua::Lua) -> Result<()> {
+    let fail = |source: mlua::Error| Error::EngineSetup {
+        stage: "protecting the string metatable",
+        source: Box::new(source),
+    };
+
+    // `lua.load` is the Rust-side loader and is unaffected by withholding the `load` global.
+    lua.load("local mt = getmetatable(''); if mt then mt.__metatable = false end")
+        .exec()
+        .map_err(fail)
+}
+
 /// Creates the root table and installs every module into it.
-fn install_modules(lua: &mlua::Lua, modules: &ModuleSet, root_table: &RootTable) -> Result<()> {
+///
+/// Every module is told the policy it is being installed under, so a module that guards an
+/// operation reads its authority from the same place [`crate::Engine::policy`] reports it from.
+fn install_modules(
+    lua: &mlua::Lua,
+    modules: &ModuleSet,
+    policy: &Policy,
+    root_table: &RootTable,
+) -> Result<()> {
     let fail = |e: mlua::Error| Error::ModuleInstall {
         module: root_table.to_string(),
         reason: e.to_string(),
     };
 
+    let context = InstallContext::new(policy, root_table);
     let root = lua.create_table().map_err(fail)?;
     for module in modules.iter() {
         let table = lua.create_table().map_err(fail)?;
-        module.install(lua, &table)?;
+        module.install(lua, &table, &context)?;
         root.set(module.name().as_str(), table).map_err(fail)?;
     }
     lua.globals().set(root_table.as_str(), root).map_err(fail)?;
@@ -249,6 +288,34 @@ mod tests {
     }
 
     #[test]
+    fn every_preset_can_count_characters_rather_than_only_bytes() {
+        // Without `utf8` a script has `#s`, which counts bytes: "café" is 5 bytes and 4
+        // characters, and truncating on the byte count cuts through the middle of one.
+        for policy in [Policy::trusted(), Policy::confined(), Policy::pure()] {
+            let found = probe(policy, "return utf8.len('café') .. '/' .. #'café'");
+            assert_eq!(found, "4/5");
+        }
+    }
+
+    #[test]
+    fn utf8_is_reachable_on_every_surface() {
+        for policy in [Policy::trusted(), Policy::confined(), Policy::pure()] {
+            assert_eq!(probe(policy, "return type(utf8)"), "table");
+        }
+    }
+
+    #[test]
+    fn a_confined_engine_can_iterate_codepoints() {
+        let found = probe(
+            Policy::confined(),
+            "local out = {}
+             for _, c in utf8.codes('café') do out[#out+1] = c end
+             return table.concat(out, ',')",
+        );
+        assert_eq!(found, "99,97,102,233");
+    }
+
+    #[test]
     fn a_pure_engine_still_has_the_pure_computation_libraries() {
         for name in ["string", "table", "math"] {
             assert_eq!(
@@ -256,6 +323,49 @@ mod tests {
                 "table"
             );
         }
+    }
+
+    #[test]
+    fn a_confined_engine_hides_the_string_metatable() {
+        assert_eq!(
+            probe(Policy::confined(), "return type(getmetatable(''))"),
+            "boolean"
+        );
+    }
+
+    #[test]
+    fn a_confined_script_cannot_replace_a_string_method_for_the_next_script() {
+        let engine = Engine::builder()
+            .policy(Policy::confined())
+            .build()
+            .unwrap();
+
+        let attack = Script::from_source(
+            "return pcall(function() getmetatable('').__index.upper = function() return 'PWNED' end end)",
+            "attacker",
+        )
+        .unwrap();
+        assert!(
+            !engine.eval_to::<bool>(&attack).unwrap(),
+            "the script reached the string metatable"
+        );
+
+        // The victim reads no global and calls no host module — it would have no way to notice.
+        let victim = Script::from_source("return ('hello'):upper()", "victim").unwrap();
+        assert_eq!(engine.eval_to::<String>(&victim).unwrap(), "HELLO");
+    }
+
+    #[test]
+    fn method_calls_on_strings_still_work_under_a_hidden_metatable() {
+        assert_eq!(probe(Policy::confined(), "return ('ab'):rep(2)"), "abab");
+    }
+
+    #[test]
+    fn a_trusted_engine_leaves_the_string_metatable_reachable() {
+        assert_eq!(
+            probe(Policy::trusted(), "return type(getmetatable(''))"),
+            "table"
+        );
     }
 
     #[test]

@@ -13,6 +13,7 @@
 mod cli;
 mod doctor;
 mod run;
+mod test_runner;
 
 use airsl::{FailurePolicy, Policy};
 use clap::Parser as _;
@@ -24,6 +25,7 @@ fn main() -> std::process::ExitCode {
             policy,
             memory_limit,
             instruction_limit,
+            grants,
             script,
             args,
         } => {
@@ -32,8 +34,16 @@ fn main() -> std::process::ExitCode {
             } else {
                 FailurePolicy::Report
             };
-            let policy = cli::resolve_policy(policy, memory_limit, instruction_limit);
+            let policy = cli::resolve_policy(policy, memory_limit, instruction_limit, grants);
             run::run(&script, &args, failure, &policy)
+        }
+        cli::Command::Test {
+            policy,
+            grants,
+            path,
+        } => {
+            let policy = cli::resolve_policy(policy, None, None, grants);
+            test_runner::run(&path, &policy)
         }
         cli::Command::Doctor { policy } => {
             print!("{}", doctor::report(&Policy::from(policy)));

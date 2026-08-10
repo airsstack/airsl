@@ -13,6 +13,8 @@
 //! Non-responsibilities: deciding what to do about a failure. [`Engine::eval`] returns a
 //! [`Result`]; [`crate::FailurePolicy`] describes how the caller should treat it.
 
+use std::sync::{Mutex, PoisonError};
+
 use mlua::FromLuaMulti;
 
 use crate::builder::{EngineBuilder, Missing};
@@ -45,6 +47,18 @@ pub struct Engine {
     policy: Policy,
     budget: Option<InstructionBudget>,
     root: RootTable,
+    /// Serialises whole evaluations against each other.
+    ///
+    /// `mlua` locks its state per *operation* (`mlua-0.12.0/src/state.rs:58`), which is enough for
+    /// memory safety and not enough for this crate: an evaluation is four operations — reset the
+    /// budget, write `arg`, install `require`, run the chunk — and without a lock spanning them,
+    /// two threads sharing an engine interleave and each runs against the other's setup. Measured
+    /// before this existed: eight threads evaluating `return arg[1]` on one engine got another
+    /// thread's argument 12,247 times out of 16,000.
+    ///
+    /// Lua execution on one state cannot proceed in parallel regardless, so serialising here
+    /// costs an uncontended lock and no throughput.
+    evaluating: Mutex<()>,
 }
 
 impl Engine {
@@ -68,6 +82,7 @@ impl Engine {
             policy,
             budget,
             root,
+            evaluating: Mutex::new(()),
         }
     }
 
@@ -115,11 +130,23 @@ impl Engine {
     /// The instruction budget is reset first, so every evaluation on a reused engine gets the
     /// whole ceiling rather than what the previous script left of it.
     ///
+    /// Evaluations on one engine are serialised, so threads sharing an engine each get their own
+    /// arguments, their own `require` root and the whole instruction budget. They do not run
+    /// concurrently — one Lua state cannot execute in parallel — so a shared engine is a way to
+    /// avoid rebuilding a state, not a way to get parallelism.
+    ///
     /// # Errors
     ///
     /// Returns [`Error::Lua`] when the chunk fails to compile, raises while running, exceeds a
     /// resource ceiling, or returns something that cannot be converted to `T`.
     pub fn eval_to<T: FromLuaMulti>(&self, script: &Script) -> Result<T> {
+        // Poisoning carries no information here: the guarded value is `()`, and a panic in a host
+        // function leaves the Lua state to `mlua`'s own recovery rather than to this lock.
+        let _guard = self
+            .evaluating
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+
         if let Some(budget) = self.budget.as_ref() {
             budget.reset();
         }
@@ -137,10 +164,14 @@ impl Engine {
     ///
     /// Written before every evaluation rather than once at construction, so two scripts run on one
     /// engine each see their own arguments instead of whichever ran first.
+    ///
+    /// `arg[0]` is the script's own name, which is Lua's convention for a standalone script and
+    /// what a ported shell script reads where it previously read `$0`.
     fn set_arguments(&self, script: &Script) -> Result<()> {
         let fail = |source: mlua::Error| Error::lua(script.name().as_str(), source);
 
         let table = self.lua.create_table().map_err(fail)?;
+        table.set(0, script.name().as_str()).map_err(fail)?;
         for (index, value) in script.args().iter().enumerate() {
             table.set(index + 1, value.as_str()).map_err(fail)?;
         }
@@ -152,9 +183,9 @@ impl Engine {
     /// Per evaluation because the directory it resolves against belongs to the script, not to the
     /// engine. A script built from source has no directory and so gets no `require` at all.
     ///
-    /// One consequence of an engine being shareable: `require` is a global, so two threads
-    /// evaluating scripts with different roots on one engine would contend for it. Give a shared
-    /// engine scripts under a single root.
+    /// The table of already-loaded modules outlives this call: it is keyed by canonical absolute
+    /// path, so it stays correct across roots, and discarding it would make every evaluation
+    /// re-run every module it requires.
     fn set_require(&self, script: &Script) -> Result<()> {
         match script.root() {
             Some(root) if RequireLoader::applies_to(self.policy.language()) => {
@@ -374,6 +405,84 @@ mod tests {
         assert_eq!(engine.eval_to::<String>(&first).unwrap(), "first");
         assert_eq!(engine.eval_to::<String>(&second).unwrap(), "second");
         assert_eq!(engine.eval_to::<String>(&first).unwrap(), "first");
+    }
+
+    #[test]
+    fn a_script_sees_its_own_name_in_arg_zero() {
+        let engine = engine();
+        assert_eq!(
+            engine.eval_to::<String>(&script("return arg[0]")).unwrap(),
+            "test"
+        );
+    }
+
+    #[test]
+    fn concurrent_evaluations_each_see_their_own_arguments() {
+        // Before the evaluation lock this returned another thread's argument on the large
+        // majority of iterations, because writing `arg` and running the chunk were separate
+        // acquisitions of `mlua`'s per-operation lock.
+        let engine = std::sync::Arc::new(engine());
+
+        // Spawned eagerly: the threads have to overlap for the race to be reachable at all, so
+        // this cannot be a lazy iterator that starts each one as it is joined.
+        let mut threads = Vec::new();
+        for id in 0..4u32 {
+            let engine = std::sync::Arc::clone(&engine);
+            threads.push(std::thread::spawn(move || {
+                let want = id.to_string();
+                let source = script("return arg[1]").with_args([want.clone()]);
+                (0..500)
+                    .filter(|_| engine.eval_to::<String>(&source).unwrap() != want)
+                    .count()
+            }));
+        }
+
+        let wrong: usize = threads.into_iter().map(|t| t.join().unwrap()).sum();
+        assert_eq!(
+            wrong, 0,
+            "{wrong} evaluations saw another thread's arguments"
+        );
+    }
+
+    #[test]
+    fn a_required_module_is_cached_across_evaluations_on_one_engine() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("counter.lua"),
+            "COUNT = (COUNT or 0) + 1 return COUNT",
+        )
+        .unwrap();
+        let path = dir.path().join("main.lua");
+        std::fs::write(&path, "return require('counter')").unwrap();
+
+        let engine = engine();
+        let script = Script::from_file(&path).unwrap();
+        for _ in 0..3 {
+            assert_eq!(
+                engine.eval_to::<i64>(&script).unwrap(),
+                1,
+                "the module re-ran, so the cache did not survive the evaluation"
+            );
+        }
+    }
+
+    #[test]
+    fn a_module_that_raised_can_be_required_again_rather_than_reported_as_a_cycle() {
+        let dir = tempfile::tempdir().unwrap();
+        let module = dir.path().join("flaky.lua");
+        std::fs::write(&module, "error('first attempt fails')").unwrap();
+        let path = dir.path().join("main.lua");
+        std::fs::write(&path, "return require('flaky')").unwrap();
+
+        let engine = engine();
+        let script = Script::from_file(&path).unwrap();
+        let first = engine.eval(&script).unwrap_err();
+        assert!(first.to_string().contains("first attempt fails"), "{first}");
+
+        // The cache now outlives the evaluation, so a leftover in-progress marker would turn the
+        // real error into a permanent and untrue cycle report.
+        std::fs::write(&module, "return 7").unwrap();
+        assert_eq!(engine.eval_to::<i64>(&script).unwrap(), 7);
     }
 
     #[test]

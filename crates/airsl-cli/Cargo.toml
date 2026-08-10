@@ -26,8 +26,10 @@ doc  = false
 workspace = true
 
 [dependencies]
-airsl = { workspace = true }
-clap  = { workspace = true }
+airsl   = { workspace = true }
+clap    = { workspace = true }
+walkdir = { workspace = true }
+mlua    = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

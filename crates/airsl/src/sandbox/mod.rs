@@ -10,18 +10,22 @@
 //! - [`policy`] — [`Policy`] and the `trusted`/`confined`/`pure` presets.
 //! - [`language_surface`] — which of Lua's own libraries a script sees.
 //! - [`grant_set`] — what the host modules it reaches may touch.
+//! - [`grants`] — the parameterised authorities a grant set is built from.
 //! - [`resource_limits`] — how much memory and execution it may consume.
 //!
 //! Non-responsibilities: what a caller does about a script that failed. That is
 //! [`crate::FailurePolicy`], which is the caller's reaction rather than the script's permissions.
 
 pub mod grant_set;
+pub mod grants;
 pub mod language_surface;
 pub mod policy;
 pub mod resource_limits;
 
 #[doc(inline)]
 pub use grant_set::GrantSet;
+#[doc(inline)]
+pub use grants::{EnvGrant, FsGrant, ProcGrant};
 #[doc(inline)]
 pub use language_surface::LanguageSurface;
 #[doc(inline)]

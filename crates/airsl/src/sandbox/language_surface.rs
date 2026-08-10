@@ -46,7 +46,8 @@ pub enum LanguageSurface {
     /// containment the host modules provide applies to it.
     Full,
 
-    /// The default: `string`, `table`, `math`, `coroutine`, and the pure-computation parts of `os`.
+    /// The default: `string`, `table`, `math`, `utf8`, `coroutine`, and the pure-computation parts
+    /// of `os`.
     ///
     /// Withholds `io`, `debug`, `package`, the chunk loaders, and the `os` functions that reach
     /// outside the process. Every side effect a script needs arrives through the `airsstack` host
@@ -54,12 +55,13 @@ pub enum LanguageSurface {
     #[default]
     Restricted,
 
-    /// `string`, `table` and `math`, and nothing else — no `os`, no `coroutine`.
+    /// `string`, `table`, `math` and `utf8`, and nothing else — no `os`, no `coroutine`.
     ///
     /// For evaluating configuration, expressions and generated snippets, where the guarantees
     /// should be as strong and as easy to state as possible. Dropping `os` removes the last source
     /// of nondeterminism a script could reach without a host module: `os.time` and `os.clock`
-    /// return something different on every run.
+    /// return something different on every run. `utf8` stays because the criterion is
+    /// nondeterminism and authority, not size: it reads a string and returns a number.
     Minimal,
 }
 
@@ -69,10 +71,19 @@ impl LanguageSurface {
     pub(crate) fn libraries(self) -> StdLib {
         match self {
             Self::Full => StdLib::ALL_SAFE,
+            // `utf8` is on every surface. It needs no authority and hazards no determinism — it
+            // is arithmetic over an encoding — and without it `#s` counts bytes with no way to
+            // count characters, so a confined script cannot truncate text without risking a cut
+            // through the middle of one.
             Self::Restricted => {
-                StdLib::STRING | StdLib::TABLE | StdLib::MATH | StdLib::COROUTINE | StdLib::OS
+                StdLib::STRING
+                    | StdLib::TABLE
+                    | StdLib::MATH
+                    | StdLib::UTF8
+                    | StdLib::COROUTINE
+                    | StdLib::OS
             }
-            Self::Minimal => StdLib::STRING | StdLib::TABLE | StdLib::MATH,
+            Self::Minimal => StdLib::STRING | StdLib::TABLE | StdLib::MATH | StdLib::UTF8,
         }
     }
 
@@ -136,6 +147,7 @@ mod tests {
             assert!(libs.contains(StdLib::STRING), "{surface}");
             assert!(libs.contains(StdLib::TABLE), "{surface}");
             assert!(libs.contains(StdLib::MATH), "{surface}");
+            assert!(libs.contains(StdLib::UTF8), "{surface}");
         }
     }
 
