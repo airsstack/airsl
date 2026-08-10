@@ -1,7 +1,8 @@
 # Host standard library
 
-**Status: every module on this page is implemented, and so is `airsl test`. What remains proposed
-is Tier 3 and the JSON `null` sentinel.**
+**Status: every module on this page is implemented, and so is `airsl test`. The plugin corpus
+this tier was designed against now runs on it. What remains proposed is Tier 3 and the JSON
+value constructors.**
 
 Everything a script can reach arrives under one Lua global, `airsstack`, as subtables installed from
 Rust. This document is the roster, the reasoning, and the rules every module follows.
@@ -52,9 +53,9 @@ already told it, and says nothing about what is there.
 
 **Grants are checked in Rust, before the operation.** See [sandbox.md](sandbox.md).
 
-## The one gap left: JSON `null`
+## JSON: two gaps closed, one narrower than it looked
 
-`encode`, `encode_pretty`, `decode`. One known gap left, and one closed.
+`encode`, `encode_pretty`, `decode`.
 
 **Object keys sort.** They used to come out in Lua hash order, which varies between runs, so the
 same table encoded to a different byte string every time — unusable for an index, a lockfile or any
@@ -75,10 +76,14 @@ they were checked against the live table by enumerating `airsstack` under `--pol
 
 ## Tier 1 — the modules the plugin corpus needs
 
-Validated against the 29 production scripts in `plugins/`, which between them exercise filesystem
+Validated against the production scripts in `plugins/`, which between them exercise filesystem
 walking, subprocess capture, environment lookup, regex, glob matching, hashing, time formatting and
 JSON round-trips against real data. That corpus is the acceptance test for this tier, not its
 specification: each module is designed for the general case.
+
+It has now been run: the whole suite is Lua, and 244 tests over it run under `airsl test`. Four
+things the corpus asked for that the roster did not supply are recorded under
+[what the port had to work around](#what-the-port-had-to-work-around).
 
 | Module | Surface | Grant | Backing crate |
 |---|---|---|---|
@@ -114,21 +119,23 @@ from inside Lua the behaviour is what a script expects — what does not change 
 process itself sees.
 
 **`fs.create_exclusive` is a concurrency primitive, not a convenience.** It is `O_CREAT|O_EXCL` — an
-atomic claim. `plugins/airsstack/hooks/enforce.py:321-335` relies on it for a sentinel claim, and its
-comment records that the previous read-then-append design let 3 of 4 concurrent hooks all fire.
-Without this function that hook cannot be ported correctly, only approximately.
+atomic claim. `plugins/airsstack/hooks/lib/enforce.lua:339-347` relies on it for a sentinel claim,
+and its comment records that the previous read-then-append design let 3 of 4 concurrent hooks all
+fire. Without this function that hook could only have been ported approximately.
 
-**`hash` needs SHA-1, not only SHA-256.** `enforce.py:109` uses `hashlib.sha1(...)[:8]` and
-`plugins/airsstack-sdd/hooks/ensure-layout.sh` uses `shasum | cut -c1-8`, which is also SHA-1. These
-produce the per-repository project key that names the HOME-global SDD spec and plan directories and
-the snapshot store. Shipping only SHA-256 silently re-keys every project and orphans existing
-artifacts — invisibly, until someone cannot find last week's plan. SHA-256 should be the default for
-new uses; SHA-1 exists for compatibility and should be documented as such.
+**`hash` needs SHA-1, not only SHA-256.** `plugins/airsstack/hooks/lib/enforce.lua:95` and
+`plugins/airsstack-sdd/hooks/lib/layout.lua:80` both take `sha1(path)[:8]`, replacing a
+`shasum | cut -c1-8` pipeline that was also SHA-1. These produce the per-repository project key
+that names the HOME-global SDD spec and plan directories and the snapshot store. Shipping only
+SHA-256 would silently re-key every project and orphan existing artifacts — invisibly, until
+someone cannot find last week's plan. SHA-256 is the default for new uses; SHA-1 exists for
+compatibility and is documented as such.
 
-**`glob`'s `**/` must match zero or more segments.** `enforce.py:36-38` makes `**/Cargo.toml` match a
-root-level `Cargo.toml`, which is this repository's most important Rust file. `globset` does agree —
-checked against that exact case rather than assumed, and pinned by a test that asserts both the
-zero-segment and the many-segment match.
+**`glob`'s `**/` must match zero or more segments.** `plugins/airsstack/hooks/lib/globs.lua` makes
+`**/Cargo.toml` match a root-level `Cargo.toml`, which is this repository's most important Rust
+file. `globset` agrees — checked against that exact case rather than assumed, and pinned by a test
+that asserts both the zero-segment and the many-segment match. It did **not** agree about `*`; see
+the defect note below.
 
 ## Tier 2 — runtime-class
 
@@ -185,8 +192,34 @@ engine reports. What `fs` adds is the vocabulary — the parameterised grant typ
 to a question `path` never had to face: whether a module the policy has granted nothing is installed
 and refuses every call, or is not installed at all so that a script can test for it.
 
-`proc`, `regex`, `hash`, `glob`, `stdio`, `hook` and `airsl test` are all built. What is left is
-Tier 3, the JSON `null` sentinel, and porting the plugin corpus itself.
+`proc`, `regex`, `hash`, `glob`, `stdio`, `hook` and `airsl test` are all built, and the plugin
+corpus is ported. What is left is Tier 3 and the JSON value constructors.
+
+## What the port had to work around
+
+Four gaps the corpus hit that the roster above does not close. None blocked the migration; each
+cost a workaround worth naming, because the next consumer will hit the same ones.
+
+| Gap | What the port did instead |
+|---|---|
+| `proc.run` takes argv only — no working directory, no stdin, no per-call environment | every git call travels through `git -C <dir>`; `CMUX_QUIET=1 cmux …` becomes an `env.set` on the process overlay |
+| No exit code but 0 and 1 — `os.exit` is withheld below `Full`, and the CLI maps any failure to 1 | the four scripts documenting `exit 2` for a usage error now exit 1; the stderr message is unchanged |
+| No JSON `null` or empty-array constructor | `airsstack.json.decode("[]")` as the empty-array idiom |
+| No random source — `getrandom` was removed with no module consuming it | `math.random`, which Lua 5.4 seeds per state, for a session-directory suffix |
+
+The port also found one outright defect, since fixed. **`airsstack.glob`'s `*` used to cross
+`/`**, because `matcher` left `literal_separator` off — and said in a comment that it did so
+"the way the plugin scripts expect", which was the reverse of the truth. Under it a manifest
+declaring `match: ["*.rs"]` also selected `deeply/nested/file.rs`, enforcing a rule over files
+its author never named. `*` and `?` now stop at a separator, `**` stays recursive, and two
+regression tests pin both halves (`modules/glob.rs`).
+
+The dispatcher still compiles its own globs
+(`plugins/airsstack/hooks/lib/globs.lua`) rather than delegating, for a different reason than
+before: `globset` accepts a strictly larger grammar than the enforcement manifests were written
+against. `*.{lua,rs}` matches here and not there, so delegating would widen matching for any
+manifest using braces — and a manifest is a contract with plugin authors outside this
+repository.
 
 ## See also
 

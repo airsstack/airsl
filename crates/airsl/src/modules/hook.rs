@@ -1,14 +1,17 @@
 //! The `airsstack.hook` host module: the agent-hook contract, in one place.
 //!
 //! A thin layer over `stdio` and `json`, and worth being its own module for one reason: the shape
-//! a hook must emit is easy to get subtly wrong, and every plugin script currently rebuilds it by
-//! hand. The nesting is real and is taken from the scripts this replaces —
-//! `plugins/airsstack/hooks/enforce.py:677-682` and
-//! `plugins/airsstack-journal/scripts/session-start.sh:38`:
+//! a hook must emit is easy to get subtly wrong, and before this existed every plugin script
+//! rebuilt it by hand — in Python, in Node and in `printf`. The nesting is real:
 //!
 //! ```json
 //! {"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": "…"}}
 //! ```
+//!
+//! Both shapes are now emitted from here rather than assembled: `context` builds the envelope for
+//! `plugins/airsstack-journal/scripts/session-start.lua:72`, and `emit` takes a caller-built one
+//! for `plugins/airsstack/hooks/enforce.lua:144-149`, which adds a `permissionDecision` field this
+//! module does not model.
 //!
 //! Responsibilities: [`Hook`], installing `payload`, `emit` and `context`.
 //!

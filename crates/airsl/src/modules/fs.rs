@@ -736,7 +736,8 @@ mod tests {
 
     #[test]
     fn create_exclusive_admits_exactly_one_claimant() {
-        // The property `enforce.py` depends on: the second caller is told it lost, rather than
+        // The property the enforcement dispatcher depends on: the second caller is told it lost,
+        // rather than
         // both proceeding as a read-then-write would allow.
         let (_dir, root) = sandbox();
         let out: String = run(

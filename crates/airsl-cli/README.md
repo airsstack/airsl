@@ -35,6 +35,7 @@ airsl run  [--policy <trusted|confined|pure>]
            [--fail-open]
            <script.lua> [args…]
 airsl test [--policy <trusted|confined|pure>] [--allow-…] [<path>]
+airsl check [<path>]
 airsl doctor [--policy <trusted|confined|pure>]
 ```
 
@@ -114,6 +115,28 @@ return {
 
 Each file gets a fresh engine, so one file cannot leave globals behind for the next. Finding no test
 files at all exits non-zero — "no tests" and "all tests passed" must not read the same to CI.
+
+## `airsl check`
+
+Compiles every `.lua` file under a directory without running a line of any of it.
+
+```bash
+airsl check plugins
+```
+
+It exists because `airsl test` covers only what a test file loads, and a hook's entry point is
+usually loaded by nothing — the tests exercise the modules underneath it. A syntax error in a
+driver therefore survives a green test run, and `--fail-open` then swallows it when the hook fires:
+CI says nothing, the session says nothing, and the hook has quietly stopped working. Measured on
+the airsstack plugin suite before this existed, a missing `end` in the enforcement dispatcher left
+244 tests passing and the hook exiting 0.
+
+It takes no policy and no grants, because nothing is executed and parsing never consults the
+globals table — a chunk compiles or does not compile identically under every preset. Finding no
+Lua files at all exits non-zero, for the same reason `airsl test` does.
+
+What it does not catch is everything past the parser: a misspelled field, a `nil` arithmetic, a
+module that raises the moment it is required. Those compile, and they are a test's job.
 
 ## `--memory-limit` and `--instruction-limit`
 

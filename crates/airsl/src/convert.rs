@@ -63,8 +63,11 @@ pub(crate) fn to_json_pretty(value: &mlua::Value) -> Result<String> {
 
 /// Parses JSON text into a Lua value.
 ///
-/// JSON `null` becomes Lua `nil`. A `nil` value inside a table is indistinguishable from an absent
-/// key in Lua, so an object whose fields are all `null` decodes to an empty table.
+/// JSON `null` becomes `mlua`'s null sentinel — a lightuserdata, not Lua `nil` — so it survives a
+/// round-trip back through [`to_json`] as `null` rather than vanishing the way an absent key would.
+/// An empty JSON array likewise stays an array. What a script cannot do is *construct* either:
+/// nothing exposes the sentinel or an empty-sequence marker, so a table built in Lua and encoded
+/// has no way to say `null`, and an empty one encodes as `{}`.
 ///
 /// # Errors
 ///
@@ -175,6 +178,32 @@ mod tests {
         let lua = lua();
         let table: mlua::Value = lua.load("return {'c','a','b'}").eval().unwrap();
         assert_eq!(to_json(&table).unwrap(), r#"["c","a","b"]"#);
+    }
+
+    #[test]
+    fn null_survives_a_round_trip_rather_than_vanishing() {
+        // `null` reaching Lua as `nil` would make it indistinguishable from an absent key, and
+        // `{"a":null}` would re-encode as `{}`. The serde bridge uses a sentinel instead.
+        let lua = lua();
+        let value = from_json(&lua, r#"{"a":null,"b":1}"#).unwrap();
+        assert_eq!(to_json(&value).unwrap(), r#"{"a":null,"b":1}"#);
+    }
+
+    #[test]
+    fn a_decoded_empty_array_re_encodes_as_an_array() {
+        // Lua cannot tell an empty sequence from an empty map, so a table built in Lua encodes as
+        // `{}`. A decoded one keeps the marker that says otherwise, which is the only way a script
+        // can emit `[]` today.
+        let lua = lua();
+        let value = from_json(&lua, r#"{"x":[]}"#).unwrap();
+        assert_eq!(to_json(&value).unwrap(), r#"{"x":[]}"#);
+    }
+
+    #[test]
+    fn a_table_built_in_lua_encodes_an_empty_sequence_as_an_object() {
+        let lua = lua();
+        let table: mlua::Value = lua.load("return {}").eval().unwrap();
+        assert_eq!(to_json(&table).unwrap(), "{}");
     }
 
     #[test]

@@ -195,6 +195,51 @@ impl Engine {
         }
     }
 
+    /// Compiles `script` without running a line of it.
+    ///
+    /// Exists because a script nothing loads is a script nothing checks. A hook's entry point is
+    /// typically required by no test — the tests exercise the modules underneath it — so a syntax
+    /// error there survives a green test run, and then `--fail-open` swallows it at the moment the
+    /// hook fires. The failure is silent at both ends: CI says nothing and the session says
+    /// nothing, and the hook has simply stopped working.
+    ///
+    /// This catches what the parser can see and no more. A misspelled field, a `nil` arithmetic, a
+    /// module that raises the moment it is required — all compile happily and are a test's job.
+    ///
+    /// The policy is irrelevant here: parsing does not consult the globals table, so a chunk
+    /// compiles or does not compile identically under every preset. Any engine will do.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Lua`] when the chunk does not compile.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use airsl::{Engine, Policy, Script};
+    ///
+    /// let engine = Engine::builder().policy(Policy::pure()).build()?;
+    /// assert!(engine.check(&Script::from_source("return 1 + 1", "ok")?).is_ok());
+    /// assert!(engine.check(&Script::from_source("local function f(", "bad")?).is_err());
+    /// # Ok::<(), airsl::Error>(())
+    /// ```
+    pub fn check(&self, script: &Script) -> Result<()> {
+        let _guard = self
+            .evaluating
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+
+        // `into_function` compiles and hands back the chunk rather than calling it, which is the
+        // whole distinction from `eval`: a driver script's body runs on load, so anything that
+        // executed it would perform the side effect it exists for.
+        self.lua
+            .load(script.source())
+            .set_name(script.name().as_lua())
+            .into_function()
+            .map(|_| ())
+            .map_err(|error| self.classify(script, error))
+    }
+
     /// Names the failure a script produced, separating a resource breach from a script defect.
     ///
     /// Both decisions are made on structure rather than on message text. A script is free to raise
@@ -283,6 +328,50 @@ mod tests {
     #[test]
     fn eval_runs_a_chunk_for_its_effect() {
         assert!(engine().eval(&script("local x = 1")).is_ok());
+    }
+
+    #[test]
+    fn check_accepts_a_chunk_that_compiles() {
+        let engine = Engine::builder().policy(Policy::pure()).build().unwrap();
+        let script = Script::from_source("return 1 + 1", "ok").unwrap();
+        assert!(engine.check(&script).is_ok());
+    }
+
+    #[test]
+    fn check_refuses_a_chunk_that_does_not_compile() {
+        let engine = Engine::builder().policy(Policy::pure()).build().unwrap();
+        let script = Script::from_source("local function f(", "bad").unwrap();
+        let err = engine.check(&script).unwrap_err();
+        assert!(
+            err.to_string().contains("bad"),
+            "the chunk name names it: {err}"
+        );
+    }
+
+    #[test]
+    fn check_compiles_without_running_the_chunk() {
+        // The distinction from `eval`, and the reason a driver script can be checked at all: its
+        // body runs on load, so anything that executed it would perform the side effect it exists
+        // for. A chunk that raises immediately still compiles.
+        let engine = Engine::builder().policy(Policy::pure()).build().unwrap();
+        let script = Script::from_source("error('this must not run')", "raises").unwrap();
+        assert!(engine.check(&script).is_ok(), "compiling must not execute");
+        assert!(
+            engine.eval(&script).is_err(),
+            "and running it must still raise"
+        );
+    }
+
+    #[test]
+    fn check_agrees_across_every_policy_preset() {
+        // Parsing does not consult the globals table, so the answer cannot depend on the surface.
+        for policy in [Policy::trusted(), Policy::confined(), Policy::pure()] {
+            let engine = Engine::builder().policy(policy).build().unwrap();
+            let good = Script::from_source("local x = io", "g").unwrap();
+            let bad = Script::from_source("if true then", "b").unwrap();
+            assert!(engine.check(&good).is_ok());
+            assert!(engine.check(&bad).is_err());
+        }
     }
 
     #[test]

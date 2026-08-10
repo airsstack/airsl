@@ -45,12 +45,25 @@ impl Default for Glob {
 
 /// Builds a matcher for `pattern`.
 ///
-/// `literal_separator` is off, so `*` crosses directory boundaries the way the plugin scripts
-/// expect. What matters more is the `**/` case: `**/Cargo.toml` has to match a root-level
-/// `Cargo.toml` as well as a nested one, because that is what `enforce.py` relies on and a
-/// root-level `Cargo.toml` is this repository's most important Rust file.
+/// `literal_separator` is **on**, so `*` and `?` stop at a directory boundary: `*.rs` matches
+/// `main.rs` and not `src/main.rs`. That is what every other path glob means — `.gitignore`,
+/// `PurePath.match`, a shell with `globstar` — and `globset` recommends it for matching paths.
+///
+/// It was off, on the stated grounds that `*` crossing a separator was "the way the plugin scripts
+/// expect". The opposite was true: the enforcement manifests declare things like `match:
+/// ["**/*.rs"]`, and under the loose reading a manifest saying `*.rs` would also match
+/// `deeply/nested/file.rs` — enforcing a rule over files its author never named. Widening
+/// authority is the one direction this can be wrong in, so the module now compiles the strict
+/// reading and the dispatcher's own compiler agrees with it.
+///
+/// What the switch must not cost is the `**/` case: `**/Cargo.toml` has to match a root-level
+/// `Cargo.toml` as well as a nested one, because a root-level `Cargo.toml` is this repository's
+/// most important Rust file. `globset` keeps `**` recursive under `literal_separator`, which is
+/// exactly the split that makes the strict reading usable, and the tests below pin both halves.
 fn matcher(pattern: &str) -> Result<globset::GlobMatcher> {
-    globset::Glob::new(pattern)
+    globset::GlobBuilder::new(pattern)
+        .literal_separator(true)
+        .build()
         .map(|glob| glob.compile_matcher())
         .map_err(|source| Error::Denied {
             module: "glob",
@@ -141,7 +154,7 @@ mod tests {
 
     #[test]
     fn a_double_star_matches_zero_segments_as_well_as_many() {
-        // The case that has to be checked rather than assumed: `enforce.py` relies on
+        // The case that has to be checked rather than assumed: the enforcement dispatcher relies on
         // `**/Cargo.toml` matching a root-level `Cargo.toml`, which is this repository's most
         // important Rust file. A glob implementation that required at least one segment would
         // silently stop matching it.
@@ -151,6 +164,55 @@ mod tests {
             m.is_match(Path::new("crates/airsl/Cargo.toml")),
             "many segments"
         );
+    }
+
+    #[test]
+    fn a_star_stops_at_a_directory_boundary() {
+        // The defect this pins. With `literal_separator` off, `*.rs` also matched `src/main.rs`,
+        // so an enforcement manifest declaring `match: ["*.rs"]` covered every Rust file in the
+        // tree rather than the ones at its root — silently widening the rule past what its author
+        // wrote. Widening authority is the one direction a matcher must not be wrong in.
+        let m = matcher("*.rs").unwrap();
+        assert!(
+            m.is_match(Path::new("main.rs")),
+            "a root-level file matches"
+        );
+        assert!(
+            !m.is_match(Path::new("src/main.rs")),
+            "`*` must not cross a separator"
+        );
+
+        let scoped = matcher("src/*.rs").unwrap();
+        assert!(scoped.is_match(Path::new("src/main.rs")));
+        assert!(
+            !scoped.is_match(Path::new("src/a/b.rs")),
+            "one segment, not a subtree"
+        );
+    }
+
+    #[test]
+    fn a_question_mark_stops_at_a_directory_boundary_too() {
+        // Probed with a pattern the separator can actually land in: `?.rs` against `a/b.rs` can
+        // never match either way, because `?` is one character and `a/b` is three, so it would
+        // pass whatever the setting and prove nothing.
+        let m = matcher("a?c").unwrap();
+        assert!(m.is_match(Path::new("abc")));
+        assert!(
+            !m.is_match(Path::new("a/c")),
+            "`?` must not match a separator"
+        );
+    }
+
+    #[test]
+    fn a_double_star_stays_recursive_under_the_strict_reading() {
+        // The half the strict reading must not cost: `**` is still the recursive wildcard, which
+        // is what makes `literal_separator` usable rather than merely stricter.
+        let m = matcher("**/*.rs").unwrap();
+        assert!(m.is_match(Path::new("main.rs")), "zero segments");
+        assert!(m.is_match(Path::new("a/b/c/main.rs")), "many segments");
+
+        let bare = matcher("**").unwrap();
+        assert!(bare.is_match(Path::new("a/b/c")));
     }
 
     #[test]

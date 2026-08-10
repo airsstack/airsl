@@ -139,7 +139,7 @@ local key = airsstack.hash.sha1(repo_path):sub(1, 8)
 d50c1217
 ```
 
-SHA-1 is here for compatibility only: `enforce.py` uses `hashlib.sha1(...).hexdigest()[:8]` and
+SHA-1 is here for compatibility only: the enforcement dispatcher takes `sha1(path)[:8]` and
 `ensure-layout.sh` uses `shasum | cut -c1-8`. A port that used SHA-256 would silently re-key every
 project and orphan its stored specs and plans. Use `hash.sha256` for anything new.
 

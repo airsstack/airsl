@@ -178,6 +178,20 @@ pub(crate) enum Command {
         path: PathBuf,
     },
 
+    /// Compile every Lua file under a path without running any of it.
+    ///
+    /// `airsl test` covers only what a test file loads, and a hook's entry point is typically
+    /// loaded by nothing — so a syntax error there survives a green test run and is then swallowed
+    /// by `--fail-open` when the hook fires. This is the check that sees it.
+    ///
+    /// No policy and no grants: parsing never consults the globals table, and nothing is executed,
+    /// so there is no authority to grant.
+    Check {
+        /// Directory to search, or a single Lua file. Defaults to the working directory.
+        #[arg(default_value = ".")]
+        path: PathBuf,
+    },
+
     /// Report the runtime version and the policy a script would run under.
     Doctor {
         /// Which policy preset to describe.

@@ -93,7 +93,7 @@ write root, and one list would force the write authority up to the read authorit
 **Enforcement lives in the Rust function.** `fs.read` canonicalises its argument and checks
 containment *before* opening anything. Lua never holds a file handle — it holds a string and calls
 in — so there is nothing to reach around. This discipline is already present in the plugin suite it
-replaces: `cache_sync.is_within` in `plugins/airsstack-plugin-dev/hooks/cache_sync.py:66` is exactly
+replaces: `is_within` in `plugins/airsstack-plugin-dev/hooks/lib/cache.lua:131` is exactly
 this check, enforced in the wrong language.
 
 The check itself is worth stating precisely, because a plausible version of it does not work. It

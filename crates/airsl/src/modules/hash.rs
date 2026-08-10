@@ -177,7 +177,7 @@ mod tests {
 
     #[test]
     fn a_truncated_sha1_reproduces_the_plugin_project_key() {
-        // `enforce.py` uses `hashlib.sha1(...).hexdigest()[:8]`; a script porting it must get the
+        // The dispatcher's project key is `sha1(path)[:8]`; a script computing it must get the
         // same eight characters or it will not find last week's plan.
         assert_eq!(
             eval("return airsstack.hash.sha1('abc'):sub(1, 8)"),

@@ -10,6 +10,7 @@
 
 #![forbid(unsafe_code)]
 
+mod check;
 mod cli;
 mod doctor;
 mod run;
@@ -45,6 +46,7 @@ fn main() -> std::process::ExitCode {
             let policy = cli::resolve_policy(policy, None, None, grants);
             test_runner::run(&path, &policy)
         }
+        cli::Command::Check { path } => check::run(&path),
         cli::Command::Doctor { policy } => {
             print!("{}", doctor::report(&Policy::from(policy)));
             0
