@@ -21,7 +21,7 @@ use crate::builder::{EngineBuilder, Missing};
 use crate::error::{Error, Result};
 use crate::instruction_budget::{BudgetExhausted, InstructionBudget};
 use crate::modules::ModuleSet;
-use crate::require_loader::RequireLoader;
+use crate::require_loader::{RequireDisposition, RequireLoader};
 use crate::sandbox::Policy;
 use crate::script::Script;
 use crate::types::{ModuleName, RootTable};
@@ -178,20 +178,23 @@ impl Engine {
         self.lua.globals().set("arg", table).map_err(fail)
     }
 
-    /// Installs or clears the confined `require` for the script about to run.
+    /// Gives the script about to run whichever `require` its surface and its root call for.
     ///
     /// Per evaluation because the directory it resolves against belongs to the script, not to the
-    /// engine. A script built from source has no directory and so gets no `require` at all.
+    /// engine. A confined script built from source has no directory and so gets no `require` at
+    /// all.
     ///
     /// The table of already-loaded modules outlives this call: it is keyed by canonical absolute
     /// path, so it stays correct across roots, and discarding it would make every evaluation
     /// re-run every module it requires.
     fn set_require(&self, script: &Script) -> Result<()> {
-        match script.root() {
-            Some(root) if RequireLoader::applies_to(self.policy.language()) => {
-                RequireLoader::new(root).install(&self.lua)
-            }
-            _ => RequireLoader::remove(&self.lua),
+        match RequireDisposition::decide(self.policy.language(), script.root()) {
+            // Nothing to install and — the part worth stating — nothing to clear. The `require`
+            // sitting in the globals table is the one `package` brought with it when the state was
+            // opened, and it is part of what this surface promises.
+            RequireDisposition::Native => Ok(()),
+            RequireDisposition::Confined(root) => RequireLoader::new(root).install(&self.lua),
+            RequireDisposition::Absent => RequireLoader::remove(&self.lua),
         }
     }
 
@@ -662,6 +665,41 @@ mod tests {
         let engine = Engine::builder().policy(Policy::pure()).build().unwrap();
         let script = Script::from_file(&path).unwrap();
         assert_eq!(engine.eval_to::<String>(&script).unwrap(), "nil");
+    }
+
+    #[test]
+    fn a_trusted_policy_leaves_lua_s_own_require_in_place() {
+        // A script from source, so nothing here could have installed a confined loader: whatever
+        // `require` is bound to is the one `package` arrived with. It stayed a function only once
+        // the engine stopped clearing the global on every surface but `restricted`.
+        let engine = Engine::builder().policy(Policy::trusted()).build().unwrap();
+        assert_eq!(
+            engine
+                .eval_to::<String>(&script("return type(require)"))
+                .unwrap(),
+            "function"
+        );
+    }
+
+    #[test]
+    fn a_trusted_script_requires_through_package_path_rather_than_a_root() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("lib.lua"), "return { answer = 42 }").unwrap();
+        let path = dir.path().join("main.lua");
+        // Resolved through `package.path`, which is the whole point of the arrangement: `full`
+        // keeps Lua's own resolution, so proving the global merely exists would not show that the
+        // surface delivers what it documents.
+        std::fs::write(
+            &path,
+            "package.path = arg[1] .. '/?.lua' return require('lib').answer",
+        )
+        .unwrap();
+
+        let engine = Engine::builder().policy(Policy::trusted()).build().unwrap();
+        let script = Script::from_file(&path)
+            .unwrap()
+            .with_args([dir.path().display().to_string()]);
+        assert_eq!(engine.eval_to::<i64>(&script).unwrap(), 42);
     }
 
     #[test]

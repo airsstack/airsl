@@ -59,7 +59,7 @@ fn instruction_ceiling() -> Result<(), Box<dyn Error>> {
         .ok_or("the instruction ceiling did not stop a non-terminating script")?;
 
     // The classification is structural: the engine consults its own counter and the VM error
-    // chain, never the message text (`src/engine.rs:248`). A script is free to raise a string that
+    // chain, never the message text (`src/engine.rs:251`). A script is free to raise a string that
     // reads exactly like this report, and matching on text would let it disguise its own failure
     // as a resource breach — or the reverse.
     assert_eq!(error.exhausted_limit(), Some(ExhaustedLimit::Instructions));

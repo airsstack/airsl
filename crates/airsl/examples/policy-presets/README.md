@@ -18,7 +18,7 @@ cargo run -p airsl --example policy-presets
 ## Output
 
 ```
-trusted  airsstack=yes coroutine=yes io=yes load=yes os=yes package=yes require=no string=yes utf8=yes | os.time=yes os.getenv=yes
+trusted  airsstack=yes coroutine=yes io=yes load=yes os=yes package=yes require=yes string=yes utf8=yes | os.time=yes os.getenv=yes
 confined airsstack=yes coroutine=yes io=no load=no os=yes package=no require=yes string=yes utf8=yes | os.time=yes os.getenv=no
 pure     airsstack=yes coroutine=no io=no load=no os=no package=no require=no string=yes utf8=yes | os.time=no os.getenv=no
 
@@ -56,15 +56,20 @@ pure     surface=minimal grants=none memory=16777216 bytes instructions=10000000
   (`src/sandbox/language_surface.rs:20`) each hand a script a second way to load code, bypassing
   both the surface and the confined `require`.
 
-### One thing the output contradicts
+### `require=yes` on two rows means two different functions
 
-`require=no` under `trusted`, while `package=yes`. `RequireLoader::applies_to`
-(`src/require_loader.rs:52`) documents `Full` as keeping Lua's own `require` — "deliberately left
-alone — a first-party script may depend on it" — but `Engine::set_require` (`src/engine.rs:189`)
-reaches its `_` arm for every surface other than `Restricted` and clears the global
-(`src/engine.rs:194`), including the one the `package` library had just installed. So a `trusted`
-script gets `package.path` and `package.loaded` but no `require` to use them with. The output above
-is what the runtime does today, not what the doc comment describes.
+`trusted` and `confined` both report a `require`, and they are not the same one.
+`RequireDisposition::decide` (`src/require_loader.rs:67`) is the three-way answer: `Full` keeps
+Lua's own loader, which resolves through `package.path` and can reach anywhere on the filesystem;
+`Restricted` gets a Rust function confined to the script's own directory, with no `package` table
+to configure and no way to widen it; `Minimal` gets neither, which is the `require=no` on the third
+row. `probe.lua` can only see that the global is non-`nil`, so this is the one place the output
+understates a difference rather than showing it.
+
+That the answer has three values and not two is the point of the enum. `Full` and `Minimal` both
+decline the *confined* loader, so a predicate asking only about that gave them one answer — and a
+`trusted` engine cleared the `require` that `package` had installed a moment earlier. The match in
+`decide` is exhaustive, so a fourth surface cannot acquire an answer by default either.
 
 ## See also
 
