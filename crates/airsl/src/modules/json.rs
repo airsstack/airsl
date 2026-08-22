@@ -1,9 +1,9 @@
 //! The `airsstack.json` host module.
 //!
-//! Its own module because JSON is the wire format for everything the plugin scripts exchange —
-//! hook payloads on stdin, hook results on stdout, and the derived index files the journal tooling
-//! writes. Lua ships no JSON support at all, so without this the scripts would shell out to another
-//! interpreter, which is the situation this crate exists to remove.
+//! Its own module because JSON is the wire format for nearly everything a host script exchanges —
+//! hook payloads on stdin, results on stdout, config and derived index files on disk. Lua ships no
+//! JSON support at all, so without this a script would shell out to another interpreter, which is
+//! the situation this crate exists to remove.
 //!
 //! Responsibilities: [`Json`], installing `encode`, `encode_pretty` and `decode`.
 //!

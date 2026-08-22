@@ -49,12 +49,11 @@ impl Default for Glob {
 /// `main.rs` and not `src/main.rs`. That is what every other path glob means — `.gitignore`,
 /// `PurePath.match`, a shell with `globstar` — and `globset` recommends it for matching paths.
 ///
-/// It was off, on the stated grounds that `*` crossing a separator was "the way the plugin scripts
-/// expect". The opposite was true: the enforcement manifests declare things like `match:
-/// ["**/*.rs"]`, and under the loose reading a manifest saying `*.rs` would also match
-/// `deeply/nested/file.rs` — enforcing a rule over files its author never named. Widening
-/// authority is the one direction this can be wrong in, so the module now compiles the strict
-/// reading and the dispatcher's own compiler agrees with it.
+/// It was off, on the stated grounds that `*` crossing a separator was what calling scripts
+/// expected. The opposite was true: rule files declare things like `match: ["**/*.rs"]`, and under
+/// the loose reading a rule saying `*.rs` would also match `deeply/nested/file.rs` — applying over
+/// files its author never named. Widening authority is the one direction this can be wrong in, so
+/// the module compiles the strict reading.
 ///
 /// What the switch must not cost is the `**/` case: `**/Cargo.toml` has to match a root-level
 /// `Cargo.toml` as well as a nested one, because a root-level `Cargo.toml` is this repository's

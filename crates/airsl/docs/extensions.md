@@ -28,10 +28,10 @@ entry   = "main.lua"
 api     = 1                      # airsl extension API version
 
 [capabilities]
-fs.read   = ["$AIRSSTACK_HOME/journal"]
-fs.write  = ["$AIRSSTACK_HOME/journal/.index"]
+fs.read   = ["$APP_HOME/journal"]
+fs.write  = ["$APP_HOME/journal/.index"]
 proc.run  = ["git"]
-env.read  = ["AIRSSTACK_HOME", "HOME"]
+env.read  = ["APP_HOME", "HOME"]
 regex     = true                 # no parameters — pure computation
 
 [capabilities.optional]
@@ -49,7 +49,7 @@ with its own ceiling. A manifest asking for `fs.read = ["/"]` is not an error; i
 granted that.
 
 **Variables are expanded by the host, from the host's environment.** If an extension could expand
-`$AIRSSTACK_HOME` itself, it could set that variable and widen its own grant. Expansion happens
+`$APP_HOME` itself, it could set that variable and widen its own grant. Expansion happens
 before the intersection, on the host side, always.
 
 **`api` is declared,** so the contract can evolve without breaking installed extensions.
@@ -86,7 +86,7 @@ let host = ExtensionHost::builder()
     .approver(Approver::manifest())              // or ::interactive(), ::deny_all()
     .build()?;
 
-let ext = host.load("~/.airsstack/extensions/journal-indexer")?;
+let ext = host.load("~/.config/myapp/extensions/journal-indexer")?;
 println!("{:?}", ext.granted());
 ext.call("on_session_start", payload)?;
 ```
@@ -95,9 +95,9 @@ The **ceiling** is what makes manifest-driven requests safe to honour at all: it
 program's own statement of maximum authority, and nothing a manifest says can exceed it. `Approver`
 then decides policy within that bound — honour the manifest, prompt the user, or refuse outright.
 
-For airsstack the natural split follows provenance, and the marketplace at
-`.claude-plugin/marketplace.json` already provides the distinction: marketplace-installed extensions
-get `Approver::manifest()`, locally-developed ones get `Approver::interactive()`.
+The natural split follows provenance, and a host that already distributes extensions through a
+registry has the distinction to hand: registry-installed extensions get `Approver::manifest()`,
+locally-developed ones get `Approver::interactive()`.
 
 ## The Lua side
 
@@ -106,7 +106,7 @@ get `Approver::manifest()`, locally-developed ones get `Approver::interactive()`
 local ext = airsstack.ext
 
 ext.on("session_start", function(payload)
-  local root  = airsstack.path.join(airsstack.env.get("AIRSSTACK_HOME"), "journal")
+  local root  = airsstack.path.join(airsstack.env.get("APP_HOME"), "journal")
   local notes = airsstack.glob.walk(root, "**/*.md")
   local index = require("lib.index").build(notes)
 
@@ -128,8 +128,8 @@ blocked on it.
 
 ## Two extension shapes
 
-**Script extensions** run to completion and produce output. This is what `airsl run` does today and
-what all 29 plugin scripts are.
+**Script extensions** run to completion and produce output. This is what `airsl run` does today, and
+what every script running on this runtime is.
 
 **Registered extensions** load once, register handlers, and are called repeatedly by the host as
 events occur. This is the Redis model and what "extension system" normally means. It needs three
@@ -180,8 +180,8 @@ here onward, and it is very hard to tighten afterwards.
 ## Open questions
 
 - Whether an extension may request a capability the ceiling permits but the *user* has not seen —
-  i.e. whether `Approver::manifest()` is acceptable at all for marketplace code, or whether first
-  load should always prompt.
+  i.e. whether `Approver::manifest()` is acceptable at all for registry-installed code, or whether
+  first load should always prompt.
 - Whether grants are revocable at runtime, or fixed for an engine's lifetime. Fixed is far simpler
   and probably right.
 - How a registered extension reports failure without taking down the dispatcher, and whether a

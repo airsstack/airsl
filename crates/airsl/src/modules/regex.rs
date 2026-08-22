@@ -159,8 +159,8 @@ impl HostModule for Regex {
             reason: e.to_string(),
         };
 
-        // `compile` exists because the one-shot forms recompile on every call, and the plugin
-        // scripts match the same pattern over thousands of lines.
+        // `compile` exists because the one-shot forms recompile on every call, and a script that
+        // scans a file matches the same pattern over thousands of lines.
         let compiled = lua
             .create_function(|lua, pattern: mlua::LuaString| {
                 let re = compile(&pattern.to_str()?)?;

@@ -250,11 +250,11 @@ mod tests {
     fn require_escape_names_both_module_and_root() {
         let err = Error::RequireEscape {
             module: "../secrets".into(),
-            root: "/plugins".into(),
+            root: "/scripts".into(),
         };
         assert_eq!(
             err.to_string(),
-            "module `../secrets` resolves outside the script directory `/plugins`"
+            "module `../secrets` resolves outside the script directory `/scripts`"
         );
     }
 

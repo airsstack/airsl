@@ -1,6 +1,6 @@
 //! The `airsl doctor` report.
 //!
-//! Exists because the plugin hooks that call this binary fail open when it is missing — a hook
+//! Exists because hooks that call this binary fail open when it is missing — a hook
 //! whose runtime is absent does nothing and says nothing, which is correct behaviour and terrible
 //! diagnostics. `doctor` is the one command that answers "is it installed, and what would a script
 //! actually get" without needing a script to run.

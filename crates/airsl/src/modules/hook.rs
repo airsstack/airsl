@@ -1,18 +1,17 @@
 //! The `airsstack.hook` host module: the agent-hook contract, in one place.
 //!
 //! A thin layer over `stdio` and `json`, and worth being its own module for one reason: the shape
-//! a hook must emit is easy to get subtly wrong, and before this existed every plugin script
-//! rebuilt it by hand — in Python, in Node and in `printf`. The nesting is real:
+//! a hook must emit is easy to get subtly wrong, and without it every hook script rebuilds the
+//! envelope by hand — in Python, in Node and in `printf`. The nesting is real:
 //!
 //! ```json
 //! {"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": "…"}}
 //! ```
 //!
-//! `context` builds and emits that envelope. Three plugin scripts use it rather than assembling
-//! the envelope by hand: `enforce.lua`'s `PreToolUse` hook, `concise-tracker.lua`'s
-//! `UserPromptSubmit` hook, and `airsstack-journal`'s `session-start.lua`'s `SessionStart` hook. It
-//! models only `hookEventName` and `additionalContext`, deliberately with no `permissionDecision`
-//! field. This was watched directly against the CLI installed on the machine that built this
+//! `context` builds and emits that envelope, for the `PreToolUse`, `UserPromptSubmit` and
+//! `SessionStart` events a hook script commonly serves. It models only `hookEventName` and
+//! `additionalContext`, deliberately with no `permissionDecision`
+//! field. This was watched directly against the agent CLI installed on the machine that built this
 //! module, not read out of a specific build's documentation — no version is claimed, and the exact
 //! conditions could shift release to release. What was watched: a hook returning
 //! `permissionDecision: defer` can have the tool call it fired on swallowed outright — the response
@@ -202,13 +201,13 @@ mod tests {
     }
 
     /// The envelope `context` writes, via [`super::context_envelope`] — the function `context`'s
-    /// closure calls, not a hand-built stand-in — matches the contract the plugin scripts use.
+    /// closure calls, not a hand-built stand-in — matches the contract an agent host expects.
     ///
     /// `context` writes to the process's stdout, which a unit test cannot capture without taking
     /// the whole harness's output with it. Calling the extracted builder directly gets the real
     /// bytes without that side effect.
     #[test]
-    fn the_emitted_envelope_matches_the_contract_the_plugin_scripts_use() {
+    fn the_emitted_envelope_matches_the_contract_an_agent_host_expects() {
         let lua = mlua::Lua::new();
         let event = lua.create_string("PreToolUse").unwrap();
         let additional = lua.create_string("note").unwrap();

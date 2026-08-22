@@ -1,6 +1,6 @@
 //! `airsl` — runs Lua scripts on the embedded `airsl` runtime.
 //!
-//! The binary the airsstack plugin hooks invoke. It stays deliberately thin: parse arguments,
+//! The binary a hook, a build step or a shell script invokes. It stays deliberately thin: parse arguments,
 //! resolve a policy and a failure policy, hand off. Every decision it makes is visible in
 //! [`cli::Command`], so what a hook gets is readable from the command line it was given.
 //!
