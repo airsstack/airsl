@@ -6,10 +6,9 @@
 #   cargo make clippy     # a single gate step
 #   cargo make --list-all-steps
 #
-# The five gate steps mirror the canonical command set in the
-# `airsstack-guideline-rust` plugin one-for-one. Change them there first; this
-# file follows. CI runs `cargo make dod`, so the pipeline and a local run are
-# the same command.
+# The five gate steps are the canonical command set for this repository: fmt, clippy,
+# rustdoc, tests, doctests, every one of them warnings-as-errors. CI runs
+# `cargo make dod`, so the pipeline and a local run are the same command.
 #
 # Install: cargo install --locked cargo-make
 #

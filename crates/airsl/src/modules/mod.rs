@@ -1,6 +1,6 @@
 //! The `airsstack` Lua standard library, and the seam for extending it.
 //!
-//! Exists as a module tree so each capability the plugin scripts need is one file with its own
+//! Exists as a module tree so each capability a script needs is one file with its own
 //! tests, rather than one large surface. Every submodule here implements [`HostModule`] and is
 //! installed as a subtable of the single `airsstack` global — `airsstack.json.decode`,
 //! `airsstack.fs.read`. Downstream crates add their own the same way, which is what makes this

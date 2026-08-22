@@ -4,19 +4,19 @@
 reach. It is not a Lua interpreter that happens to be written in Rust — the point is the boundary:
 the host owns the capability surface, and a script gets only what the host granted it.
 
-Two things drive the design. The near-term one is done: the mix of Python, Node and POSIX sh in the
-[airsstack plugin suite](https://github.com/rstlix0x0/airsstack) is gone, replaced by Lua on this
-runtime, with 244 tests over it in that repository's CI. The longer-term one is serving as the **extension
-system** for airsstack — third-party code, running with declared and negotiated capabilities. Redis
-is the precedent: scripts are useful precisely because the server, not the script, decides what the
-script can touch.
+Two things drive the design. The near-term one is done: the mix of Python, Node and POSIX sh a
+project accumulates around its hooks and its tooling, replaced by Lua on one runtime, where what
+each script may touch is declared rather than inherited from whichever interpreter happened to run
+it. The longer-term one is serving as an **extension system** for a host program — third-party
+code, running with declared and negotiated capabilities. Redis is the precedent: scripts are useful
+precisely because the server, not the script, decides what the script can touch.
 
 ## Status: read this first
 
-The runtime foundation ships, and so does the whole host standard library. The airsstack plugin
-suite — the near-term driver named below — now runs entirely on it. What remains unbuilt is the
-extension host — manifests, ceilings, approval and dispatch — and Tier 3. Every document marks
-each piece, and the table below is the summary.
+The runtime foundation ships, and so does the whole host standard library — a mixed-language script
+corpus of several thousand lines now runs entirely on it. What remains unbuilt is the extension
+host — manifests, ceilings, approval and dispatch — and Tier 3. Every document marks each piece,
+and the table below is the summary.
 
 | Area | State |
 |---|---|

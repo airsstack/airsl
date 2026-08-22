@@ -129,7 +129,7 @@ child sees: from-lua
 Edition 2024 and this crate forbids `unsafe`, and partly because a sandboxed script silently changing
 the host's environment is not a capability anyone meant to grant.
 
-### Derive the plugin suite's project key
+### Derive a stable project key from a path
 
 ```lua
 local key = airsstack.hash.sha1(repo_path):sub(1, 8)
@@ -305,7 +305,7 @@ it is a fact about the machine rather than a diagnostic the script chose to emit
 
 ```bash
 airsl test .
-airsl test --allow-read . plugins/
+airsl test --allow-read . scripts/
 ```
 
 Test files are named `*_test.lua` or `test_*.lua` and return a table of named functions. A test

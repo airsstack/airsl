@@ -2,11 +2,12 @@
 //!
 //! Separate from the sandbox because it describes the *caller's* behaviour rather than the
 //! script's permissions, and the two are read at different times: the engine reads a policy while
-//! building a state, and the caller reads this after evaluation has already returned. The plugin
-//! suite this crate was built for has a rule that a hook script must never propagate a non-zero
-//! exit — a `PreToolUse` hook that exits 2 blocks the tool call, and the matcher covers `Read`, so
-//! a propagated failure blocks every file read in the session. Encoding that in a type makes the
-//! choice explicit at every call site instead of relying on each script to remember.
+//! building a state, and the caller reads this after evaluation has already returned. Agent-hook
+//! conventions make the distinction load-bearing: a hook script must never propagate a non-zero
+//! exit, because a `PreToolUse` hook that exits 2 blocks the tool call that triggered it, and such
+//! matchers commonly cover `Read` — so a propagated failure blocks every file read in the session.
+//! Encoding that in a type makes the choice explicit at every call site instead of relying on each
+//! script to remember.
 //!
 //! Responsibilities: [`FailurePolicy`], and the exit code each variant implies.
 //!

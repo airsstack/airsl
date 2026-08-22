@@ -140,11 +140,11 @@ mod tests {
 
     #[test]
     fn an_over_long_path_keeps_the_tail_that_identifies_it() {
-        let path = format!("/{}/plugins/hooks/enforce.lua", "deep".repeat(90));
+        let path = format!("/{}/scripts/hooks/enforce.lua", "deep".repeat(90));
         let name = ChunkName::from_path(Path::new(&path));
         assert!(name.as_str().len() <= 240, "{}", name.as_str().len());
         assert!(
-            name.as_str().ends_with("/plugins/hooks/enforce.lua"),
+            name.as_str().ends_with("/scripts/hooks/enforce.lua"),
             "{}",
             name.as_str()
         );
@@ -163,14 +163,14 @@ mod tests {
 
     #[test]
     fn a_path_within_the_limit_is_left_exactly_as_it_is() {
-        let name = ChunkName::from_path(Path::new("/plugins/hooks/enforce.lua"));
-        assert_eq!(name.as_str(), "/plugins/hooks/enforce.lua");
+        let name = ChunkName::from_path(Path::new("/scripts/hooks/enforce.lua"));
+        assert_eq!(name.as_str(), "/scripts/hooks/enforce.lua");
     }
 
     #[test]
     fn from_path_uses_the_path_text() {
-        let name = ChunkName::from_path(Path::new("plugins/airsstack/hooks/enforce.lua"));
-        assert_eq!(name.as_str(), "plugins/airsstack/hooks/enforce.lua");
+        let name = ChunkName::from_path(Path::new("scripts/hooks/enforce.lua"));
+        assert_eq!(name.as_str(), "scripts/hooks/enforce.lua");
     }
 
     #[test]

@@ -319,9 +319,9 @@ mod tests {
 
     #[test]
     fn an_env_grant_admits_only_the_names_it_lists() {
-        let grant = EnvGrant::none().read(["HOME", "AIRSSTACK_HOME"]);
+        let grant = EnvGrant::none().read(["HOME", "APP_HOME"]);
         assert!(grant.allows("HOME"));
-        assert!(grant.allows("AIRSSTACK_HOME"));
+        assert!(grant.allows("APP_HOME"));
         assert!(!grant.allows("AWS_SECRET_ACCESS_KEY"));
     }
 

@@ -7,8 +7,8 @@ the resource ceilings — with three presets over them.
 
 Not "stop the script doing damage" in the abstract. The goal is narrower and more useful: **the host
 decides what a script may reach, per script, and can prove it afterwards.** That framing is what
-makes the same mechanism serve first-party plugin scripts (which want nearly everything) and
-third-party extensions (which want a named, bounded slice).
+makes the same mechanism serve first-party scripts you ship yourself (which want nearly everything)
+and third-party extensions (which want a named, bounded slice).
 
 ## The three axes
 
@@ -60,7 +60,7 @@ Policy::confined().with_grants(
     GrantSet::declared()
         .with_fs(|fs| fs.read("/etc/app").write("/var/app/state"))
         .with_proc(|proc| proc.allow(["git"]))
-        .with_env(|env| env.read(["HOME", "AIRSSTACK_HOME"])),
+        .with_env(|env| env.read(["HOME", "APP_HOME"])),
 )
 ```
 
@@ -68,16 +68,16 @@ and the CLI says the same thing on the command line, which is where a hook launc
 should be readable:
 
 ```bash
-airsl run --allow-read "$AIRSSTACK_HOME" \
-          --allow-write "$AIRSSTACK_HOME/journal/.index" \
+airsl run --allow-read "$APP_HOME" \
+          --allow-write "$APP_HOME/index" \
           --allow-exec git \
-          --allow-env AIRSSTACK_HOME \
+          --allow-env APP_HOME \
           hooks/index.lua
 ```
 
-**Nothing is granted by default** below `trusted`. That does not block the plugin migration: the
-first-party scripts port under `trusted`, which already gives them everything and is documented for
-exactly that, and tighten to named grants afterwards. The alternatives both cost something
+**Nothing is granted by default** below `trusted`. That does not block a migration onto this
+runtime: existing scripts port under `trusted`, which already gives them everything and is
+documented for exactly that, and tighten to named grants afterwards. The alternatives both cost something
 permanent — an implicit script-directory grant would let an extension rewrite its own code and would
 not appear in `airsl doctor`, and granting everything would make `confined` a language-surface
 restriction rather than a capability boundary.
@@ -92,10 +92,9 @@ write root, and one list would force the write authority up to the read authorit
 
 **Enforcement lives in the Rust function.** `fs.read` canonicalises its argument and checks
 containment *before* opening anything. Lua never holds a file handle — it holds a string and calls
-in — so there is nothing to reach around. This discipline is already present in the plugin suite it
-replaces: `is_within` in `plugins/airsstack-plugin-dev/hooks/lib/cache.lua:131`, in the
-[airsstack repository](https://github.com/rstlix0x0/airsstack), is exactly this check, enforced in
-the wrong language.
+in — so there is nothing to reach around. The discipline is not new; what is new is where it lives.
+A hand-written `is_within` guard at the top of a Lua helper is exactly this check, enforced in the
+wrong language: a script that forgets to call it is unguarded, and nothing makes it call it.
 
 The check itself is worth stating precisely, because a plausible version of it does not work. It
 canonicalises the deepest part of a path that **exists** and accepts only ordinary names below that:
@@ -115,7 +114,7 @@ Most callers should not hand-assemble a policy. All three ship.
 
 | Preset | Language surface | Grants | Ceilings | `require` | Intended for |
 |---|---|---|---|---|---|
-| `trusted` | full Lua stdlib | unrestricted | none | Lua's own | first-party code — the airsstack plugin scripts |
+| `trusted` | full Lua stdlib | unrestricted | none | Lua's own | first-party code you ship yourself |
 | `confined` *(default)* | restricted + host modules | declared, empty until named | 64 MiB, 100M | confined to the script directory | third-party extensions |
 | `pure` | minimal, no I/O at all | declared, empty until named | 16 MiB, 10M | none | config evaluation, expressions, generated snippets |
 
@@ -202,7 +201,7 @@ WASM isolates at the VM boundary and would survive a buggy host function. Lua is
 boundary and would not. WASM also lets extension authors choose their language, at the cost of a
 toolchain, a heavier runtime, and a much more awkward data boundary.
 
-For extensions you write, review, or accept from a marketplace you control, Lua is the right trade
+For extensions you write, review, or accept from a registry you control, Lua is the right trade
 and Redis is the precedent. For executing genuinely hostile third-party code, WASM is stronger, and
 these documents should not be read as claiming otherwise.
 

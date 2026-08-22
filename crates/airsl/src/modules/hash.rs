@@ -6,8 +6,8 @@
 //!
 //! Responsibilities: [`struct@Hash`], installing `sha256`, `sha1`, `hash_file` and `hex`.
 //!
-//! Non-responsibilities: choosing an algorithm for the caller. Both are offered because the plugin
-//! suite needs one for compatibility and the other for everything new.
+//! Non-responsibilities: choosing an algorithm for the caller. Both are offered because a real
+//! corpus needs one for compatibility and the other for everything new.
 
 use std::sync::Arc;
 
@@ -45,7 +45,8 @@ impl Default for Hash {
     }
 }
 
-/// Lowercase hexadecimal, which is what every tool the plugin suite shells out to produces.
+/// Lowercase hexadecimal, which is what the command-line hashing tools a script would otherwise
+/// shell out to produce.
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().fold(String::new(), |mut out, byte| {
         use core::fmt::Write as _;
@@ -78,10 +79,10 @@ impl HostModule for Hash {
             .map_err(fail)?;
         table.set("sha256", sha256).map_err(fail)?;
 
-        // SHA-1 is present for compatibility, not because it is a good choice. The plugin suite
-        // derives its per-repository project key with `hashlib.sha1(...)[:8]` and
-        // `shasum | cut -c1-8`; shipping only SHA-256 would silently re-key every project and
-        // orphan the SDD specs, plans and snapshots already stored under the old key.
+        // SHA-1 is present for compatibility, not because it is a good choice. Scripts that derive
+        // a directory or cache key with `hashlib.sha1(...)[:8]` or `shasum | cut -c1-8` are naming
+        // artifacts that already exist; shipping only SHA-256 would silently re-key every such
+        // project and orphan everything stored under the old key.
         let sha1 = lua
             .create_function(|_, body: mlua::LuaString| {
                 Ok(hex(&sha1::Sha1::digest(body.as_bytes())))
@@ -176,9 +177,9 @@ mod tests {
     }
 
     #[test]
-    fn a_truncated_sha1_reproduces_the_plugin_project_key() {
-        // The dispatcher's project key is `sha1(path)[:8]`; a script computing it must get the
-        // same eight characters or it will not find last week's plan.
+    fn a_truncated_sha1_reproduces_the_shell_pipeline_project_key() {
+        // A project key of the form `sha1(path)[:8]` must come out identical to the
+        // `shasum | cut -c1-8` it replaces, or a script will not find what it wrote last week.
         assert_eq!(
             eval("return airsstack.hash.sha1('abc'):sub(1, 8)"),
             "a9993e36"

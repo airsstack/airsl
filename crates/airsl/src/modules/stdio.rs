@@ -1,7 +1,7 @@
 //! The `airsstack.stdio` host module.
 //!
-//! Below `Full` there is no `io` table at all, and every plugin hook receives its payload on
-//! stdin — so without this the hooks cannot be ported to any policy worth running them under.
+//! Below `Full` there is no `io` table at all, and a hook receives its payload on stdin — so
+//! without this such a script cannot run under any policy worth running it under.
 //!
 //! Needs no grant. The three standard streams are the ones the host handed this process when it
 //! started it, so reading and writing them is not authority over anything the host did not

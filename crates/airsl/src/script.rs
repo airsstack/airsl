@@ -214,8 +214,8 @@ mod tests {
     fn with_root_overrides_the_inferred_directory() {
         let script = Script::from_source("return 1", "inline")
             .unwrap()
-            .with_root("/plugins");
-        assert_eq!(script.root(), Some(Path::new("/plugins")));
+            .with_root("/scripts");
+        assert_eq!(script.root(), Some(Path::new("/scripts")));
     }
 
     #[test]
@@ -229,8 +229,8 @@ mod tests {
     #[test]
     fn a_path_with_directories_roots_at_its_parent() {
         assert_eq!(
-            require_root(Path::new("/plugins/hooks/enforce.lua")),
-            Path::new("/plugins/hooks")
+            require_root(Path::new("/scripts/hooks/enforce.lua")),
+            Path::new("/scripts/hooks")
         );
         assert_eq!(require_root(Path::new("/main.lua")), Path::new("/"));
     }

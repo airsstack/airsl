@@ -1,8 +1,8 @@
 [toolchain]
-# Pinned to a minor channel rather than an exact patch. The airsstack workspace this
-# crate was extracted from pins an exact patch because `trybuild` fixtures there assert
-# verbatim rustc diagnostics; nothing in this repository does, so a patch release that
-# merely rewords a diagnostic must not turn the gate red.
+# Pinned to a minor channel rather than an exact patch. An exact patch is worth pinning
+# only where something asserts verbatim rustc diagnostics — `trybuild` fixtures, say.
+# Nothing in this repository does, so a patch release that merely rewords a diagnostic
+# must not turn the gate red.
 #
 # The channel matches `rust-version` in the workspace manifest, so the MSRV claim is
 # exercised by every ordinary build rather than asserted and never checked.
