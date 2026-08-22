@@ -18,6 +18,10 @@ assert_eq!(engine.eval_to::<String>(&script)?, r#"{"ok":true}"#);
 
 ## Building
 
+**Linux and macOS only.** `airsstack.proc` resolves executables by unix mode bits, which have no
+Windows equivalent, so the crate fails the build off unix with a message saying so rather than a
+cascade of resolution errors out of `std`.
+
 A **C compiler is required**. `mlua`'s `vendored` feature compiles Lua 5.4 from the C sources
 shipped by the `lua-src` crate and links it statically, so there is nothing to install and no
 `pkg-config` involved — but `cc` must be present.
