@@ -5,9 +5,12 @@ The `airsl` binary: runs Lua scripts on the [`airsl`](../airsl) runtime.
 ## Install
 
 ```bash
-cargo install --path crates/airsl-cli --force
+cargo install --git https://github.com/rstlix0x0/airsstack --locked airsl-cli
 airsl doctor
 ```
+
+Working inside a clone of this repo, `cargo install --path crates/airsl-cli --force` builds from
+the checked-out sources instead of fetching from GitHub.
 
 `doctor` prints the runtime version and the policy a script would actually run under:
 

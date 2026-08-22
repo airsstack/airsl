@@ -8,12 +8,26 @@
 //! {"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": "…"}}
 //! ```
 //!
-//! Both shapes are now emitted from here rather than assembled: `context` builds the envelope for
-//! `plugins/airsstack-journal/scripts/session-start.lua:72`, and `emit` takes a caller-built one
-//! for `plugins/airsstack/hooks/enforce.lua:144-149`, which adds a `permissionDecision` field this
-//! module does not model.
+//! `context` builds and emits that envelope. Three plugin scripts use it rather than assembling
+//! the envelope by hand: `enforce.lua`'s `PreToolUse` hook, `concise-tracker.lua`'s
+//! `UserPromptSubmit` hook, and `airsstack-journal`'s `session-start.lua`'s `SessionStart` hook. It
+//! models only `hookEventName` and `additionalContext`, deliberately with no `permissionDecision`
+//! field. This was watched directly against the CLI installed on the machine that built this
+//! module, not read out of a specific build's documentation — no version is claimed, and the exact
+//! conditions could shift release to release. What was watched: a hook returning
+//! `permissionDecision: defer` can have the tool call it fired on swallowed outright — the response
+//! carries no `tool_result` at all — when the session is non-interactive, the tool batch is solo,
+//! and the abort signal is not already set, which strands the caller with no record the call ever
+//! happened. Other cases still produce a result: an interactive session or a multi-tool batch just
+//! warns and lets the tool run normally, and an already-aborted signal still pushes a `tool_result`
+//! carrying a `cancelled` denial. `additionalContext` alone was confirmed to carry no such risk:
+//! emitting an envelope with `hookEventName` and `additionalContext` but no `permissionDecision`
+//! still injects the context into the model's turn while the tool call it fired on returns its
+//! normal `tool_result`.
 //!
-//! Responsibilities: [`Hook`], installing `payload`, `emit` and `context`.
+//! Responsibilities: [`Hook`], installing `payload`, `emit` and `context`. `emit` writes an
+//! arbitrary Lua value to stdout as JSON with no envelope shape imposed — the unmodelled escape
+//! hatch for anything `context` doesn't cover.
 //!
 //! Non-responsibilities: deciding whether the hook should have fired, and exiting. A hook that
 //! fails must not turn its failure into a non-zero exit — that is [`crate::FailurePolicy`]'s job,
@@ -98,13 +112,7 @@ impl HostModule for Hook {
         let context = lua
             .create_function(
                 |lua, (event, additional): (mlua::LuaString, mlua::LuaString)| {
-                    let specific = lua.create_table()?;
-                    specific.set("hookEventName", event)?;
-                    specific.set("additionalContext", additional)?;
-                    let envelope = lua.create_table()?;
-                    envelope.set("hookSpecificOutput", specific)?;
-
-                    let text = convert::to_json(&mlua::Value::Table(envelope))?;
+                    let text = context_envelope(lua, event, additional)?;
                     write_stdout(&text).map_err(mlua::Error::from)
                 },
             )
@@ -113,6 +121,24 @@ impl HostModule for Hook {
 
         Ok(())
     }
+}
+
+/// Builds the envelope `context` writes to stdout, as JSON text.
+///
+/// Returned as a value, not written directly, so callers and tests can inspect the envelope
+/// itself rather than only its side effect on the process's stdout.
+fn context_envelope(
+    lua: &mlua::Lua,
+    event: mlua::LuaString,
+    additional: mlua::LuaString,
+) -> mlua::Result<String> {
+    let specific = lua.create_table()?;
+    specific.set("hookEventName", event)?;
+    specific.set("additionalContext", additional)?;
+    let envelope = lua.create_table()?;
+    envelope.set("hookSpecificOutput", specific)?;
+
+    convert::to_json(&mlua::Value::Table(envelope)).map_err(mlua::Error::from)
 }
 
 /// Writes `text` to standard output, flushing it.
@@ -175,24 +201,42 @@ mod tests {
         assert_eq!(eval("return type(airsstack.hook)"), "table");
     }
 
-    /// The envelope `context` writes, built the same way but returned instead of printed.
+    /// The envelope `context` writes, via [`super::context_envelope`] — the function `context`'s
+    /// closure calls, not a hand-built stand-in — matches the contract the plugin scripts use.
     ///
     /// `context` writes to the process's stdout, which a unit test cannot capture without taking
-    /// the whole harness's output with it. Asserting on the identical structure keeps the shape
-    /// under test; that it reaches stdout is `stdio`'s behaviour and is tested there.
+    /// the whole harness's output with it. Calling the extracted builder directly gets the real
+    /// bytes without that side effect.
     #[test]
     fn the_emitted_envelope_matches_the_contract_the_plugin_scripts_use() {
-        let json = eval(
-            "return airsstack.json.encode({
-               hookSpecificOutput = {
-                 hookEventName = 'PreToolUse',
-                 additionalContext = 'note',
-               }
-             })",
-        );
+        let lua = mlua::Lua::new();
+        let event = lua.create_string("PreToolUse").unwrap();
+        let additional = lua.create_string("note").unwrap();
+        let json = super::context_envelope(&lua, event, additional).unwrap();
         assert_eq!(
             json,
             r#"{"hookSpecificOutput":{"additionalContext":"note","hookEventName":"PreToolUse"}}"#
+        );
+    }
+
+    /// `context` must never add a `permissionDecision` field: the CLI honours that field on a path
+    /// that can swallow the tool call the hook fired on (see the module doc for the mechanism), so
+    /// a hand-rolled decision field must not silently reappear in the envelope this module builds.
+    ///
+    /// Goes through [`super::context_envelope`] — the real function `context`'s closure calls —
+    /// rather than a hand-built literal, so a decision field added to that function's
+    /// implementation turns this test red instead of leaving it green against its own fixture.
+    #[test]
+    fn the_context_envelope_carries_no_permission_decision_field() {
+        let lua = mlua::Lua::new();
+        let event = lua.create_string("PreToolUse").unwrap();
+        let additional = lua.create_string("note").unwrap();
+        let json = super::context_envelope(&lua, event, additional).unwrap();
+        let decoded: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let specific = decoded["hookSpecificOutput"].as_object().unwrap();
+        assert!(
+            !specific.contains_key("permissionDecision"),
+            "envelope must not carry a permissionDecision field: {specific:?}"
         );
     }
 

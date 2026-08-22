@@ -9,9 +9,12 @@ Everything here is run from one directory. Nothing is installed except the binar
 ## Install the binary
 
 ```bash
-cargo install --path crates/airsl-cli --force
+cargo install --git https://github.com/rstlix0x0/airsstack --locked airsl-cli
 airsl doctor
 ```
+
+Working inside a clone of this repo, `cargo install --path crates/airsl-cli --force` builds from
+the checked-out sources instead of fetching from GitHub.
 
 ```
 airsl 0.1.0
