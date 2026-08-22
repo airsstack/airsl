@@ -1,0 +1,174 @@
+#
+# cargo-make task graph for the airsl workspace.
+#
+#   cargo make            # the full Definition-of-Done gate
+#   cargo make fmt        # rewrite formatting (the only task that mutates the tree)
+#   cargo make clippy     # a single gate step
+#   cargo make --list-all-steps
+#
+# The five gate steps mirror the canonical command set in the
+# `airsstack-guideline-rust` plugin one-for-one. Change them there first; this
+# file follows. CI runs `cargo make dod`, so the pipeline and a local run are
+# the same command.
+#
+# Install: cargo install --locked cargo-make
+#
+
+[config]
+# Every gate command already carries `--workspace`, so the task must run exactly
+# once from the workspace root. Without this, cargo-make re-runs each task once
+# per member crate — redundant full-workspace builds.
+default_to_workspace = false
+# No implicit task graph. The gate is only what is written below, and a
+# built-in `build`/`test`/`ci-flow` inherited from cargo-make's core set would
+# run cargo commands nobody in this repo chose.
+skip_core_tasks = true
+min_version = "0.37.0"
+
+[env]
+CARGO_TERM_COLOR = "always"
+
+# `--all-features` below is carried for forward-safety: neither crate in this
+# workspace declares Cargo `[features]`, so today it equals the default build.
+# It stays in every command so the gate stays correct the day a feature is added.
+
+# ---------------------------------------------------------------------------
+# The gate
+# ---------------------------------------------------------------------------
+
+[tasks.default]
+alias = "dod"
+
+[tasks.dod]
+category = "Gate"
+description = "Definition of Done — every step must exit 0 with zero warnings"
+dependencies = ["fmt-check", "clippy", "doc", "test", "test-doc"]
+
+[tasks.fmt-check]
+category = "Gate"
+description = "Assert formatting without rewriting anything"
+command = "cargo"
+args = ["fmt", "--all", "--", "--check"]
+
+[tasks.clippy]
+category = "Gate"
+description = "Lint every target, warnings are errors"
+# `--all-targets` covers tests, examples and benches — a lint living only in
+# test code passes silently without it. `-D warnings` also promotes plain rustc
+# warnings, which is why the gate has no separate `cargo build` step.
+command = "cargo"
+args = [
+  "clippy",
+  "--workspace",
+  "--all-targets",
+  "--all-features",
+  "--",
+  "-D",
+  "warnings",
+]
+
+[tasks.doc]
+category = "Gate"
+description = "Build rustdoc with warnings promoted to errors"
+# Plain `cargo doc` prints rustdoc warnings and still exits 0; RUSTDOCFLAGS is
+# the only thing that makes this step a gate rather than a report.
+command = "cargo"
+args = ["doc", "--workspace", "--all-features", "--no-deps"]
+
+[tasks.doc.env]
+RUSTDOCFLAGS = "-D warnings"
+
+[tasks.test]
+category = "Gate"
+description = "Unit, integration, example and bench targets"
+command = "cargo"
+args = ["test", "--workspace", "--all-targets", "--all-features"]
+
+[tasks.test-doc]
+category = "Gate"
+description = "Doctests — excluded by --all-targets, so they need their own run"
+command = "cargo"
+args = ["test", "--workspace", "--all-features", "--doc"]
+
+# ---------------------------------------------------------------------------
+# Supply chain
+# ---------------------------------------------------------------------------
+
+[tasks.deny]
+category = "Supply chain"
+description = "cargo-deny: security advisories, licenses, duplicate versions, sources"
+# Deliberately not a dependency of `dod`. The Definition of Done is the five
+# commands the guideline skill owns; adding a sixth here would make this file
+# disagree with its source of truth. This check also answers to a moving
+# advisory database rather than to the working tree, so it can fail on a commit
+# that changed nothing.
+command = "cargo"
+args = ["deny", "check"]
+
+# ---------------------------------------------------------------------------
+# Release
+# ---------------------------------------------------------------------------
+
+[tasks.publish-dry-run]
+category = "Release"
+description = "Validate both crates against what crates.io enforces, publishing nothing"
+# `airsl-cli` cannot resolve a published `airsl` until `airsl` is actually on
+# crates.io, so its dry run is expected to fail on the first release and to
+# start passing from the second. Run it anyway: everything it checks before
+# dependency resolution — metadata, keyword count, category slugs, the packaged
+# file list — still reports.
+script_runner = "@shell"
+script = '''
+set -x
+cargo package --list -p airsl
+cargo publish --dry-run -p airsl
+'''
+
+# ---------------------------------------------------------------------------
+# Development helpers
+# ---------------------------------------------------------------------------
+
+[tasks.install]
+category = "Development"
+description = "Install the airsl binary from this checkout"
+command = "cargo"
+args = ["install", "--path", "crates/airsl-cli", "--locked", "--force"]
+
+[tasks.fmt]
+category = "Development"
+description = "Rewrite formatting in place"
+command = "cargo"
+args = ["fmt", "--all"]
+
+[tasks.clippy-fix]
+category = "Development"
+description = "Apply the clippy suggestions that are machine-applicable"
+command = "cargo"
+args = [
+  "clippy",
+  "--workspace",
+  "--all-targets",
+  "--all-features",
+  "--fix",
+  "--allow-dirty",
+]
+
+[tasks.dod-crate]
+category = "Development"
+description = "The gate scoped to one crate: cargo make dod-crate airsl"
+# While developing a single-crate change, `-p <crate>` replaces `--workspace`.
+# Cross-crate changes and pre-release runs use the unscoped `dod`.
+script_runner = "@shell"
+script = '''
+crate="${1}"
+if [ -z "${crate}" ]; then
+    echo "usage: cargo make dod-crate <crate-name>" >&2
+    exit 1
+fi
+set -x
+cargo fmt -p "${crate}" -- --check
+cargo clippy -p "${crate}" --all-targets --all-features -- -D warnings
+RUSTDOCFLAGS="-D warnings" cargo doc -p "${crate}" --all-features --no-deps
+cargo test -p "${crate}" --all-targets --all-features
+cargo test -p "${crate}" --all-features --doc
+'''

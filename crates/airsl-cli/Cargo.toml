@@ -1,6 +1,6 @@
 [package]
 name        = "airsl-cli"
-description = "Command-line runner for airsl Lua scripts, used by the airsstack plugin hooks"
+description = "Command-line runner for airsl Lua scripts: run, test, check and doctor"
 version     = "0.1.0"
 
 edition.workspace      = true
@@ -8,7 +8,6 @@ rust-version.workspace = true
 license.workspace      = true
 repository.workspace   = true
 authors.workspace      = true
-publish.workspace      = true
 
 readme     = "README.md"
 keywords   = ["lua", "scripting", "cli", "hooks"]

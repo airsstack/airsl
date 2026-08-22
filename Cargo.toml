@@ -1,0 +1,67 @@
+[workspace]
+resolver = "3"
+members  = ["crates/airsl", "crates/airsl-cli"]
+
+[workspace.package]
+edition       = "2024"
+rust-version  = "1.94"
+license       = "Apache-2.0"
+repository    = "https://github.com/airsstack/airsl"
+authors       = ["rstlix0x0 <rstlix.dev@gmail.com>"]
+
+[workspace.dependencies]
+# Embedded Lua runtime. `vendored` compiles Lua 5.4 from the C sources shipped by
+# `lua-src`, so no system Lua and no pkg-config are involved — but a C compiler is
+# required to build this workspace and every crate that depends on `airsl`.
+# `serialize` bridges Lua values through serde.
+# Lua 5.4 (not 5.1/LuaJIT) because only 5.3+ distinguishes integers from floats,
+# which the JSON that host programs exchange with scripts depends on.
+mlua       = { version = "0.12", features = ["lua54", "vendored", "serialize", "send"] }
+# Serialization
+serde      = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
+# Errors
+thiserror  = "2.0.18"
+# Host-module support for the Lua standard library
+regex      = "1"
+globset    = "0.4"
+walkdir    = "2.5"
+sha2       = "0.10"
+# SHA-1 for compatibility only. Callers that key artifacts off `shasum | cut -c1-8`
+# or `hashlib.sha1(...)[:8]` need it; shipping only SHA-256 would silently re-key
+# every such project and orphan its artifacts.
+sha1       = "0.10"
+# Time formatting. `jiff` over `time` because it reads /etc/localtime directly
+# instead of libc `tzset`, so local time resolves in multi-threaded embedders.
+jiff       = "0.2"
+# Temp files and dirs. A runtime dependency of `airsl`, which exposes
+# `airsstack.fs.tempdir` to Lua; dev-only for `airsl-cli`.
+tempfile   = "3.23.0"
+# CLI argument parsing (airsl-cli)
+clap       = { version = "4", features = ["derive"] }
+# Internal workspace member — path for local builds, version for publish-readiness.
+# `airsl-cli` inherits this with `{ workspace = true }`. Cargo strips the path and
+# keeps the version when packaging, so the published crate depends on crates.io.
+airsl      = { version = "0.1.0", path = "crates/airsl" }
+
+[workspace.lints.rust]
+unsafe_code        = "forbid"
+missing_docs       = "warn"
+unreachable_pub    = "warn"
+unused_must_use    = "deny"
+
+[workspace.lints.clippy]
+pedantic           = { level = "warn", priority = -1 }
+nursery            = { level = "warn", priority = -1 }
+unwrap_used        = "deny"
+expect_used        = "warn"
+panic              = "deny"
+todo               = "warn"
+dbg_macro          = "deny"
+missing_errors_doc = "warn"
+missing_panics_doc = "warn"
+
+[profile.release]
+lto                = "thin"
+codegen-units      = 1
+strip              = "symbols"
