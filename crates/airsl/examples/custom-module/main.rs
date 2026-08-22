@@ -124,7 +124,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let path: PathBuf =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/custom-module/metrics.lua");
-    let script = Script::from_source(std::fs::read_to_string(&path)?, "metrics.lua")?;
+    // Renamed rather than left as the absolute path `CARGO_MANIFEST_DIR` builds: the refusal this
+    // script prints carries its chunk name, and that name is not the reader's machine's business.
+    let script = Script::from_file(&path)?.with_name("metrics.lua")?;
     engine.eval(&script)?;
 
     Ok(())

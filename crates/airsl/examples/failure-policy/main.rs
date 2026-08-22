@@ -59,19 +59,17 @@ fn main() -> Result<(), Box<dyn Error>> {
 /// `CARGO_MANIFEST_DIR` rather than the working directory, so the example runs the same from the
 /// workspace root, from the crate directory, or from a `cargo run` in an editor.
 ///
-/// `Script::from_file` would be the shorter call, but it takes the chunk name from the path *as
-/// given* — and the path built here is absolute. The chunk name is what appears in every error
-/// message this example prints, so inheriting it would put the developer's home directory into the
-/// diagnostics. For a hook whose stderr ends up in someone else's log, that is a real leak and not
-/// only an untidy line, which is why the name is chosen here rather than inherited.
-///
-/// The cost is that the script gets no root, so it has no `require` — neither script here needs
-/// one. A script that loads siblings wants `from_file`, or `from_source(..).with_root(dir)`.
+/// `from_file` alone would take the chunk name from the path *as given*, and the path built here
+/// is absolute. That name appears in every error message this example prints, so inheriting it
+/// would put the developer's home directory into the diagnostics — and for a hook whose stderr
+/// ends up in someone else's log that is a real leak, not only an untidy line. `with_name`
+/// replaces the label and leaves everything else alone, so the script keeps the root it was read
+/// from and could still `require` a sibling.
 fn script(file: &str) -> Result<Script, Box<dyn Error>> {
     let path: PathBuf = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("examples/failure-policy")
         .join(file);
-    Ok(Script::from_source(std::fs::read_to_string(&path)?, file)?)
+    Ok(Script::from_file(&path)?.with_name(file)?)
 }
 
 /// Runs `script` and reports what `policy` would have the caller do about the outcome.

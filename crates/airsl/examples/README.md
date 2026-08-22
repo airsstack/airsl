@@ -63,19 +63,19 @@ does not run one, which is the difference between "it builds" and "it works" —
 - **`Script::from_file` is a host read.** Loading a script from disk is not governed by `FsGrant`;
   the grant governs the `airsstack.fs.*` calls the script itself makes. An example may therefore
   load a script from a path that script could not read.
-- **Several examples read the file and name the chunk themselves.** `Script::from_file` takes the
-  chunk name from the path as given (`src/types/chunk_name.rs:60`), and these examples build that
-  path from `CARGO_MANIFEST_DIR` — so a raised error would carry an absolute path into the
-  traceback, which is neither reproducible nor anyone else's business. Where an example prints a
-  failure, it uses:
+- **Several examples name the chunk themselves.** `Script::from_file` takes the chunk name from the
+  path as given (`src/types/chunk_name.rs:60`), and these examples build that path from
+  `CARGO_MANIFEST_DIR` — so a raised error would carry an absolute path into the traceback, which is
+  neither reproducible nor anyone else's business. Where an example prints a failure, it uses:
 
   ```rust
-  let script = Script::from_source(std::fs::read_to_string(&path)?, "raises.lua")?;
+  let script = Script::from_file(&path)?.with_name("raises.lua")?;
   ```
 
   This is worth knowing outside the examples: a hook loaded from an absolute path puts that path in
-  every diagnostic it emits. `with_root` is a separate wither, so a script named this way can still
-  have `require` — `Script::from_source(text, "main.lua")?.with_root(dir)` gives both.
+  every diagnostic it emits, and a hook's stderr often ends up in someone else's log. `with_name`
+  (`src/script.rs:118`) changes only the label — the source, the arguments and the root the file was
+  read from are untouched, so a renamed script still `require`s exactly what it could before.
 
 ## See also
 

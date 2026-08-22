@@ -33,7 +33,7 @@ decoded back: name=widget observed_at=1700000000 tags=2
 
 ## What it demonstrates
 
-- **Arguments arrive in Lua's own `arg` table.** `Script::with_args` (`src/script.rs:87`) carries
+- **Arguments arrive in Lua's own `arg` table.** `Script::with_args` (`src/script.rs:130`) carries
   them on the script rather than installing them into the state, so one engine can run two scripts
   and give each the arguments it was built with. A ported shell script reads `arg[1]` where it read
   `$1`.

@@ -65,11 +65,12 @@ counts.lua returned 20000100000
   caller would have to match on message text, and a script could then disguise its own failure as a
   resource breach.
 - **The chunk name is chosen, not inherited.** `Script::from_file` takes the chunk name from the
-  path as given (`src/script.rs:58`), and the path this example builds from `CARGO_MANIFEST_DIR` is
+  path as given (`src/script.rs:63`), and the path this example builds from `CARGO_MANIFEST_DIR` is
   absolute — so inheriting it would put the developer's home directory into every diagnostic above.
-  For a hook whose stderr lands in someone else's log that is a real leak, so the example reads the
-  file and names the chunk itself. The cost is that such a script has no root and therefore no
-  `require`; neither script here needs one.
+  For a hook whose stderr lands in someone else's log that is a real leak, so the example overrides
+  the label with `Script::with_name` (`src/script.rs:118`). It changes nothing else: the source, the
+  arguments and the root the file was read from all survive, so a renamed script still `require`s
+  what it could before.
 
 `counts.lua` is deliberately not a runaway. It is a correct, terminating script that becomes a
 breach only because the host handed it a 100,000-instruction budget — which keeps the file safe to
