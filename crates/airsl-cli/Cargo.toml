@@ -12,6 +12,9 @@ authors.workspace      = true
 readme     = "README.md"
 keywords   = ["lua", "scripting", "cli", "hooks"]
 categories = ["command-line-utilities"]
+# Points at the library's rustdoc rather than this crate's. The binary sets `doc = false`
+# below, so docs.rs would otherwise publish an empty page as this crate's documentation link.
+documentation = "https://docs.rs/airsl"
 
 [[bin]]
 name = "airsl"

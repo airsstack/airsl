@@ -1,6 +1,6 @@
 # airsl-cli
 
-The `airsl` binary: runs Lua scripts on the [`airsl`](../airsl) runtime.
+The `airsl` binary: runs Lua scripts on the [`airsl`](https://crates.io/crates/airsl) runtime.
 
 ## Install
 
@@ -8,6 +8,14 @@ The `airsl` binary: runs Lua scripts on the [`airsl`](../airsl) runtime.
 cargo install --locked airsl-cli
 airsl doctor
 ```
+
+**Linux and macOS only.** `airsstack.proc` resolves executables by unix mode bits, which have no
+Windows equivalent, so the runtime refuses to build off unix rather than pretending. Supporting
+Windows is a decision about what "executable" means there, not a portability patch.
+
+**A C compiler is required.** `mlua`'s `vendored` feature builds Lua 5.4 from the C sources shipped
+by `lua-src` and links it statically, so there is no system Lua and no `pkg-config` — but `cc` must
+be present before `cargo install` will get anywhere.
 
 To track unreleased `main` instead of the last release, `cargo install --git
 https://github.com/airsstack/airsl --locked airsl-cli`. Working inside a clone,
@@ -80,9 +88,9 @@ the invocation:
 | `--allow-exec PROGRAM` | running `PROGRAM`, matched on the name as written | yes |
 
 ```bash
-airsl run --allow-read "$AIRSSTACK_HOME" \
-          --allow-write "$AIRSSTACK_HOME/journal/.index" \
-          --allow-env AIRSSTACK_HOME \
+airsl run --allow-read "$APP_HOME" \
+          --allow-write "$APP_HOME/index" \
+          --allow-env APP_HOME \
           --allow-exec git \
           hooks/index.lua
 ```
@@ -101,7 +109,7 @@ declared list would narrow nothing and would make `airsl doctor` report somethin
 Runs the Lua test files under a directory, with the same policy and grant flags as `airsl run`.
 
 ```bash
-airsl test --allow-read . plugins/
+airsl test --allow-read . scripts/
 ```
 
 A test file is named `*_test.lua` or `test_*.lua` and returns a table whose named function values
@@ -125,15 +133,15 @@ files at all exits non-zero — "no tests" and "all tests passed" must not read 
 Compiles every `.lua` file under a directory without running a line of any of it.
 
 ```bash
-airsl check plugins
+airsl check scripts
 ```
 
 It exists because `airsl test` covers only what a test file loads, and a hook's entry point is
 usually loaded by nothing — the tests exercise the modules underneath it. A syntax error in a
 driver therefore survives a green test run, and `--fail-open` then swallows it when the hook fires:
-CI says nothing, the session says nothing, and the hook has quietly stopped working. Measured on
-the airsstack plugin suite before this existed, a missing `end` in the enforcement dispatcher left
-244 tests passing and the hook exiting 0.
+CI says nothing, the session says nothing, and the hook has quietly stopped working. Measured on one
+such script suite before this existed, a missing `end` in the dispatcher left 244 tests passing and
+the hook exiting 0.
 
 It takes no policy and no grants, because nothing is executed and parsing never consults the
 globals table — a chunk compiles or does not compile identically under every preset. Finding no
@@ -196,3 +204,25 @@ exit 0
 
 Every path exits 0, and `exec` is deliberately not used — it would replace the shell and hand the
 child's exit status straight back to the caller.
+
+## Documentation
+
+The reference layer is the library's rustdoc at [docs.rs/airsl](https://docs.rs/airsl) — this crate
+publishes none of its own, because every public item lives in `airsl` and the binary is a thin shell
+over it.
+
+Everything else is in [`crates/airsl/docs/`](https://github.com/airsstack/airsl/tree/main/crates/airsl/docs),
+organised on [Diátaxis](https://diataxis.fr/):
+
+- **[Tutorial](https://github.com/airsstack/airsl/blob/main/crates/airsl/docs/tutorial.md)** — from
+  installing this binary to a working agent hook, hitting the sandbox once on purpose along the way.
+- **[How-to](https://github.com/airsstack/airsl/blob/main/crates/airsl/docs/how-to.md)** — recipes
+  for a specific job, from Lua and from Rust.
+- **[Sandbox](https://github.com/airsstack/airsl/blob/main/crates/airsl/docs/sandbox.md)** — what a
+  grant is, where enforcement lives, and what the resource ceilings can and cannot promise.
+- **[Host standard library](https://github.com/airsstack/airsl/blob/main/crates/airsl/docs/stdlib.md)**
+  — every module a script sees under the `airsstack` global.
+- **[Architecture](https://github.com/airsstack/airsl/blob/main/crates/airsl/docs/architecture.md)**
+  — the three layers and why it is shaped this way.
+
+Each document marks which parts ship and which are design.
