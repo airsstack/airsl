@@ -7,6 +7,10 @@ value constructors.**
 Everything a script can reach arrives under one Lua global, `airsstack`, as subtables installed from
 Rust. This document is the roster, the reasoning, and the rules every module follows.
 
+Paths below of the form `plugins/…` cite the
+[airsstack plugin suite](https://github.com/rstlix0x0/airsstack), the corpus this tier was designed
+against. They are evidence from that repository, not files in this one.
+
 ## Why a host stdlib at all
 
 The answer that sounds right and is wrong: "because the sandbox removes Lua's own libraries." Under
@@ -218,8 +222,8 @@ The dispatcher still compiles its own globs
 (`plugins/airsstack/hooks/lib/globs.lua`) rather than delegating, for a different reason than
 before: `globset` accepts a strictly larger grammar than the enforcement manifests were written
 against. `*.{lua,rs}` matches here and not there, so delegating would widen matching for any
-manifest using braces — and a manifest is a contract with plugin authors outside this
-repository.
+manifest using braces — and a manifest is a contract with plugin authors outside the
+airsstack repository.
 
 ## See also
 

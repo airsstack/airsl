@@ -1,9 +1,9 @@
 //! `airsl test` — discovering and running Lua test files.
 //!
-//! Exists because the migration it serves is otherwise unverifiable. The plugin suite has test
-//! files that neither `cargo make dod` nor CI executes — they run under `sh` and `python3` by hand
-//! — and porting several thousand lines of script onto a new runtime without a test story is how a
-//! migration becomes a rewrite with unknown behaviour.
+//! Exists because the migration it served was otherwise unverifiable. The airsstack plugin suite's
+//! test files ran under `sh` and `python3` by hand, executed by no gate and no CI, and porting
+//! several thousand lines of script onto a new runtime without a test story is how a migration
+//! becomes a rewrite with unknown behaviour. Those files now run here.
 //!
 //! The conventions are deliberately thin, because every convention is something a script author
 //! has to learn:

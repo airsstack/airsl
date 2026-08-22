@@ -4,8 +4,9 @@
 reach. It is not a Lua interpreter that happens to be written in Rust — the point is the boundary:
 the host owns the capability surface, and a script gets only what the host granted it.
 
-Two things drive the design. The near-term one is done: the airsstack plugin suite's mix of
-Python, Node and POSIX sh is gone, replaced by Lua on this runtime, with 244 tests over it in CI. The longer-term one is serving as the **extension
+Two things drive the design. The near-term one is done: the mix of Python, Node and POSIX sh in the
+[airsstack plugin suite](https://github.com/rstlix0x0/airsstack) is gone, replaced by Lua on this
+runtime, with 244 tests over it in that repository's CI. The longer-term one is serving as the **extension
 system** for airsstack — third-party code, running with declared and negotiated capabilities. Redis
 is the precedent: scripts are useful precisely because the server, not the script, decides what the
 script can touch.

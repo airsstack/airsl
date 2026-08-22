@@ -4,8 +4,8 @@
 //! typically loaded by nothing: the tests exercise the modules underneath it. A syntax error in a
 //! driver therefore survives a green test run, and `--fail-open` then swallows it at the moment
 //! the hook fires — CI says nothing, the session says nothing, and the hook has quietly stopped
-//! working. Measured on this repository's own plugin suite before this existed: a missing `end` in
-//! the enforcement dispatcher left 244 tests passing and the hook exiting 0.
+//! working. Measured on the airsstack plugin suite before this existed: a missing `end` in the
+//! enforcement dispatcher left 244 tests passing and the hook exiting 0.
 //!
 //! Responsibilities: [`run`], which discovers, compiles and reports.
 //!
