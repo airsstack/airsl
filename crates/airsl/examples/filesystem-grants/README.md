@@ -25,10 +25,10 @@ atomic_write wrote <output>/index.json
 create_exclusive, first call:  true
 create_exclusive, second call: false
 <source> holds: notes.txt
-writing into the read root: fs.write denied: `<source>/notes.txt` is outside them — granted write roots are <output>
-reading back from the write root: fs.read denied: `<output>/notes.txt` is outside them — granted read roots are <source>
-listing the write root: fs.list denied: `<output>` is outside them — granted read roots are <source>
-reading outside every root: fs.read denied: `<outside>/secret.txt` is outside them — granted read roots are <source>
+writing into the read root: fs.write denied: `<source>/notes.txt` is outside the granted write roots: <output>
+reading back from the write root: fs.read denied: `<output>/notes.txt` is outside the granted read roots: <source>
+listing the write root: fs.list denied: `<output>` is outside the granted read roots: <source>
+reading outside every root: fs.read denied: `<outside>/secret.txt` is outside the granted read roots: <source>
 ```
 
 `<source>`, `<output>` and `<outside>` are substituted by `copy.lua` itself. A temporary directory
@@ -42,13 +42,15 @@ is one nobody can check.
   `allows_read` (`:61`) and `allows_write` (`:67`). The second and third refusals above are the
   script failing to read files it had just written.
 - **Containment is decided in exactly one place.** Every `fs` call — plus `hash.hash_file` and
-  `glob.walk` — funnels through `PathGuard` (`src/modules/guard.rs:30`), whose `read` (`:47`) and
-  `write` (`:60`) resolve the path before checking it. `resolve` (`:110`) canonicalises the deepest
+  `glob.walk` — funnels through `PathGuard` (`src/modules/guard.rs:57`), whose `read` (`:74`) and
+  `write` (`:87`) resolve the path before checking it. `resolve` (`:145`) canonicalises the deepest
   existing part of the path, so a symlink out of a granted root is caught, and refuses a `..` below
   that point rather than resolving it lexically.
-- **A refusal names the roots that *were* granted** — `PathGuard::deny` (`src/modules/guard.rs:72`).
+- **A refusal names the roots that *were* granted** — `PathGuard::deny` (`src/modules/guard.rs:105`).
   The usual cause of a denial is a grant one directory too deep, which is invisible without the
-  list.
+  list. Which allowlist a refusal was measured against is carried as an `Access` value
+  (`src/modules/guard.rs:31`) rather than a string, so the message and the check cannot name
+  different directions.
 - **Interrogation counts as reading.** `list`, `stat` and `exists` refuse an ungranted path rather
   than answering `false` for it (`src/modules/fs.rs:183`); answering would conflate "you may not
   ask" with "there is nothing there".

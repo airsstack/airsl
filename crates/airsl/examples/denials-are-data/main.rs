@@ -20,9 +20,9 @@ use tempfile::TempDir;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // One narrow grant, so every refusal has something to name. A policy granting nothing at all
-    // would print "no read roots are granted" four times and show nothing about how a refusal
-    // helps: the usual cause of one is a grant a single directory too deep, which is invisible
-    // unless the message lists the roots that did apply.
+    // would print "none are granted" four times and show nothing about how a refusal helps: the
+    // usual cause of one is a grant a single directory too deep, which is invisible unless the
+    // message lists the roots that did apply.
     let granted = TempDir::new()?;
     let granted_root = granted.path().canonicalize()?;
     std::fs::write(granted_root.join("visible.txt"), "inside the grant\n")?;

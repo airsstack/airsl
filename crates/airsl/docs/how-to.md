@@ -172,7 +172,7 @@ utf8.len("café")   --> 4   (characters)
 Read the whole message — it names the roots that *were* granted:
 
 ```
-airsl: fs.read denied: `/etc/hostname` is outside them — granted read roots are /home/me/journal
+airsl: fs.read denied: `/etc/hostname` is outside the granted read roots: /home/me/journal
 ```
 
 The usual cause is a grant one directory too deep. If the roots list looks right but nothing matches,

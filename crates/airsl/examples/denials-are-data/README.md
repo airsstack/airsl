@@ -14,8 +14,8 @@ cargo run -p airsl --example denials-are-data
 ```
 
 The policy carries one narrow grant of each kind, so every refusal has something to name. A policy
-granting nothing at all would print *"no read roots are granted"* four times and show nothing about
-how a refusal helps.
+granting nothing at all would print *"none are granted"* four times and show nothing about how a
+refusal helps.
 
 ## Output
 
@@ -26,13 +26,13 @@ json.encode needs nothing: {"ok":true}
 granted read works: 17 bytes
 
 fs.read, outside the granted root
-  fs.read denied: `/` is outside them — granted read roots are <granted>
+  fs.read denied: `/` is outside the granted read roots: <granted>
 fs.write, into the read-only root
-  fs.write denied: `<granted>/new.txt` is outside them — no write roots are granted
+  fs.write denied: `<granted>/new.txt` is outside the granted write roots: none are granted
 hash.hash_file, outside the granted root
-  hash.hash_file denied: `/` is outside them — granted read roots are <granted>
+  hash.hash_file denied: `/` is outside the granted read roots: <granted>
 glob.walk, outside the granted root
-  glob.walk denied: `/` is outside them — granted read roots are <granted>
+  glob.walk denied: `/` is outside the granted read roots: <granted>
 env.get, a name that is not on the allowlist
   env.get denied: `AIRSL_EXAMPLE_SECRET` is not granted — the allowed names are PATH
 proc.run, an executable that is not on the allowlist

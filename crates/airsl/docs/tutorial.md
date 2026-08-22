@@ -68,7 +68,7 @@ print(#airsstack.regex.find_all([[(?m)^#+ .+$]], notes) .. " headings")
 
 ```console
 $ airsl run count.lua
-airsl: lua error in count.lua: fs.read denied: `/home/you/demo/notes.md` is outside them — no read roots are granted
+airsl: lua error in count.lua: fs.read denied: `/home/you/demo/notes.md` is outside the granted read roots: none are granted
 ```
 
 **This is the point of the crate, so it is worth pausing on.** The script is not broken. `airsl` runs
