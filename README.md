@@ -61,6 +61,12 @@ Needs [cargo-make](https://github.com/sagiegurari/cargo-make)
 (`cargo install --locked cargo-make`). CI runs `cargo make dod`, so the pipeline and a local run are
 the same command.
 
+## Releases
+
+[CHANGELOG.md](CHANGELOG.md) covers both crates in one timeline. Each release is tagged per crate —
+`airsl-v0.1.2`, `airsl-cli-v0.1.1` — because one commit has shipped two crates under two different
+version numbers, which a single `vX.Y.Z` tag cannot name.
+
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
