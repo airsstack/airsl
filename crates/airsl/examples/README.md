@@ -57,6 +57,7 @@ does not run one, which is the difference between "it builds" and "it works" —
 | Example | What it shows |
 | --- | --- |
 | [`engine-reuse`](engine-reuse/) | What an evaluation resets and what it leaves behind, and why a shared engine buys reuse rather than parallelism. |
+| [`agent-hook`](agent-hook/) | A `PreToolUse` hook end to end: the payload on stdin, the envelope on stdout, and why only the exit status blocks a tool call. |
 
 ### Extending the runtime
 
