@@ -44,6 +44,7 @@ On 5.1 a JSON `3` and a JSON `3.0` are the same value, which breaks byte-stable 
 | `airsstack.glob` | glob matching, and walking a tree by pattern | only `walk` |
 | `airsstack.stdio` | the process's own standard streams | no |
 | `airsstack.hook` | the agent-hook payload and output contract | no |
+| `airsstack.ext` | event registration (`on`) and capability introspection (`granted`) for a registered extension | no |
 
 Every module is installed under every preset. One the policy has granted nothing is present and
 refuses each call — the authority is in the grant, not in whether the table is there.

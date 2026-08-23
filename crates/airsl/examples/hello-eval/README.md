@@ -26,11 +26,11 @@ surface: restricted, grants: none
   the `EngineBuilder<Present>` that does — `src/builder.rs:41` and `src/builder.rs:67`. Forgetting
   to sandbox an engine is not a mistake this API lets you make.
 - **`eval` versus `eval_to`.** `eval` runs a chunk for its effects and discards the result
-  (`src/engine.rs:124`); `eval_to::<T>` converts whatever the chunk returned into a Rust type
-  through `FromLuaMulti` (`src/engine.rs:142`).
+  (`src/engine.rs:215`); `eval_to::<T>` converts whatever the chunk returned into a Rust type
+  through `FromLuaMulti` (`src/engine.rs:237`).
 - **`Script::from_source` names the chunk.** The name is what appears in an error message, so it is
   a required argument rather than an option — `src/script.rs:37`.
-- **The policy reads back off the engine** (`src/engine.rs:100`). A module enforces the same object
+- **The policy reads back off the engine** (`src/engine.rs:131`). A module enforces the same object
   the engine reports, which is why `airsl doctor` cannot describe one policy while the runtime
   applies another.
 

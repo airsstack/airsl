@@ -20,7 +20,7 @@ refusal helps.
 ## Output
 
 ```
-modules installed: json, path, fs, env, proc, regex, hash, time, glob, stdio, hook
+modules installed: json, path, fs, env, proc, regex, hash, time, glob, stdio, hook, ext
 path.join needs nothing: a/b/c.txt
 json.encode needs nothing: {"ok":true}
 granted read works: 17 bytes
@@ -46,9 +46,9 @@ which keeps the message identical on Linux and macOS. `<granted>` is substituted
 
 ## What it demonstrates
 
-- **A module is always present, even ungranted.** All eleven are asserted to be tables under a
+- **A module is always present, even ungranted.** All twelve are asserted to be tables under a
   policy that grants almost none of what they do. The roster comes from `modules::stdlib()`
-  (`src/modules/stdlib.rs:20`), which is the single list the engine, `airsl doctor` and the tests
+  (`src/modules/stdlib.rs:22`), which is the single list the engine, `airsl doctor` and the tests
   all read.
 - **Enforcement is per call, not per installation.** `HostModule::install` receives the policy
   through `InstallContext` (`src/modules/registry.rs:33`) and captures what it needs into the
@@ -63,7 +63,7 @@ which keeps the message identical on Linux and macOS. `<granted>` is substituted
   own. They share `PathGuard` with `fs` — `src/modules/hash.rs:73` and `src/modules/glob.rs:89`,
   against `src/modules/fs.rs:78`. `glob.match`, which is pure pattern arithmetic, needs nothing.
 - **Every refusal is actionable.** Each message names the module, the operation, what was refused,
-  and what *was* granted — `Error::Denied` (`src/error.rs:131`). "Permission denied" without those
+  and what *was* granted — `Error::Denied` (`src/error.rs:169`). "Permission denied" without those
   is indistinguishable from the operating system's own refusal, and sends whoever reads it looking
   at file modes instead of at the policy.
 

@@ -18,18 +18,18 @@ https://github.com/airsstack/airsl --locked airsl-cli`. Working inside a clone,
 `cargo install --path crates/airsl-cli --force` builds from the checked-out sources.
 
 ```
-airsl 0.1.0
+airsl 0.1.1
   lua:          Lua 5.4
   language:     restricted
   root table:   airsstack
   grants:       none
   memory:       67108864 bytes
   instructions: 100000000 instructions
-  modules:      json, path, fs, env, proc, regex, hash, time, glob, stdio, hook
+  modules:      json, path, fs, env, proc, regex, hash, time, glob, stdio, hook, ext
 ```
 
 `doctor` describes what a script would actually get. Read the last three lines now, because they are
-the whole model: a script gets eleven host modules, two resource ceilings, and **no grants**.
+the whole model: a script gets twelve host modules, two resource ceilings, and **no grants**.
 
 ## 1. Run something
 

@@ -63,16 +63,16 @@ not this example's to choose, and every `## Output` block here has to reproduce 
   with `cargo bench -p airsl` before relying on them. Nothing is measured *inside* this example,
   because a printed duration would give it a different output on every run.
 - **The `arg` table is per evaluation.** `set_arguments` builds a fresh table and assigns the global
-  before the chunk loads (`src/engine.rs:170`), so one `Script` cloned with three different
+  before the chunk loads (`src/engine.rs:260`), so one `Script` cloned with three different
   `with_args` (`src/script.rs:130`) yields three different answers on one engine. `arg[0]` is the
   chunk's own name — Lua's convention for a standalone script, and what a ported shell script reads
   where it read `$0`.
 - **The instruction counter is per evaluation.** `eval_to` resets the budget before anything else
-  (`src/engine.rs:150`), so the script after a breach gets the whole ceiling rather than what the
+  (`src/engine.rs:237`), so the script after a breach gets the whole ceiling rather than what the
   previous one left of it. The alternative fails in a way that depends on what ran before it, which
-  is not reproducible from the failing script alone. Tested at `src/engine.rs:467`.
+  is not reproducible from the failing script alone. Tested at `src/engine.rs:619`.
 - **The `require` root is per evaluation.** `set_require` decides from the *script's* directory
-  (`src/engine.rs:190`), so `alpha/main.lua` and `beta/main.lua` each resolve `require('lib')`
+  (`src/engine.rs:280`), so `alpha/main.lua` and `beta/main.lua` each resolve `require('lib')`
   against their own root on the same engine. A confined script built from source has no directory
   and so gets no `require` at all.
 - **The `require` module cache is not.** The table of loaded modules is created once and kept
@@ -91,11 +91,11 @@ not this example's to choose, and every `## Output` block here has to reproduce 
   engine carries earlier scripts' garbage until the collector runs.
 - **`Engine` is `Send + Sync`, and sharing is not parallelism.** Four threads hold one engine through
   an `Arc` and each sees its own arguments. That works because the engine takes a lock spanning the
-  whole evaluation (`src/engine.rs:145`) rather than relying on `mlua`'s per-operation locking, which
+  whole evaluation (`src/engine.rs:64`) rather than relying on `mlua`'s per-operation locking, which
   is memory-safe without being correct across the four steps of an eval — reset the budget, write
-  `arg`, install `require`, run the chunk (`src/engine.rs:142`). Before that lock existed, eight
+  `arg`, install `require`, run the chunk (`src/engine.rs:56`). Before that lock existed, eight
   threads evaluating `return arg[1]` on one engine got another thread's argument 12,247 times out of
-  16,000 (`src/engine.rs:50`); the regression test is at `src/engine.rs:512`. Lua on a single state
+  16,000 (`src/engine.rs:59`); the regression test is at `src/engine.rs:664`. Lua on a single state
   cannot execute in parallel however you hold it, so the lock costs an uncontended acquisition and
   no throughput — **a shared engine buys reuse, never concurrency.** For parallelism, build one
   engine per thread and pay construction once each.

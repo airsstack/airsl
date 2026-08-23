@@ -61,11 +61,15 @@ is the long form.
    (which of *Lua's own* libraries a script sees), `GrantSet`/`FsGrant`/`EnvGrant`/`ProcGrant`
    (what host modules may touch), `ResourceLimits` (memory + instruction ceilings, armed on the
    state before any module installs). `Policy::trusted() / confined() / pure()` are the presets.
-3. **The capability surface** (`src/modules/`) — eleven `HostModule` implementations installed as
+3. **The capability surface** (`src/modules/`) — twelve `HostModule` implementations installed as
    subtables of a single Lua global, per-engine and defaulting to `airsstack`.
 
 Key seams:
 
+- `Engine::dispatch` (`engine.rs`) is how a host invokes the handlers a script registered with
+  `ext.on`. Handlers live in a registry table written by `modules/ext.rs`; the engine records the
+  evaluating `ThreadId` so a handler that re-enters its own engine gets `Error::Reentrant`, never a
+  deadlock.
 - `Engine::builder()` is a **type-state builder** (`builder.rs`, `Missing`/`Present`): there is no
   `build()` until `policy()` has been called, so a sandbox cannot be forgotten.
 - `HostModule::install(&mlua::Lua, &mlua::Table, &InstallContext)` is the extension seam. `mlua` is
@@ -125,7 +129,8 @@ sandbox, stdlib, extensions. Reference is the rustdoc, not a file there.
 Evidence rules those documents follow, and that edits to them must keep: a claim about code that
 exists carries a `file:line`; a claim about code that does not exist says so explicitly. The status
 table in `docs/README.md` marks each area **implemented** or **proposed** — the extension host
-(manifests, negotiation, dispatch) is proposed and unbuilt. Quoted measurements are a snapshot from
+(manifests, negotiation, loader) is proposed and unbuilt; event dispatch (`modules/ext.rs`,
+`Engine::dispatch`) is implemented. Quoted measurements are a snapshot from
 `cargo bench -p airsl` on one machine, not a guarantee.
 
 Commits follow Conventional Commits with a scope naming the affected area (`fix(ci):`,

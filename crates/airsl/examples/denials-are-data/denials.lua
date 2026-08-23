@@ -39,7 +39,7 @@ end
 -- about its own authority.
 local installed = {
   "json", "path", "fs", "env", "proc", "regex",
-  "hash", "time", "glob", "stdio", "hook",
+  "hash", "time", "glob", "stdio", "hook", "ext",
 }
 for _, name in ipairs(installed) do
   assert(type(airsstack[name]) == "table", name .. " is missing from the root table")

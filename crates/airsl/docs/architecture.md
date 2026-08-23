@@ -18,7 +18,7 @@ independent, they fail differently, and they are at different stages of completi
 
 ```mermaid
 graph TD
-    L3["Layer 3 — Capability surface<br/>host modules under the root table<br/>complete: 11 modules"]
+    L3["Layer 3 — Capability surface<br/>host modules under the root table<br/>complete: 12 modules"]
     L2["Layer 2 — Policy<br/>language surface, grants, resource ceilings<br/>complete"]
     L1["Layer 1 — The VM<br/>Lua 5.4, compiled from C, statically linked<br/>complete"]
     L3 --> L2 --> L1
@@ -48,8 +48,9 @@ directory roots split by read and write, environment variable names, executable 
 module through the `InstallContext` its `install` receives. [sandbox.md](sandbox.md) has the model.
 
 **Layer 3 — the capability surface.** Rust functions installed as subtables of a single Lua global,
-named per engine and defaulting to `airsstack`. Eleven modules ship: `json`, `path`, `fs`, `env`,
-`proc`, `regex`, `hash`, `time`, `glob`, `stdio` and `hook`. [stdlib.md](stdlib.md) has the roster.
+named per engine and defaulting to `airsstack`. Twelve modules ship: `json`, `path`, `fs`, `env`,
+`proc`, `regex`, `hash`, `time`, `glob`, `stdio`, `hook` and `ext`. [stdlib.md](stdlib.md) has the
+roster.
 
 The split that matters is which of them need authority. `path`, `regex`, `time` and `stdio` reach
 nothing and are installed under every preset including `pure`. `fs`, `env` and `proc` each take a
@@ -61,9 +62,9 @@ A module is a capability, and sometimes the boundary runs through the middle of 
 
 | Preset | Lua libraries | `require` | Ceilings | Host modules |
 |---|---|---|---|---|
-| `trusted` | everything except `debug` — including `io`, `os`, `package` | Lua's own, unconfined | none | all 11, unrestricted |
-| `confined` (default) | `string`, `table`, `math`, `utf8`, `coroutine`, pure `os` | confined to the script directory | 64 MiB, 100M instructions | all 11, granted nothing by default |
-| `pure` | `string`, `table`, `math`, `utf8` | none | 16 MiB, 10M instructions | all 11, granted nothing by default |
+| `trusted` | everything except `debug` — including `io`, `os`, `package` | Lua's own, unconfined | none | all 12, unrestricted |
+| `confined` (default) | `string`, `table`, `math`, `utf8`, `coroutine`, pure `os` | confined to the script directory | 64 MiB, 100M instructions | all 12, granted nothing by default |
+| `pure` | `string`, `table`, `math`, `utf8` | none | 16 MiB, 10M instructions | all 12, granted nothing by default |
 
 Every module is installed under every preset. A module the policy has granted nothing is present and
 refuses each call with a message naming what *was* granted — rather than being absent, which would
@@ -99,7 +100,7 @@ let engine = Engine::builder()
 
 This was verified from a separate crate outside the workspace, and re-verified after `install`
 gained its context argument: the custom module installed under a root table named `myapp`, read its
-authority from the `InstallContext`, and all eleven built-ins remained available alongside it.
+authority from the `InstallContext`, and all twelve built-ins remained available alongside it.
 
 `install` also receives an `InstallContext` carrying the policy the engine was built with, which is
 what keeps the authority a module enforces and the authority `airsl doctor` reports the same object.
@@ -134,7 +135,7 @@ operation (`mlua-0.12.0/src/state.rs:58`), and an evaluation is four of them —
 write `arg`, install `require`, run the chunk. That was enough for memory safety and not enough for
 correctness: eight threads evaluating `return arg[1]` on one engine got another thread's argument
 12,247 times out of 16,000. `Engine` now holds a lock spanning the whole sequence
-(`engine.rs:142-161`), which takes that to zero. Lua on one state cannot execute in parallel
+(`engine.rs:237-251`), which takes that to zero. Lua on one state cannot execute in parallel
 whatever we do, so the lock costs an uncontended acquisition and no throughput — a shared engine is
 a way to avoid rebuilding a state, never a way to get parallelism.
 
@@ -149,7 +150,7 @@ eval, fresh engine each time:  136 µs
 ```
 
 Thirty-fold between reusing a state and rebuilding one, and the gap widened as the standard library
-grew — construction installs eleven modules now rather than one. For the CLI it is irrelevant — a
+grew — construction installs twelve modules now rather than one. For the CLI it is irrelevant — a
 process spawn costs 3.2 ms, which dwarfs everything above and is itself within half again of a bare
 `sh` spawn. For an embedded consumer it is the difference between a viable dispatch path and a wasteful
 one, and for a registered extension called on every event it is the whole design.

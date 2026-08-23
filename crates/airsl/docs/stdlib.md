@@ -150,9 +150,20 @@ match. It did **not** agree about `*`; see the defect note below.
 |---|---|
 | `stdio` | `read`, `lines`, `write`, `error`, `isatty` — read stdin, write stdout/stderr. `Restricted` has no `io` at all, and a hook receives its payload on stdin |
 | `hook` | `payload`, `emit`, `context` — the agent-hook contract. A thin layer over `stdio` + `json` |
+| `ext` | `on`, `granted` — event registration and capability introspection for a registered extension. It addresses the host's dispatch, not the script's own work, which is why it is a separate module rather than an addition to `hook` |
 | `test` | not a module but a runner — `airsl test`. See below |
 
-All three ship. `airsl test` deserves emphasis: a script corpus typically has test files that no
+`ext` needs no grant. `on` and `granted` touch a registry table and the policy the engine already
+carries, not a host resource, so neither goes through `InstallContext`'s grant checks the way `fs`
+or `proc` do. `stdlib()` installs it with no declared events — `Ext::new()` — so calling `on` under
+the default module set refuses immediately with `this runtime dispatches no events`; a registered
+extension instead gets a copy built with `Ext::with_events(...)`, naming the events its host
+declared, and `on` accepts registrations only for names in that set. `granted()` returns a table
+built once at install time from the engine's grants and resource limits, so a script can introspect
+what it actually received without needing a grant of its own to ask
+(`src/modules/ext.rs:123`, `GRANTED_KEY`; `granted_table` at `src/modules/ext.rs:149`).
+
+All four ship. `airsl test` deserves emphasis: a script corpus typically has test files that no
 Rust gate executes — they run under `sh` and `python3` by hand — and porting several thousand lines
 of script onto a new runtime without a test story is how a migration becomes a rewrite with unknown
 behaviour.

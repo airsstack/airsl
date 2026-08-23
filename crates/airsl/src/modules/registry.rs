@@ -151,6 +151,26 @@ impl ModuleSet {
         Ok(())
     }
 
+    /// Replaces the registered module with the same name, keeping its position.
+    ///
+    /// Exists so a host can take [`mod@crate::modules::stdlib`] and swap one built-in for a
+    /// differently-configured instance — the `ext` module with the host's event list — without
+    /// rebuilding the list or changing installation order.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::ModuleNotFound`] if no module with that name is registered; the set is
+    /// left unchanged.
+    pub fn replace(&mut self, module: Box<dyn HostModule>) -> Result<()> {
+        let Some(slot) = self.modules.iter_mut().find(|m| m.name() == module.name()) else {
+            return Err(Error::ModuleNotFound {
+                module: module.name().to_string(),
+            });
+        };
+        *slot = module;
+        Ok(())
+    }
+
     /// Whether a module is registered under `name`.
     #[must_use]
     pub fn contains(&self, name: &ModuleName) -> bool {
@@ -264,5 +284,29 @@ mod tests {
         set.insert(Stub::boxed("b")).unwrap();
         let seen: Vec<_> = set.iter().map(|m| m.name().to_string()).collect();
         assert_eq!(seen, ["a", "b"]);
+    }
+
+    #[test]
+    fn replace_swaps_a_registered_module_in_place() {
+        let mut set = ModuleSet::new();
+        set.insert(Stub::boxed("a")).unwrap();
+        set.insert(Stub::boxed("b")).unwrap();
+        set.insert(Stub::boxed("c")).unwrap();
+        set.replace(Stub::boxed("b")).unwrap();
+        let seen: Vec<_> = set.iter().map(|m| m.name().to_string()).collect();
+        assert_eq!(seen, ["a", "b", "c"], "order is preserved");
+        assert_eq!(set.len(), 3);
+    }
+
+    #[test]
+    fn replace_refuses_a_module_that_is_not_registered() {
+        let mut set = ModuleSet::new();
+        set.insert(Stub::boxed("a")).unwrap();
+        let err = set.replace(Stub::boxed("zzz")).unwrap_err();
+        assert!(
+            matches!(err, crate::Error::ModuleNotFound { ref module } if module == "zzz"),
+            "{err}"
+        );
+        assert_eq!(set.len(), 1);
     }
 }

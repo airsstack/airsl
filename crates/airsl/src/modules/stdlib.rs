@@ -9,7 +9,9 @@
 //! Non-responsibilities: installing the modules. The engine does that.
 
 use crate::error::Result;
-use crate::modules::{Env, Fs, Glob, Hash, Hook, Json, ModuleSet, Path, Proc, Regex, Stdio, Time};
+use crate::modules::{
+    Env, Ext, Fs, Glob, Hash, Hook, Json, ModuleSet, Path, Proc, Regex, Stdio, Time,
+};
 
 /// Builds the default host-module set.
 ///
@@ -30,6 +32,7 @@ pub fn stdlib() -> Result<ModuleSet> {
     set.insert(Box::new(Glob::new()))?;
     set.insert(Box::new(Stdio::new()))?;
     set.insert(Box::new(Hook::new()))?;
+    set.insert(Box::new(Ext::new()))?;
     Ok(set)
 }
 
