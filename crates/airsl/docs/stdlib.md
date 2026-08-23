@@ -93,12 +93,20 @@ recorded under [what the port had to work around](#what-the-port-had-to-work-aro
 | `proc` | `run(argv) -> {stdout, stderr, status}`, `which` | executable allowlist | std |
 | `regex` | `compile`, `is_match`, `find`, `find_all`, `captures`, `replace`, `replace_all`, `split` | none | `regex` |
 | `hash` | `sha1`, `sha256`, `hash_file`, hex encoding | none, except `hash_file`, which needs the read grant | `sha2`, `sha1` |
-| `time` | `now`, `monotonic`, `format`, `parse` | none | `jiff` |
+| `time` | `now`, `monotonic`, `format`, `parse` | none | `jiff`, std |
 | `glob` | `match(pattern, path)`, `walk(root, pattern)` | inherits `fs` | `globset` |
 
 All eight are built and every backing crate is now used by the module that named it. `getrandom`
 was declared with no module on this roster to consume it and has been removed; `sha1` was added
 with `hash`, so the dependency list keeps meaning "something uses this".
+
+`time` names two backing crates because `monotonic` is not a date. `now`, `format` and `parse` are
+calendar operations and go through `jiff`; `monotonic` reads `std::time::Instant`
+(`src/modules/time.rs:103`), which is `CLOCK_MONOTONIC` and therefore unaffected by the wall clock
+being adjusted under a running script. No datetime crate can supply that — a `DateTime` is a point
+on a calendar, and a calendar point is defined by the wall clock, so `jiff` and `chrono` alike
+bottom out in `SystemTime::now`. It follows that a `monotonic` reading is seconds since an
+unspecified origin, meaningful only when subtracted from another one, and never a timestamp.
 
 Three rows carry a grant, and two more inherit one. `hash_file` and `glob.walk` read the filesystem,
 so they go through the same guard `fs` does and need the same read grants — "inherits `fs`" made
