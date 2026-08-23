@@ -168,6 +168,9 @@ one Lua state cannot execute in parallel anyway.
 - **[How-to](docs/how-to.md)** — recipes for a specific job, from Lua and from Rust.
 - **[Architecture](docs/architecture.md)**, **[Sandbox](docs/sandbox.md)**,
   **[Host stdlib](docs/stdlib.md)**, **[Extensions](docs/extensions.md)** — the explanation layer.
+  Extensions covers manifests, capability negotiation, and `ExtensionHost` — the host loads a
+  directory of third-party Lua extensions into running, negotiated engines and dispatches events
+  to them; only the `airsl ext` CLI is still proposed.
 - Reference is the rustdoc: `cargo doc -p airsl --no-deps --open`.
 
 Each document says which parts are shipped and which are design.

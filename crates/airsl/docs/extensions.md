@@ -1,13 +1,15 @@
 # Extension system
 
-**Status: partly implemented.** The dispatcher exists — `airsstack.ext` (`src/modules/ext.rs`) and
-`Engine::dispatch` (`src/engine.rs`), see the status table at the end of this document. The
-manifest parser exists (`src/extension/manifest.rs:189`), and so do the ceiling
-(`src/extension/ceiling.rs:18`, `Ceiling::new`), negotiation (`src/extension/negotiate.rs:274`,
+**Status: implemented, except the CLI.** The dispatcher exists — `airsstack.ext`
+(`src/modules/ext.rs`) and `Engine::dispatch` (`src/engine.rs`), see the status table at the end of
+this document. The manifest parser exists (`src/extension/manifest.rs:189`), and so do the ceiling
+(`src/extension/ceiling.rs:27`, `Ceiling::new`), negotiation (`src/extension/negotiate.rs:274`,
 `negotiate`) and the approver (`src/extension/approver.rs:68`, the `Approver` trait plus
-`ManifestApprover`/`DenyAll`). What is still missing is the loader that ties them together —
-`ExtensionHost`, `ExtensionHost::load`, and the `Extension` handle the sketch below shows — so a
-host cannot yet call one function and get a running, negotiated extension back.
+`ManifestApprover`/`DenyAll`). The loader that ties them together is built too:
+`ExtensionHost::load` (`src/extension/host.rs:251`) drives `Extension::approve`
+(`src/extension/loaded.rs:175`) followed by `Approved::start` (`src/extension/loaded.rs:96`), so a
+host calls one function and gets a running, negotiated extension back. What remains is the CLI
+(`airsl ext doctor`/`airsl ext fire`), still proposed.
 See [architecture.md](architecture.md).
 
 An extension is third-party code that runs inside a host program with capabilities it *requested* and
@@ -81,12 +83,12 @@ end
 
 ## The host API
 
-The pieces below the loader are implemented and tested today; `ExtensionHost` is the proposed shape
-that will call them in sequence and is not yet built.
+Every piece below is implemented and tested today, `ExtensionHost` included
+(`src/extension/host.rs:208`).
 
 ```rust
-// Implemented: Ceiling::new (src/extension/ceiling.rs:27) refuses a policy that would not bound
-// anything — a full language surface or unrestricted grants.
+// Ceiling::new (src/extension/ceiling.rs:27) refuses a policy that would not bound anything — a
+// full language surface or unrestricted grants.
 let ceiling = Ceiling::new(
     Policy::confined().with_grants(
         GrantSet::declared()
@@ -95,21 +97,29 @@ let ceiling = Ceiling::new(
     ),
 )?;
 
-// Implemented: Manifest::from_dir (src/extension/manifest.rs:189) and negotiate
-// (src/extension/negotiate.rs:274) intersect the request with the ceiling.
-let manifest = Manifest::from_dir(extension_dir, &variables)?;
-let negotiation = negotiate(&manifest, &ceiling, &stdlib()?);
+// ExtensionHost::builder (src/extension/host.rs:222) is a type-state builder — there is no
+// `build()` until `ceiling()` has been called. `.modules(factory)` replaces the module set each
+// load starts from; it takes a `Fn() -> Result<ModuleSet>` because ModuleSet holds
+// `Box<dyn HostModule>` and cannot be cloned, so a factory is drawn from fresh per load rather
+// than passed as one owned value. Left unset it defaults to `crate::modules::stdlib`.
+let mut host = ExtensionHost::builder()
+    .ceiling(ceiling)
+    .events(["session_start"])?
+    .approver(ManifestApprover)
+    .build()?;
 
-// Implemented: the Approver trait (src/extension/approver.rs:68) with two shipped
-// implementations — ManifestApprover honours a satisfied negotiation, DenyAll refuses everything.
-let decision = ManifestApprover.decide(&ApprovalRequest::new(extension_dir, &manifest, &negotiation));
-
-// Proposed, not yet built: the loader that turns an approved negotiation into a running engine.
-let host = ExtensionHost::builder().ceiling(ceiling).approver(ManifestApprover).build()?;
+// ExtensionHost::load (src/extension/host.rs:251) runs Manifest::from_dir
+// (src/extension/manifest.rs:189), negotiate (src/extension/negotiate.rs:274), the approver, and
+// Approved::start (src/extension/loaded.rs:96), which builds the engine and evaluates the entry
+// script — in that order, and returns the running Extension.
 let ext = host.load(extension_dir)?;
 println!("{:?}", ext.granted());
-ext.call("on_session_start", payload)?;
+ext.call(&EventName::new("session_start")?, &payload)?;
 ```
+
+`ManifestApprover` and `DenyAll` are the two shipped `Approver` implementations
+(`src/extension/approver.rs:68,75,95`) — the library ships no `interactive()`. Prompting a person is
+a host's own `Approver` impl: the library never owns a terminal.
 
 The **ceiling** is what makes manifest-driven requests safe to honour at all: it is the host
 program's own statement of maximum authority, and nothing a manifest says can exceed it. The
@@ -155,8 +165,11 @@ what every script running on this runtime is.
 **Registered extensions** load once, register handlers, and are called repeatedly by the host as
 events occur. This is the Redis model and what "extension system" normally means. The pieces it
 runs on are implemented — registration (`airsstack.ext.on`, `src/modules/ext.rs:104`), dispatch
-(`Engine::dispatch`, `src/engine.rs:353`), and a **persistent engine across calls** (below) — but
-nothing yet turns a manifest into one: that is the loader, `ExtensionHost`, still proposed.
+(`Engine::dispatch`, `src/engine.rs:353`), and a **persistent engine across calls** (below) — and
+`ExtensionHost` turns a manifest into one: `Extension` owns the engine `Approved::start`
+(`src/extension/loaded.rs:96`) builds, and `ExtensionHost::broadcast`
+(`src/extension/host.rs:312`) calls every loaded extension's handler in load order without
+short-circuiting on a failure.
 
 The persistent engine is where the measurements matter: 4.6 µs per call on a reused engine against
 136 µs constructing a fresh one. The gap widened as the standard library grew — a fresh engine now
@@ -187,9 +200,10 @@ dispatches has to be built.
 | `Approver`, `ManifestApprover`, `DenyAll` | implemented — `src/extension/approver.rs:68,75,95` |
 | `ext.on` registration and host dispatcher | implemented — `src/modules/ext.rs:104` (`on`), `src/engine.rs:353` (`dispatch`) |
 | Capability introspection (`ext.granted`) | implemented — `src/modules/ext.rs:116` (`granted`) |
-| `ExtensionHost` — the loader tying the above together | proposed |
+| `ExtensionHost`, `Extension` — the loader tying the above together | implemented — `src/extension/host.rs:251` (`ExtensionHost::load`), `src/extension/loaded.rs:175` (`Extension::approve`), `src/extension/loaded.rs:96` (`Approved::start`) |
+| CLI — `airsl ext doctor` / `airsl ext fire` | proposed |
 
-## Sequencing, and one caution
+## Sequencing, versioning, and fail-closed
 
 **The extension host should come after the standard library, not before.** The grant vocabulary *is*
 the module list — a manifest cannot say `fs.read = [...]` before `fs` exists — so building the host
@@ -197,20 +211,38 @@ first would have meant designing grants for capabilities with no implementation 
 That ordering is now satisfied: every capability a manifest can name exists, and the grant types a
 manifest would parse into are the ones the modules already enforce.
 
-**Versioning needs a decision before the first third-party extension ships.** An extension pins
-`api = 1`; modules will grow functions and occasionally change semantics. Whether the guarantee is
-"additive only within an api version" or something looser constrains every module signature from
-here onward, and it is very hard to tighten afterwards.
+**Versioning rule.** Within `api = 1`, a module or event may only gain functions or names — an
+existing signature never narrows, and an existing name never changes meaning. A change that is not
+additive bumps `SUPPORTED_API` (`src/extension/api_version.rs:20`); an extension whose manifest
+names an `api` outside that set is refused before any code runs — `ApiVersion::supported`
+(`src/extension/api_version.rs:34`) returns `Error::UnsupportedApi` naming the supported set. This
+is the guarantee an installed extension gets: nothing it already relies on stops working under the
+api number it pinned.
 
-## Open questions
+**The fail-closed invariant.** A required capability outside the ceiling is refused before the
+approver is ever asked, and the approver is asked before any engine exists —
+`Extension::approve` (`src/extension/loaded.rs:175`) runs the negotiation check first and returns
+`Error::ExtensionDenied` on the first denial it finds, so an approver can only narrow what a
+ceiling already bounds, never widen it, and no entry script executes until both checks have passed.
 
-- Whether grants are revocable at runtime, or fixed for an engine's lifetime. Fixed is far simpler
-  and probably right.
-- How a registered extension reports failure without taking down the dispatcher, and whether a
-  repeatedly-failing extension gets disabled automatically.
+## Resolved questions
+
+**Grants are fixed for an engine's lifetime, not revocable at runtime.** Every module `Arc`-clones
+the `GrantSet` at install; changing what an extension may reach means reloading it.
+
+**Auto-disabling a repeatedly-failing extension is the host's decision, not the library's.**
+`ExtensionHost::broadcast` (`src/extension/host.rs:312`) isolates one extension's failure into its
+own `Dispatch` rather than stopping the rest, and hands every outcome to the caller — deciding
+whether three failures in a row means "stop calling this one" is a policy `ExtensionHost` does not
+impose.
+
+Nothing about the negotiation-and-load design is left open; the only remaining piece is the CLI
+(`airsl ext doctor`/`airsl ext fire`), which is specified and simply not yet built.
 
 ## See also
 
 - [architecture.md](architecture.md) — the seam this is built on and the gaps in it.
 - [sandbox.md](sandbox.md) — the policy model a manifest negotiates against.
+- [extension-host example](../examples/extension-host/) — `ExtensionHost::load_dir` and
+  `broadcast` end to end, loading a directory of extensions under one ceiling.
 - [stdlib.md](stdlib.md) — the capabilities a manifest can name.

@@ -185,6 +185,13 @@ pub enum Error {
         detail: String,
     },
 
+    /// Two extensions in one host declared the same name.
+    #[error("extension `{extension}` is already loaded")]
+    DuplicateExtension {
+        /// The name both manifests declared.
+        extension: String,
+    },
+
     /// A name did not satisfy the rules for its kind.
     #[error("invalid {kind} `{value}`: {reason}")]
     InvalidName {
@@ -501,6 +508,17 @@ mod tests {
         assert_eq!(
             err.to_string(),
             "extension `journal-indexer` was not loaded: fs.read `/` is outside the ceiling"
+        );
+    }
+
+    #[test]
+    fn duplicate_extension_names_the_extension() {
+        let err = Error::DuplicateExtension {
+            extension: "journal-indexer".into(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "extension `journal-indexer` is already loaded"
         );
     }
 }

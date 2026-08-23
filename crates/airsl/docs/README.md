@@ -14,9 +14,9 @@ precisely because the server, not the script, decides what the script can touch.
 ## Status: read this first
 
 The runtime foundation ships, and so does the whole host standard library — a mixed-language script
-corpus of several thousand lines now runs entirely on it. Manifests, ceilings, negotiation and
-approval are built too; what remains unbuilt is the extension *loader* that ties them into one call
-— `ExtensionHost` — and Tier 3. Every document marks each piece, and the table below is the summary.
+corpus of several thousand lines now runs entirely on it. Manifests, ceilings, negotiation,
+approval and the extension loader (`ExtensionHost`) are all built too; what remains unbuilt is the
+`airsl ext` CLI and Tier 3. Every document marks each piece, and the table below is the summary.
 
 | Area | State |
 |---|---|
@@ -35,7 +35,8 @@ approval are built too; what remains unbuilt is the extension *loader* that ties
 | `Ceiling` | **implemented** (`src/extension/ceiling.rs:18`) |
 | Negotiation — `negotiate`, `Negotiation`, `Reduction`, `Denial` | **implemented** (`src/extension/negotiate.rs:274`) |
 | `Approver` trait, `ManifestApprover`, `DenyAll` | **implemented** (`src/extension/approver.rs:68`) |
-| Extension host / loader — `ExtensionHost`, `ExtensionHost::load` | **proposed** |
+| Extension host / loader — `ExtensionHost`, `ExtensionHost::load` | **implemented** (`src/extension/host.rs:251`) |
+| `airsl ext` CLI — `doctor`, `fire` | **proposed** |
 
 Do not cite these documents as evidence that something works. Where a claim is about code that
 exists, it carries a `file:line`. Where it is about code that does not, it says so.

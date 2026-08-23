@@ -1,0 +1,8 @@
+[extension]
+name    = "broken"
+version = "0.1.0"
+entry   = "main.lua"
+api     = 1
+
+[capabilities]
+fs.read = ["/"]

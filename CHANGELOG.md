@@ -9,6 +9,29 @@ The two crates are versioned independently and have released together so far, so
 both. Every release is tagged per crate — `airsl-v0.1.2`, `airsl-cli-v0.1.1` — because one commit
 has shipped two crates under two different numbers, which a single `vX.Y.Z` tag cannot name.
 
+## Unreleased
+
+### Added
+
+- **The extension system.** A host program loads third-party Lua extensions that declare the
+  capabilities they need in an `extension.toml` manifest; the host bounds those requests with its
+  own `Ceiling`, an `Approver` decides within that bound, and the result is an ordinary `Policy`
+  enforced by the engine that already exists.
+
+  - `airsstack.ext` (`on`, `granted`) and `Engine::dispatch` — a script registers a handler for a
+    host-declared event and the host calls it repeatedly on one persistent engine, rather than the
+    script running once to completion.
+  - The manifest parser (`extension::manifest`) — `extension.toml`'s `[extension]`,
+    `[capabilities]`, `[capabilities.optional]` and `[limits]` blocks, with `$VAR` expansion from
+    host-supplied variables.
+  - `Ceiling`, negotiation (`extension::negotiate`) and the `Approver` trait, with
+    `ManifestApprover` and `DenyAll` shipped — a manifest's request is intersected with the host's
+    ceiling, and a required capability outside it fails the load before the approver is even asked.
+  - `ExtensionHost` and `Extension` (`extension::host`, `extension::loaded`) — `load` and
+    `load_dir` turn a directory (or a whole tree of them) into running, negotiated extensions
+    without short-circuiting on the first failure, and `broadcast` fans one event out to every
+    loaded extension, isolating each one's outcome into its own `Dispatch`.
+
 ## airsl 0.1.2 — airsl-cli 0.1.1 — 2026-08-23
 
 Four fixes, every one of them found by writing an example against the real API rather than by

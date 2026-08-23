@@ -46,7 +46,7 @@ Written to the [Diátaxis](https://diataxis.fr/) split; start at
 - [Sandbox](crates/airsl/docs/sandbox.md) — presets, grants, resource ceilings
 - [Standard library](crates/airsl/docs/stdlib.md) — every host module
 - [Architecture](crates/airsl/docs/architecture.md) — why it is shaped this way
-- [Extension system](crates/airsl/docs/extensions.md) — dispatch (`ext` module, `Engine::dispatch`), the manifest parser, the ceiling, negotiation and the approver built; loader proposed
+- [Extension system](crates/airsl/docs/extensions.md) — dispatch (`ext` module, `Engine::dispatch`), the manifest parser, the ceiling, negotiation, the approver, and the loader (`ExtensionHost`) all built; only the `airsl ext` CLI is proposed
 
 ## Development
 

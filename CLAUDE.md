@@ -64,6 +64,12 @@ is the long form.
 3. **The capability surface** (`src/modules/`) — twelve `HostModule` implementations installed as
    subtables of a single Lua global, per-engine and defaulting to `airsstack`.
 
+`src/extension/` sits on top of those three layers: it reads a manifest, bounds the request with a
+host-supplied `Ceiling`, asks an `Approver`, and only then builds an ordinary `Engine` under the
+negotiated `Policy`. `ExtensionHost::load` (`extension/host.rs`) is the entry point a host calls;
+`Extension::approve` followed by `Approved::start` (`extension/loaded.rs`) is the type-state that
+proves a denial ran before any extension code does.
+
 Key seams:
 
 - `Engine::dispatch` (`engine.rs`) is how a host invokes the handlers a script registered with
@@ -128,12 +134,12 @@ sandbox, stdlib, extensions. Reference is the rustdoc, not a file there.
 
 Evidence rules those documents follow, and that edits to them must keep: a claim about code that
 exists carries a `file:line`; a claim about code that does not exist says so explicitly. The status
-table in `docs/README.md` marks each area **implemented** or **proposed** — the extension host's
-*loader* (`ExtensionHost`, `ExtensionHost::load`) is proposed and unbuilt; the manifest parser
+table in `docs/README.md` marks each area **implemented** or **proposed** — the manifest parser
 (`extension/manifest.rs`), ceiling (`extension/ceiling.rs`), negotiation (`extension/negotiate.rs`),
-approver (`extension/approver.rs`) and event dispatch (`modules/ext.rs`, `Engine::dispatch`) are
-implemented. Quoted measurements are a snapshot from `cargo bench -p airsl` on one machine, not a
-guarantee.
+approver (`extension/approver.rs`), event dispatch (`modules/ext.rs`, `Engine::dispatch`), and the
+extension host / loader (`ExtensionHost`, `ExtensionHost::load`, `extension/host.rs`) are all
+implemented; only the `airsl ext` CLI (`doctor`, `fire`) is proposed and unbuilt. Quoted
+measurements are a snapshot from `cargo bench -p airsl` on one machine, not a guarantee.
 
 Commits follow Conventional Commits with a scope naming the affected area (`fix(ci):`,
 `chore(workspace):`, `docs:`).
