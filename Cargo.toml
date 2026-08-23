@@ -34,6 +34,11 @@ sha1       = "0.10"
 # Time formatting. `jiff` over `time` because it reads /etc/localtime directly
 # instead of libc `tzset`, so local time resolves in multi-threaded embedders.
 jiff       = "0.2"
+# Extension manifests (`extension.toml`). `toml` rather than a hand parser because the
+# manifest is the one file a third party writes for this runtime, and the error messages a
+# real parser produces are part of that contract. `airsl` only reads manifests, never writes
+# them back out, so the `display` default feature (TOML serialization) is dropped.
+toml       = { version = "0.8", default-features = false, features = ["parse"] }
 # Temp files and dirs. A runtime dependency of `airsl`, which exposes
 # `airsstack.fs.tempdir` to Lua; dev-only for `airsl-cli`.
 tempfile   = "3.23.0"

@@ -121,6 +121,54 @@ pub enum Error {
         event: Option<String>,
     },
 
+    /// `extension.toml` could not be read.
+    #[error("cannot read manifest `{path}`: {source}")]
+    ManifestRead {
+        /// The manifest path.
+        path: String,
+        /// The underlying failure.
+        #[source]
+        source: std::io::Error,
+    },
+
+    /// `extension.toml` is not valid TOML or not the expected shape.
+    #[error("cannot parse manifest `{path}`: {reason}")]
+    ManifestParse {
+        /// The manifest path.
+        path: String,
+        /// The parser's message, verbatim.
+        reason: String,
+    },
+
+    /// A manifest field parsed but violates a rule the parser cannot express.
+    #[error("invalid manifest field `{field}`: {reason}")]
+    ManifestInvalid {
+        /// Dotted path of the field, such as `capabilities.fs.read`, or the block name (for
+        /// example `capabilities`) when the offending key is itself runtime data.
+        field: &'static str,
+        /// What was wrong with it.
+        reason: String,
+    },
+
+    /// A manifest path refers to a `$VAR` the host did not supply.
+    #[error("manifest refers to `${name}`, which the host did not supply")]
+    ManifestVariable {
+        /// The variable name, without the `$`.
+        name: String,
+    },
+
+    /// The manifest pins an api version this runtime does not implement.
+    #[error(
+        "manifest declares api {requested}; this runtime supports api {}",
+        join_versions(supported)
+    )]
+    UnsupportedApi {
+        /// What the manifest asked for.
+        requested: u32,
+        /// What this runtime implements.
+        supported: Vec<u32>,
+    },
+
     /// A name did not satisfy the rules for its kind.
     #[error("invalid {kind} `{value}`: {reason}")]
     InvalidName {
@@ -250,6 +298,15 @@ fn describe_reentrant(event: Option<&str>) -> String {
     )
 }
 
+/// Comma-joined api versions for an [`Error::UnsupportedApi`] message.
+fn join_versions(versions: &[u32]) -> String {
+    versions
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 /// Which resource ceiling a script exhausted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -371,5 +428,40 @@ mod tests {
         // to name — the re-entrancy is real, but there was never a handler running.
         let err = Error::Reentrant { event: None };
         assert_eq!(err.to_string(), "re-entrant evaluation");
+    }
+
+    #[test]
+    fn manifest_invalid_names_the_field() {
+        let err = Error::ManifestInvalid {
+            field: "capabilities.fs.read",
+            reason: "`journal` is not absolute after expansion".into(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "invalid manifest field `capabilities.fs.read`: `journal` is not absolute after expansion"
+        );
+    }
+
+    #[test]
+    fn manifest_variable_names_the_variable() {
+        let err = Error::ManifestVariable {
+            name: "APP_HOME".into(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "manifest refers to `$APP_HOME`, which the host did not supply"
+        );
+    }
+
+    #[test]
+    fn unsupported_api_lists_the_supported_set() {
+        let err = Error::UnsupportedApi {
+            requested: 7,
+            supported: vec![1],
+        };
+        assert_eq!(
+            err.to_string(),
+            "manifest declares api 7; this runtime supports api 1"
+        );
     }
 }

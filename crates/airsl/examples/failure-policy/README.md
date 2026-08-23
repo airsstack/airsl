@@ -61,7 +61,7 @@ counts.lua returned 20000100000
 - **Surfacing and exiting are separate decisions.** `exit_code()` (`src/failure_policy.rs:49`) still
   returns `0` for `FailOpen` on that breach. Only the exit status can block a tool call; printing a
   diagnostic cannot.
-- **`exhausted_limit()` is what makes the distinction available** (`src/error.rs:278`). Without it a
+- **`exhausted_limit()` is what makes the distinction available** (`src/error.rs:335`). Without it a
   caller would have to match on message text, and a script could then disguise its own failure as a
   resource breach.
 - **The chunk name is chosen, not inherited.** `Script::from_file` takes the chunk name from the

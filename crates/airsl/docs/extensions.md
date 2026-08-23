@@ -1,8 +1,9 @@
 # Extension system
 
 **Status: partly implemented.** The dispatcher exists — `airsstack.ext` (`src/modules/ext.rs`) and
-`Engine::dispatch` (`src/engine.rs`), see the status table at the end of this document. No part of
-the negotiation exists yet — no manifest, no ceiling, no approver. Everything it builds on does: the `HostModule` seam, a per-engine root table, confined
+`Engine::dispatch` (`src/engine.rs`), see the status table at the end of this document. The
+manifest parser exists (`src/extension/manifest.rs:189`); the ceiling and the approver do not.
+Everything the negotiation builds on does: the `HostModule` seam, a per-engine root table, confined
 `require`, resource ceilings, the parameterised grants a manifest would parse into, and the whole
 host standard library a manifest names capabilities from. See [architecture.md](architecture.md).
 
@@ -160,7 +161,7 @@ dispatches has to be built.
 | `Policy` composing all three axes | implemented |
 | Parameterised grants — `FsGrant`, `EnvGrant`, `ProcGrant` | implemented |
 | The host standard library a manifest names capabilities from | implemented |
-| Manifest format and parser | new |
+| Manifest format and parser | implemented — `src/extension/manifest.rs:189` (`Manifest::from_dir`) |
 | Ceiling and `Approver` | new |
 | `ext.on` registration and host dispatcher | implemented — `src/modules/ext.rs:104` (`on`), `src/engine.rs:353` (`dispatch`) |
 | Capability introspection (`ext.granted`) | implemented — `src/modules/ext.rs:116` (`granted`) |

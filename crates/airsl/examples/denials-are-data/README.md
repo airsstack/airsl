@@ -63,7 +63,7 @@ which keeps the message identical on Linux and macOS. `<granted>` is substituted
   own. They share `PathGuard` with `fs` — `src/modules/hash.rs:73` and `src/modules/glob.rs:89`,
   against `src/modules/fs.rs:78`. `glob.match`, which is pure pattern arithmetic, needs nothing.
 - **Every refusal is actionable.** Each message names the module, the operation, what was refused,
-  and what *was* granted — `Error::Denied` (`src/error.rs:169`). "Permission denied" without those
+  and what *was* granted — `Error::Denied` (`src/error.rs:217`). "Permission denied" without those
   is indistinguishable from the operating system's own refusal, and sends whoever reads it looking
   at file modes instead of at the policy.
 

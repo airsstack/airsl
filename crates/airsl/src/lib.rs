@@ -47,6 +47,7 @@ mod instruction_budget;
 mod require_loader;
 mod script;
 
+pub mod extension;
 pub mod modules;
 pub mod sandbox;
 pub mod types;
@@ -70,4 +71,4 @@ pub use sandbox::{
     ResourceLimits,
 };
 pub use script::Script;
-pub use types::{ChunkName, EventName, ModuleName, RequireTarget, RootTable};
+pub use types::{ChunkName, EventName, ExtensionName, ModuleName, RequireTarget, RootTable};

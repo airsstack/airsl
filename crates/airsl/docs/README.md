@@ -31,7 +31,8 @@ and the table below is the summary.
 | Host standard library — `path`, `fs`, `env`, `proc`, `regex`, `hash`, `time`, `glob`, `stdio`, `hook`, `ext` | **implemented** |
 | `airsl test` and `airsl check` | **implemented** |
 | Extension dispatch — `ext` module (`on`, `granted`), `Engine::dispatch` | **implemented** |
-| Extension host — manifest, ceiling, negotiation, approver | **proposed** |
+| Extension manifest — `extension.toml` format and parser | **implemented** (`src/extension/manifest.rs:189`) |
+| Extension host — ceiling, negotiation, approver | **proposed** |
 
 Do not cite these documents as evidence that something works. Where a claim is about code that
 exists, it carries a `file:line`. Where it is about code that does not, it says so.
