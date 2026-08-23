@@ -64,6 +64,16 @@ jobs:
       - name: cargo make dod
         run: cargo make dod
 
+      # A step in this job rather than a job of its own — unlike `deny`, which
+      # compiles nothing and is free to isolate. The examples link the whole
+      # workspace, so running them where the target dir is already warm costs
+      # seconds instead of a second full build.
+      #
+      # The gate above only compiles the examples. This runs them, which is
+      # what makes them a check on the runtime rather than on the type checker.
+      - name: cargo make examples
+        run: cargo make examples
+
   deny:
     name: Supply chain
     runs-on: ubuntu-latest

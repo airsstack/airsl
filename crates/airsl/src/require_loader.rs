@@ -7,11 +7,11 @@
 //!
 //! Responsibilities:
 //!
+//! - [`RequireDisposition`], which of the three possible `require` globals a script should get.
 //! - [`RequireLoader`], which installs and removes the `require` global for one script root.
 //! - Resolution, containment, caching and cycle detection.
 //!
-//! Non-responsibilities: deciding whether a script gets `require` at all. That follows from the
-//! policy and from whether the script has a root, and [`crate::Engine`] decides it.
+//! Non-responsibilities: applying the disposition. [`crate::Engine`] holds the state and does that.
 #![expect(
     clippy::redundant_pub_crate,
     reason = "explicit pub(crate) documents the crate-wide visibility intent at each item"
@@ -31,6 +31,48 @@ const LOADED_KEY: &str = "airsl.require.loaded";
 /// The global a script calls.
 const REQUIRE: &str = "require";
 
+/// Which `require` a script should be given, before an engine goes and installs it.
+///
+/// An enum rather than a predicate because the answer has three values, not two. Asking only
+/// "should this script get a *confined* `require`" collapses [`LanguageSurface::Full`] and
+/// [`LanguageSurface::Minimal`] onto one `false`, and those two must not share an answer: `Full`
+/// keeps the loader `package` installed, `Minimal` is entitled to none. Naming the third case is
+/// what stops a `Full` engine from clearing the global its own surface promises to provide.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RequireDisposition<'a> {
+    /// Leave Lua's own `require` exactly as `luaopen_package` installed it.
+    Native,
+
+    /// Install a `require` resolving under this directory and nowhere else.
+    Confined(&'a Path),
+
+    /// Clear `require`. Either the surface withholds it or the script has no directory to
+    /// resolve against.
+    Absent,
+}
+
+impl<'a> RequireDisposition<'a> {
+    /// The disposition for a script with `root`, running on `surface`.
+    ///
+    /// `Full` keeps Lua's own, which resolves through `package.path` and is deliberately left
+    /// alone — a first-party script may depend on it, and the surface documents `require` as part
+    /// of what it grants. `Restricted` gets the confined loader, but only where there is a
+    /// directory to confine it to: a script built from source has none. `Minimal` gets nothing,
+    /// because that surface exists for evaluating expressions and generated snippets, and a loader
+    /// that opens files would contradict the one configuration whose guarantees are meant to be
+    /// easiest to state.
+    ///
+    /// The match is exhaustive on purpose. A fourth surface should not be able to acquire a
+    /// default here by falling into a wildcard; it should fail to compile until someone decides.
+    pub(crate) const fn decide(surface: LanguageSurface, root: Option<&'a Path>) -> Self {
+        match (surface, root) {
+            (LanguageSurface::Full, _) => Self::Native,
+            (LanguageSurface::Restricted, Some(root)) => Self::Confined(root),
+            (LanguageSurface::Restricted | LanguageSurface::Minimal, _) => Self::Absent,
+        }
+    }
+}
+
 /// Installs a `require` confined to one directory.
 #[derive(Debug, Clone)]
 pub(crate) struct RequireLoader {
@@ -41,16 +83,6 @@ impl RequireLoader {
     /// A loader confined to `root`.
     pub(crate) fn new(root: impl Into<PathBuf>) -> Self {
         Self { root: root.into() }
-    }
-
-    /// Whether a script on `surface` should get a confined `require` at all.
-    ///
-    /// `Full` keeps Lua's own, which resolves through `package.path` and is deliberately left
-    /// alone — a first-party script may depend on it. `Minimal` gets none: that surface exists for
-    /// evaluating expressions and generated snippets, and a loader that opens files would
-    /// contradict the one configuration whose guarantees are meant to be easiest to state.
-    pub(crate) const fn applies_to(surface: LanguageSurface) -> bool {
-        matches!(surface, LanguageSurface::Restricted)
     }
 
     /// Installs `require` into the globals table.
@@ -204,7 +236,7 @@ mod tests {
         reason = "tests unwrap known-valid fixtures; a panic is the intended failure signal"
     )]
 
-    use super::RequireLoader;
+    use super::RequireDisposition;
     use crate::sandbox::LanguageSurface;
     use crate::types::RequireTarget;
     use std::io::Write as _;
@@ -225,9 +257,43 @@ mod tests {
 
     #[test]
     fn only_the_restricted_surface_gets_a_confined_require() {
-        assert!(RequireLoader::applies_to(LanguageSurface::Restricted));
-        assert!(!RequireLoader::applies_to(LanguageSurface::Full));
-        assert!(!RequireLoader::applies_to(LanguageSurface::Minimal));
+        let root = Path::new("/scripts");
+        assert_eq!(
+            RequireDisposition::decide(LanguageSurface::Restricted, Some(root)),
+            RequireDisposition::Confined(root)
+        );
+        assert_eq!(
+            RequireDisposition::decide(LanguageSurface::Full, Some(root)),
+            RequireDisposition::Native
+        );
+        assert_eq!(
+            RequireDisposition::decide(LanguageSurface::Minimal, Some(root)),
+            RequireDisposition::Absent
+        );
+    }
+
+    #[test]
+    fn the_full_surface_keeps_lua_s_own_require_whether_or_not_the_script_has_a_root() {
+        // The distinction this enum exists for: `Full` and `Minimal` both decline the confined
+        // loader, but only one of them wants the global cleared.
+        for root in [None, Some(Path::new("/scripts"))] {
+            assert_eq!(
+                RequireDisposition::decide(LanguageSurface::Full, root),
+                RequireDisposition::Native,
+                "{root:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_script_with_no_root_has_nothing_to_resolve_against_and_gets_no_require() {
+        for surface in [LanguageSurface::Restricted, LanguageSurface::Minimal] {
+            assert_eq!(
+                RequireDisposition::decide(surface, None),
+                RequireDisposition::Absent,
+                "{surface}"
+            );
+        }
     }
 
     #[test]

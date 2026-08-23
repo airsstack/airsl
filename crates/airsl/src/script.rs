@@ -48,6 +48,11 @@ impl Script {
     /// The chunk name is the path as given, and the root is the path's parent directory — so a
     /// script may `require` its siblings but nothing above them.
     ///
+    /// Naming it after the path is right for a script someone just pointed at, and wrong for one
+    /// whose diagnostics leave the machine: the chunk name reaches every traceback this script
+    /// produces, so an absolute path travels with them. Use [`Script::with_name`] where that
+    /// matters.
+    ///
     /// A bare filename has an empty parent, which means the current directory rather than no
     /// directory. Reading it as the latter is why `airsl run main.lua` and `airsl run ./main.lua`
     /// used to differ: the same file got `require` under one spelling and not the other.
@@ -75,6 +80,44 @@ impl Script {
     pub fn with_root(mut self, root: impl Into<PathBuf>) -> Self {
         self.root = Some(root.into());
         self
+    }
+
+    /// Reports the script under `name` rather than the name it was constructed with.
+    ///
+    /// Exists for the case [`Script::from_file`] cannot serve on its own. A chunk name is not
+    /// internal bookkeeping: it appears in every traceback and every [`Error::Lua`] the script
+    /// raises, and a host that forwards those anywhere — a hook writing to stderr, a service
+    /// returning an error to a caller — forwards the path with them. Reading the file separately
+    /// to reach [`Script::from_source`] works, but gives up the [`Error::ScriptRead`] diagnostic
+    /// and the inferred root; this keeps both and changes only the label.
+    ///
+    /// Returning a [`Result`] rather than `Self` is the same trade [`Script::from_source`] makes:
+    /// the name is validated once, here, so nothing downstream has to cope with one that would
+    /// corrupt the traceback it lands in.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidName`] when `name` is empty, longer than 240 bytes, or contains a
+    /// newline or NUL.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # fn main() -> Result<(), airsl::Error> {
+    /// # let dir = tempfile::tempdir().expect("temp dir");
+    /// # let path = dir.path().join("enforce.lua");
+    /// # std::fs::write(&path, "return 1").expect("write");
+    /// let script = airsl::Script::from_file(&path)?.with_name("enforce.lua")?;
+    ///
+    /// // The label travels; the root the file was read from does not change.
+    /// assert_eq!(script.name().as_str(), "enforce.lua");
+    /// assert_eq!(script.root(), Some(dir.path()));
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_name(mut self, name: impl Into<String>) -> Result<Self> {
+        self.name = ChunkName::new(name)?;
+        Ok(self)
     }
 
     /// Supplies the arguments the script sees in Lua's global `arg` table.
@@ -216,6 +259,47 @@ mod tests {
             .unwrap()
             .with_root("/scripts");
         assert_eq!(script.root(), Some(Path::new("/scripts")));
+    }
+
+    #[test]
+    fn with_name_replaces_the_name_inferred_from_the_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("enforce.lua");
+        let mut file = std::fs::File::create(&path).unwrap();
+        writeln!(file, "return 42").unwrap();
+        drop(file);
+
+        let script = Script::from_file(&path).unwrap().with_name("hook").unwrap();
+        assert_eq!(script.name().as_str(), "hook");
+        assert!(
+            !script
+                .name()
+                .as_str()
+                .contains(&dir.path().display().to_string()),
+            "the absolute path should not survive into the traceback name: {}",
+            script.name()
+        );
+    }
+
+    #[test]
+    fn with_name_leaves_the_source_and_the_require_root_alone() {
+        // Renaming is about what diagnostics say, not about what the script may reach.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("enforce.lua");
+        let mut file = std::fs::File::create(&path).unwrap();
+        writeln!(file, "return 42").unwrap();
+        drop(file);
+
+        let script = Script::from_file(&path).unwrap().with_name("hook").unwrap();
+        assert_eq!(script.source().trim(), "return 42");
+        assert_eq!(script.root(), Some(dir.path()));
+    }
+
+    #[test]
+    fn with_name_rejects_a_name_that_would_corrupt_a_traceback() {
+        let script = Script::from_source("return 1", "inline").unwrap();
+        assert!(script.clone().with_name("").is_err());
+        assert!(script.with_name("two\nlines").is_err());
     }
 
     #[test]

@@ -98,7 +98,7 @@ airsl run --allow-read "$APP_HOME" \
 A refusal names what was granted, because the usual cause is a root one directory too deep:
 
 ```
-airsl: fs.read denied: `/etc/hostname` is outside them — granted read roots are /home/me/journal
+airsl: fs.read denied: `/etc/hostname` is outside the granted read roots: /home/me/journal
 ```
 
 Under `--policy trusted` these flags are ignored: that preset waives containment entirely, so a

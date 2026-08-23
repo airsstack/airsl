@@ -4,6 +4,7 @@
 #   cargo make            # the full Definition-of-Done gate
 #   cargo make fmt        # rewrite formatting (the only task that mutates the tree)
 #   cargo make clippy     # a single gate step
+#   cargo make examples   # run every example end to end
 #   cargo make --list-all-steps
 #
 # The five gate steps are the canonical command set for this repository: fmt, clippy,
@@ -88,6 +89,52 @@ category = "Gate"
 description = "Doctests — excluded by --all-targets, so they need their own run"
 command = "cargo"
 args = ["test", "--workspace", "--all-features", "--doc"]
+
+# ---------------------------------------------------------------------------
+# Examples
+# ---------------------------------------------------------------------------
+
+[tasks.examples]
+category = "Examples"
+description = "Run every example end to end, and compile every shipped .lua"
+# Deliberately not a dependency of `dod`, for the reason `deny` is not: the
+# Definition of Done is five commands, and this is a sixth. It also does things
+# the five do not — spawns `sh`, writes into a temp dir — so it answers to the
+# machine as well as to the working tree.
+#
+# `--all-targets` in the gate already *compiles* every example. Only this task
+# runs them, which is the difference between "it builds" and "it works".
+#
+# Discovery is by directory rather than a hand-kept list: an example that is
+# added but not listed would silently never run, which is the failure mode a
+# coverage suite can least afford.
+script_runner = "@shell"
+script = '''
+set -eu
+for dir in crates/airsl/examples/*/; do
+    name="$(basename "${dir}")"
+    # A directory without a `main.rs` is not an example target — cargo ignores
+    # it, and so does this.
+    [ -f "${dir}main.rs" ] || continue
+    echo "--- ${name}"
+    cargo run -q -p airsl --example "${name}"
+done
+# Every shipped script still compiles against the current runtime. `check`
+# loads and compiles without running, so this costs a parse and nothing else.
+echo "--- airsl check"
+cargo run -q -p airsl-cli -- check crates/airsl/examples/
+# `airsl test` is a documented entry point of the CLI, and until this line it
+# was one no gate exercised — a test runner nobody runs is the one piece of a
+# toolchain that can rot without anyone noticing. It runs over the whole
+# examples tree for the reason discovery above is by directory: a shipped test
+# file that no command picks up is worse than none.
+#
+# Confined with no grants, which is this command's default, so a shipped test
+# file has to be one — the modules that need no authority are the ones a test
+# can lean on here.
+echo "--- airsl test"
+cargo run -q -p airsl-cli -- test crates/airsl/examples/
+'''
 
 # ---------------------------------------------------------------------------
 # Supply chain

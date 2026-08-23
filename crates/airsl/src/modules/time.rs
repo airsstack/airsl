@@ -14,9 +14,20 @@
 //! period defeats the instruction ceiling, which is the one defence against a script that never
 //! finishes.
 
+use std::sync::OnceLock;
+use std::time::Instant;
+
 use crate::error::{Error, Result};
 use crate::modules::{HostModule, InstallContext};
 use crate::types::ModuleName;
+
+/// The instant every `monotonic` reading is measured from.
+///
+/// Process-wide rather than a field on [`Time`] because a module is installed per engine, and two
+/// engines carrying two origins would hand a script readings it had no way to subtract. An
+/// [`Instant`] has no epoch, so an origin has to be chosen by somebody; choosing it once here is
+/// what makes every reading taken anywhere in the process comparable with every other.
+static ORIGIN: OnceLock<Instant> = OnceLock::new();
 
 /// Installs `airsstack.time`.
 #[derive(Debug)]
@@ -77,16 +88,20 @@ impl HostModule for Time {
             .map_err(fail)?;
         table.set("now", now).map_err(fail)?;
 
-        // A monotonic reading, for measuring how long something took. Unrelated to wall-clock time
-        // and unaffected by the clock being adjusted underneath a running script, which is exactly
-        // why subtracting two `now` readings is the wrong way to time anything.
+        // Seconds since `ORIGIN`, for measuring how long something took.
+        //
+        // `Instant` and not `SystemTime`: this reads `CLOCK_MONOTONIC`, so it is unaffected by the
+        // clock being adjusted underneath a running script — which is the entire reason to reach
+        // for it rather than subtracting two `now` readings. `SystemTime` here would be `now`
+        // under a second name, and an NTP step between two readings would make the later one
+        // smaller, handing a script a negative duration or a timeout that never elapses.
+        //
+        // No datetime crate offers this. A `DateTime` is a point on a calendar and a calendar
+        // point is defined by the wall clock, so `jiff` and `chrono` both bottom out in
+        // `SystemTime::now`; monotonic time has no epoch and no timezone, which is why it lives in
+        // `std` as its own type.
         let monotonic = lua
-            .create_function(|_, ()| {
-                let since = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default();
-                Ok(since.as_secs_f64())
-            })
+            .create_function(|_, ()| Ok(ORIGIN.get_or_init(Instant::now).elapsed().as_secs_f64()))
             .map_err(fail)?;
         table.set("monotonic", monotonic).map_err(fail)?;
 
@@ -242,6 +257,32 @@ mod tests {
             ),
             "true"
         );
+    }
+
+    #[test]
+    fn monotonic_is_measured_from_process_start_rather_than_the_unix_epoch() {
+        // This is the assertion the loop above cannot make. The wall clock does not go backwards
+        // across 10,000 iterations either, so "non-decreasing" holds just as well under an
+        // implementation carrying no monotonic guarantee at all — which is what this module used
+        // to ship. The magnitude is what tells the two apart.
+        //
+        // The bound is absurd on purpose: 1e6 seconds is eleven days of uptime, so it cannot fire
+        // on a long-lived host, while a reading taken from `SystemTime` is around 1.7e9.
+        let reading = eval::<f64>("return airsstack.time.monotonic()");
+        assert!(
+            (0.0..1.0e6).contains(&reading),
+            "expected seconds since process start, got {reading}"
+        );
+    }
+
+    #[test]
+    fn two_engines_take_their_readings_from_one_origin() {
+        // A module is installed per engine, so an origin held on `Time` would start the second
+        // engine counting again and hand back a smaller number than the first — two clocks
+        // wearing one name, and a script subtracting across them would get a negative duration.
+        let first = eval::<f64>("return airsstack.time.monotonic()");
+        let second = eval::<f64>("return airsstack.time.monotonic()");
+        assert!(second >= first, "{second} is behind {first}");
     }
 
     #[test]

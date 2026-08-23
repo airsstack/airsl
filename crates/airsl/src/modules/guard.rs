@@ -22,6 +22,33 @@ use std::sync::Arc;
 use crate::error::{Error, Result};
 use crate::sandbox::GrantSet;
 
+/// Which set of roots a refusal was measured against.
+///
+/// A type rather than the `&str` it replaces because the refusal message and the choice of
+/// allowlist are driven by the same value: spelling it once as data means a message can never
+/// name one direction while the check consulted the other.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Access {
+    Read,
+    Write,
+}
+
+impl Access {
+    /// The word this access reads as in a refusal.
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Read => "read",
+            Self::Write => "write",
+        }
+    }
+}
+
+impl core::fmt::Display for Access {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// Checks paths against the filesystem grants of one policy.
 ///
 /// Cheap to clone: the grants sit behind an [`Arc`] so every host function installed by a module
@@ -49,7 +76,7 @@ impl PathGuard {
         if self.grants.is_unrestricted() || self.grants.fs().allows_read(&resolved) {
             return Ok(resolved);
         }
-        Err(self.deny(operation, "read", &resolved))
+        Err(self.deny(operation, Access::Read, &resolved))
     }
 
     /// Resolves `raw` and returns it if the policy permits writing it.
@@ -62,31 +89,39 @@ impl PathGuard {
         if self.grants.is_unrestricted() || self.grants.fs().allows_write(&resolved) {
             return Ok(resolved);
         }
-        Err(self.deny(operation, "write", &resolved))
+        Err(self.deny(operation, Access::Write, &resolved))
     }
 
     /// Builds the refusal, naming the roots that *were* granted.
     ///
     /// Listing them turns "denied" into something actionable — the usual cause is a grant one
     /// directory too deep, and without the list that is invisible from the message.
-    fn deny(&self, operation: &'static str, direction: &str, resolved: &Path) -> Error {
-        let roots = if direction == "read" {
-            self.grants.fs().read_roots()
-        } else {
-            self.grants.fs().write_roots()
+    ///
+    /// Both branches share the phrase "is outside the granted read roots", so the sentence names
+    /// what it is comparing against before it says anything about the comparison. An earlier
+    /// wording opened with "is outside them", which reads as a continuation of a clause that is
+    /// not there: the roots were introduced *after* the pronoun that referred to them, and when
+    /// none were granted they were never introduced at all.
+    fn deny(&self, operation: &'static str, access: Access, resolved: &Path) -> Error {
+        let roots = match access {
+            Access::Read => self.grants.fs().read_roots(),
+            Access::Write => self.grants.fs().write_roots(),
         };
 
         let granted = if roots.is_empty() {
-            format!("no {direction} roots are granted")
+            String::from("none are granted")
         } else {
             let names: Vec<_> = roots.iter().map(|r| r.display().to_string()).collect();
-            format!("granted {direction} roots are {}", names.join(", "))
+            names.join(", ")
         };
 
         Error::Denied {
             module: self.module,
             operation,
-            detail: format!("`{}` is outside them — {granted}", resolved.display()),
+            detail: format!(
+                "`{}` is outside the granted {access} roots: {granted}",
+                resolved.display()
+            ),
         }
     }
 
@@ -299,6 +334,22 @@ mod tests {
             err.to_string().contains(&root.display().to_string()),
             "the refusal should say what was granted: {err}"
         );
+        assert!(
+            err.to_string().contains("outside the granted read roots"),
+            "the refusal should name what it compared against: {err}"
+        );
+    }
+
+    #[test]
+    fn a_refusal_measured_against_the_write_roots_says_write() {
+        // The message and the allowlist come from one value, so a refusal cannot report a
+        // direction the check did not use.
+        let guard = guard(|g| g);
+        let err = guard.write("write", "/etc/hostname").unwrap_err();
+        assert!(
+            err.to_string().contains("outside the granted write roots"),
+            "{err}"
+        );
     }
 
     #[test]
@@ -306,7 +357,8 @@ mod tests {
         let guard = guard(|g| g);
         let err = guard.read("read", "/etc/hostname").unwrap_err();
         assert!(
-            err.to_string().contains("no read roots are granted"),
+            err.to_string()
+                .contains("outside the granted read roots: none are granted"),
             "{err}"
         );
     }
