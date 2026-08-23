@@ -64,7 +64,9 @@ Lua's own loader, which resolves through `package.path` and can reach anywhere o
 `Restricted` gets a Rust function confined to the script's own directory, with no `package` table
 to configure and no way to widen it; `Minimal` gets neither, which is the `require=no` on the third
 row. `probe.lua` can only see that the global is non-`nil`, so this is the one place the output
-understates a difference rather than showing it.
+understates a difference rather than showing it —
+[`multi-file-project`](../multi-file-project/) runs the same `require("../secrets")` under all three
+surfaces and prints three different answers.
 
 That the answer has three values and not two is the point of the enum. `Full` and `Minimal` both
 decline the *confined* loader, so a predicate asking only about that gave them one answer — and a
@@ -75,5 +77,7 @@ decline the *confined* loader, so a predicate asking only about that gave them o
 
 - [sandbox](../../docs/sandbox.md) — the three questions a policy answers, at length.
 - [resource-limits](../resource-limits/) — the ceilings in the second block, made to fire.
+- [`multi-file-project`](../multi-file-project/) — that confined `require`, given a module tree to
+  resolve against.
 - [architecture](../../docs/architecture.md) — the confined `require` that `restricted` gets, and
   why `full` keeps Lua's own instead.
