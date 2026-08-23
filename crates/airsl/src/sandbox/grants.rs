@@ -85,6 +85,19 @@ impl FsGrant {
     pub const fn is_empty(&self) -> bool {
         self.read.is_empty() && self.write.is_empty()
     }
+
+    /// Resolves `path` the way [`FsGrant::read`] and [`FsGrant::write`] resolve a root they are
+    /// given: canonicalised if it exists, made absolute if it does not, and returned unchanged if
+    /// neither succeeds.
+    ///
+    /// Public so a caller that needs to compare a requested root against a grant's roots without
+    /// building a throwaway [`FsGrant`] just to read back its first element — `airsl ext doctor`
+    /// negotiating a manifest's `fs.read`/`fs.write` requests against a ceiling, most concretely —
+    /// resolves it exactly the way a granted root would be, rather than re-deriving the rule.
+    #[must_use]
+    pub fn resolve_root(path: &Path) -> PathBuf {
+        resolve_root(path.to_path_buf())
+    }
 }
 
 /// Puts a grant root into the form the paths checked against it will be in.
@@ -300,6 +313,27 @@ mod tests {
         let grant = FsGrant::none().read(base.join("link"));
         assert_eq!(grant.read_roots(), [base.join("real")]);
         assert!(grant.allows_read(&base.join("real/a.txt")));
+    }
+
+    #[test]
+    fn resolve_root_matches_what_a_read_grant_would_store() {
+        // A caller that needs to compare a requested root against a grant's roots — `airsl ext
+        // doctor`, most concretely — must resolve it exactly the way `FsGrant::read` would, or the
+        // comparison silently stops matching the moment the two diverge.
+        let dir = tempfile::tempdir().unwrap();
+        let grant = FsGrant::none().read(dir.path());
+        assert_eq!(FsGrant::resolve_root(dir.path()), grant.read_roots()[0]);
+    }
+
+    #[test]
+    fn resolve_root_of_a_missing_path_is_made_absolute_but_kept() {
+        let resolved = FsGrant::resolve_root(Path::new("definitely/not/here"));
+        assert!(resolved.is_absolute(), "{}", resolved.display());
+        assert!(
+            resolved.ends_with("definitely/not/here"),
+            "{}",
+            resolved.display()
+        );
     }
 
     #[test]

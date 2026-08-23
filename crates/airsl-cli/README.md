@@ -49,6 +49,10 @@ airsl run  [--policy <trusted|confined|pure>]
 airsl test [--policy <trusted|confined|pure>] [--allow-…] [<path>]
 airsl check [<path>]
 airsl doctor [--policy <trusted|confined|pure>]
+airsl ext doctor <DIR> [--allow-…] [--memory-limit <BYTES|none>] [--instruction-limit <COUNT|none>]
+                       [--event <NAME>] [--var <NAME=VALUE>]
+airsl ext fire   <DIR> <EVENT> [--allow-…] [--memory-limit <BYTES|none>] [--instruction-limit <COUNT|none>]
+                       [--event <NAME>] [--var <NAME=VALUE>]
 ```
 
 Arguments after the script path reach it in the global `arg` table — `arg[1]` where a shell script
@@ -150,6 +154,91 @@ Lua files at all exits non-zero, for the same reason `airsl test` does.
 What it does not catch is everything past the parser: a misspelled field, a `nil` arithmetic, a
 module that raises the moment it is required. Those compile, and they are a test's job.
 
+## `airsl ext`
+
+`ext doctor` shows what a ceiling would grant, reduce and deny for one extension's manifest,
+without running a line of its entry script:
+
+```bash
+airsl ext doctor ./word-count
+```
+
+```
+extension:    word-count 0.1.0 (api 1, entry main.lua)
+events:       none
+ceiling:
+  language:     restricted
+  grants:       none
+  memory:       67108864 bytes
+  instructions: 100000000 instructions
+negotiated:
+  language:     restricted
+  grants:       none
+  memory:       8388608 bytes
+  instructions: 1000000 instructions
+requested:
+  module       regex                    granted
+decision:     approve
+```
+
+`ceiling:` is the host's real bound — `confined` plus whatever `--allow-…`/`--memory-limit`/
+`--instruction-limit` widened it to — unmodified by anything the manifest asked for. `negotiated:`
+is the policy this extension would actually run under, which differs wherever the manifest's own
+`[limits]` asked for a tighter ceiling than the host offers, as it does here (this manifest asks for
+8 MiB and 1M instructions, well under the host's 64 MiB / 100M default). `events:` is the sorted,
+deduplicated set the host declared with `--event` — the names `ext fire` is allowed to dispatch —
+and reads `none` when the flag was never passed; `ext doctor` never dispatches anything, so the line
+is informational here.
+
+A denied or reduced request is tagged in place, and the decision line names why:
+
+```
+extension:    broken 0.1.0 (api 1, entry main.lua)
+events:       none
+ceiling:
+  language:     restricted
+  grants:       none
+  memory:       67108864 bytes
+  instructions: 100000000 instructions
+negotiated:
+  language:     restricted
+  grants:       none
+  memory:       67108864 bytes
+  instructions: 100000000 instructions
+requested:
+  fs.read      /                        denied    (outside the granted read roots: none)
+decision:     deny — fs.read `/`: outside the granted read roots: none
+```
+
+`ext fire` loads the extension for real and dispatches one event, with the payload on stdin and the
+result on stdout as byte-stable JSON (`null` when nothing handled the event):
+
+```bash
+echo '{"text":"the quick brown fox"}' | airsl ext fire ./word-count count
+```
+
+```
+{"longest":"quick","words":4}
+```
+
+Both subcommands take the same grant flags as `airsl run` — `--allow-read`, `--allow-write`,
+`--allow-env`, `--allow-exec` (see "Grant flags" above) — plus `--memory-limit` and
+`--instruction-limit` (see "`--memory-limit` and `--instruction-limit`" below), `--event NAME` to
+declare an event beyond the one being fired or inspected (repeatable), and `--var NAME=VALUE` to
+supply a manifest variable (repeatable). There is no `--policy`: `ext` negotiates against `confined`
+plus whatever the flags widen — `trusted` waives containment entirely, which is not a ceiling an
+extension manifest can be held against.
+
+| Command | Exit 0 | Exit 1 |
+|---|---|---|
+| `ext doctor` | any decision, including a deny | the manifest cannot be read or parsed, or the ceiling itself is invalid |
+| `ext fire` | the event dispatched and a result (or `null`) was written | any error — invalid JSON on stdin, a denied manifest, a handler error |
+
+`ext doctor` never builds an engine; `ext fire` goes through `ExtensionHost` exactly the way a host
+program would, so what it does is by construction what embedding this crate does. A resource-limit
+breach is always reported on stderr, whether or not `ext fire` otherwise succeeds — there is no
+`--fail-open` for this subcommand, so every failure, breach included, is reported and exits 1.
+
 ## `--memory-limit` and `--instruction-limit`
 
 Override whatever the preset supplied. Pass `none` to lift a ceiling the preset imposed, or a count
@@ -224,6 +313,8 @@ organised on [Diátaxis](https://diataxis.fr/):
   — every module a script sees under the `airsstack` global.
 - **[Architecture](https://github.com/airsstack/airsl/blob/main/crates/airsl/docs/architecture.md)**
   — the three layers and why it is shaped this way.
+- **[Extensions](https://github.com/airsstack/airsl/blob/main/crates/airsl/docs/extensions.md)** —
+  the manifest format, ceilings and negotiation `ext doctor`/`ext fire` are built on.
 
 Each document marks which parts ship and which are design.
 

@@ -31,6 +31,9 @@ has shipped two crates under two different numbers, which a single `vX.Y.Z` tag 
     `load_dir` turn a directory (or a whole tree of them) into running, negotiated extensions
     without short-circuiting on the first failure, and `broadcast` fans one event out to every
     loaded extension, isolating each one's outcome into its own `Dispatch`.
+  - `airsl ext doctor` and `airsl ext fire` — inspect what a ceiling would grant, reduce and deny
+    for a manifest without running its entry script, or load the extension for real and dispatch
+    one event with the payload on stdin and byte-stable JSON on stdout.
 
 ## airsl 0.1.2 — airsl-cli 0.1.1 — 2026-08-23
 

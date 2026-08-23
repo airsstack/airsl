@@ -73,7 +73,8 @@ error when the engine is built rather than a module that silently replaces anoth
 
 ## See also
 
-- [extensions](../../docs/extensions.md) — the extension host. Note the status table in
-  `docs/README.md`: manifests, negotiation and dispatch are **proposed**, not built. What this
-  example uses — `HostModule`, `ModuleSet`, `InstallContext`, `RootTable` — is implemented today.
+- [extensions](../../docs/extensions.md) — the extension host: manifests, negotiation, dispatch,
+  and the `airsl ext` CLI built on top of them are all implemented, per the status table in
+  `docs/README.md`. What this example uses — `HostModule`, `ModuleSet`, `InstallContext`,
+  `RootTable` — is a layer below that, and implemented too.
 - [`hello-eval`](../hello-eval/) — the builder this example adds two calls to.

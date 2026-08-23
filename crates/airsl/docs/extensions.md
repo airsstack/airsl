@@ -1,15 +1,17 @@
 # Extension system
 
-**Status: implemented, except the CLI.** The dispatcher exists — `airsstack.ext`
-(`src/modules/ext.rs`) and `Engine::dispatch` (`src/engine.rs`), see the status table at the end of
-this document. The manifest parser exists (`src/extension/manifest.rs:189`), and so do the ceiling
-(`src/extension/ceiling.rs:27`, `Ceiling::new`), negotiation (`src/extension/negotiate.rs:274`,
-`negotiate`) and the approver (`src/extension/approver.rs:68`, the `Approver` trait plus
-`ManifestApprover`/`DenyAll`). The loader that ties them together is built too:
-`ExtensionHost::load` (`src/extension/host.rs:251`) drives `Extension::approve`
-(`src/extension/loaded.rs:175`) followed by `Approved::start` (`src/extension/loaded.rs:96`), so a
-host calls one function and gets a running, negotiated extension back. What remains is the CLI
-(`airsl ext doctor`/`airsl ext fire`), still proposed.
+**Status: implemented.** The dispatcher exists — `airsstack.ext` (`src/modules/ext.rs`) and
+`Engine::dispatch` (`src/engine.rs`), see the status table at the end of this document. The manifest
+parser exists (`src/extension/manifest.rs:189`), and so do the ceiling (`src/extension/ceiling.rs:27`,
+`Ceiling::new`), negotiation (`src/extension/negotiate.rs:274`, `negotiate`) and the approver
+(`src/extension/approver.rs:68`, the `Approver` trait plus `ManifestApprover`/`DenyAll`). The loader
+that ties them together is built too: `ExtensionHost::load` (`src/extension/host.rs:251`) drives
+`Extension::approve` (`src/extension/loaded.rs:175`) followed by `Approved::start`
+(`src/extension/loaded.rs:96`), so a host calls one function and gets a running, negotiated
+extension back. The CLI is built on the same loader: `airsl ext doctor`
+(`crates/airsl-cli/src/ext_doctor.rs:198`, `run`) reports a negotiation without running the entry
+script, and `airsl ext fire` (`crates/airsl-cli/src/ext_fire.rs:91`, `run`) loads and dispatches one
+event through `ExtensionHost` exactly as a host program would.
 See [architecture.md](architecture.md).
 
 An extension is third-party code that runs inside a host program with capabilities it *requested* and
@@ -201,7 +203,7 @@ dispatches has to be built.
 | `ext.on` registration and host dispatcher | implemented — `src/modules/ext.rs:104` (`on`), `src/engine.rs:353` (`dispatch`) |
 | Capability introspection (`ext.granted`) | implemented — `src/modules/ext.rs:116` (`granted`) |
 | `ExtensionHost`, `Extension` — the loader tying the above together | implemented — `src/extension/host.rs:251` (`ExtensionHost::load`), `src/extension/loaded.rs:175` (`Extension::approve`), `src/extension/loaded.rs:96` (`Approved::start`) |
-| CLI — `airsl ext doctor` / `airsl ext fire` | proposed |
+| CLI — `airsl ext doctor` / `airsl ext fire` | implemented — `crates/airsl-cli/src/ext_doctor.rs:198` (`run`), `crates/airsl-cli/src/ext_fire.rs:91` (`run`) |
 
 ## Sequencing, versioning, and fail-closed
 
@@ -236,8 +238,8 @@ own `Dispatch` rather than stopping the rest, and hands every outcome to the cal
 whether three failures in a row means "stop calling this one" is a policy `ExtensionHost` does not
 impose.
 
-Nothing about the negotiation-and-load design is left open; the only remaining piece is the CLI
-(`airsl ext doctor`/`airsl ext fire`), which is specified and simply not yet built.
+Nothing about the negotiation-and-load design is left open, and the CLI built on top of it
+(`airsl ext doctor`/`airsl ext fire`) closes the loop: every piece the spec named now has a caller.
 
 ## See also
 

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `airsl` embeds Lua 5.4 in Rust and lets the **host** decide what a script may reach. Two crates in
 one workspace: `crates/airsl` (the library) and `crates/airsl-cli` (the `airsl` binary — `run`,
-`test`, `check`, `doctor`).
+`test`, `check`, `doctor`, `ext doctor`/`ext fire`).
 
 Build requirements that are not negotiable: **unix only** (`lib.rs` has a `compile_error!` off unix,
 because `modules::proc` decides executability from mode bits) and **a C compiler** (`mlua`'s
@@ -134,12 +134,13 @@ sandbox, stdlib, extensions. Reference is the rustdoc, not a file there.
 
 Evidence rules those documents follow, and that edits to them must keep: a claim about code that
 exists carries a `file:line`; a claim about code that does not exist says so explicitly. The status
-table in `docs/README.md` marks each area **implemented** or **proposed** — the manifest parser
-(`extension/manifest.rs`), ceiling (`extension/ceiling.rs`), negotiation (`extension/negotiate.rs`),
-approver (`extension/approver.rs`), event dispatch (`modules/ext.rs`, `Engine::dispatch`), and the
-extension host / loader (`ExtensionHost`, `ExtensionHost::load`, `extension/host.rs`) are all
-implemented; only the `airsl ext` CLI (`doctor`, `fire`) is proposed and unbuilt. Quoted
-measurements are a snapshot from `cargo bench -p airsl` on one machine, not a guarantee.
+table in `docs/README.md` marks each area **implemented** or **proposed** this way — the extension
+manifest parser's row reads implemented, and names `extension/manifest.rs:189`, the function a
+reader can go check, rather than a bare "yes". Every extension-system area — manifest parser,
+ceiling, negotiation, approver, event dispatch, the extension host / loader, and the `airsl ext` CLI
+(`doctor`, `fire`) — is implemented as of this writing; the next area to go from proposed to
+implemented is the one to model this citation style on. Quoted measurements are a snapshot from
+`cargo bench -p airsl` on one machine, not a guarantee.
 
 Commits follow Conventional Commits with a scope naming the affected area (`fix(ci):`,
 `chore(workspace):`, `docs:`).

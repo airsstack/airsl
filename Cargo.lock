@@ -36,6 +36,7 @@ dependencies = [
  "airsl",
  "clap",
  "mlua",
+ "serde_json",
  "tempfile",
  "walkdir",
 ]

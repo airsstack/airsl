@@ -13,8 +13,13 @@
 mod check;
 mod cli;
 mod doctor;
+mod ext;
+mod ext_doctor;
+mod ext_fire;
 mod run;
 mod test_runner;
+
+use std::io;
 
 use airsl::{FailurePolicy, Policy};
 use clap::Parser as _;
@@ -51,6 +56,12 @@ fn main() -> std::process::ExitCode {
             print!("{}", doctor::report(&Policy::from(policy)));
             0
         }
+        cli::Command::Ext(command) => ext::run(
+            command,
+            io::stdin().lock(),
+            &mut io::stdout().lock(),
+            &mut io::stderr().lock(),
+        ),
     };
     std::process::ExitCode::from(u8::try_from(code).unwrap_or(1))
 }

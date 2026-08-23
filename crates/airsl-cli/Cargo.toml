@@ -28,10 +28,11 @@ doc  = false
 workspace = true
 
 [dependencies]
-airsl   = { workspace = true }
-clap    = { workspace = true }
-walkdir = { workspace = true }
-mlua    = { workspace = true }
+airsl      = { workspace = true }
+clap       = { workspace = true }
+walkdir    = { workspace = true }
+mlua       = { workspace = true }
+serde_json = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
