@@ -44,6 +44,7 @@ On 5.1 a JSON `3` and a JSON `3.0` are the same value, which breaks byte-stable 
 | `airsstack.glob` | glob matching, and walking a tree by pattern | only `walk` |
 | `airsstack.stdio` | the process's own standard streams | no |
 | `airsstack.hook` | the agent-hook payload and output contract | no |
+| `airsstack.ext` | event registration (`on`) and capability introspection (`granted`) for a registered extension | no |
 
 Every module is installed under every preset. One the policy has granted nothing is present and
 refuses each call — the authority is in the grant, not in whether the table is there.
@@ -167,6 +168,9 @@ one Lua state cannot execute in parallel anyway.
 - **[How-to](docs/how-to.md)** — recipes for a specific job, from Lua and from Rust.
 - **[Architecture](docs/architecture.md)**, **[Sandbox](docs/sandbox.md)**,
   **[Host stdlib](docs/stdlib.md)**, **[Extensions](docs/extensions.md)** — the explanation layer.
+  Extensions covers manifests, capability negotiation, and `ExtensionHost` — the host loads a
+  directory of third-party Lua extensions into running, negotiated engines and dispatches events
+  to them, and the `airsl ext` CLI (`doctor`, `fire`) is built on the same loader.
 - Reference is the rustdoc: `cargo doc -p airsl --no-deps --open`.
 
 Each document says which parts are shipped and which are design.
@@ -175,6 +179,6 @@ Each document says which parts are shipped and which are design.
 
 [CHANGELOG.md](https://github.com/airsstack/airsl/blob/main/CHANGELOG.md) — one timeline covering
 this crate and `airsl-cli`, which are numbered independently. Releases are tagged per crate:
-`airsl-v0.1.2`, `airsl-cli-v0.1.1`.
+`airsl-v0.1.3`, `airsl-cli-v0.1.2`.
 
 [`mlua`]: https://crates.io/crates/mlua

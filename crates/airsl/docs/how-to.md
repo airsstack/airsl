@@ -284,6 +284,43 @@ Three things to know:
 - **Name your own root table.** A module contributed by a third party should not land in a namespace
   called `airsstack`.
 
+### Host an extension
+
+```rust
+let ceiling = Ceiling::new(
+    Policy::confined().with_grants(GrantSet::declared().with_fs(|fs| fs.read(&home))),
+)?;
+
+let mut host = ExtensionHost::builder()
+    .ceiling(ceiling)
+    .events(["session_start"])?
+    .build()?;
+
+let report = host.load_dir(&extensions_root)?;
+for (dir, error) in report.failed() {
+    eprintln!("{}: {error}", dir.display());
+}
+
+let results = host.broadcast(&EventName::new("session_start")?, &payload);
+for dispatch in &results {
+    match dispatch.result() {
+        Ok(value) => println!("{}: {value:?}", dispatch.name()),
+        Err(error) => eprintln!("{}: {error}", dispatch.name()),
+    }
+}
+```
+
+`ExtensionHost::builder()` is a type-state builder: there is no `build()` until `ceiling()` has
+been called, so a host cannot forget its own bound. `load_dir` loads every subdirectory of
+`extensions_root` that has an `extension.toml`, in directory-name order, and never stops at the
+first failure — each outcome lands in the returned `LoadReport` instead. `broadcast` calls every
+loaded extension's handler for one event, also without short-circuiting, and gives back one
+`Dispatch` per extension so a failing handler does not hide the others' results.
+
+`ExtensionHost::load(dir)` loads one extension by hand instead, when there is no directory of them
+to discover. See [`crates/airsl/examples/extension-host/`](../examples/extension-host/) for a
+runnable host, including a deliberately broken extension and the report it produces.
+
 ### React to a failure without propagating it
 
 ```rust

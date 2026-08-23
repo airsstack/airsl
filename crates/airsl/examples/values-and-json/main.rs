@@ -44,7 +44,7 @@ fn main() -> Result<(), airsl::Error> {
 
     // The point of the example. Lua iterates a table in hash order, which varies between runs, so
     // encoding straight through `serde_json` produced different bytes each time. `airsl` sorts
-    // object keys unconditionally — see `sorted` in `src/convert.rs:30` — which is what lets a
+    // object keys unconditionally — see `sorted` in `src/convert.rs:34` — which is what lets a
     // script write an index or a lockfile that diffs cleanly.
     assert_eq!(
         compact, again,

@@ -21,7 +21,7 @@ assert_eq!(engine.eval_to::<String>(&script)?, r#"{"ok":true}"#);
 | Crate | What it is |
 |---|---|
 | [`airsl`](crates/airsl) | The library. Engine, sandbox policy, host-module registry, standard library. |
-| [`airsl-cli`](crates/airsl-cli) | The `airsl` binary: `run`, `test`, `check`, `doctor`. |
+| [`airsl-cli`](crates/airsl-cli) | The `airsl` binary: `run`, `test`, `check`, `doctor`, `ext`. |
 
 ```
 cargo add airsl              # embed the runtime
@@ -46,7 +46,7 @@ Written to the [Diátaxis](https://diataxis.fr/) split; start at
 - [Sandbox](crates/airsl/docs/sandbox.md) — presets, grants, resource ceilings
 - [Standard library](crates/airsl/docs/stdlib.md) — every host module
 - [Architecture](crates/airsl/docs/architecture.md) — why it is shaped this way
-- [Extension system](crates/airsl/docs/extensions.md) — proposed, not built
+- [Extension system](crates/airsl/docs/extensions.md) — dispatch (`ext` module, `Engine::dispatch`), the manifest parser, the ceiling, negotiation, the approver, the loader (`ExtensionHost`), and the `airsl ext` CLI (`doctor`, `fire`) — all built
 
 ## Development
 
@@ -64,7 +64,7 @@ the same command.
 ## Releases
 
 [CHANGELOG.md](CHANGELOG.md) covers both crates in one timeline. Each release is tagged per crate —
-`airsl-v0.1.2`, `airsl-cli-v0.1.1` — because one commit has shipped two crates under two different
+`airsl-v0.1.3`, `airsl-cli-v0.1.2` — because one commit has shipped two crates under two different
 version numbers, which a single `vX.Y.Z` tag cannot name.
 
 ## License

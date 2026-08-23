@@ -52,7 +52,10 @@ pub(crate) fn report(policy: &Policy) -> String {
 }
 
 /// Renders a ceiling, or the word that says there is none.
-fn describe<T: core::fmt::Display>(limit: Option<T>) -> String {
+///
+/// `pub(crate)` so [`crate::ext_doctor`] can render a negotiated policy's limits the same way,
+/// rather than duplicating the "no ceiling" wording.
+pub(crate) fn describe<T: core::fmt::Display>(limit: Option<T>) -> String {
     limit.map_or_else(|| String::from("unlimited"), |value| value.to_string())
 }
 

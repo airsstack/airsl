@@ -1,0 +1,12 @@
+[extension]
+name    = "word-count"
+version = "0.1.0"
+entry   = "main.lua"
+api     = 1
+
+[capabilities]
+regex = true
+
+[limits]
+memory       = "8MB"
+instructions = 1_000_000

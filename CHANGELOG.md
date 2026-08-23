@@ -6,8 +6,38 @@ Notable changes to both crates in this workspace, newest first. The format follo
 the slot Cargo treats as breaking, so a compatible change ships as a `z` bump.
 
 The two crates are versioned independently and have released together so far, so each entry names
-both. Every release is tagged per crate — `airsl-v0.1.2`, `airsl-cli-v0.1.1` — because one commit
+both. Every release is tagged per crate — `airsl-v0.1.3`, `airsl-cli-v0.1.2` — because one commit
 has shipped two crates under two different numbers, which a single `vX.Y.Z` tag cannot name.
+
+## airsl 0.1.3 — airsl-cli 0.1.2 — 2026-08-23
+
+One feature, additive end to end: no public item changed shape, `Error` is `#[non_exhaustive]`
+so its new variants break no match, and the only thing an existing script sees is a new
+`airsstack.ext` subtable. A `z` bump in both crates, per the rule above.
+
+### Added
+
+- **The extension system.** A host program loads third-party Lua extensions that declare the
+  capabilities they need in an `extension.toml` manifest; the host bounds those requests with its
+  own `Ceiling`, an `Approver` decides within that bound, and the result is an ordinary `Policy`
+  enforced by the engine that already exists.
+
+  - `airsstack.ext` (`on`, `granted`) and `Engine::dispatch` — a script registers a handler for a
+    host-declared event and the host calls it repeatedly on one persistent engine, rather than the
+    script running once to completion.
+  - The manifest parser (`extension::manifest`) — `extension.toml`'s `[extension]`,
+    `[capabilities]`, `[capabilities.optional]` and `[limits]` blocks, with `$VAR` expansion from
+    host-supplied variables.
+  - `Ceiling`, negotiation (`extension::negotiate`) and the `Approver` trait, with
+    `ManifestApprover` and `DenyAll` shipped — a manifest's request is intersected with the host's
+    ceiling, and a required capability outside it fails the load before the approver is even asked.
+  - `ExtensionHost` and `Extension` (`extension::host`, `extension::loaded`) — `load` and
+    `load_dir` turn a directory (or a whole tree of them) into running, negotiated extensions
+    without short-circuiting on the first failure, and `broadcast` fans one event out to every
+    loaded extension, isolating each one's outcome into its own `Dispatch`.
+  - `airsl ext doctor` and `airsl ext fire` — inspect what a ceiling would grant, reduce and deny
+    for a manifest without running its entry script, or load the extension for real and dispatch
+    one event with the payload on stdin and byte-stable JSON on stdout.
 
 ## airsl 0.1.2 — airsl-cli 0.1.1 — 2026-08-23
 

@@ -34,13 +34,13 @@ byte-identical every time and on every platform.
   are variants of their own rather than an `Error::Lua` carrying a message
   (`src/error.rs:49` and `src/error.rs:64`), because a script stopped for consuming the host's
   memory is an operational event, not a defect in the script.
-- **Classification is structural, never textual.** `Engine::classify` (`src/engine.rs:251`)
+- **Classification is structural, never textual.** `Engine::classify` (`src/engine.rs:399`)
   consults the engine's own instruction counter and walks the VM error chain for
   `mlua::Error::MemoryError`. It never matches on message text — a script is free to raise a string
   that reads exactly like either report, and a text match would let it disguise its own failure as
   a resource breach, or the reverse.
-- **`exhausted_limit()` is the caller's question** (`src/error.rs:224`). It returns
-  `Option<ExhaustedLimit>` (`src/error.rs:202`), which is how the `failure-policy` example decides
+- **`exhausted_limit()` is the caller's question** (`src/error.rs:335`). It returns
+  `Option<ExhaustedLimit>` (`src/error.rs:313`), which is how the `failure-policy` example decides
   to surface a breach even while discarding ordinary script errors.
 - **The ceiling is enforced to within a check interval.** The VM hook fires every 10,000
   instructions (`src/instruction_budget.rs:34`), so a ceiling is approximate by that much. Precision

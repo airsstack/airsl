@@ -27,7 +27,11 @@ const CHUNK: &str = "<json>";
 /// `serde_json` produced a different byte string each time. Anything that writes an index, a
 /// lockfile or a cached artifact needs the opposite, and a caller cannot recover insertion order
 /// afterwards because Lua never had it. Sorting is therefore the behaviour rather than an option.
-fn sorted(value: &mlua::Value) -> mlua::SerializableValue<'_> {
+///
+/// `pub(crate)` rather than private: [`crate::Engine::dispatch`] converts a handler's return value
+/// through this same function, so the sorting decision has exactly one place to change rather than
+/// a copy that could silently drift from it.
+pub(crate) fn sorted(value: &mlua::Value) -> mlua::SerializableValue<'_> {
     value.to_serializable().sort_keys(true)
 }
 

@@ -14,9 +14,10 @@ precisely because the server, not the script, decides what the script can touch.
 ## Status: read this first
 
 The runtime foundation ships, and so does the whole host standard library — a mixed-language script
-corpus of several thousand lines now runs entirely on it. What remains unbuilt is the extension
-host — manifests, ceilings, approval and dispatch — and Tier 3. Every document marks each piece,
-and the table below is the summary.
+corpus of several thousand lines now runs entirely on it. Manifests, ceilings, negotiation,
+approval, the extension loader (`ExtensionHost`) and the `airsl ext` CLI (`doctor`, `fire`) are all
+built too; what remains unbuilt is Tier 3. Every document marks each piece, and the table below is
+the summary.
 
 | Area | State |
 |---|---|
@@ -28,9 +29,15 @@ and the table below is the summary.
 | `airsstack.json` | **implemented** (sorted keys; `null` and `[]` round-trip, but neither can be constructed from Lua — see [stdlib](stdlib.md)) |
 | `airsl` CLI — `run`, `test`, `check`, `doctor`, grant flags | **implemented** |
 | Parameterised capability grants — `FsGrant`, `EnvGrant`, `ProcGrant` | **implemented** |
-| Host standard library — `path`, `fs`, `env`, `proc`, `regex`, `hash`, `time`, `glob`, `stdio`, `hook` | **implemented** |
+| Host standard library — `path`, `fs`, `env`, `proc`, `regex`, `hash`, `time`, `glob`, `stdio`, `hook`, `ext` | **implemented** |
 | `airsl test` and `airsl check` | **implemented** |
-| Extension host — manifests, ceilings, approval, dispatch | **proposed** |
+| Extension dispatch — `ext` module (`on`, `granted`), `Engine::dispatch` | **implemented** |
+| Extension manifest — `extension.toml` format and parser | **implemented** (`src/extension/manifest.rs:189`) |
+| `Ceiling` | **implemented** (`src/extension/ceiling.rs:18`) |
+| Negotiation — `negotiate`, `Negotiation`, `Reduction`, `Denial` | **implemented** (`src/extension/negotiate.rs:274`) |
+| `Approver` trait, `ManifestApprover`, `DenyAll` | **implemented** (`src/extension/approver.rs:68`) |
+| Extension host / loader — `ExtensionHost`, `ExtensionHost::load` | **implemented** (`src/extension/host.rs:251`) |
+| `airsl ext` CLI — `doctor`, `fire` | **implemented** (`crates/airsl-cli/src/ext_doctor.rs:198`, `crates/airsl-cli/src/ext_fire.rs:91`) |
 
 Do not cite these documents as evidence that something works. Where a claim is about code that
 exists, it carries a `file:line`. Where it is about code that does not, it says so.
@@ -85,7 +92,7 @@ guarantee, and an earlier snapshot taken elsewhere was roughly twice as slow acr
 Two things follow, and [architecture](architecture.md) develops both.
 
 **Reuse against rebuild is thirty-fold**, which makes engine lifetime an API-shape question rather
-than an optimisation. It widened as the standard library grew: construction installs eleven modules
+than an optimisation. It widened as the standard library grew: construction installs twelve modules
 now rather than one, and went from 40 µs to 128 µs while the reused path barely moved. The argument
 the number supports got stronger, not weaker.
 

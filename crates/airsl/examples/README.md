@@ -64,6 +64,7 @@ does not run one, which is the difference between "it builds" and "it works" —
 | Example | What it shows |
 | --- | --- |
 | [`custom-module`](custom-module/) | Implementing `HostModule`, reading authority from `InstallContext`, and naming your own root table. |
+| [`extension-host`](extension-host/) | Loading a directory of third-party extensions under one ceiling, and broadcasting one event to every extension that made it in. |
 
 ## Conventions these examples follow
 

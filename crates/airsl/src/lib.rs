@@ -23,6 +23,10 @@
 //!
 //! Extend the surface by implementing [`HostModule`] and adding it to a [`ModuleSet`]; the module
 //! becomes a subtable of `airsstack` alongside the built-ins.
+//!
+//! Third-party scripts load as [`extension`]s: a directory with its own `extension.toml` manifest,
+//! negotiated against the host's ceiling and run through an [`ExtensionHost`] that owns the
+//! resulting engines.
 
 #![forbid(unsafe_code)]
 
@@ -47,6 +51,7 @@ mod instruction_budget;
 mod require_loader;
 mod script;
 
+pub mod extension;
 pub mod modules;
 pub mod sandbox;
 pub mod types;
@@ -63,6 +68,7 @@ pub use mlua;
 pub use builder::{EngineBuilder, Missing, Present};
 pub use engine::Engine;
 pub use error::{Error, ExhaustedLimit, Result};
+pub use extension::{Extension, ExtensionHost};
 pub use failure_policy::FailurePolicy;
 pub use modules::{HostModule, InstallContext, ModuleSet};
 pub use sandbox::{
@@ -70,4 +76,4 @@ pub use sandbox::{
     ResourceLimits,
 };
 pub use script::Script;
-pub use types::{ChunkName, ModuleName, RequireTarget, RootTable};
+pub use types::{ChunkName, EventName, ExtensionName, ModuleName, RequireTarget, RootTable};

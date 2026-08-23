@@ -3,7 +3,7 @@
 //! Exists as its own example because it exercises the seam that makes `airsl` a shared Lua
 //! integration point rather than a fixed script runner: a downstream crate's module goes through
 //! the same [`HostModule`] trait, the same uniqueness check and the same [`InstallContext`] as the
-//! eleven built-ins, so nothing here is a special case the library had to anticipate.
+//! twelve built-ins, so nothing here is a special case the library had to anticipate.
 //!
 //! Responsibilities: implementing [`HostModule`], reading authority from
 //! [`InstallContext::grants`], inserting into [`airsl::modules::stdlib`], and naming a custom
@@ -96,7 +96,7 @@ fn describe(grants: &GrantSet) -> String {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    // The contributed module joins the eleven built-ins in one set. `insert` enforces name
+    // The contributed module joins the twelve built-ins in one set. `insert` enforces name
     // uniqueness, so colliding with `json` is an error at build time rather than a module that
     // silently replaces another.
     let mut modules = airsl::modules::stdlib()?;

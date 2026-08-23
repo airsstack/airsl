@@ -1,7 +1,7 @@
 [package]
 name        = "airsl-cli"
 description = "Command-line runner for airsl Lua scripts: run, test, check and doctor"
-version     = "0.1.1"
+version     = "0.1.2"
 
 edition.workspace      = true
 rust-version.workspace = true
@@ -28,10 +28,11 @@ doc  = false
 workspace = true
 
 [dependencies]
-airsl   = { workspace = true }
-clap    = { workspace = true }
-walkdir = { workspace = true }
-mlua    = { workspace = true }
+airsl      = { workspace = true }
+clap       = { workspace = true }
+walkdir    = { workspace = true }
+mlua       = { workspace = true }
+serde_json = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

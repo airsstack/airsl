@@ -10,6 +10,7 @@
 //!
 //! - [`registry`] — the [`HostModule`] trait, [`InstallContext`] and [`ModuleSet`].
 //! - [`mod@env`] — environment variables, guarded by a name allowlist.
+//! - [`mod@ext`] — what an extension registers with the host, and the grants it was loaded with.
 //! - [`mod@fs`] — filesystem access, guarded by the policy's filesystem grants.
 //! - [`mod@proc`] — subprocesses, guarded by an executable allowlist.
 //! - [`mod@regex`] — real regular expressions, needing no authority.
@@ -28,6 +29,7 @@
 mod guard;
 
 pub mod env;
+pub mod ext;
 pub mod fs;
 pub mod glob;
 pub mod hash;
@@ -42,6 +44,7 @@ pub mod stdlib;
 pub mod time;
 
 pub use env::Env;
+pub use ext::Ext;
 pub use fs::Fs;
 pub use glob::Glob;
 pub use hash::Hash;

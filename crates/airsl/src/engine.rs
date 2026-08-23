@@ -9,22 +9,25 @@
 //!
 //! - [`Engine`], owning the [`mlua::Lua`] state and the installed [`crate::ModuleSet`].
 //! - Evaluating a [`Script`], with and without a typed return value.
+//! - Dispatching a host event into a handler a script registered through `airsstack.ext`.
 //!
 //! Non-responsibilities: deciding what to do about a failure. [`Engine::eval`] returns a
 //! [`Result`]; [`crate::FailurePolicy`] describes how the caller should treat it.
 
-use std::sync::{Mutex, PoisonError};
+use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::thread::ThreadId;
 
-use mlua::FromLuaMulti;
+use mlua::{FromLuaMulti, LuaSerdeExt as _};
 
 use crate::builder::{EngineBuilder, Missing};
 use crate::error::{Error, Result};
 use crate::instruction_budget::{BudgetExhausted, InstructionBudget};
 use crate::modules::ModuleSet;
+use crate::modules::ext::HANDLERS_KEY;
 use crate::require_loader::{RequireDisposition, RequireLoader};
 use crate::sandbox::Policy;
 use crate::script::Script;
-use crate::types::{ModuleName, RootTable};
+use crate::types::{EventName, ModuleName, RootTable};
 
 /// A configured Lua state.
 ///
@@ -59,6 +62,33 @@ pub struct Engine {
     /// Lua execution on one state cannot proceed in parallel regardless, so serialising here
     /// costs an uncontended lock and no throughput.
     evaluating: Mutex<()>,
+    /// The thread currently holding `evaluating`, and the event it is inside a handler for, if
+    /// any — so a re-entrant call issued from inside a running evaluation is refused with
+    /// [`Error::Reentrant`] instead of deadlocking on the lock that thread already holds. Not only
+    /// `dispatch`: a host function that calls back into `eval` or `check` on the same engine hits
+    /// this the same way. Other threads are not affected: they block on `evaluating` exactly as an
+    /// evaluation does.
+    evaluating_thread: Mutex<Option<(ThreadId, Option<EventName>)>>,
+}
+
+/// Holds the evaluation lock and records which thread holds it; clears the record on drop.
+///
+/// The record has to survive for exactly as long as the lock's own critical section, which is
+/// what makes this a guard rather than a plain assignment around the call: a `dispatch` that
+/// returns early through `?` still clears the thread id when the guard drops.
+struct Evaluation<'a> {
+    _lock: MutexGuard<'a, ()>,
+    thread: &'a Mutex<Option<(ThreadId, Option<EventName>)>>,
+}
+
+impl Drop for Evaluation<'_> {
+    fn drop(&mut self) {
+        // Poisoning carries information here — a stale thread id would misreport every later
+        // re-entrancy check on this engine for the rest of the process — so, like `evaluating`,
+        // a poisoned lock is recovered rather than left holding the previous value forever.
+        let mut slot = self.thread.lock().unwrap_or_else(PoisonError::into_inner);
+        *slot = None;
+    }
 }
 
 impl Engine {
@@ -83,6 +113,7 @@ impl Engine {
             budget,
             root,
             evaluating: Mutex::new(()),
+            evaluating_thread: Mutex::new(None),
         }
     }
 
@@ -116,11 +147,71 @@ impl Engine {
         self.modules.names()
     }
 
+    /// Takes the evaluation lock, blocking behind any other thread, and records this thread —
+    /// unless this thread already holds it, in which case the lock is never touched and the call
+    /// is refused instead of deadlocked.
+    ///
+    /// The thread id is read before either lock is taken, not inside the critical section: acquiring
+    /// it can itself panic (`std::thread::current` — after thread-local teardown, notably in a
+    /// custom test harness), and a panic while holding `evaluating_thread` would poison the very
+    /// lock re-entrancy detection depends on.
+    ///
+    /// `event` names the handler this call is running for, if any — `dispatch` passes its own
+    /// event, `eval`/`check` pass `None`. It is what a *nested* re-entrant call reports: a handler
+    /// that calls a host function that calls back into `eval` sees `Error::Reentrant` naming the
+    /// handler's own event, not the inner `eval`'s (which has none).
+    ///
+    /// Poisoning `evaluating` carries no information: the guarded value is `()`, and a panic in a
+    /// host function leaves the Lua state to `mlua`'s own recovery rather than to this lock.
+    /// Poisoning `evaluating_thread` is recovered the same way, for the reason its own doc comment
+    /// gives: leaving it poisoned would misreport every later call as reentrant or never as
+    /// reentrant, depending which side of the poison the read landed on.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Reentrant`] when this thread is already inside an evaluation on this
+    /// engine.
+    fn begin_evaluation(&self, event: Option<&EventName>) -> Result<Evaluation<'_>> {
+        let current = std::thread::current().id();
+
+        {
+            let holder = self
+                .evaluating_thread
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
+            if let Some((thread, outer_event)) = holder.as_ref()
+                && *thread == current
+            {
+                return Err(Error::Reentrant {
+                    event: outer_event.as_ref().map(EventName::to_string),
+                });
+            }
+        }
+
+        let lock = self
+            .evaluating
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let mut slot = self
+            .evaluating_thread
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        *slot = Some((current, event.cloned()));
+        drop(slot);
+
+        Ok(Evaluation {
+            _lock: lock,
+            thread: &self.evaluating_thread,
+        })
+    }
+
     /// Runs `script`, discarding whatever it returns.
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Lua`] when the chunk fails to compile or raises while running.
+    /// Returns [`Error::Lua`] when the chunk fails to compile or raises while running, and
+    /// [`Error::Reentrant`] when called from a thread already evaluating on this engine — see
+    /// [`Engine::eval_to`].
     pub fn eval(&self, script: &Script) -> Result<()> {
         self.eval_to::<()>(script)
     }
@@ -138,14 +229,13 @@ impl Engine {
     /// # Errors
     ///
     /// Returns [`Error::Lua`] when the chunk fails to compile, raises while running, exceeds a
-    /// resource ceiling, or returns something that cannot be converted to `T`.
+    /// resource ceiling, or returns something that cannot be converted to `T`. Returns
+    /// [`Error::Reentrant`] when called from a host function that is itself running inside an
+    /// evaluation already in progress on this engine's own thread — the same protection
+    /// [`Engine::dispatch`] gives a handler, extended to `eval`/`check` because a host function
+    /// reachable from a handler can call either.
     pub fn eval_to<T: FromLuaMulti>(&self, script: &Script) -> Result<T> {
-        // Poisoning carries no information here: the guarded value is `()`, and a panic in a host
-        // function leaves the Lua state to `mlua`'s own recovery rather than to this lock.
-        let _guard = self
-            .evaluating
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
+        let _evaluation = self.begin_evaluation(None)?;
 
         if let Some(budget) = self.budget.as_ref() {
             budget.reset();
@@ -157,7 +247,7 @@ impl Engine {
             .load(script.source())
             .set_name(script.name().as_lua())
             .eval::<T>()
-            .map_err(|error| self.classify(script, error))
+            .map_err(|error| self.classify(script.name().as_str(), error))
     }
 
     /// Installs the script's arguments as the global `arg` table.
@@ -214,7 +304,9 @@ impl Engine {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Lua`] when the chunk does not compile.
+    /// Returns [`Error::Lua`] when the chunk does not compile. Returns [`Error::Reentrant`] when
+    /// called from a host function already running inside an evaluation on this engine's own
+    /// thread — see [`Engine::eval_to`].
     ///
     /// # Examples
     ///
@@ -227,10 +319,7 @@ impl Engine {
     /// # Ok::<(), airsl::Error>(())
     /// ```
     pub fn check(&self, script: &Script) -> Result<()> {
-        let _guard = self
-            .evaluating
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
+        let _evaluation = self.begin_evaluation(None)?;
 
         // `into_function` compiles and hands back the chunk rather than calling it, which is the
         // whole distinction from `eval`: a driver script's body runs on load, so anything that
@@ -240,17 +329,74 @@ impl Engine {
             .set_name(script.name().as_lua())
             .into_function()
             .map(|_| ())
-            .map_err(|error| self.classify(script, error))
+            .map_err(|error| self.classify(script.name().as_str(), error))
     }
 
-    /// Names the failure a script produced, separating a resource breach from a script defect.
+    /// Calls the handler a script registered for `event` through `airsstack.ext.on`.
+    ///
+    /// The payload crosses into Lua as a table built from `payload`, and the handler's first
+    /// return value crosses back as JSON with sorted keys; a handler that returns nothing yields
+    /// `Some(Value::Null)`. An event with no registered handler yields `None`, which is the normal
+    /// case for an extension that chose not to subscribe, not a failure.
+    ///
+    /// Like [`Engine::eval_to`], a dispatch resets the instruction budget, holds the evaluation
+    /// lock for its whole duration, and serialises against other threads. Unlike `eval_to`, it
+    /// does not touch `arg` or `require`: the `require` installed when the registering script ran
+    /// is still in place and still points at that script's root.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Reentrant`] when called from the thread already evaluating on this engine
+    /// — a handler calling a host function that dispatches back. Returns
+    /// [`Error::InstructionLimit`] or [`Error::MemoryLimit`] when the handler breaches a ceiling,
+    /// and [`Error::Lua`] when it raises or when its result cannot be represented as JSON.
+    pub fn dispatch(
+        &self,
+        event: &EventName,
+        payload: &serde_json::Value,
+    ) -> Result<Option<serde_json::Value>> {
+        let _evaluation = self.begin_evaluation(Some(event))?;
+
+        if let Some(budget) = self.budget.as_ref() {
+            budget.reset();
+        }
+
+        let chunk = event.as_str();
+        let fail = |error: mlua::Error| self.classify(chunk, error);
+
+        let handlers: mlua::Value = self.lua.named_registry_value(HANDLERS_KEY).map_err(fail)?;
+        let mlua::Value::Table(handlers) = handlers else {
+            return Ok(None);
+        };
+        let handler: mlua::Value = handlers.get(chunk).map_err(fail)?;
+        let mlua::Value::Function(handler) = handler else {
+            return Ok(None);
+        };
+
+        let argument = self.lua.to_value(payload).map_err(fail)?;
+        let returned: mlua::Value = handler.call(argument).map_err(fail)?;
+
+        // Through `convert::sorted` rather than a second copy of its serializer options, so the
+        // sorted-keys decision has exactly one place it can change.
+        serde_json::to_value(crate::convert::sorted(&returned))
+            .map(Some)
+            // Wrapped as an `mlua::Error` and passed through `classify` like every other failure
+            // in this function, rather than constructed directly — a `serde_json` failure cannot
+            // be a resource breach today, but nothing here should be allowed to bypass the
+            // structural check by construction.
+            .map_err(|error| fail(mlua::Error::external(error)))
+    }
+
+    /// Names the failure a chunk produced, separating a resource breach from a script defect.
     ///
     /// Both decisions are made on structure rather than on message text. A script is free to raise
     /// a string that reads exactly like either report, and matching on the text would let it
     /// disguise its own failure as a resource breach or the reverse.
-    fn classify(&self, script: &Script, error: mlua::Error) -> Error {
-        let chunk = script.name().as_str();
-
+    ///
+    /// `chunk` names whatever ran — a script's own chunk name for `eval`/`check`, or the event
+    /// name for [`Engine::dispatch`] — so a breach report always says what was running when it
+    /// happened rather than reusing a name that would not fit an event.
+    fn classify(&self, chunk: &str, error: mlua::Error) -> Error {
         if let Some(budget) = self.budget.as_ref()
             && (budget.is_exhausted() || error.downcast_ref::<BudgetExhausted>().is_some())
         {
@@ -304,9 +450,15 @@ mod tests {
         reason = "tests unwrap known-valid fixtures; a panic is the intended failure signal"
     )]
 
+    use std::sync::{Arc, OnceLock};
+
+    use serde_json::json;
+
     use super::Engine;
+    use crate::modules::{Ext, HostModule, InstallContext, ModuleSet, stdlib};
     use crate::{
-        ExhaustedLimit, InstructionLimit, MemoryLimit, Policy, ResourceLimits, RootTable, Script,
+        EventName, ExhaustedLimit, InstructionLimit, MemoryLimit, ModuleName, Policy,
+        ResourceLimits, RootTable, Script,
     };
 
     /// Fails to compile if `T` is not shareable between threads.
@@ -711,5 +863,462 @@ mod tests {
             .map(ToString::to_string)
             .collect();
         assert!(names.contains(&String::from("json")), "{names:?}");
+    }
+
+    fn dispatching_engine(events: &[&str], policy: Policy) -> Engine {
+        let mut set = stdlib().unwrap();
+        set.replace(Box::new(Ext::with_events(
+            events.iter().map(|e| EventName::new(*e).unwrap()),
+        )))
+        .unwrap();
+        Engine::builder()
+            .policy(policy)
+            .stdlib(set)
+            .build()
+            .unwrap()
+    }
+
+    fn event(name: &str) -> EventName {
+        EventName::new(name).unwrap()
+    }
+
+    #[test]
+    fn dispatch_without_a_handler_is_silence_not_an_error() {
+        let engine = dispatching_engine(&["ping"], Policy::confined());
+        assert_eq!(engine.dispatch(&event("ping"), &json!({})).unwrap(), None);
+    }
+
+    #[test]
+    fn dispatch_passes_the_payload_and_returns_the_handler_result() {
+        let engine = dispatching_engine(&["echo"], Policy::confined());
+        engine
+            .eval(&script(
+                "airsstack.ext.on('echo', function(p) return { got = p.n * 2, tags = p.tags } end)",
+            ))
+            .unwrap();
+        let reply = engine
+            .dispatch(&event("echo"), &json!({ "n": 21, "tags": ["a", "b"] }))
+            .unwrap();
+        assert_eq!(reply, Some(json!({ "got": 42, "tags": ["a", "b"] })));
+    }
+
+    #[test]
+    fn a_handler_returning_nothing_yields_json_null() {
+        let engine = dispatching_engine(&["fire"], Policy::confined());
+        engine
+            .eval(&script("airsstack.ext.on('fire', function() end)"))
+            .unwrap();
+        assert_eq!(
+            engine.dispatch(&event("fire"), &json!(null)).unwrap(),
+            Some(serde_json::Value::Null)
+        );
+    }
+
+    #[test]
+    fn a_handler_returning_an_empty_table_yields_an_empty_json_object() {
+        // `nil` and `{}` cross the boundary as different JSON shapes; conflating them would make
+        // "no reply" indistinguishable from "an empty object reply".
+        let engine = dispatching_engine(&["empty"], Policy::confined());
+        engine
+            .eval(&script(
+                "airsstack.ext.on('empty', function() return {} end)",
+            ))
+            .unwrap();
+        assert_eq!(
+            engine.dispatch(&event("empty"), &json!(null)).unwrap(),
+            Some(json!({}))
+        );
+    }
+
+    #[test]
+    fn state_persists_between_dispatches() {
+        let engine = dispatching_engine(&["tick"], Policy::confined());
+        engine
+            .eval(&script(
+                "local n = 0 airsstack.ext.on('tick', function() n = n + 1 return n end)",
+            ))
+            .unwrap();
+        for expected in 1..=3 {
+            assert_eq!(
+                engine.dispatch(&event("tick"), &json!(null)).unwrap(),
+                Some(json!(expected))
+            );
+        }
+    }
+
+    #[test]
+    fn a_runaway_handler_is_named_as_an_instruction_breach_and_the_next_call_is_unaffected() {
+        let policy = Policy::confined().with_limits(
+            ResourceLimits::none().with_instructions(Some(InstructionLimit::count(100_000))),
+        );
+        let engine = dispatching_engine(&["spin", "ok"], policy);
+        engine
+            .eval(&script(
+                "airsstack.ext.on('spin', function() while true do end end) \
+                 airsstack.ext.on('ok', function() return 1 end)",
+            ))
+            .unwrap();
+        let err = engine.dispatch(&event("spin"), &json!(null)).unwrap_err();
+        assert_eq!(err.exhausted_limit(), Some(ExhaustedLimit::Instructions));
+        assert!(
+            err.to_string().contains("spin"),
+            "the event names the chunk: {err}"
+        );
+        assert_eq!(
+            engine.dispatch(&event("ok"), &json!(null)).unwrap(),
+            Some(json!(1))
+        );
+    }
+
+    #[test]
+    fn a_handler_that_allocates_past_the_memory_ceiling_is_named_as_a_memory_breach() {
+        let policy = Policy::confined()
+            .with_limits(ResourceLimits::none().with_memory(Some(MemoryLimit::mebibytes(1))));
+        let engine = dispatching_engine(&["grow"], policy);
+        engine
+            .eval(&script(
+                "airsstack.ext.on('grow', function() \
+                     local t = {} for i = 1, 1e9 do t[i] = i end return 1 \
+                 end)",
+            ))
+            .unwrap();
+        let err = engine.dispatch(&event("grow"), &json!(null)).unwrap_err();
+        assert_eq!(err.exhausted_limit(), Some(ExhaustedLimit::Memory));
+    }
+
+    #[test]
+    fn dispatch_on_an_engine_without_the_ext_module_reports_no_handler_rather_than_an_error() {
+        // `Ext` supplies the `HANDLERS_KEY` registry table `dispatch` reads. An engine built from
+        // a `ModuleSet` that never installed `Ext` has no such table, which is the same shape as
+        // "no handler registered" and dispatch must not treat it as a defect.
+        let engine = Engine::builder()
+            .policy(Policy::confined())
+            .stdlib(ModuleSet::new())
+            .build()
+            .unwrap();
+        assert_eq!(
+            engine.dispatch(&event("anything"), &json!(null)).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn a_handler_that_raises_is_a_lua_error_naming_the_event() {
+        let engine = dispatching_engine(&["bad"], Policy::confined());
+        engine
+            .eval(&script(
+                "airsstack.ext.on('bad', function() error('boom') end)",
+            ))
+            .unwrap();
+        let err = engine.dispatch(&event("bad"), &json!(null)).unwrap_err();
+        assert!(err.exhausted_limit().is_none());
+        let text = err.to_string();
+        assert!(text.contains("bad") && text.contains("boom"), "{text}");
+    }
+
+    #[test]
+    fn re_registering_an_event_replaces_the_handler() {
+        let engine = dispatching_engine(&["v"], Policy::confined());
+        engine
+            .eval(&script(
+                "airsstack.ext.on('v', function() return 1 end) \
+                 airsstack.ext.on('v', function() return 2 end)",
+            ))
+            .unwrap();
+        assert_eq!(
+            engine.dispatch(&event("v"), &json!(null)).unwrap(),
+            Some(json!(2))
+        );
+    }
+
+    /// A module whose single function dispatches `reenter` on the engine it was installed into.
+    struct Boomerang {
+        name: ModuleName,
+        engine: Arc<OnceLock<Engine>>,
+    }
+
+    impl HostModule for Boomerang {
+        fn name(&self) -> &ModuleName {
+            &self.name
+        }
+
+        fn install(
+            &self,
+            lua: &mlua::Lua,
+            table: &mlua::Table,
+            _context: &InstallContext<'_>,
+        ) -> crate::Result<()> {
+            let engine = Arc::clone(&self.engine);
+            let back = lua
+                .create_function(move |_, ()| {
+                    let Some(engine) = engine.get() else {
+                        return Ok(String::from("no engine"));
+                    };
+                    match engine.dispatch(&event("reenter"), &serde_json::Value::Null) {
+                        Ok(_) => Ok(String::from("dispatched")),
+                        Err(error) => Ok(error.to_string()),
+                    }
+                })
+                .map_err(|e| crate::Error::lua("boomerang", e))?;
+            table
+                .set("back", back)
+                .map_err(|e| crate::Error::lua("boomerang", e))
+        }
+    }
+
+    #[test]
+    fn a_handler_dispatching_back_into_its_own_engine_is_refused_not_deadlocked() {
+        let slot = Arc::new(OnceLock::new());
+        let mut set = stdlib().unwrap();
+        set.replace(Box::new(Ext::with_events([event("reenter")])))
+            .unwrap();
+        set.insert(Box::new(Boomerang {
+            name: ModuleName::new("boomerang").unwrap(),
+            engine: Arc::clone(&slot),
+        }))
+        .unwrap();
+        let engine = Engine::builder()
+            .policy(Policy::confined())
+            .stdlib(set)
+            .build()
+            .unwrap();
+        assert!(slot.set(engine).is_ok());
+        let engine = slot.get().unwrap();
+
+        engine
+            .eval(&script(
+                "airsstack.ext.on('reenter', function() return airsstack.boomerang.back() end)",
+            ))
+            .unwrap();
+        let reply = engine.dispatch(&event("reenter"), &json!(null)).unwrap();
+        let text = reply.unwrap().as_str().unwrap().to_owned();
+        assert!(
+            text.contains("re-entrant call during handler for event `reenter`"),
+            "the inner dispatch was refused with Reentrant: {text}"
+        );
+    }
+
+    /// A module whose single function calls `eval` back on the engine it was installed into —
+    /// the case beyond `dispatch` that [`Error::Reentrant`] also has to cover: a host function
+    /// reachable from a handler is not limited to calling `dispatch` back.
+    struct EvalBoomerang {
+        name: ModuleName,
+        engine: Arc<OnceLock<Engine>>,
+    }
+
+    impl HostModule for EvalBoomerang {
+        fn name(&self) -> &ModuleName {
+            &self.name
+        }
+
+        fn install(
+            &self,
+            lua: &mlua::Lua,
+            table: &mlua::Table,
+            _context: &InstallContext<'_>,
+        ) -> crate::Result<()> {
+            let engine = Arc::clone(&self.engine);
+            let back = lua
+                .create_function(move |_, ()| {
+                    let Some(engine) = engine.get() else {
+                        return Ok(String::from("no engine"));
+                    };
+                    match engine.eval(&script("return 1")) {
+                        Ok(()) => Ok(String::from("evaluated")),
+                        Err(error) => Ok(error.to_string()),
+                    }
+                })
+                .map_err(|e| crate::Error::lua("eval_boomerang", e))?;
+            table
+                .set("back", back)
+                .map_err(|e| crate::Error::lua("eval_boomerang", e))
+        }
+    }
+
+    #[test]
+    fn a_handler_calling_eval_back_on_its_own_engine_is_refused_not_deadlocked() {
+        let slot = Arc::new(OnceLock::new());
+        let mut set = stdlib().unwrap();
+        set.replace(Box::new(Ext::with_events([event("reenter")])))
+            .unwrap();
+        set.insert(Box::new(EvalBoomerang {
+            name: ModuleName::new("eval_boomerang").unwrap(),
+            engine: Arc::clone(&slot),
+        }))
+        .unwrap();
+        let engine = Engine::builder()
+            .policy(Policy::confined())
+            .stdlib(set)
+            .build()
+            .unwrap();
+        assert!(slot.set(engine).is_ok());
+        let engine = slot.get().unwrap();
+
+        engine
+            .eval(&script(
+                "airsstack.ext.on('reenter', function() return airsstack.eval_boomerang.back() end)",
+            ))
+            .unwrap();
+        let reply = engine.dispatch(&event("reenter"), &json!(null)).unwrap();
+        let text = reply.unwrap().as_str().unwrap().to_owned();
+        assert!(
+            text.contains("re-entrant call during handler for event `reenter`"),
+            "the inner eval was refused with Reentrant, naming the outer handler's event: {text}"
+        );
+    }
+
+    #[test]
+    fn a_plain_eval_that_calls_eval_back_on_itself_reports_no_event() {
+        // No handler and no dispatch anywhere in this call chain — the re-entrancy is real, but
+        // there is no event to name, which is what `Error::Reentrant { event: None }` exists for.
+        let slot = Arc::new(OnceLock::new());
+        let mut set = stdlib().unwrap();
+        set.insert(Box::new(EvalBoomerang {
+            name: ModuleName::new("eval_boomerang").unwrap(),
+            engine: Arc::clone(&slot),
+        }))
+        .unwrap();
+        let engine = Engine::builder()
+            .policy(Policy::confined())
+            .stdlib(set)
+            .build()
+            .unwrap();
+        assert!(slot.set(engine).is_ok());
+        let engine = slot.get().unwrap();
+
+        let reply = engine
+            .eval_to::<String>(&script("return airsstack.eval_boomerang.back()"))
+            .unwrap();
+        assert_eq!(reply, "re-entrant evaluation");
+    }
+
+    /// A module whose function poisons `evaluating_thread` — the same way a panic mid-critical-
+    /// section would — and then attempts a re-entrant `eval`, so the test can see whether
+    /// detection survives the poison rather than silently disabling itself.
+    struct Poisoner {
+        name: ModuleName,
+        engine: Arc<OnceLock<Engine>>,
+    }
+
+    /// Poisons `evaluating_thread` without changing what it holds: locks it, panics while the
+    /// guard is alive, and catches the unwind on the same thread. The slot still names the
+    /// calling thread when the guard's `Drop` runs mid-unwind, so the poisoned `Mutex` keeps the
+    /// correct value — only its poison flag changes.
+    #[expect(
+        clippy::unwrap_used,
+        reason = "test helper poisoning a lock on purpose; a panic here is the intended trigger"
+    )]
+    #[expect(
+        clippy::panic,
+        reason = "the panic is the poisoning mechanism itself, caught by `catch_unwind` and never \
+                  propagated past this function"
+    )]
+    fn poison_evaluating_thread(engine: &Engine) {
+        let poisoned = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _guard = engine.evaluating_thread.lock().unwrap();
+            panic!("deliberately poisoning `evaluating_thread` for the test");
+        }));
+        assert!(poisoned.is_err(), "the panic must have actually unwound");
+        assert!(engine.evaluating_thread.is_poisoned());
+    }
+
+    impl HostModule for Poisoner {
+        fn name(&self) -> &ModuleName {
+            &self.name
+        }
+
+        fn install(
+            &self,
+            lua: &mlua::Lua,
+            table: &mlua::Table,
+            _context: &InstallContext<'_>,
+        ) -> crate::Result<()> {
+            let engine = Arc::clone(&self.engine);
+            let trigger = lua
+                .create_function(move |_, ()| {
+                    let Some(engine) = engine.get() else {
+                        return Ok(String::from("no engine"));
+                    };
+
+                    poison_evaluating_thread(engine);
+
+                    match engine.eval(&script("return 1")) {
+                        Ok(()) => Ok(String::from("not reentrant")),
+                        Err(error) => Ok(error.to_string()),
+                    }
+                })
+                .map_err(|e| crate::Error::lua("poisoner", e))?;
+            table
+                .set("trigger", trigger)
+                .map_err(|e| crate::Error::lua("poisoner", e))
+        }
+    }
+
+    #[test]
+    #[expect(
+        clippy::unwrap_used,
+        reason = "test poisons and inspects the lock directly; a panic here is the failure signal"
+    )]
+    fn a_poisoned_evaluating_thread_lock_still_detects_reentrancy_rather_than_deadlocking() {
+        let slot = Arc::new(OnceLock::new());
+        let mut set = stdlib().unwrap();
+        set.insert(Box::new(Poisoner {
+            name: ModuleName::new("poisoner").unwrap(),
+            engine: Arc::clone(&slot),
+        }))
+        .unwrap();
+        let engine = Engine::builder()
+            .policy(Policy::confined())
+            .stdlib(set)
+            .build()
+            .unwrap();
+        assert!(slot.set(engine).is_ok());
+        let engine = slot.get().unwrap();
+
+        let reply = engine
+            .eval_to::<String>(&script("return airsstack.poisoner.trigger()"))
+            .unwrap();
+        assert_eq!(
+            reply, "re-entrant evaluation",
+            "poisoning must not silently disable re-entrancy detection"
+        );
+
+        // The lock stays poisoned (poisoning this way is permanent by design), but recovery keeps
+        // the engine usable rather than making every later call fail.
+        assert!(engine.eval(&script("return 1")).is_ok());
+    }
+
+    #[test]
+    fn threads_dispatching_concurrently_serialise_without_a_spurious_reentrant_error() {
+        let engine = Arc::new(dispatching_engine(&["add"], Policy::confined()));
+        engine
+            .eval(&script(
+                "airsstack.ext.on('add', function(p) return p.a + p.b end)",
+            ))
+            .unwrap();
+
+        let workers: Vec<_> = (0..8)
+            .map(|i| {
+                let engine = Arc::clone(&engine);
+                std::thread::spawn(move || {
+                    let mut results = Vec::new();
+                    for j in 0..200 {
+                        let reply = engine
+                            .dispatch(&event("add"), &json!({ "a": i, "b": j }))
+                            .unwrap();
+                        results.push(reply == Some(json!(i + j)));
+                    }
+                    results
+                })
+            })
+            .collect();
+
+        for worker in workers {
+            let results = worker.join().unwrap();
+            assert!(
+                results.iter().all(|ok| *ok),
+                "every reply matched its own arguments"
+            );
+        }
     }
 }

@@ -39,19 +39,19 @@ decoded back: name=widget observed_at=1700000000 tags=2
   `$1`.
 - **Object keys are sorted; array elements are not.** Lua iterates a table in hash order, which
   varies between runs, so encoding straight through `serde_json` produced different bytes each
-  time. `sorted` (`src/convert.rs:30`) makes sorting the behaviour rather than an option — which is
+  time. `sorted` (`src/convert.rs:34`) makes sorting the behaviour rather than an option — which is
   what lets a script write an index or a lockfile that diffs cleanly. `tags` comes back
   `["beta","alpha"]`, not `["alpha","beta"]`: element order is data the script chose, while key
   order was never anything but an artefact of hashing. The example asserts the two encodings of the
   same table are identical.
 - **An empty Lua table encodes as `{}`.** Lua has no distinct empty-sequence value, so there is
-  nothing to disambiguate an empty object from an empty array with (`src/convert.rs:36`).
+  nothing to disambiguate an empty object from an empty array with (`src/convert.rs:41`).
 - **Lua 5.4's integers survive the round trip.** `observed_at` stays `1700000000` rather than
   becoming `1.7e9`. Only Lua 5.3+ distinguishes integers from floats, which is why the crate pins
   5.4 rather than the more commonly embedded 5.1 or LuaJIT.
-- **`encode_pretty` ends with a newline** (`src/convert.rs:55`, `src/modules/json.rs:69`), so a
+- **`encode_pretty` ends with a newline** (`src/convert.rs:64`, `src/modules/json.rs:69`), so a
   script can write it straight to a file without appending one.
-- **A returned table is read through `mlua`.** `eval_to::<T>` (`src/engine.rs:142`) converts through
+- **A returned table is read through `mlua`.** `eval_to::<T>` (`src/engine.rs:237`) converts through
   `FromLuaMulti`, so `airsl::mlua::Table` is a legitimate target. Depend on `airsl::mlua`, never on
   a separately declared `mlua` — a version mismatch produces type errors that never name the real
   cause.

@@ -84,6 +84,114 @@ pub enum Error {
         module: String,
     },
 
+    /// A module was asked to be replaced in a set that does not contain it.
+    #[error("host module `{module}` is not registered")]
+    ModuleNotFound {
+        /// The name that was looked up.
+        module: String,
+    },
+
+    /// `ext.on` was called with an event the host never declared.
+    ///
+    /// Raised while the extension's entry script runs, so it surfaces as a load failure rather
+    /// than as a handler that silently never fires.
+    #[error(
+        "event `{event}` is not one this host dispatches; {}",
+        describe_declared(declared)
+    )]
+    UnknownEvent {
+        /// The name the script asked for.
+        event: String,
+        /// Every event the host did declare, so the refusal names what *was* available.
+        declared: Vec<String>,
+    },
+
+    /// An evaluation was attempted from the thread already evaluating on this engine.
+    ///
+    /// Covers every way that can happen: a handler calling a host function that dispatches back
+    /// into the same engine, and — beyond `dispatch` — a host function that calls [`crate::Engine::eval`]
+    /// or [`crate::Engine::check`] on an engine it is already running on, whether or not the outer
+    /// call was itself a dispatched event. `event` names the handler that was running when the
+    /// re-entrant call happened; `None` when the outer call was a plain `eval`/`check` rather than
+    /// a dispatch. The alternative in every case is a deadlock on the evaluation lock, which this
+    /// variant exists to avoid.
+    #[error("{}", describe_reentrant(event.as_deref()))]
+    Reentrant {
+        /// The event whose handler was running when the re-entrant call was refused, if any.
+        event: Option<String>,
+    },
+
+    /// `extension.toml` could not be read.
+    #[error("cannot read manifest `{path}`: {source}")]
+    ManifestRead {
+        /// The manifest path.
+        path: String,
+        /// The underlying failure.
+        #[source]
+        source: std::io::Error,
+    },
+
+    /// `extension.toml` is not valid TOML or not the expected shape.
+    #[error("cannot parse manifest `{path}`: {reason}")]
+    ManifestParse {
+        /// The manifest path.
+        path: String,
+        /// The parser's message, verbatim.
+        reason: String,
+    },
+
+    /// A manifest field parsed but violates a rule the parser cannot express.
+    #[error("invalid manifest field `{field}`: {reason}")]
+    ManifestInvalid {
+        /// Dotted path of the field, such as `capabilities.fs.read`, or the block name (for
+        /// example `capabilities`) when the offending key is itself runtime data.
+        field: &'static str,
+        /// What was wrong with it.
+        reason: String,
+    },
+
+    /// A manifest path refers to a `$VAR` the host did not supply.
+    #[error("manifest refers to `${name}`, which the host did not supply")]
+    ManifestVariable {
+        /// The variable name, without the `$`.
+        name: String,
+    },
+
+    /// The manifest pins an api version this runtime does not implement.
+    #[error(
+        "manifest declares api {requested}; this runtime supports api {}",
+        join_versions(supported)
+    )]
+    UnsupportedApi {
+        /// What the manifest asked for.
+        requested: u32,
+        /// What this runtime implements.
+        supported: Vec<u32>,
+    },
+
+    /// A policy offered as a ceiling does not bound anything on one of its axes.
+    #[error("the ceiling is not a bound: {reason}")]
+    CeilingUnbounded {
+        /// Which axis is unbounded.
+        reason: &'static str,
+    },
+
+    /// An extension asked for something the host would not give it, or the approver refused.
+    #[error("extension `{extension}` was not loaded: {detail}")]
+    ExtensionDenied {
+        /// The extension's declared name.
+        extension: String,
+        /// Every denial, or the approver's reason.
+        detail: String,
+    },
+
+    /// Two extensions in one host declared the same name.
+    #[error("extension `{extension}` is already loaded")]
+    DuplicateExtension {
+        /// The name both manifests declared.
+        extension: String,
+    },
+
     /// A name did not satisfy the rules for its kind.
     #[error("invalid {kind} `{value}`: {reason}")]
     InvalidName {
@@ -196,6 +304,32 @@ pub enum Error {
     },
 }
 
+/// The tail of an [`Error::UnknownEvent`] message.
+fn describe_declared(declared: &[String]) -> String {
+    if declared.is_empty() {
+        String::from("this runtime dispatches no events")
+    } else {
+        format!("declared events: {}", declared.join(", "))
+    }
+}
+
+/// The message for an [`Error::Reentrant`].
+fn describe_reentrant(event: Option<&str>) -> String {
+    event.map_or_else(
+        || String::from("re-entrant evaluation"),
+        |event| format!("re-entrant call during handler for event `{event}`"),
+    )
+}
+
+/// Comma-joined api versions for an [`Error::UnsupportedApi`] message.
+fn join_versions(versions: &[u32]) -> String {
+    versions
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 /// Which resource ceiling a script exhausted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -266,5 +400,125 @@ mod tests {
         let text = err.to_string();
         let lua: mlua::Error = err.into();
         assert!(lua.to_string().contains(&text));
+    }
+
+    #[test]
+    fn module_not_found_names_the_module() {
+        let err = Error::ModuleNotFound {
+            module: "ext".into(),
+        };
+        assert_eq!(err.to_string(), "host module `ext` is not registered");
+    }
+
+    #[test]
+    fn unknown_event_names_what_was_declared() {
+        let err = Error::UnknownEvent {
+            event: "tpyo".into(),
+            declared: vec!["note_saved".into(), "query".into()],
+        };
+        assert_eq!(
+            err.to_string(),
+            "event `tpyo` is not one this host dispatches; declared events: note_saved, query"
+        );
+    }
+
+    #[test]
+    fn unknown_event_with_nothing_declared_says_so() {
+        let err = Error::UnknownEvent {
+            event: "x".into(),
+            declared: Vec::new(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "event `x` is not one this host dispatches; this runtime dispatches no events"
+        );
+    }
+
+    #[test]
+    fn reentrant_names_the_handler_s_event_when_one_is_running() {
+        let err = Error::Reentrant {
+            event: Some("query".into()),
+        };
+        assert_eq!(
+            err.to_string(),
+            "re-entrant call during handler for event `query`"
+        );
+    }
+
+    #[test]
+    fn reentrant_with_no_event_describes_a_plain_re_entrant_evaluation() {
+        // `eval`/`check` nested inside `eval`/`check` on the same engine has no event of its own
+        // to name — the re-entrancy is real, but there was never a handler running.
+        let err = Error::Reentrant { event: None };
+        assert_eq!(err.to_string(), "re-entrant evaluation");
+    }
+
+    #[test]
+    fn manifest_invalid_names_the_field() {
+        let err = Error::ManifestInvalid {
+            field: "capabilities.fs.read",
+            reason: "`journal` is not absolute after expansion".into(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "invalid manifest field `capabilities.fs.read`: `journal` is not absolute after expansion"
+        );
+    }
+
+    #[test]
+    fn manifest_variable_names_the_variable() {
+        let err = Error::ManifestVariable {
+            name: "APP_HOME".into(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "manifest refers to `$APP_HOME`, which the host did not supply"
+        );
+    }
+
+    #[test]
+    fn unsupported_api_lists_the_supported_set() {
+        let err = Error::UnsupportedApi {
+            requested: 7,
+            supported: vec![1],
+        };
+        assert_eq!(
+            err.to_string(),
+            "manifest declares api 7; this runtime supports api 1"
+        );
+    }
+
+    #[test]
+    fn ceiling_unbounded_states_the_reason() {
+        let err = Error::CeilingUnbounded {
+            reason: "grants are unrestricted",
+        };
+        assert_eq!(
+            err.to_string(),
+            "the ceiling is not a bound: grants are unrestricted"
+        );
+    }
+
+    #[test]
+    fn extension_denied_names_the_extension_and_the_detail() {
+        let err = Error::ExtensionDenied {
+            extension: "journal-indexer".into(),
+            detail: "fs.read `/` is outside the ceiling".into(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "extension `journal-indexer` was not loaded: fs.read `/` is outside the ceiling"
+        );
+    }
+
+    #[test]
+    fn duplicate_extension_names_the_extension() {
+        let err = Error::DuplicateExtension {
+            extension: "journal-indexer".into(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "extension `journal-indexer` is already loaded"
+        );
     }
 }

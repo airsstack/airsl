@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `airsl` embeds Lua 5.4 in Rust and lets the **host** decide what a script may reach. Two crates in
 one workspace: `crates/airsl` (the library) and `crates/airsl-cli` (the `airsl` binary — `run`,
-`test`, `check`, `doctor`).
+`test`, `check`, `doctor`, `ext doctor`/`ext fire`).
 
 Build requirements that are not negotiable: **unix only** (`lib.rs` has a `compile_error!` off unix,
 because `modules::proc` decides executability from mode bits) and **a C compiler** (`mlua`'s
@@ -61,11 +61,21 @@ is the long form.
    (which of *Lua's own* libraries a script sees), `GrantSet`/`FsGrant`/`EnvGrant`/`ProcGrant`
    (what host modules may touch), `ResourceLimits` (memory + instruction ceilings, armed on the
    state before any module installs). `Policy::trusted() / confined() / pure()` are the presets.
-3. **The capability surface** (`src/modules/`) — eleven `HostModule` implementations installed as
+3. **The capability surface** (`src/modules/`) — twelve `HostModule` implementations installed as
    subtables of a single Lua global, per-engine and defaulting to `airsstack`.
+
+`src/extension/` sits on top of those three layers: it reads a manifest, bounds the request with a
+host-supplied `Ceiling`, asks an `Approver`, and only then builds an ordinary `Engine` under the
+negotiated `Policy`. `ExtensionHost::load` (`extension/host.rs`) is the entry point a host calls;
+`Extension::approve` followed by `Approved::start` (`extension/loaded.rs`) is the type-state that
+proves a denial ran before any extension code does.
 
 Key seams:
 
+- `Engine::dispatch` (`engine.rs`) is how a host invokes the handlers a script registered with
+  `ext.on`. Handlers live in a registry table written by `modules/ext.rs`; the engine records the
+  evaluating `ThreadId` so a handler that re-enters its own engine gets `Error::Reentrant`, never a
+  deadlock.
 - `Engine::builder()` is a **type-state builder** (`builder.rs`, `Missing`/`Present`): there is no
   `build()` until `policy()` has been called, so a sandbox cannot be forgotten.
 - `HostModule::install(&mlua::Lua, &mlua::Table, &InstallContext)` is the extension seam. `mlua` is
@@ -124,8 +134,12 @@ sandbox, stdlib, extensions. Reference is the rustdoc, not a file there.
 
 Evidence rules those documents follow, and that edits to them must keep: a claim about code that
 exists carries a `file:line`; a claim about code that does not exist says so explicitly. The status
-table in `docs/README.md` marks each area **implemented** or **proposed** — the extension host
-(manifests, negotiation, dispatch) is proposed and unbuilt. Quoted measurements are a snapshot from
+table in `docs/README.md` marks each area **implemented** or **proposed** this way — the extension
+manifest parser's row reads implemented, and names `extension/manifest.rs:189`, the function a
+reader can go check, rather than a bare "yes". Every extension-system area — manifest parser,
+ceiling, negotiation, approver, event dispatch, the extension host / loader, and the `airsl ext` CLI
+(`doctor`, `fire`) — is implemented as of this writing; the next area to go from proposed to
+implemented is the one to model this citation style on. Quoted measurements are a snapshot from
 `cargo bench -p airsl` on one machine, not a guarantee.
 
 Commits follow Conventional Commits with a scope naming the affected area (`fix(ci):`,

@@ -5,7 +5,7 @@ it refuse a call it was not granted authority for.
 
 This is the seam that makes `airsl` a shared Lua integration point rather than a fixed script
 runner. It gets its own example because the contributed module goes through the *same*
-`HostModule` trait, the same uniqueness check and the same `InstallContext` as the eleven
+`HostModule` trait, the same uniqueness check and the same `InstallContext` as the twelve
 built-ins: there is no second, lesser path for third-party code, and the only way to show that is
 to add one and watch it come out indistinguishable at the call site.
 
@@ -30,7 +30,7 @@ contributed from Rust is reachable only from a host that installed it.
 
 ```
 root table: myapp
-modules: json, path, fs, env, proc, regex, hash, time, glob, stdio, hook, metrics
+modules: json, path, fs, env, proc, regex, hash, time, glob, stdio, hook, ext, metrics
 
 ["myapp.metrics recorded requests","myapp.metrics recorded cache.hits","myapp.metrics recorded cache.misses"]
 reset allowed: false
@@ -67,13 +67,14 @@ And two things the output shows about the surrounding design:
   anything it was not granted.
 
 The module list in the output is insertion order (`src/modules/registry.rs:144` preserves it), which
-is why `metrics` appears last, after the eleven from `airsl::modules::stdlib()`
-(`src/modules/stdlib.rs:20`). `insert` rejects a duplicate name, so colliding with `json` is an
+is why `metrics` appears last, after the twelve from `airsl::modules::stdlib()`
+(`src/modules/stdlib.rs:22`). `insert` rejects a duplicate name, so colliding with `json` is an
 error when the engine is built rather than a module that silently replaces another.
 
 ## See also
 
-- [extensions](../../docs/extensions.md) — the extension host. Note the status table in
-  `docs/README.md`: manifests, negotiation and dispatch are **proposed**, not built. What this
-  example uses — `HostModule`, `ModuleSet`, `InstallContext`, `RootTable` — is implemented today.
+- [extensions](../../docs/extensions.md) — the extension host: manifests, negotiation, dispatch,
+  and the `airsl ext` CLI built on top of them are all implemented, per the status table in
+  `docs/README.md`. What this example uses — `HostModule`, `ModuleSet`, `InstallContext`,
+  `RootTable` — is a layer below that, and implemented too.
 - [`hello-eval`](../hello-eval/) — the builder this example adds two calls to.
