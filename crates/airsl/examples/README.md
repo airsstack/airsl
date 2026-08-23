@@ -52,6 +52,12 @@ does not run one, which is the difference between "it builds" and "it works" —
 | [`text-toolkit`](text-toolkit/) | `regex`, `path`, `hash`, `time` and `glob.match` under a policy that grants nothing — plus the `_test.lua` twin `airsl test` runs. |
 | [`multi-file-project`](multi-file-project/) | The confined `require`: a module tree, its cache, and the three different functions that share the name. |
 
+### The shape of a real host
+
+| Example | What it shows |
+| --- | --- |
+| [`engine-reuse`](engine-reuse/) | What an evaluation resets and what it leaves behind, and why a shared engine buys reuse rather than parallelism. |
+
 ### Extending the runtime
 
 | Example | What it shows |
