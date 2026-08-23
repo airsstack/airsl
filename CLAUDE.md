@@ -129,9 +129,11 @@ sandbox, stdlib, extensions. Reference is the rustdoc, not a file there.
 Evidence rules those documents follow, and that edits to them must keep: a claim about code that
 exists carries a `file:line`; a claim about code that does not exist says so explicitly. The status
 table in `docs/README.md` marks each area **implemented** or **proposed** — the extension host's
-negotiation and loader are proposed and unbuilt; the manifest parser (`extension/manifest.rs`) and
-event dispatch (`modules/ext.rs`, `Engine::dispatch`) are implemented. Quoted measurements are a
-snapshot from `cargo bench -p airsl` on one machine, not a guarantee.
+*loader* (`ExtensionHost`, `ExtensionHost::load`) is proposed and unbuilt; the manifest parser
+(`extension/manifest.rs`), ceiling (`extension/ceiling.rs`), negotiation (`extension/negotiate.rs`),
+approver (`extension/approver.rs`) and event dispatch (`modules/ext.rs`, `Engine::dispatch`) are
+implemented. Quoted measurements are a snapshot from `cargo bench -p airsl` on one machine, not a
+guarantee.
 
 Commits follow Conventional Commits with a scope naming the affected area (`fix(ci):`,
 `chore(workspace):`, `docs:`).

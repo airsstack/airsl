@@ -2,10 +2,13 @@
 
 **Status: partly implemented.** The dispatcher exists — `airsstack.ext` (`src/modules/ext.rs`) and
 `Engine::dispatch` (`src/engine.rs`), see the status table at the end of this document. The
-manifest parser exists (`src/extension/manifest.rs:189`); the ceiling and the approver do not.
-Everything the negotiation builds on does: the `HostModule` seam, a per-engine root table, confined
-`require`, resource ceilings, the parameterised grants a manifest would parse into, and the whole
-host standard library a manifest names capabilities from. See [architecture.md](architecture.md).
+manifest parser exists (`src/extension/manifest.rs:189`), and so do the ceiling
+(`src/extension/ceiling.rs:18`, `Ceiling::new`), negotiation (`src/extension/negotiate.rs:274`,
+`negotiate`) and the approver (`src/extension/approver.rs:68`, the `Approver` trait plus
+`ManifestApprover`/`DenyAll`). What is still missing is the loader that ties them together —
+`ExtensionHost`, `ExtensionHost::load`, and the `Extension` handle the sketch below shows — so a
+host cannot yet call one function and get a running, negotiated extension back.
+See [architecture.md](architecture.md).
 
 An extension is third-party code that runs inside a host program with capabilities it *requested* and
 the host *granted*. That negotiation is the whole difference between an extension system and a
@@ -78,28 +81,44 @@ end
 
 ## The host API
 
+The pieces below the loader are implemented and tested today; `ExtensionHost` is the proposed shape
+that will call them in sequence and is not yet built.
+
 ```rust
-let host = ExtensionHost::builder()
-    .ceiling(Policy::confined().with_grants(     // no manifest may exceed this
+// Implemented: Ceiling::new (src/extension/ceiling.rs:27) refuses a policy that would not bound
+// anything — a full language surface or unrestricted grants.
+let ceiling = Ceiling::new(
+    Policy::confined().with_grants(
         GrantSet::declared()
             .with_fs(|fs| fs.read(home).write(home_index))
             .with_proc(|proc| proc.allow(["git", "tar"])),
-    ))
-    .approver(Approver::manifest())              // or ::interactive(), ::deny_all()
-    .build()?;
+    ),
+)?;
 
-let ext = host.load("~/.config/myapp/extensions/journal-indexer")?;
+// Implemented: Manifest::from_dir (src/extension/manifest.rs:189) and negotiate
+// (src/extension/negotiate.rs:274) intersect the request with the ceiling.
+let manifest = Manifest::from_dir(extension_dir, &variables)?;
+let negotiation = negotiate(&manifest, &ceiling, &stdlib()?);
+
+// Implemented: the Approver trait (src/extension/approver.rs:68) with two shipped
+// implementations — ManifestApprover honours a satisfied negotiation, DenyAll refuses everything.
+let decision = ManifestApprover.decide(&ApprovalRequest::new(extension_dir, &manifest, &negotiation));
+
+// Proposed, not yet built: the loader that turns an approved negotiation into a running engine.
+let host = ExtensionHost::builder().ceiling(ceiling).approver(ManifestApprover).build()?;
+let ext = host.load(extension_dir)?;
 println!("{:?}", ext.granted());
 ext.call("on_session_start", payload)?;
 ```
 
 The **ceiling** is what makes manifest-driven requests safe to honour at all: it is the host
-program's own statement of maximum authority, and nothing a manifest says can exceed it. `Approver`
-then decides policy within that bound — honour the manifest, prompt the user, or refuse outright.
+program's own statement of maximum authority, and nothing a manifest says can exceed it. The
+`Approver` trait then decides policy within that bound — a host writes its own implementation for
+anything `ManifestApprover` and `DenyAll` do not cover, such as prompting a person interactively.
 
 The natural split follows provenance, and a host that already distributes extensions through a
-registry has the distinction to hand: registry-installed extensions get `Approver::manifest()`,
-locally-developed ones get `Approver::interactive()`.
+registry has the distinction to hand: registry-installed extensions get `ManifestApprover`,
+locally-developed ones get a host-written interactive `Approver`.
 
 ## The Lua side
 
@@ -134,11 +153,12 @@ blocked on it.
 what every script running on this runtime is.
 
 **Registered extensions** load once, register handlers, and are called repeatedly by the host as
-events occur. This is the Redis model and what "extension system" normally means. It needs three
-things that do not exist: the `ext.on` registration API, a host-side dispatcher, and a **persistent
-engine across calls**.
+events occur. This is the Redis model and what "extension system" normally means. The pieces it
+runs on are implemented — registration (`airsstack.ext.on`, `src/modules/ext.rs:104`), dispatch
+(`Engine::dispatch`, `src/engine.rs:353`), and a **persistent engine across calls** (below) — but
+nothing yet turns a manifest into one: that is the loader, `ExtensionHost`, still proposed.
 
-That last requirement is where the measurements matter: 4.6 µs per call on a reused engine against
+The persistent engine is where the measurements matter: 4.6 µs per call on a reused engine against
 136 µs constructing a fresh one. The gap widened as the standard library grew — a fresh engine now
 installs twelve modules — so the case for a persistent engine is stronger than when it was first
 made. A registered extension pays setup
@@ -162,9 +182,12 @@ dispatches has to be built.
 | Parameterised grants — `FsGrant`, `EnvGrant`, `ProcGrant` | implemented |
 | The host standard library a manifest names capabilities from | implemented |
 | Manifest format and parser | implemented — `src/extension/manifest.rs:189` (`Manifest::from_dir`) |
-| Ceiling and `Approver` | new |
+| `Ceiling` | implemented — `src/extension/ceiling.rs:18` |
+| Negotiation (`negotiate`, `Negotiation`, `Reduction`, `Denial`) | implemented — `src/extension/negotiate.rs:274` |
+| `Approver`, `ManifestApprover`, `DenyAll` | implemented — `src/extension/approver.rs:68,75,95` |
 | `ext.on` registration and host dispatcher | implemented — `src/modules/ext.rs:104` (`on`), `src/engine.rs:353` (`dispatch`) |
 | Capability introspection (`ext.granted`) | implemented — `src/modules/ext.rs:116` (`granted`) |
+| `ExtensionHost` — the loader tying the above together | proposed |
 
 ## Sequencing, and one caution
 
@@ -181,9 +204,6 @@ here onward, and it is very hard to tighten afterwards.
 
 ## Open questions
 
-- Whether an extension may request a capability the ceiling permits but the *user* has not seen —
-  i.e. whether `Approver::manifest()` is acceptable at all for registry-installed code, or whether
-  first load should always prompt.
 - Whether grants are revocable at runtime, or fixed for an engine's lifetime. Fixed is far simpler
   and probably right.
 - How a registered extension reports failure without taking down the dispatcher, and whether a

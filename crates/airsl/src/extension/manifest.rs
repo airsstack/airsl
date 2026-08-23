@@ -359,6 +359,16 @@ fn expand_paths(
                 reason: format!("`{expanded}` is not absolute after expansion"),
             });
         }
+        // Same rule `validate_entry` applies to `extension.entry`: a `..` component lets a path
+        // spelled inside the ceiling resolve lexically outside it, before negotiation ever
+        // canonicalises anything. `Path::components()` only ever yields `CurDir` for a leading
+        // `.`, which an absolute path can never have, so `..` is the one case worth checking here.
+        if path.components().any(|c| c == Component::ParentDir) {
+            return Err(Error::ManifestInvalid {
+                field,
+                reason: format!("`{expanded}` must not contain `..` components"),
+            });
+        }
         out.push(path);
     }
     Ok(out)
@@ -630,6 +640,32 @@ instructions = 50_000_000
             msg.contains("capabilities.fs.read") && msg.contains("absolute"),
             "{msg}"
         );
+    }
+
+    #[test]
+    fn fs_paths_containing_a_parent_dir_component_are_refused() {
+        // Mirrors `validate_entry`'s rule: a request that resolves lexically outside its own
+        // written root must not reach negotiation looking like a plain absolute path, even though
+        // it is refused at runtime by the canonicalising guard regardless.
+        let dir = tempfile::tempdir().unwrap();
+        for (body, field) in [
+            (
+                "[capabilities]\nfs.read=['$APP_HOME/../secret']\n",
+                "capabilities.fs.read",
+            ),
+            (
+                "[capabilities]\nfs.write=['$APP_HOME/sub/../../escape']\n",
+                "capabilities.fs.write",
+            ),
+        ] {
+            write_manifest(
+                dir.path(),
+                &format!("[extension]\nname='a'\nversion='1'\nentry='main.lua'\napi=1\n{body}"),
+            );
+            let err = Manifest::from_dir(dir.path(), &vars()).unwrap_err();
+            let msg = err.to_string();
+            assert!(msg.contains(field) && msg.contains(".."), "{field}: {msg}");
+        }
     }
 
     #[test]

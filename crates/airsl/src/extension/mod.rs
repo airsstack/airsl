@@ -11,19 +11,31 @@
 //! - [`api_version`] — the api number a manifest pins and the set this crate supports.
 //! - [`memory_size`] — the `"64MB"` spelling of a memory ceiling.
 //! - [`variables`] — the `$VAR` values a host supplies for manifest paths.
+//! - [`ceiling`] — the host's maximum, validated to be a bound.
+//! - [`mod@negotiate`] — the intersection of a request with a ceiling.
+//! - [`approver`] — who decides whether a negotiated extension loads.
 //!
 //! Non-responsibilities: running anything. The engine does that.
 
 pub mod api_version;
+pub mod approver;
+pub mod ceiling;
 pub mod manifest;
 pub mod memory_size;
+pub mod negotiate;
 pub mod variables;
 
 #[doc(inline)]
 pub use api_version::{ApiVersion, SUPPORTED_API};
 #[doc(inline)]
+pub use approver::{ApprovalRequest, Approver, Decision, DenyAll, ManifestApprover};
+#[doc(inline)]
+pub use ceiling::Ceiling;
+#[doc(inline)]
 pub use manifest::{CapabilityRequest, LimitRequest, MANIFEST_FILE, Manifest, RawManifest};
 #[doc(inline)]
 pub use memory_size::parse_memory_size;
+#[doc(inline)]
+pub use negotiate::{Capability, Denial, Negotiation, Reduction, negotiate};
 #[doc(inline)]
 pub use variables::Variables;

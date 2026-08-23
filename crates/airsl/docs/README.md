@@ -14,9 +14,9 @@ precisely because the server, not the script, decides what the script can touch.
 ## Status: read this first
 
 The runtime foundation ships, and so does the whole host standard library — a mixed-language script
-corpus of several thousand lines now runs entirely on it. What remains unbuilt is the extension
-host — manifests, ceilings, approval and dispatch — and Tier 3. Every document marks each piece,
-and the table below is the summary.
+corpus of several thousand lines now runs entirely on it. Manifests, ceilings, negotiation and
+approval are built too; what remains unbuilt is the extension *loader* that ties them into one call
+— `ExtensionHost` — and Tier 3. Every document marks each piece, and the table below is the summary.
 
 | Area | State |
 |---|---|
@@ -32,7 +32,10 @@ and the table below is the summary.
 | `airsl test` and `airsl check` | **implemented** |
 | Extension dispatch — `ext` module (`on`, `granted`), `Engine::dispatch` | **implemented** |
 | Extension manifest — `extension.toml` format and parser | **implemented** (`src/extension/manifest.rs:189`) |
-| Extension host — ceiling, negotiation, approver | **proposed** |
+| `Ceiling` | **implemented** (`src/extension/ceiling.rs:18`) |
+| Negotiation — `negotiate`, `Negotiation`, `Reduction`, `Denial` | **implemented** (`src/extension/negotiate.rs:274`) |
+| `Approver` trait, `ManifestApprover`, `DenyAll` | **implemented** (`src/extension/approver.rs:68`) |
+| Extension host / loader — `ExtensionHost`, `ExtensionHost::load` | **proposed** |
 
 Do not cite these documents as evidence that something works. Where a claim is about code that
 exists, it carries a `file:line`. Where it is about code that does not, it says so.

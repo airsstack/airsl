@@ -169,6 +169,22 @@ pub enum Error {
         supported: Vec<u32>,
     },
 
+    /// A policy offered as a ceiling does not bound anything on one of its axes.
+    #[error("the ceiling is not a bound: {reason}")]
+    CeilingUnbounded {
+        /// Which axis is unbounded.
+        reason: &'static str,
+    },
+
+    /// An extension asked for something the host would not give it, or the approver refused.
+    #[error("extension `{extension}` was not loaded: {detail}")]
+    ExtensionDenied {
+        /// The extension's declared name.
+        extension: String,
+        /// Every denial, or the approver's reason.
+        detail: String,
+    },
+
     /// A name did not satisfy the rules for its kind.
     #[error("invalid {kind} `{value}`: {reason}")]
     InvalidName {
@@ -462,6 +478,29 @@ mod tests {
         assert_eq!(
             err.to_string(),
             "manifest declares api 7; this runtime supports api 1"
+        );
+    }
+
+    #[test]
+    fn ceiling_unbounded_states_the_reason() {
+        let err = Error::CeilingUnbounded {
+            reason: "grants are unrestricted",
+        };
+        assert_eq!(
+            err.to_string(),
+            "the ceiling is not a bound: grants are unrestricted"
+        );
+    }
+
+    #[test]
+    fn extension_denied_names_the_extension_and_the_detail() {
+        let err = Error::ExtensionDenied {
+            extension: "journal-indexer".into(),
+            detail: "fs.read `/` is outside the ceiling".into(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "extension `journal-indexer` was not loaded: fs.read `/` is outside the ceiling"
         );
     }
 }

@@ -102,7 +102,10 @@ impl FsGrant {
 ///
 /// A root that does not exist yet is made absolute but not canonical, since there is nothing to
 /// resolve; that is the ordinary case for a write root the script is about to create.
-fn resolve_root(root: PathBuf) -> PathBuf {
+///
+/// `pub(crate)` so [`crate::extension::negotiate`] can canonicalise a requested root the same way
+/// a grant would, without allocating a whole [`FsGrant`] just to read back its first element.
+pub(crate) fn resolve_root(root: PathBuf) -> PathBuf {
     root.canonicalize()
         .or_else(|_| std::path::absolute(&root))
         .unwrap_or(root)
