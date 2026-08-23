@@ -45,6 +45,12 @@ does not run one, which is the difference between "it builds" and "it works" —
 | [`resource-limits`](resource-limits/) | Instruction and memory ceilings, and why a breach is classified structurally rather than by message text. |
 | [`failure-policy`](failure-policy/) | Fail-open versus fail-closed, and why a limit breach is reported under both. |
 
+### Working in Lua
+
+| Example | What it shows |
+| --- | --- |
+| [`text-toolkit`](text-toolkit/) | `regex`, `path`, `hash`, `time` and `glob.match` under a policy that grants nothing — plus the `_test.lua` twin `airsl test` runs. |
+
 ### Extending the runtime
 
 | Example | What it shows |
@@ -58,8 +64,19 @@ does not run one, which is the difference between "it builds" and "it works" —
   and running the example again reproduces it byte for byte.
 - **Nothing is written inside the repository.** Examples that need a writable directory use a
   temporary one, removed when the example ends.
+- **Printing from both sides is safe, and several examples do.** Lua's `print` writes to C `stdout`
+  and `println!` writes to Rust's, which sounds like two buffers waiting to reorder — they are not.
+  Lua flushes after every line (`lua_writeline` is `fwrite` followed by `fflush`), Rust's stdout is
+  a `LineWriter` that flushes on the newline, and `airsstack.stdio.write` flushes explicitly
+  (`src/modules/stdio.rs:109`). So a run piped into a file has the same line order as a run on a
+  terminal, which is what lets an `## Output` block be captured through a pipe and still be true.
 - **Only `sh` is ever executed.** An example that wanted some other program would be an example that
   fails on a machine without it.
+- **A shipped `*_test.lua` runs under `confined` with no grants.** `cargo make examples` finishes by
+  running `airsl test` over this whole tree, and that command's default policy is confined with an
+  empty grant set. Discovery is by directory rather than a list, for the reason the run above is: a
+  test file no command picks up is worse than no test file. So a test that needs authority to run is
+  a test this suite cannot carry.
 - **`Script::from_file` is a host read.** Loading a script from disk is not governed by `FsGrant`;
   the grant governs the `airsstack.fs.*` calls the script itself makes. An example may therefore
   load a script from a path that script could not read.
