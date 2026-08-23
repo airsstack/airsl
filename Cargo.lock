@@ -13,7 +13,7 @@ dependencies = [
 
 [[package]]
 name = "airsl"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "globset",
  "jiff",
@@ -31,7 +31,7 @@ dependencies = [
 
 [[package]]
 name = "airsl-cli"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "airsl",
  "clap",

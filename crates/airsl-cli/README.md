@@ -322,7 +322,7 @@ Each document marks which parts ship and which are design.
 
 [CHANGELOG.md](https://github.com/airsstack/airsl/blob/main/CHANGELOG.md) — one timeline covering
 this binary and the `airsl` library it carries, which are numbered independently. Releases are
-tagged per crate: `airsl-cli-v0.1.1`, `airsl-v0.1.2`.
+tagged per crate: `airsl-cli-v0.1.2`, `airsl-v0.1.3`.
 
 This binary's behaviour changes when the library beneath it does, so an entry naming an `airsl`
 version is describing this crate too.

@@ -6,10 +6,14 @@ Notable changes to both crates in this workspace, newest first. The format follo
 the slot Cargo treats as breaking, so a compatible change ships as a `z` bump.
 
 The two crates are versioned independently and have released together so far, so each entry names
-both. Every release is tagged per crate — `airsl-v0.1.2`, `airsl-cli-v0.1.1` — because one commit
+both. Every release is tagged per crate — `airsl-v0.1.3`, `airsl-cli-v0.1.2` — because one commit
 has shipped two crates under two different numbers, which a single `vX.Y.Z` tag cannot name.
 
-## Unreleased
+## airsl 0.1.3 — airsl-cli 0.1.2 — 2026-08-23
+
+One feature, additive end to end: no public item changed shape, `Error` is `#[non_exhaustive]`
+so its new variants break no match, and the only thing an existing script sees is a new
+`airsstack.ext` subtable. A `z` bump in both crates, per the rule above.
 
 ### Added
 
