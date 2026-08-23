@@ -171,4 +171,10 @@ one Lua state cannot execute in parallel anyway.
 
 Each document says which parts are shipped and which are design.
 
+## Releases
+
+[CHANGELOG.md](https://github.com/airsstack/airsl/blob/main/CHANGELOG.md) — one timeline covering
+this crate and `airsl-cli`, which are numbered independently. Releases are tagged per crate:
+`airsl-v0.1.2`, `airsl-cli-v0.1.1`.
+
 [`mlua`]: https://crates.io/crates/mlua

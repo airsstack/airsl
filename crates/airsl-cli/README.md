@@ -226,3 +226,12 @@ organised on [Diátaxis](https://diataxis.fr/):
   — the three layers and why it is shaped this way.
 
 Each document marks which parts ship and which are design.
+
+## Releases
+
+[CHANGELOG.md](https://github.com/airsstack/airsl/blob/main/CHANGELOG.md) — one timeline covering
+this binary and the `airsl` library it carries, which are numbered independently. Releases are
+tagged per crate: `airsl-cli-v0.1.1`, `airsl-v0.1.2`.
+
+This binary's behaviour changes when the library beneath it does, so an entry naming an `airsl`
+version is describing this crate too.
