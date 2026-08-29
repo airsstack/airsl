@@ -38,8 +38,9 @@
 // nine resolution errors pointing at std.
 #[cfg(not(any(unix, windows)))]
 compile_error!(
-    "airsl supports unix and Windows targets only: the host modules assume one of those two \
-     platform families and this target is neither."
+    "airsl supports unix and Windows targets only, and this target is neither: \
+     `airsstack.proc` decides executability from unix mode bits or a Windows file extension, \
+     and `airsstack.fs` containment is written against those two path families."
 );
 
 mod builder;

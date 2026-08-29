@@ -63,6 +63,13 @@ jobs:
       # Windows requires elevated rights to create symlinks unless Developer Mode
       # is on; the sandbox tests create them, so this makes the leg match what
       # unix runners get for free.
+      #
+      # This writes a machine-wide HKLM key that drops the developer-license
+      # requirement for symlink creation and app sideloading. That is acceptable
+      # only because a GitHub-hosted runner is ephemeral and discarded after the
+      # job. Do not copy this step onto a self-hosted runner or a developer
+      # machine, where it persists and permanently lowers a system-wide boundary;
+      # there, turn on Settings -> For developers -> Developer Mode instead.
       - name: Enable Developer Mode
         if: runner.os == 'Windows'
         run: reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /t REG_DWORD /f /v AllowDevelopmentWithoutDevLicense /d 1
