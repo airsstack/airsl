@@ -302,6 +302,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn a_symlinked_root_resolves_to_what_it_points_at() {
         // Otherwise granting the link grants nothing: a path under it canonicalises past the link,
         // and the refusal names a root that looks exactly right.

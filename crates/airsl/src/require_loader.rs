@@ -325,6 +325,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn a_symlink_out_of_the_root_is_refused() {
         let outside = tempfile::tempdir().unwrap();
         write(outside.path(), "secrets.lua", "return 'leaked'");
@@ -338,6 +339,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn a_sibling_directory_sharing_a_name_prefix_is_not_inside_the_root() {
         let parent = tempfile::tempdir().unwrap();
         let root = parent.path().join("app");

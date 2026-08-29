@@ -494,6 +494,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn an_entry_swapped_for_an_escaping_symlink_after_validation_is_refused() {
         let dir = fixture("echo", "", "return 1");
         let ceiling = Ceiling::new(Policy::confined()).unwrap();

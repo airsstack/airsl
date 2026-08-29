@@ -234,6 +234,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn a_symlink_inside_the_root_pointing_out_of_it_is_refused() {
         // The whole reason resolution canonicalises rather than normalising: the path is spelled
         // entirely inside the granted root and still reaches outside it.
@@ -252,6 +253,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn a_dotdot_through_a_symlink_does_not_escape() {
         // `<root>/link/../secret` reads lexically as `<root>/secret`, which is inside the root.
         // The operating system would open `<outside>/secret`, which is not.

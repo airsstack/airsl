@@ -168,10 +168,21 @@ fn which(program: &str) -> Option<String> {
 }
 
 /// Whether `path` is a file the current user could execute.
+#[cfg(unix)]
 fn is_executable(path: &std::path::Path) -> bool {
     use std::os::unix::fs::PermissionsExt as _;
     std::fs::metadata(path)
         .is_ok_and(|meta| meta.is_file() && meta.permissions().mode() & 0o111 != 0)
+}
+
+/// Whether `path` is a file the current user could execute.
+///
+/// Measurement stub only, with no bearing on the real design: it exists solely so this crate
+/// type-checks on Windows for a throwaway test-inventory pass. Real Windows executability turns
+/// on `PATHEXT`/extension, not this check.
+#[cfg(windows)]
+fn is_executable(path: &std::path::Path) -> bool {
+    std::fs::metadata(path).is_ok_and(|meta| meta.is_file())
 }
 
 #[cfg(test)]

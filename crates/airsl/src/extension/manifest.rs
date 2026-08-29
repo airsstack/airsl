@@ -814,6 +814,7 @@ instructions = 50_000_000
     }
 
     #[test]
+    #[cfg(unix)]
     fn a_symlinked_entry_pointing_outside_the_directory_is_refused() {
         let dir = tempfile::tempdir().unwrap();
         let outside = tempfile::tempdir().unwrap();
