@@ -34,7 +34,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
@@ -43,6 +43,7 @@ jobs:
       # `rustup show` resolves the override in rust-toolchain.toml and installs it.
       # The versions printed below are the record of which toolchain the gate ran on.
       - name: Install the pinned Rust toolchain
+        shell: bash
         run: |
           rustup show
           cargo --version
@@ -58,6 +59,13 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-make
+
+      # Windows requires elevated rights to create symlinks unless Developer Mode
+      # is on; the sandbox tests create them, so this makes the leg match what
+      # unix runners get for free.
+      - name: Enable Developer Mode
+        if: runner.os == 'Windows'
+        run: reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /t REG_DWORD /f /v AllowDevelopmentWithoutDevLicense /d 1
 
       # One command, the same one a developer runs locally: fmt-check, clippy,
       # rustdoc, tests, doctests — each with warnings as errors.

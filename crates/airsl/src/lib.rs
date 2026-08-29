@@ -36,10 +36,10 @@
 // `PATHEXT`. Supporting it is a decision about what "executable" should mean there, not a
 // portability patch — so the crate refuses to build with a sentence a reader can act on, instead of
 // nine resolution errors pointing at std.
-#[cfg(not(unix))]
+#[cfg(not(any(unix, windows)))]
 compile_error!(
-    "airsl supports unix targets only (Linux and macOS). Windows is not supported: \
-     `airsstack.proc` resolves executables by unix mode bits, which have no Windows equivalent."
+    "airsl supports unix and Windows targets only: the host modules assume one of those two \
+     platform families and this target is neither."
 );
 
 mod builder;
