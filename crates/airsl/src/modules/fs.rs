@@ -83,8 +83,8 @@ impl HostModule for Fs {
         let read = lua
             .create_function(move |_, path: mlua::LuaString| {
                 let target = g.read("read", &path.to_str()?)?;
-                std::fs::read_to_string(&target)
-                    .map_err(io("read", &target))
+                std::fs::read_to_string(target.as_path())
+                    .map_err(io("read", target.as_path()))
                     .map_err(mlua::Error::from)
             })
             .map_err(fail)?;
@@ -94,7 +94,8 @@ impl HostModule for Fs {
         let read_lines = lua
             .create_function(move |lua, path: mlua::LuaString| {
                 let target = g.read("read_lines", &path.to_str()?)?;
-                let text = std::fs::read_to_string(&target).map_err(io("read_lines", &target))?;
+                let text = std::fs::read_to_string(target.as_path())
+                    .map_err(io("read_lines", target.as_path()))?;
                 // A trailing newline terminates the last line rather than starting an empty one,
                 // which is what every line-oriented tool means by it.
                 let body = text.strip_suffix('\n').unwrap_or(&text);
@@ -116,8 +117,8 @@ impl HostModule for Fs {
         let write = lua
             .create_function(move |_, (path, body): (mlua::LuaString, mlua::LuaString)| {
                 let target = g.write("write", &path.to_str()?)?;
-                std::fs::write(&target, body.as_bytes())
-                    .map_err(io("write", &target))
+                std::fs::write(target.as_path(), body.as_bytes())
+                    .map_err(io("write", target.as_path()))
                     .map_err(mlua::Error::from)
             })
             .map_err(fail)?;
@@ -130,10 +131,10 @@ impl HostModule for Fs {
                 let mut file = std::fs::OpenOptions::new()
                     .create(true)
                     .append(true)
-                    .open(&target)
-                    .map_err(io("append", &target))?;
+                    .open(target.as_path())
+                    .map_err(io("append", target.as_path()))?;
                 file.write_all(&body.as_bytes())
-                    .map_err(io("append", &target))
+                    .map_err(io("append", target.as_path()))
                     .map_err(mlua::Error::from)
             })
             .map_err(fail)?;
@@ -143,7 +144,7 @@ impl HostModule for Fs {
         let atomic_write = lua
             .create_function(move |_, (path, body): (mlua::LuaString, mlua::LuaString)| {
                 let target = g.write("atomic_write", &path.to_str()?)?;
-                atomic_write(&target, &body.as_bytes()).map_err(mlua::Error::from)
+                atomic_write(target.as_path(), &body.as_bytes()).map_err(mlua::Error::from)
             })
             .map_err(fail)?;
         table.set("atomic_write", atomic_write).map_err(fail)?;
@@ -157,19 +158,21 @@ impl HostModule for Fs {
                     match std::fs::OpenOptions::new()
                         .write(true)
                         .create_new(true)
-                        .open(&target)
+                        .open(target.as_path())
                     {
                         Ok(mut file) => {
                             if let Some(bytes) = contents {
                                 file.write_all(&bytes)
-                                    .map_err(io("create_exclusive", &target))?;
+                                    .map_err(io("create_exclusive", target.as_path()))?;
                             }
                             Ok(true)
                         }
                         // Losing the race is the expected other outcome, not a failure: this function
                         // exists so that exactly one of several concurrent callers proceeds.
                         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Ok(false),
-                        Err(e) => Err(mlua::Error::from(io("create_exclusive", &target)(e))),
+                        Err(e) => Err(mlua::Error::from(io("create_exclusive", target.as_path())(
+                            e,
+                        ))),
                     }
                 },
             )
@@ -188,7 +191,7 @@ impl HostModule for Fs {
         let g = guard.clone();
         let exists = lua
             .create_function(move |_, path: mlua::LuaString| {
-                Ok(g.read("exists", &path.to_str()?)?.exists())
+                Ok(g.read("exists", &path.to_str()?)?.as_path().exists())
             })
             .map_err(fail)?;
         table.set("exists", exists).map_err(fail)?;
@@ -196,7 +199,7 @@ impl HostModule for Fs {
         let g = guard.clone();
         let is_file = lua
             .create_function(move |_, path: mlua::LuaString| {
-                Ok(g.read("is_file", &path.to_str()?)?.is_file())
+                Ok(g.read("is_file", &path.to_str()?)?.as_path().is_file())
             })
             .map_err(fail)?;
         table.set("is_file", is_file).map_err(fail)?;
@@ -204,7 +207,7 @@ impl HostModule for Fs {
         let g = guard.clone();
         let is_dir = lua
             .create_function(move |_, path: mlua::LuaString| {
-                Ok(g.read("is_dir", &path.to_str()?)?.is_dir())
+                Ok(g.read("is_dir", &path.to_str()?)?.as_path().is_dir())
             })
             .map_err(fail)?;
         table.set("is_dir", is_dir).map_err(fail)?;
@@ -213,7 +216,8 @@ impl HostModule for Fs {
         let stat = lua
             .create_function(move |lua, path: mlua::LuaString| {
                 let target = g.read("stat", &path.to_str()?)?;
-                let meta = std::fs::symlink_metadata(&target).map_err(io("stat", &target))?;
+                let meta = std::fs::symlink_metadata(target.as_path())
+                    .map_err(io("stat", target.as_path()))?;
                 let out = lua.create_table()?;
                 out.set("size", meta.len())?;
                 out.set(
@@ -237,7 +241,7 @@ impl HostModule for Fs {
         let canonicalize = lua
             .create_function(move |_, path: mlua::LuaString| {
                 let target = g.read("canonicalize", &path.to_str()?)?;
-                Ok(target.to_string_lossy().into_owned())
+                Ok(target.as_path().to_string_lossy().into_owned())
             })
             .map_err(fail)?;
         table.set("canonicalize", canonicalize).map_err(fail)?;
@@ -248,8 +252,10 @@ impl HostModule for Fs {
                 move |_, (left, right): (mlua::LuaString, mlua::LuaString)| {
                     let a = g.read("same_content", &left.to_str()?)?;
                     let b = g.read("same_content", &right.to_str()?)?;
-                    let left = std::fs::read(&a).map_err(io("same_content", &a))?;
-                    let right = std::fs::read(&b).map_err(io("same_content", &b))?;
+                    let left =
+                        std::fs::read(a.as_path()).map_err(io("same_content", a.as_path()))?;
+                    let right =
+                        std::fs::read(b.as_path()).map_err(io("same_content", b.as_path()))?;
                     Ok(left == right)
                 },
             )
@@ -263,8 +269,10 @@ impl HostModule for Fs {
             .create_function(move |lua, path: mlua::LuaString| {
                 let target = g.read("list", &path.to_str()?)?;
                 let mut names = Vec::new();
-                for entry in std::fs::read_dir(&target).map_err(io("list", &target))? {
-                    let entry = entry.map_err(io("list", &target))?;
+                for entry in
+                    std::fs::read_dir(target.as_path()).map_err(io("list", target.as_path()))?
+                {
+                    let entry = entry.map_err(io("list", target.as_path()))?;
                     names.push(entry.file_name().to_string_lossy().into_owned());
                 }
                 // Directory order is whatever the filesystem returns and differs between machines.
@@ -278,7 +286,7 @@ impl HostModule for Fs {
         let walk = lua
             .create_function(move |lua, path: mlua::LuaString| {
                 let target = g.read("walk", &path.to_str()?)?;
-                lua.create_sequence_from(walk(&target)?)
+                lua.create_sequence_from(walk(target.as_path())?)
             })
             .map_err(fail)?;
         table.set("walk", walk).map_err(fail)?;
@@ -287,8 +295,8 @@ impl HostModule for Fs {
         let mkdir = lua
             .create_function(move |_, path: mlua::LuaString| {
                 let target = g.write("mkdir", &path.to_str()?)?;
-                std::fs::create_dir_all(&target)
-                    .map_err(io("mkdir", &target))
+                std::fs::create_dir_all(target.as_path())
+                    .map_err(io("mkdir", target.as_path()))
                     .map_err(mlua::Error::from)
             })
             .map_err(fail)?;
@@ -298,8 +306,8 @@ impl HostModule for Fs {
         let remove = lua
             .create_function(move |_, path: mlua::LuaString| {
                 let target = g.write("remove", &path.to_str()?)?;
-                std::fs::remove_file(&target)
-                    .map_err(io("remove", &target))
+                std::fs::remove_file(target.as_path())
+                    .map_err(io("remove", target.as_path()))
                     .map_err(mlua::Error::from)
             })
             .map_err(fail)?;
@@ -309,8 +317,8 @@ impl HostModule for Fs {
         let remove_dir = lua
             .create_function(move |_, path: mlua::LuaString| {
                 let target = g.write("remove_dir", &path.to_str()?)?;
-                std::fs::remove_dir_all(&target)
-                    .map_err(io("remove_dir", &target))
+                std::fs::remove_dir_all(target.as_path())
+                    .map_err(io("remove_dir", target.as_path()))
                     .map_err(mlua::Error::from)
             })
             .map_err(fail)?;
@@ -321,7 +329,8 @@ impl HostModule for Fs {
             .create_function(move |_, (from, to): (mlua::LuaString, mlua::LuaString)| {
                 let source = g.read("copy", &from.to_str()?)?;
                 let target = g.write("copy", &to.to_str()?)?;
-                std::fs::copy(&source, &target).map_err(io("copy", &target))?;
+                std::fs::copy(source.as_path(), target.as_path())
+                    .map_err(io("copy", target.as_path()))?;
                 Ok(())
             })
             .map_err(fail)?;
@@ -334,8 +343,8 @@ impl HostModule for Fs {
                 // `remove` does.
                 let source = g.write("rename", &from.to_str()?)?;
                 let target = g.write("rename", &to.to_str()?)?;
-                std::fs::rename(&source, &target)
-                    .map_err(io("rename", &target))
+                std::fs::rename(source.as_path(), target.as_path())
+                    .map_err(io("rename", target.as_path()))
                     .map_err(mlua::Error::from)
             })
             .map_err(fail)?;
@@ -350,8 +359,8 @@ impl HostModule for Fs {
                 let checked = g.write("tempdir", &base.to_string_lossy())?;
                 let made = tempfile::Builder::new()
                     .prefix("airsl-")
-                    .tempdir_in(&checked)
-                    .map_err(io("tempdir", &checked))?;
+                    .tempdir_in(checked.as_path())
+                    .map_err(io("tempdir", checked.as_path()))?;
                 Ok(made.keep().to_string_lossy().into_owned())
             })
             .map_err(fail)?;
@@ -364,11 +373,11 @@ impl HostModule for Fs {
                 let checked = g.write("tempfile", &base.to_string_lossy())?;
                 let made = tempfile::Builder::new()
                     .prefix("airsl-")
-                    .tempfile_in(&checked)
-                    .map_err(io("tempfile", &checked))?;
+                    .tempfile_in(checked.as_path())
+                    .map_err(io("tempfile", checked.as_path()))?;
                 let (_, path) = made.keep().map_err(|e| Error::Io {
                     operation: "tempfile",
-                    path: checked.display().to_string(),
+                    path: checked.as_path().display().to_string(),
                     source: e.error,
                 })?;
                 Ok(path.to_string_lossy().into_owned())

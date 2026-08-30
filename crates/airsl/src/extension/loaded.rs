@@ -25,6 +25,8 @@ use crate::extension::{
 };
 use crate::modules::ModuleSet;
 use crate::modules::ext::Ext;
+use crate::paths::containment::is_within;
+use crate::paths::rules::native::strip_verbatim;
 use crate::sandbox::Policy;
 use crate::script::Script;
 use crate::types::{EventName, ExtensionName, RootTable};
@@ -144,13 +146,13 @@ impl<A: Approver> Approved<'_, A> {
         let resolved = full
             .canonicalize()
             .map_err(|e| invalid(format!("{}: {e}", full.display())))?;
-        if !resolved.starts_with(&root) {
+        if !is_within(&resolved, &root) {
             return Err(invalid(format!(
                 "`{}` resolves outside the extension directory",
                 entry.display()
             )));
         }
-        Ok(resolved)
+        Ok(strip_verbatim(resolved))
     }
 }
 

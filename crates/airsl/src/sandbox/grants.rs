@@ -9,12 +9,16 @@
 //!
 //! - [`FsGrant`], [`EnvGrant`] and [`ProcGrant`], each an allowlist with the containment rule that
 //!   fits it.
-//! - The containment checks themselves, which are the only place the rules are written down.
+//! - `FsGrant`'s root resolution, which puts a grant root into the same spelling the paths checked
+//!   against it will be in; the comparison itself is `paths::containment`'s, shared with every
+//!   other site in this crate that checks a path against a root.
 //!
 //! Non-responsibilities: resolving a path against the filesystem. A grant is asked about a path
 //! that has already been made absolute and canonical as far as it exists; deciding what that means
 //! is the `fs` module's job, because only it knows whether the target is being read or created.
 
+use crate::paths::containment::contains_any;
+use crate::paths::rules::native::strip_verbatim;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
@@ -116,21 +120,24 @@ impl FsGrant {
 /// A root that does not exist yet is made absolute but not canonical, since there is nothing to
 /// resolve; that is the ordinary case for a write root the script is about to create.
 ///
+/// The result is stripped of any verbatim prefix regardless of which branch produced it — not
+/// only the `canonicalize()` branch — so a caller can never end up with a verbatim root. The
+/// `std::path::absolute` fallback never produces one, and neither does the final `unwrap_or`
+/// fallback ordinarily, but a **host-supplied** root can already be verbatim (a caller writing
+/// `FsGrant::write(r"\\?\C:\out")` directly), and that value flows through `unwrap_or` unchanged
+/// unless it is stripped here too. Stripping once, over the whole expression, closes that gap
+/// instead of leaving it open in the one branch this function does not construct itself: an
+/// unstripped root compares unequal to every resolved path checked against it, so the grant would
+/// silently match nothing rather than fail loudly.
+///
 /// `pub(crate)` so [`crate::extension::negotiate`] can canonicalise a requested root the same way
 /// a grant would, without allocating a whole [`FsGrant`] just to read back its first element.
 pub(crate) fn resolve_root(root: PathBuf) -> PathBuf {
-    root.canonicalize()
+    let resolved = root
+        .canonicalize()
         .or_else(|_| std::path::absolute(&root))
-        .unwrap_or(root)
-}
-
-/// Whether `path` is inside any of `roots`.
-///
-/// Compared component-wise via [`Path::starts_with`] rather than as strings, so `/repo-extra` is
-/// not inside `/repo`. A string prefix test accepts that, and it is the classic way a containment
-/// check turns out to have never contained anything.
-fn contains_any(roots: &[PathBuf], path: &Path) -> bool {
-    roots.iter().any(|root| path.starts_with(root))
+        .unwrap_or(root);
+    strip_verbatim(resolved)
 }
 
 /// Which environment variables a script may read.
@@ -343,6 +350,64 @@ mod tests {
         assert_eq!(
             grant.write_roots(),
             [std::path::PathBuf::from("/definitely/not/here")]
+        );
+    }
+
+    #[test]
+    fn a_write_root_that_does_not_exist_yet_still_matches_a_path_resolved_beneath_it_once_created()
+    {
+        // What this test establishes: the ordinary, positive-path case works end to end — a write
+        // root granted before it exists still matches a path resolved beneath it once the
+        // directory is created and canonicalised. `resolved_after_creation` is stripped with
+        // `native::strip_verbatim` because that is what every real caller does before comparing
+        // against a grant (`PathGuard::resolve`, in this crate); comparing a bare, unstripped
+        // `canonicalize()` result would fail on Windows regardless of `resolve_root`, since that
+        // is not the input shape this grant is ever actually checked against.
+        //
+        // What this test does **not** establish: that it would go red on a Windows host with the
+        // whole-expression `strip_verbatim` removed from `resolve_root` (see that function's doc
+        // comment for the gap it closes). Reasoning about that would require knowing whether
+        // `std::path::absolute` preserves or discards an already-verbatim prefix on an input that
+        // inherited one — a real Windows API behaviour this crate cannot observe from this host
+        // (no rust-src, no Windows runner) or settle by reading the standard library source. A
+        // more targeted test for the specific gap `resolve_root`'s fix closes —
+        // `a_verbatim_root_the_host_supplies_directly_is_never_stored_verbatim`, below — is
+        // `#[cfg(windows)]` for the same reason and is honest about the same limit.
+        let dir = tempfile::tempdir().unwrap();
+        // Canonicalised up front, the same way the sibling symlink test does: `tempdir()` on
+        // macOS returns a path through `/tmp`, itself a symlink to `/private/tmp`, and that
+        // unrelated indirection would fail this assertion for reasons that have nothing to do
+        // with the fix under test.
+        let base = dir.path().canonicalize().unwrap();
+        let root = base.join("not-created-yet");
+        let grant = FsGrant::none().write(&root);
+        assert!(!root.exists());
+
+        std::fs::create_dir(&root).unwrap();
+        let resolved_after_creation =
+            crate::paths::rules::native::strip_verbatim(root.canonicalize().unwrap());
+
+        assert!(grant.allows_write(&resolved_after_creation.join("output.json")));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_verbatim_root_the_host_supplies_directly_is_never_stored_verbatim() {
+        // Targets the specific gap `resolve_root`'s whole-expression `strip_verbatim` closes: a
+        // host that writes `FsGrant::write(r"\\?\C:\...")` directly, rather than a root this crate
+        // derived from its own `canonicalize()` call. The location does not exist, so
+        // `root.canonicalize()` fails and the function falls through to `std::path::absolute` (or,
+        // failing that, `unwrap_or(root)`); before the fix only the `canonicalize()` branch was
+        // stripped, so a verbatim root reaching either of the other two flowed through unchanged.
+        // A stored verbatim root compares unequal to every ordinary resolved path checked against
+        // it via `starts_with`, so the grant would silently match nothing.
+        let grant = FsGrant::none().write(r"\\?\C:\definitely\not\here");
+        assert!(
+            !grant.write_roots()[0]
+                .to_string_lossy()
+                .starts_with(r"\\?\"),
+            "a stored grant root must never be verbatim: {}",
+            grant.write_roots()[0].display()
         );
     }
 

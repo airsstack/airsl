@@ -16,10 +16,13 @@
     reason = "explicit pub(crate) documents the crate-wide visibility intent at each item"
 )]
 
-use std::path::{Component, Path, PathBuf};
+use std::path::Component;
 use std::sync::Arc;
 
 use crate::error::{Error, Result};
+use crate::paths::ResolvedPath;
+use crate::paths::rules::Unrepresentable;
+use crate::paths::rules::native;
 use crate::sandbox::GrantSet;
 
 /// Which set of roots a refusal was measured against.
@@ -71,9 +74,9 @@ impl PathGuard {
     ///
     /// [`Error::Denied`] when no read grant covers the resolved path, or [`Error::UncheckablePath`]
     /// when it cannot be resolved to something checkable.
-    pub(crate) fn read(&self, operation: &'static str, raw: &str) -> Result<PathBuf> {
+    pub(crate) fn read(&self, operation: &'static str, raw: &str) -> Result<ResolvedPath> {
         let resolved = Self::resolve(raw)?;
-        if self.grants.is_unrestricted() || self.grants.fs().allows_read(&resolved) {
+        if self.grants.is_unrestricted() || self.grants.fs().allows_read(resolved.as_path()) {
             return Ok(resolved);
         }
         Err(self.deny(operation, Access::Read, &resolved))
@@ -84,9 +87,9 @@ impl PathGuard {
     /// # Errors
     ///
     /// As [`PathGuard::read`], against the write roots.
-    pub(crate) fn write(&self, operation: &'static str, raw: &str) -> Result<PathBuf> {
+    pub(crate) fn write(&self, operation: &'static str, raw: &str) -> Result<ResolvedPath> {
         let resolved = Self::resolve(raw)?;
-        if self.grants.is_unrestricted() || self.grants.fs().allows_write(&resolved) {
+        if self.grants.is_unrestricted() || self.grants.fs().allows_write(resolved.as_path()) {
             return Ok(resolved);
         }
         Err(self.deny(operation, Access::Write, &resolved))
@@ -102,7 +105,7 @@ impl PathGuard {
     /// wording opened with "is outside them", which reads as a continuation of a clause that is
     /// not there: the roots were introduced *after* the pronoun that referred to them, and when
     /// none were granted they were never introduced at all.
-    fn deny(&self, operation: &'static str, access: Access, resolved: &Path) -> Error {
+    fn deny(&self, operation: &'static str, access: Access, resolved: &ResolvedPath) -> Error {
         let roots = match access {
             Access::Read => self.grants.fs().read_roots(),
             Access::Write => self.grants.fs().write_roots(),
@@ -111,6 +114,10 @@ impl PathGuard {
         let granted = if roots.is_empty() {
             String::from("none are granted")
         } else {
+            // These roots come straight from `FsGrant`, never through this guard's resolution, so
+            // there is nothing verbatim here to strip and no diagnostic that points at this line —
+            // it renders whatever spelling the grant itself was built with, unrelated to this
+            // fix's concern with `canonicalize()` output.
             let names: Vec<_> = roots.iter().map(|r| r.display().to_string()).collect();
             names.join(", ")
         };
@@ -120,7 +127,7 @@ impl PathGuard {
             operation,
             detail: format!(
                 "`{}` is outside the granted {access} roots: {granted}",
-                resolved.display()
+                resolved.to_script_string()
             ),
         }
     }
@@ -138,11 +145,40 @@ impl PathGuard {
     /// `/granted/secret` — inside the root — while the operating system opens `/secret`. The two
     /// disagree, and the lexical answer is the wrong one.
     ///
+    /// The [`Component::ParentDir`] arm below is reachable on unix only. On Windows,
+    /// `std::path::absolute` is `GetFullPathNameW`, which collapses `..` out of the string lexically
+    /// before this function ever sees it, so a `..` component below the deepest existing ancestor
+    /// simply cannot occur there. This looks like the same unsound lexical collapse the paragraph
+    /// above warns against, but it is not: Win32 normalises `..` out of the path string *before* the
+    /// object manager resolves what remains, so the check performed here and the open the operating
+    /// system later performs are working from the same already-collapsed string and necessarily
+    /// agree. Soundness holds on both platforms, by different arguments — this is documented and
+    /// pinned by tests rather than left to be rediscovered.
+    ///
+    /// Two more checks happen before any of this: [`native::reject_unrepresentable`] refuses a
+    /// spelling this runtime will not reason about at all — a verbatim (`\\?\`) prefix, a device
+    /// namespace, a reserved device name — and the verbatim prefix `canonicalize()` adds on Windows
+    /// is stripped from its result before the suffix is re-appended, so nothing verbatim is ever
+    /// stored in the [`ResolvedPath`] this function returns.
+    ///
     /// # Errors
     ///
-    /// [`Error::UncheckablePath`] when the path cannot be made absolute or ends in an unresolvable
-    /// `..`.
-    fn resolve(raw: &str) -> Result<PathBuf> {
+    /// [`Error::UncheckablePath`] when the path is a spelling this runtime cannot reason about, when
+    /// it cannot be made absolute, or when it ends in an unresolvable `..`.
+    fn resolve(raw: &str) -> Result<ResolvedPath> {
+        native::reject_unrepresentable(raw).map_err(|unrepresentable| Error::UncheckablePath {
+            path: raw.to_owned(),
+            reason: match unrepresentable {
+                Unrepresentable::Verbatim => {
+                    r"it is a verbatim \\?\ path, which this runtime refuses as input"
+                }
+                Unrepresentable::DeviceNamespace => {
+                    "it names a reserved device rather than an ordinary file"
+                }
+                Unrepresentable::InteriorNul => "it contains a nul byte",
+            },
+        })?;
+
         let absolute = std::path::absolute(raw).map_err(|_| Error::UncheckablePath {
             path: raw.to_owned(),
             reason: "the working directory could not be read",
@@ -153,11 +189,11 @@ impl PathGuard {
 
         loop {
             if let Ok(canonical) = probe.canonicalize() {
-                let mut resolved = canonical;
+                let mut resolved = native::strip_verbatim(canonical);
                 for name in suffix.iter().rev() {
                     resolved.push(name);
                 }
-                return Ok(resolved);
+                return Ok(ResolvedPath::new(resolved));
             }
 
             match probe.components().next_back() {
@@ -165,6 +201,7 @@ impl PathGuard {
                 Some(Component::Normal(name)) => suffix.push(name.to_owned()),
                 // `..` below the deepest existing directory has no filesystem meaning, and
                 // inventing one lexically is exactly the bypass this function exists to prevent.
+                // Unix-reachable only — see the doc comment above.
                 Some(Component::ParentDir) => {
                     return Err(Error::UncheckablePath {
                         path: raw.to_owned(),
@@ -197,6 +234,10 @@ mod tests {
         clippy::unwrap_used,
         reason = "tests unwrap known-valid fixtures; a panic is the intended failure signal"
     )]
+    #![expect(
+        clippy::panic,
+        reason = "a wrong Error variant is the intended failure signal"
+    )]
 
     use super::PathGuard;
     use crate::sandbox::GrantSet;
@@ -204,6 +245,22 @@ mod tests {
 
     fn guard(build: impl FnOnce(GrantSet) -> GrantSet) -> PathGuard {
         PathGuard::new(Arc::new(build(GrantSet::declared())), "fs")
+    }
+
+    /// Renders `path` the way a script actually hands a path to this guard: absolute, but never
+    /// verbatim.
+    ///
+    /// `canonicalize()` is the only way to get an existing directory's real, symlink-resolved
+    /// spelling, but on Windows it returns a `\\?\`-prefixed string. Interpolating that directly
+    /// into a test's input string would make the door check in `native::reject_unrepresentable`
+    /// refuse the input before the behaviour under test ever runs — the grant **root** may stay
+    /// canonicalised, because `sandbox::grants::resolve_root` strips it, but the string built here
+    /// stands in for what a script would type, which is never verbatim.
+    fn non_verbatim(path: &std::path::Path) -> String {
+        crate::paths::rules::native::strip_verbatim(path.to_path_buf())
+            .to_str()
+            .unwrap()
+            .to_owned()
     }
 
     #[test]
@@ -262,13 +319,28 @@ mod tests {
 
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path().canonicalize().unwrap();
+        #[cfg(unix)]
         std::os::unix::fs::symlink(outside_root.join("sub"), root.join("link")).unwrap();
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_dir(outside_root.join("sub"), root.join("link")).unwrap();
 
         let guard = guard(|g| g.with_fs(|fs| fs.read(&root)));
-        let attack = format!("{}/link/../secret", root.display());
+        // `non_verbatim`, not `root.display()`: on Windows, `root` came from `canonicalize()` and
+        // is `\\?\`-prefixed, which the door check in `resolve` refuses before this test's `..`
+        // ever gets a chance to matter.
+        let attack = format!("{}/link/../secret", non_verbatim(&root));
+        let result = guard.read("read", &attack);
+
+        // Unix resolves `link` before it sees the `..`, so the escape is caught. Windows collapses
+        // `..` out of the string lexically before the guard ever sees `link` — see the doc comment
+        // on `resolve` — so the same raw string never reaches through the symlink there at all;
+        // both platforms are sound, by different arguments.
+        #[cfg(unix)]
+        assert!(result.is_err(), "{attack} was permitted");
+        #[cfg(windows)]
         assert!(
-            guard.read("read", &attack).is_err(),
-            "{attack} was permitted"
+            result.is_ok(),
+            "{attack} should resolve inside the root on Windows: {result:?}"
         );
     }
 
@@ -297,10 +369,24 @@ mod tests {
         let root = dir.path().canonicalize().unwrap();
 
         let guard = guard(|g| g.with_fs(|fs| fs.write(&root)));
-        let err = guard
-            .write("write", &format!("{}/absent/../ok.txt", root.display()))
-            .unwrap_err();
-        assert!(err.to_string().contains("cannot resolve"), "{err}");
+        // `non_verbatim`, not `root.display()`: see the comment on `non_verbatim` for why.
+        let result = guard.write(
+            "write",
+            &format!("{}/absent/../ok.txt", non_verbatim(&root)),
+        );
+
+        // Unix reaches the `ParentDir` arm, because `absent` never gets created and `..` is never
+        // collapsed lexically. Windows collapses `..` out of the string before the guard ever sees
+        // it — see the doc comment on `resolve` — so this reaches the ordinary "does not exist yet"
+        // path against `root` itself, which is granted, rather than the unreachable `ParentDir`
+        // arm.
+        #[cfg(unix)]
+        {
+            let err = result.unwrap_err();
+            assert!(err.to_string().contains("cannot resolve"), "{err}");
+        }
+        #[cfg(windows)]
+        assert!(result.is_ok(), "{result:?}");
     }
 
     #[test]
@@ -360,6 +446,97 @@ mod tests {
             err.to_string()
                 .contains("outside the granted read roots: none are granted"),
             "{err}"
+        );
+    }
+
+    #[test]
+    fn a_path_containing_a_nul_byte_is_refused_before_any_resolution_is_attempted() {
+        // Caught by `reject_unrepresentable`, not left to fall through to `canonicalize`'s own
+        // failure and the generic "no part of it exists" that would otherwise misreport why.
+        let err = PathGuard::resolve("a\0b").unwrap_err();
+        match err {
+            crate::error::Error::UncheckablePath { reason, .. } => {
+                assert_eq!(reason, "it contains a nul byte");
+            }
+            other => panic!("expected UncheckablePath, got {other:?}"),
+        }
+    }
+
+    // The rest of this module is exercised on every host this crate builds for. These two are
+    // `#[cfg(windows)]` because the spellings they refuse — a verbatim prefix, a reserved device
+    // name — are ordinary, meaningful strings on unix (a verbatim prefix is just an unusual
+    // filename; `CON` is a real one) and refusing them there would regress unix behaviour rather
+    // than protect anything. See `reject_unrepresentable`'s own doc comment.
+
+    #[cfg(windows)]
+    #[test]
+    fn a_verbatim_path_with_a_hidden_dotdot_is_refused_rather_than_approved() {
+        // Before this fix, this exact path was approved: `/` is not a separator inside a verbatim
+        // spelling, so `a/../../Windows` parses as one `Component::Normal` and the `ParentDir` arm
+        // never fires, so resolution pops to the root, canonicalises, and re-appends the suffix —
+        // approving a path that leaves the root. Refusing every verbatim spelling at the door
+        // closes the class rather than chasing this one instance of it.
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().canonicalize().unwrap(); // canonicalize() returns a verbatim path
+        let attack = format!("{}\\a/../../Windows\\System32\\x", root.display());
+
+        let err = PathGuard::resolve(&attack).unwrap_err();
+        match err {
+            crate::error::Error::UncheckablePath { reason, .. } => {
+                assert_eq!(
+                    reason,
+                    r"it is a verbatim \\?\ path, which this runtime refuses as input"
+                );
+            }
+            other => panic!("expected UncheckablePath, got {other:?}"),
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_reserved_device_name_is_refused_by_name_not_by_the_misleading_existence_reason() {
+        let dir = tempfile::tempdir().unwrap();
+        let attack = format!("{}\\CON", dir.path().display());
+
+        let err = PathGuard::resolve(&attack).unwrap_err();
+        match err {
+            crate::error::Error::UncheckablePath { reason, .. } => {
+                assert_eq!(
+                    reason,
+                    "it names a reserved device rather than an ordinary file"
+                );
+            }
+            other => panic!("expected UncheckablePath, got {other:?}"),
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn the_guards_verdict_for_a_dotdot_through_a_symlink_matches_what_windows_actually_opens() {
+        // `GetFullPathNameW` collapses `..` out of `<root>/link/../secret` before this function,
+        // or the operating system's own open, ever sees `link` — so both land on `<root>/secret`.
+        // Unix disagrees (see `a_dotdot_through_a_symlink_does_not_escape`): there the same string
+        // opens through the symlink to `elsewhere/secret`. Both are sound; they reach the
+        // conclusion by different arguments. Proven here by actually opening the file
+        // the guard resolved to, not merely by inspecting its verdict.
+        let outside = tempfile::tempdir().unwrap();
+        let outside_root = outside.path().canonicalize().unwrap();
+        std::fs::write(outside_root.join("secret"), "leaked").unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().canonicalize().unwrap();
+        std::fs::write(root.join("secret"), "granted").unwrap();
+        std::os::windows::fs::symlink_dir(&outside_root, root.join("link")).unwrap();
+
+        let guard = guard(|g| g.with_fs(|fs| fs.read(&root)));
+        // `non_verbatim`, not `root.display()`: see the comment on `non_verbatim` for why.
+        let attack = format!("{}/link/../secret", non_verbatim(&root));
+
+        let resolved = guard.read("read", &attack).unwrap();
+        let opened = std::fs::read_to_string(resolved.as_path()).unwrap();
+        assert_eq!(
+            opened, "granted",
+            "the guard's verdict must match what the operating system actually opens"
         );
     }
 }

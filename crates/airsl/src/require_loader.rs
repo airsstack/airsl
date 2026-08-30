@@ -22,6 +22,8 @@ use std::path::{Path, PathBuf};
 use mlua::Value;
 
 use crate::error::{Error, Result};
+use crate::paths::containment::is_within;
+use crate::paths::rules::native::strip_verbatim;
 use crate::sandbox::LanguageSurface;
 use crate::types::RequireTarget;
 
@@ -210,17 +212,20 @@ fn resolve(root: &Path, target: &RequireTarget) -> Result<PathBuf> {
         let Ok(path) = root.join(&candidate).canonicalize() else {
             continue;
         };
-        // Compared as paths rather than as strings: `Path::starts_with` matches whole components,
-        // so a sibling directory whose name merely begins with the root's is not a match. Both
-        // sides are canonical, so a symlink pointing out of the root is caught here — the one
-        // escape a validated target cannot rule out on its own.
-        if !path.starts_with(&root) {
+        // Compared component-wise via the shared containment predicate, never as strings: a
+        // sibling directory whose name merely begins with the root's is not a match. Both sides
+        // are canonical, so a symlink pointing out of the root is caught here — the one escape a
+        // validated target cannot rule out on its own.
+        if !is_within(&path, &root) {
             return Err(Error::RequireEscape {
                 module: target.to_string(),
                 root: root.display().to_string(),
             });
         }
-        return Ok(path);
+        // Stripped before it crosses back out of this function: this value becomes both the
+        // module-cache key and the chunk name a Lua traceback shows, and nothing verbatim may ever
+        // reach either.
+        return Ok(strip_verbatim(path));
     }
 
     Err(Error::RequireNotFound {

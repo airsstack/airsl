@@ -49,6 +49,7 @@ mod engine;
 mod error;
 mod failure_policy;
 mod instruction_budget;
+mod paths;
 mod require_loader;
 mod script;
 

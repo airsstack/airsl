@@ -103,13 +103,13 @@ impl HostModule for Glob {
                     let selected = matcher(&pattern.to_str()?)?;
 
                     let mut found = Vec::new();
-                    for entry in walkdir::WalkDir::new(&base).sort_by_file_name() {
+                    for entry in walkdir::WalkDir::new(base.as_path()).sort_by_file_name() {
                         let entry = entry.map_err(|source| Error::Io {
                             operation: "walk",
-                            path: base.display().to_string(),
+                            path: base.as_path().display().to_string(),
                             source: source.into(),
                         })?;
-                        let Ok(relative) = entry.path().strip_prefix(&base) else {
+                        let Ok(relative) = entry.path().strip_prefix(base.as_path()) else {
                             continue;
                         };
                         // Matched against the path relative to the root, so a pattern does not have to

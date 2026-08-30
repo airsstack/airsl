@@ -31,6 +31,7 @@ use crate::error::{Error, Result};
 use crate::extension::api_version::ApiVersion;
 use crate::extension::memory_size::parse_memory_size;
 use crate::extension::variables::Variables;
+use crate::paths::containment::is_within;
 use crate::sandbox::{InstructionLimit, MemoryLimit};
 use crate::types::{ExtensionName, ModuleName};
 
@@ -284,7 +285,7 @@ fn validate_entry(entry: &str, dir: &Path) -> Result<PathBuf> {
         .join(&relative)
         .canonicalize()
         .map_err(|e| invalid(format!("`{entry}` cannot be resolved: {e}")))?;
-    if !resolved.starts_with(&root) {
+    if !is_within(&resolved, &root) {
         return Err(invalid(format!(
             "`{entry}` resolves outside the extension directory"
         )));
@@ -292,6 +293,9 @@ fn validate_entry(entry: &str, dir: &Path) -> Result<PathBuf> {
     if !resolved.is_file() {
         return Err(invalid(format!("`{entry}` is not a file")));
     }
+    // `relative`, not `resolved`, is what this function returns: it was never canonicalised, only
+    // checked, so unlike `require_loader::resolve` and `loaded::recheck_entry` there is nothing
+    // verbatim in it to strip.
     Ok(relative)
 }
 
