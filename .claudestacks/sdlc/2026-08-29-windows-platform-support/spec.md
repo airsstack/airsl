@@ -192,6 +192,21 @@ tail, and refuse a `..` below that point rather than resolving it lexically. Thr
    ever stored or compared.
 3. **The root comparison is delegated** to `paths::containment`, shared with `require_loader`.
 
+**The cost of change 1, recorded rather than discovered.** On Windows `std::fs::canonicalize`
+returns a verbatim path, and it is the most common way a Rust host obtains one. Every such value
+is now refused by every `fs` call, with `Error::UncheckablePath`. That is intended — premise 1.4
+is that nothing verbatim exists internally, and refusing at the door removes the class rather than
+the instance — but the burden lands on the host, which must strip before handing a path to a
+script. Implementing §9's tests hit exactly this and it is the origin of §9's class 4.
+
+The alternative considered and not taken is to *strip* verbatim input rather than refuse it, which
+would be friendlier and still satisfy premise 1.4. It is rejected because the two spellings are
+not equivalent: `\\?\` also disables the `..`, `.` and trailing-space normalisation that the
+non-verbatim form gets, so silently rewriting one into the other changes what the path means. A
+host that passes a verbatim path is asserting something this runtime does not honour, and saying
+so is better than quietly reinterpreting it. The refusal message therefore names the spelling, and
+the how-to documents the one-line strip a host needs.
+
 ### 3.2 The hole this closes
 
 On Windows `std::path::absolute` returns verbatim paths **unchanged**
@@ -247,8 +262,8 @@ predicate:
 |---|---|---|
 | `crates/airsl/src/modules/guard.rs:145-191` | partial canonicalisation, then compare | yes, as `ResolvedPath` |
 | `crates/airsl/src/require_loader.rs:202-230` | `canonicalize` + `starts_with` | **yes** (`:223`) |
-| `crates/airsl/src/extension/manifest.rs:280-291` (`validate_entry`) | `canonicalize` + `starts_with` | no (returns `relative`) |
-| `crates/airsl/src/extension/loaded.rs:140-152` (`recheck_entry`) | `canonicalize` + `starts_with` | **yes** (`:152`) |
+| `crates/airsl/src/extension/manifest.rs:261-296` (`validate_entry`) | `canonicalize` + `starts_with` | no (returns `relative`) |
+| `crates/airsl/src/extension/loaded.rs:135-154` (`recheck_entry`) | `canonicalize` + `starts_with` | **yes** (`:152`) |
 | `crates/airsl/src/sandbox/grants.rs:121-125` (`resolve_root`) | `canonicalize`, no comparison | **yes** |
 
 That is a duplicate-concept violation of the modularity rule today and, once Windows is
@@ -568,6 +583,14 @@ directory cases (`crates/airsl/src/modules/guard.rs:265`,
 `crates/airsl/src/extension/manifest.rs:822`, `crates/airsl/src/extension/loaded.rs:515`) take
 `symlink_file`. Getting that split wrong yields a link that resolves but is not traversable.
 
+The count and the citations above are as of this spec's baseline. Implementing §3 changed both:
+one directory case in `modules/guard.rs` gained inline `#[cfg(unix)]`/`#[cfg(windows)]` arms
+because a Windows test body was needed before the shared helper existed, and a new
+`#[cfg(windows)]` `symlink_dir` site was added for the §3.4 pin — nine sites, not eight, and no
+longer all spelled `std::os::unix::fs::symlink`. The re-derived list lives in the plan that owns
+the helper; a verification that greps only for the unix spelling now reports success while two
+sites remain unrouted.
+
 An earlier draft used directory *junctions* for the three directory cases on the theory that they
 need no privilege. That is doubly wrong: `std` exposes no junction-creation API, and creating one
 by hand needs `DeviceIoControl` with `FSCTL_SET_REPARSE_POINT`, which
@@ -577,9 +600,13 @@ modules — and it is unnecessary anyway, because `std` passes
 plain `symlink_dir` succeeds unprivileged once Developer Mode is on. The CI job enables it:
 
 ```
-reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /t REG_DWORD /f ^
-  /v AllowDevelopmentWithoutDevLicense /d 1
+reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /t REG_DWORD /f /v AllowDevelopmentWithoutDevLicense /d 1
 ```
+
+One line, deliberately. `windows-latest` runs `run:` steps under `pwsh` by default, where `^`
+is not a line continuation, so the two-line `cmd` form this originally carried would have
+executed only the first half. The shipped step is `.github/workflows/ci.yml:73-75`, guarded by
+`if: runner.os == 'Windows'` so it does not run on the Linux and macOS legs.
 
 A test whose symlink creation is denied **fails loudly**, naming Developer Mode, so a maintainer
 running locally is told what to enable rather than getting a false green.
@@ -620,6 +647,17 @@ that matters on unix.
 *Class 3 — tests asserting a natively-rendered path in a message or chunk name*, which §4
 re-spells. Known sites: `crates/airsl/src/modules/guard.rs:326-341`,
 `crates/airsl/src/script.rs:219` and `:278`.
+
+*Class 4 — tests whose guard input is built from a canonicalised temp path.* Found by reviewing
+§3's implementation, not predicted here. A test that builds its input from
+`dir.path().canonicalize().unwrap()` and hands it to `PathGuard::read` is handing it a
+`\\?\C:\…` string on Windows, which §3.1's door check now refuses as `Verbatim` *before* the
+code under test runs. The assertion then fails — or the `unwrap()` panics — for a reason unrelated
+to what the test is about, and any comment describing the intended path documents a branch never
+reached. This is the largest known Windows-leg failure set and it is a direct consequence of
+§3.1, so it belongs with the symlink helper: one test helper that canonicalises **and** strips.
+The grant *root* may stay canonical, because `resolve_root` strips it; only the string handed to
+`read`/`write` must not be verbatim.
 
 `crates/airsl-cli/src/check.rs:199` and `crates/airsl-cli/src/test_runner.rs:247` assert
 `/`-joined relative paths and **are not fixed by §4**. Their expectations are built inside the

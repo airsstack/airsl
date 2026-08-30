@@ -19,6 +19,15 @@ patched, and `is_absolute`/`absolute` are deliberately left alone.
 
 **Tech Stack:** Rust 1.94, `std::path`, `globset` 0.4, `walkdir` 2.5, `mlua`.
 
+> **Line numbers below predate plan 03.** That plan added a `reject_unrepresentable` call, a
+> `strip_verbatim` call and doc text to `modules/guard.rs`, and `.as_path()` to twenty-six
+> consumer sites in `modules/fs.rs`, `modules/hash.rs` and `modules/glob.rs`, shifting everything
+> beneath them. Task 4's citations were re-derived against the post-plan-03 tree and are correct.
+> **Task 2's list of eighteen `io(...)` call sites was not** — re-derive it at execution time from
+> the file rather than trusting the numbers, and correct them here as you go. The plan's own rule
+> is that a claim about code carries a `file:line` a reader can check; a stale number breaks that
+> silently.
+
 **Content authority:** spec §4 in full — §4.0 `is_absolute`/`absolute`, §4.1 `normalize`, §4.2 glob
 patterns, §4.3 what is not a determinism problem — and premise §1.1.
 
@@ -48,10 +57,14 @@ be a fourth copy of a rule that now has one home.
 
 **Steps:**
 
-1. Take plan 03 task 2 step 5's compile-error list — every site that takes a value out of
-   `PathGuard::read`/`write`. That list is complete for *consumers* and is not the list of
-   *renderings*; spec §4 states the gap precisely and this task exists so a later task does not
-   forget it.
+1. Take plan 03's "Handoff to plan 04 — deferred consumer sites" list — every site that takes a
+   value out of `PathGuard::read`/`write`. That list is complete for *consumers* and is not the
+   list of *renderings*; spec §4 states the gap precisely and this task exists so a later task
+   does not forget it.
+
+   Those sites arrive already carrying `.as_path()`, applied by plan 03 solely to keep its own
+   boundary compiling. Treat every one as unclassified: `.as_path()` there is a deferral marker,
+   not a verdict, and at a rendering site it is the exact mistake step 2 guards against.
 2. For each entry, classify it into exactly one of three:
    - **a rendering** — the value becomes a `String` handed to Lua, an error message, or a chunk
      name. Convert it with `to_script_string`.
@@ -70,10 +83,15 @@ be a fourth copy of a rule that now has one home.
      `target.to_script_string()`.
 4. Verify:
    ```
-   $ cargo build -p airsl --all-targets 2>&1 | grep -c "^error"
+   $ grep -rn "as_path()" crates/airsl/src/modules/
    ```
-   Expected: the count matches the number of entries triaged. A diagnostic cleared but not
-   classified is the failure mode this task exists to prevent.
+   Expected: every remaining hit is one this task classified as a genuine filesystem handoff, and
+   the count of hits removed plus hits kept equals the handoff list's length. A deferral marker
+   silently kept is the failure mode this task exists to prevent.
+
+   This verification was originally a count of live compile errors. It cannot be — plan 03 was
+   amended to end on a compiling crate, so there are no diagnostics left to count; the deferral
+   markers replace them as the thing to enumerate.
 
 ### Task 2 — `fs::io` takes `&ResolvedPath`
 
@@ -87,7 +105,9 @@ be a fourth copy of a rule that now has one home.
    `path.display().to_string()` to `path.to_script_string()`. About eighteen call sites already
    pass a guard-derived value (`:87`, `:97`, `:120`, `:134`, `:136`, `:165`, `:172`, `:216`,
    `:251`, `:252`, `:266`, `:267`, `:291`, `:302`, `:313`, `:324`, `:338`, `:354`, `:368`) and
-   compile unchanged. The point of the signature change is that the diagnostic now lands on the
+   need only their `.as_path()` deferral marker dropped — the value they already hold is the one
+   the new signature wants. (As approved this read "compile unchanged", which assumed plan 03 left
+   those sites broken rather than deferred.) The point of the signature change is that the diagnostic now lands on the
    rendering rather than on the handoff above it.
 2. Two call sites break, both inside `atomic_write` (`:419-434`), and neither should be silenced
    with `.as_path()`:
@@ -153,11 +173,11 @@ be a fourth copy of a rule that now has one home.
    `C:\Users\RUNNER~1\AppData\Local\Temp\airsl-…`, because both are rooted at
    `std::env::temp_dir()` and never pass a rendering boundary. Assert on the absence of `\`
    rather than on an exact string, since the temp root is machine-specific.
-2. Convert `:355` (`made.keep().to_string_lossy()`) and `:374` (`path.to_string_lossy()`) to
+2. Convert `:364` (`made.keep().to_string_lossy()`) and `:383` (`path.to_string_lossy()`) to
    `paths::rules::native::to_script_string`.
-3. `:371` renders `checked`, a `ResolvedPath`, inside an inline `Error::Io`. It is a task 1
-   diagnostic; convert it to `checked.to_script_string()`.
-4. Leave `:350` and `:364` alone — `base.to_string_lossy()` is *input* to `g.write`, and premise
+3. `:380` renders `checked`, a `ResolvedPath`, inside an inline `Error::Io`. Plan 03 left it as
+   `checked.as_path().display().to_string()`; convert it to `checked.to_script_string()`.
+4. Leave `:359` and `:373` alone — `base.to_string_lossy()` is *input* to `g.write`, and premise
    §1.1 says input is accepted in either form. A comment records this, because converting it would
    look like the consistent thing to do and would add a conversion the guard does not need.
 5. Verify:
@@ -196,12 +216,17 @@ be a fourth copy of a rule that now has one home.
 
 **Steps:**
 
-1. `guard.rs:114` renders the granted roots in a refusal. They arrive as a plain `&[PathBuf]` off
-   `FsGrant` (`:107-108`), never guard-derived, so the type system will never mention them — plan 03
-   task 2 step 4 deliberately left this line for here. Convert
+1. `guard.rs:121` renders the granted roots in a refusal. They arrive as a plain `&[PathBuf]` off
+   `FsGrant` (`:109-112`), never guard-derived, so the type system will never mention them — plan 03
+   task 2 step 4 deliberately left this line for here, with a comment saying so. Convert
    `roots.iter().map(|r| r.display().to_string())` to
-   `roots.iter().map(|r| paths::rules::native::to_script_string(r))`. `:123` was already converted
-   when plan 03 changed `deny` to take `&ResolvedPath`; confirm, do not redo.
+   `roots.iter().map(|r| paths::rules::native::to_script_string(r))`, and delete that comment as
+   part of the same change. `:130` was already converted when plan 03 changed `deny` to take
+   `&ResolvedPath`; confirm, do not redo.
+
+   Until this lands, a Windows denial message mixes separators — the offending path arrives from
+   `resolved.to_script_string()` as `C:/a/b` while the roots beside it render as `C:\a`. That is
+   the visible symptom to look for when checking the fix.
 2. `ext.rs`'s `sorted_roots` is at `:136-143` — the spec cites `:138-143`, which starts one line
    into the function; the rendering is `:139` and the sort is `:141`. **The sort runs over the
    rendered strings**, so the separator changes ordering and not only spelling. Write that test
@@ -244,7 +269,22 @@ be a fourth copy of a rule that now has one home.
 4. **Do not touch the module-cache key at `require_loader.rs:147`.** It is an internal `PathBuf`
    keyed on the canonical path and is never script-visible; re-spelling it would change a lookup
    key to fix a display problem. A comment says so, because it is the obvious next line to convert.
-5. `loaded.rs:117-121` builds the extension chunk name from `manifest.entry()`. That is a
+6. **The `root` field of the four `require` errors.** `require_loader.rs` renders
+   `root.display().to_string()` at `:159` (`Error::RequireCycle`), `:208` (`Error::RequireNotFound`,
+   the `canonicalize` failure arm), `:222` (`Error::RequireEscape`) and `:233`
+   (`Error::RequireNotFound`, the exhausted-candidates arm). All four are script-visible messages
+   and all four convert to `paths::rules::native::to_script_string`.
+
+   Two of them are worse than a spelling problem. At `:222` and `:233` the `root` binding is the
+   **shadowed, canonicalised** one from `:206`, so on Windows it renders `\\?\C:\…` — a verbatim
+   path reaching a message a script author reads, which premise §1.4 forbids outright. At `:159`
+   and `:208` `root` is still the caller-supplied `&Path` (the shadow at `:206` has not taken
+   effect inside its own initialiser), so those two are native-separator only.
+
+   Line numbers are post-plan-03: that plan added a comment and a `strip_verbatim` call to
+   `resolve`, shifting everything below `:214` down.
+
+7. `loaded.rs:117-121` builds the extension chunk name from `manifest.entry()`. That is a
    manifest-declared relative path whose components are all `Component::Normal`
    (`manifest.rs:272-278`), so on Windows it renders `src/main.lua` unchanged when the manifest
    wrote `/` — and `src\main.lua` when the manifest wrote `\`, which premise §1.1 accepts on input.
@@ -389,3 +429,12 @@ be a fourth copy of a rule that now has one home.
 - `path.rs` has 27 tests: 5 with platform-conditional arms, 22 unchanged.
 - Plan 01's `INVENTORY.md` class-3 entries (natively-rendered paths in a message or chunk name) are
   all accounted for by a task above, or the shortfall is reported rather than absorbed.
+
+---
+
+## Amendments after approval
+
+| What | Why |
+|---|---|
+| Task 7 gained a step covering the four `root.display()` renderings in `require_loader.rs` (`:159`, `:208`, `:222`, `:233`) | No task owned them. Task 7 as approved covered only the chunk name (`:197`) and `Error::ScriptRead` (`:192`); task 6 covered the guard and `ext` residue. `:222` and `:233` render the *canonicalised* root, so on Windows they put a verbatim `\\?\C:\…` into a script-visible error message — a premise §1.4 violation, not merely a separator inconsistency. Found by reading the function after plan 03 rewrote it; no diagnostic points at any of the four. |
+| Task 1 steps 1 and 4, and task 2 step 1, re-pointed from live compile diagnostics to plan 03's recorded handoff list and `.as_path()` deferral markers | Plan 04 as approved required the crate to be non-compiling at plan 03's boundary — task 1 step 4 counted `^error` lines and task 2 step 1 expected eighteen sites to "compile unchanged". Plan 03 was amended to end green, since ending a plan red contradicts the repo's rule that anything short of `cargo make dod` is not a green result. The inventory is unchanged and still compiler-derived; only where it is read from moved, from live diagnostics to a written list plus a greppable marker. |

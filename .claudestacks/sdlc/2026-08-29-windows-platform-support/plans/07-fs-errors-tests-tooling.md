@@ -185,7 +185,7 @@ commit rather than assuming it.
    Expected: green on macOS unchanged; the Windows leg no longer reports a TOML or Lua parse error
    from a temp path.
 
-### Task 5 — One symlink helper, eight call sites
+### Task 5 — One symlink helper, nine call sites
 
 **Files:**
 - Create `crates/airsl/src/test_support.rs`
@@ -208,16 +208,46 @@ commit rather than assuming it.
    Register it in `crates/airsl/src/lib.rs` as `#[cfg(test)] mod test_support;` beside the private
    modules at `:45-52`. The crate has no `tests/` directory and adds none — this is a crate-root
    test module, not an integration-test tree.
-2. Route the three **directory** targets through `link_dir`:
-   - `crates/airsl/src/modules/guard.rs:265` — links to `outside_root.join("sub")`
-   - `crates/airsl/src/sandbox/grants.rs:311` — links to `base.join("real")`
+
+   The same module carries the fix for spec §9's **class 4**, because it is the same shape of
+   problem and splitting it across two modules would leave tests importing path helpers from two
+   places:
+
+   ```rust
+   /// A temp dir canonicalised the way a test needs it, with any verbatim prefix removed.
+   pub(crate) fn resolved_root(dir: &Path) -> PathBuf;
+   ```
+
+   Every test that builds a *guard input* string from `dir.path().canonicalize().unwrap()` routes
+   through this instead. On Windows the raw canonical form is `\\?\C:\…`, which the guard's door
+   check refuses as `Verbatim` before the code under test runs — so the test fails, or its
+   `unwrap()` panics, for a reason unrelated to its subject. The grant **root** may stay canonical
+   (`resolve_root` strips it); it is only the string handed to `read`/`write` that must not be
+   verbatim.
+
+   Known sites at the time of writing: `modules/guard.rs` (the majority — every test that
+   interpolates a canonicalised root into an attack string), plus `modules/fs.rs`,
+   `modules/glob.rs` and `modules/hash.rs` test fixtures. Derive the list by running the suite on
+   Windows rather than by reading, for the same reason the rest of this plan's inventory is
+   measured: the count above is a floor.
+2. Route the four **directory** targets through `link_dir`:
+   - `crates/airsl/src/modules/guard.rs:307` / `:309` — links to `outside_root.join("sub")`.
+     **Already carries inline `#[cfg(unix)]` / `#[cfg(windows)]` arms**, added by plan 03 task 5
+     because that test needed a Windows body before this helper existed. Task 5 *replaces* the two
+     arms with a single `link_dir` call; it does not add a third.
+   - `crates/airsl/src/sandbox/grants.rs:313` — links to `base.join("real")`
    - `crates/airsl/src/extension/negotiate.rs:515` — links to `outside.path()`
+   - `crates/airsl/src/modules/guard.rs:506` — links to `&outside_root`. Added by plan 03 task 5
+     (`the_guards_verdict_for_a_dotdot_through_a_symlink_matches_what_windows_actually_opens`) and
+     currently `#[cfg(windows)]`-only, so it calls `symlink_dir` directly. It routes through
+     `link_dir` like the rest; the test itself stays `#[cfg(windows)]`, since what it pins is a
+     Windows-specific verdict.
 3. Route the five **file** targets through `link_file`:
-   - `crates/airsl/src/modules/guard.rs:245` — `outside.path().join("secret")`
-   - `crates/airsl/src/require_loader.rs:333` — `outside.path().join("secrets.lua")`
-   - `crates/airsl/src/require_loader.rs:348` — `decoy.join("m.lua")`
-   - `crates/airsl/src/extension/manifest.rs:822` — `target`
-   - `crates/airsl/src/extension/loaded.rs:515` — `outside_file`
+   - `crates/airsl/src/modules/guard.rs:286` — `outside.path().join("secret")`
+   - `crates/airsl/src/require_loader.rs:338` — `outside.path().join("secrets.lua")`
+   - `crates/airsl/src/require_loader.rs:353` — `decoy.join("m.lua")`
+   - `crates/airsl/src/extension/manifest.rs:826` — `target`
+   - `crates/airsl/src/extension/loaded.rs:517` — `outside_file`
 4. Check each target against what the test actually creates before committing the split. Windows
    distinguishes the two at creation time and never repairs a mismatch: a `symlink_file` pointing
    at a directory resolves — so a test asserting the link exists still passes — but is not
@@ -232,10 +262,12 @@ commit rather than assuming it.
    converts them into decoration. CI is already covered: plan 01 added the Developer Mode step.
 6. Verify:
    ```
-   $ grep -rn "os::unix::fs::symlink" crates/ ; cargo test -p airsl
+   $ grep -rn "os::unix::fs::symlink\|os::windows::fs::symlink" crates/ ; cargo test -p airsl
    ```
-   Expected: the grep returns **only** `test_support.rs`; all eight call sites now name
-   `link_file`/`link_dir`; macOS test results identical to before this task.
+   Expected: the grep returns **only** `test_support.rs`; all nine call sites now name
+   `link_file`/`link_dir`; macOS test results identical to before this task. The grep covers the
+   Windows path too — plan 03 left two `symlink_dir` calls in `modules/guard.rs`, and a pattern
+   matching only the unix spelling would report success while both remained.
 
 ### Task 6 — Classes 2 and 3
 
@@ -454,3 +486,13 @@ commit rather than assuming it.
 - No new public error variant, and no new public item on `airsl`'s API surface. Confirm against
   `cargo public-api` or by reading the diff for `pub`.
 - Spec §11's documentation edits are **not** in this plan's diff; they belong to plan 08.
+
+---
+
+## Amendments after approval
+
+| What | Why |
+|---|---|
+| Task 5 re-titled "nine call sites"; every symlink citation re-derived; `modules/guard.rs:506` added as a fourth directory target | Plans 03's edits shifted every line this task cited (`guard.rs:245→286`, `grants.rs:311→313`, `require_loader.rs:333→338` and `:348→353`, `manifest.rs:822→826`, `loaded.rs:515→517`). Plan 03 task 5 also gave `guard.rs`'s directory case inline platform arms and added a new `#[cfg(windows)]` `symlink_dir` site, so the count and the "all eight call `std::os::unix::fs::symlink` today" premise were both stale. Re-derived by grepping the tree after plan 03 landed. |
+| Task 5 step 1 gained `resolved_root`, covering spec §9's class 4 | Refusing verbatim input at the guard (spec §3.1) means any test whose input is built from `canonicalize()` is refused on Windows before the code under test runs. No task owned this; §9's three seeded classes predate the implementation that caused it. It shares `test_support.rs` with the symlink helpers because it is the same shape of problem and the same importers. |
+| Task 5 step 6's grep widened to match the Windows spelling | The approved grep matched only `os::unix::fs::symlink`. Plan 03 left two `os::windows::fs::symlink_dir` calls in `modules/guard.rs`, so the original pattern would have returned clean while two unrouted sites remained — a verification that reports success without checking the thing it names. |
