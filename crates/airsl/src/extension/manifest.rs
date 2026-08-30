@@ -32,6 +32,7 @@ use crate::extension::api_version::ApiVersion;
 use crate::extension::memory_size::parse_memory_size;
 use crate::extension::variables::Variables;
 use crate::paths::containment::is_within;
+use crate::paths::rules::native::to_script_string;
 use crate::sandbox::{InstructionLimit, MemoryLimit};
 use crate::types::{ExtensionName, ModuleName};
 
@@ -176,7 +177,7 @@ impl Manifest {
     /// or contains an unknown key; `path` is only used in the message.
     pub fn parse(text: &str, path: &Path) -> Result<RawManifest> {
         toml::from_str(text).map_err(|error| Error::ManifestParse {
-            path: path.display().to_string(),
+            path: to_script_string(path),
             reason: error.to_string(),
         })
     }
@@ -191,7 +192,7 @@ impl Manifest {
         let dir = dir.as_ref();
         let path = dir.join(MANIFEST_FILE);
         let text = std::fs::read_to_string(&path).map_err(|source| Error::ManifestRead {
-            path: path.display().to_string(),
+            path: to_script_string(&path),
             source,
         })?;
         let raw = Self::parse(&text, &path)?;

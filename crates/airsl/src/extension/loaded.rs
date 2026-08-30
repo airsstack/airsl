@@ -26,7 +26,7 @@ use crate::extension::{
 use crate::modules::ModuleSet;
 use crate::modules::ext::Ext;
 use crate::paths::containment::is_within;
-use crate::paths::rules::native::strip_verbatim;
+use crate::paths::rules::native::{strip_verbatim, to_script_string};
 use crate::sandbox::Policy;
 use crate::script::Script;
 use crate::types::{EventName, ExtensionName, RootTable};
@@ -114,12 +114,18 @@ impl<A: Approver> Approved<'_, A> {
             .stdlib(context.modules)
             .build()?;
 
+        // `manifest.entry()` is manifest-declared and never guard-derived, so it renders however
+        // the manifest spelled it rather than through this crate's own separator — a manifest
+        // written on Windows with `\` would otherwise put a `\` into a chunk name next to file
+        // route and require route names that are always `/`-spelled. Rendering it through the
+        // script vocabulary here is what keeps all three sources in agreement regardless of how
+        // the manifest was written.
         let script = Script::from_file(&entry)?
             .with_root(&dir)
             .with_name(format!(
                 "{}/{}",
                 manifest.name(),
-                manifest.entry().display()
+                to_script_string(manifest.entry())
             ))?;
         engine.eval(&script)?;
 
@@ -141,15 +147,15 @@ impl<A: Approver> Approved<'_, A> {
         };
         let root = dir
             .canonicalize()
-            .map_err(|e| invalid(format!("{}: {e}", dir.display())))?;
+            .map_err(|e| invalid(format!("{}: {e}", to_script_string(dir))))?;
         let full = dir.join(entry);
         let resolved = full
             .canonicalize()
-            .map_err(|e| invalid(format!("{}: {e}", full.display())))?;
+            .map_err(|e| invalid(format!("{}: {e}", to_script_string(&full))))?;
         if !is_within(&resolved, &root) {
             return Err(invalid(format!(
                 "`{}` resolves outside the extension directory",
-                entry.display()
+                to_script_string(entry)
             )));
         }
         Ok(strip_verbatim(resolved))
@@ -340,6 +346,40 @@ mod tests {
             .call(&EventName::new("ping").unwrap(), &json!({"n": 3}))
             .unwrap();
         assert_eq!(result, Some(json!({"got": 3})));
+    }
+
+    #[test]
+    fn the_chunk_name_renders_the_manifest_entry_through_the_script_vocabulary() {
+        // The chunk name is `"{manifest name}/{entry}"`; `entry` here has a subdirectory so the
+        // test exercises a multi-component rendering rather than a single filename that would
+        // look identical under any rule.
+        //
+        // On unix `to_script_string` is the identity, so this assertion is green before and after
+        // the conversion on this host — it cannot demonstrate the Windows case, where a manifest
+        // entry written with `\` would otherwise reach this script-visible traceback unconverted
+        // while the file-loaded and required chunk names beside it are always `/`-spelled.
+        let dir = TempDir::new().unwrap();
+        fs::create_dir_all(dir.path().join("lib")).unwrap();
+        fs::write(
+            dir.path().join("extension.toml"),
+            "[extension]\nname = \"nested\"\nversion = \"0.1.0\"\nentry = \"lib/main.lua\"\napi = 1\n",
+        )
+        .unwrap();
+        fs::write(dir.path().join("lib/main.lua"), "error('boom')").unwrap();
+
+        let ceiling = Ceiling::new(Policy::confined()).unwrap();
+        let events = events(&[]);
+        let variables = Variables::none();
+        let approver = ManifestApprover;
+        let root = RootTable::default();
+
+        let err = Extension::load(
+            dir.path(),
+            context(&ceiling, &events, &variables, &approver, &root),
+        )
+        .unwrap_err();
+
+        assert!(err.to_string().contains("nested/lib/main.lua"), "{err}");
     }
 
     #[test]

@@ -23,7 +23,7 @@ use mlua::Value;
 
 use crate::error::{Error, Result};
 use crate::paths::containment::is_within;
-use crate::paths::rules::native::strip_verbatim;
+use crate::paths::rules::native::{strip_verbatim, to_script_string};
 use crate::sandbox::LanguageSurface;
 use crate::types::RequireTarget;
 
@@ -146,6 +146,8 @@ fn load(lua: &mlua::Lua, root: &Path, target: &RequireTarget) -> Result<Value> {
     let fail = |source: mlua::Error| Error::lua(target.as_str(), source);
 
     let path = resolve(root, target)?;
+    // Not `to_script_string`: this key is an internal lookup, never shown to a script, and
+    // re-spelling it to fix a display problem would change what it is keyed on instead.
     let key = path.display().to_string();
     let loaded: mlua::Table = lua.named_registry_value(LOADED_KEY).map_err(fail)?;
 
@@ -156,7 +158,7 @@ fn load(lua: &mlua::Lua, root: &Path, target: &RequireTarget) -> Result<Value> {
         Value::LightUserData(_) => {
             return Err(Error::RequireCycle {
                 module: target.to_string(),
-                root: root.display().to_string(),
+                root: to_script_string(root),
             });
         }
         Value::Nil => {}
@@ -191,12 +193,12 @@ fn load(lua: &mlua::Lua, root: &Path, target: &RequireTarget) -> Result<Value> {
 /// Reads and evaluates the module at `path`.
 fn run(lua: &mlua::Lua, path: &Path, target: &RequireTarget) -> Result<Value> {
     let source = std::fs::read_to_string(path).map_err(|source| Error::ScriptRead {
-        path: path.display().to_string(),
+        path: to_script_string(path),
         source,
     })?;
 
     lua.load(&source)
-        .set_name(format!("@{}", path.display()))
+        .set_name(format!("@{}", to_script_string(path)))
         .eval::<Value>()
         .map_err(|source| Error::lua(target.as_str(), source))
 }
@@ -205,7 +207,9 @@ fn run(lua: &mlua::Lua, path: &Path, target: &RequireTarget) -> Result<Value> {
 fn resolve(root: &Path, target: &RequireTarget) -> Result<PathBuf> {
     let root = root.canonicalize().map_err(|_| Error::RequireNotFound {
         module: target.to_string(),
-        root: root.display().to_string(),
+        // `root` here is still the caller-supplied path: the shadowed, canonicalised binding
+        // this `let` introduces has not taken effect inside its own initialiser.
+        root: to_script_string(root),
     })?;
 
     for candidate in target.candidates() {
@@ -219,7 +223,10 @@ fn resolve(root: &Path, target: &RequireTarget) -> Result<PathBuf> {
         if !is_within(&path, &root) {
             return Err(Error::RequireEscape {
                 module: target.to_string(),
-                root: root.display().to_string(),
+                // `root` here is the canonicalised binding, so on Windows it would otherwise carry
+                // a verbatim `\\?\` prefix into a message a script reads. `to_script_string` strips
+                // it and re-spells the separator in the same call.
+                root: to_script_string(&root),
             });
         }
         // Stripped before it crosses back out of this function: this value becomes both the
@@ -230,7 +237,8 @@ fn resolve(root: &Path, target: &RequireTarget) -> Result<PathBuf> {
 
     Err(Error::RequireNotFound {
         module: target.to_string(),
-        root: root.display().to_string(),
+        // Same canonicalised binding as the escape arm above, and the same reason it converts.
+        root: to_script_string(&root),
     })
 }
 
@@ -244,6 +252,7 @@ mod tests {
     use super::RequireDisposition;
     use crate::sandbox::LanguageSurface;
     use crate::types::RequireTarget;
+    use crate::{Engine, Policy, Script};
     use std::io::Write as _;
     use std::path::Path;
 
@@ -340,6 +349,60 @@ mod tests {
 
         let err = resolve(dir.path(), "s").unwrap_err();
         assert!(err.to_string().contains("outside"), "{err}");
+    }
+
+    #[test]
+    fn a_module_loaded_as_a_file_and_the_same_module_reached_through_require_report_the_same_traceback_name()
+     {
+        // `ChunkName::from_path` (the file route) and this module's own `run` (the `require`
+        // route) each render the same physical file's path independently. If only one of them
+        // converted through the script vocabulary, the two routes would spell the same file two
+        // ways in a traceback.
+        //
+        // Both errors wrap the location a different distance from the top — the file route's
+        // outer wrapper names the whole script, the require route's inner wrapper names the
+        // module by its dotted target rather than a path — so the one place both share the exact
+        // same rendering of `nested.lua`'s own path is the stack-traceback frame Lua emits for it.
+        // That frame is what this test compares, rather than a precomputed expected string,
+        // because Lua also truncates a long chunk id to fit its fixed-size buffer: the truncation
+        // is deterministic on the underlying name, so two byte-identical names still truncate to
+        // byte-identical frames, but a bare `.contains(expected)` would spuriously fail once a
+        // temp-directory path is long enough to trigger it — as it is on this host.
+        //
+        // On unix `to_script_string` is the identity, so the two frames compared below would be
+        // byte-identical whether or not either route actually converts — this test cannot
+        // distinguish "both converted", "neither converted" and "only one converted" on this
+        // host. Only a Windows host, where the two routes' inputs diverge (one is canonicalised
+        // through `resolve`, the other is not), can fail this for the reason it exists to catch.
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().canonicalize().unwrap();
+        write(&root, "lib/nested.lua", "error('boom')");
+        write(&root, "main.lua", "return require('lib.nested')");
+
+        let engine = Engine::builder()
+            .policy(Policy::confined())
+            .build()
+            .unwrap();
+
+        let direct = Script::from_file(root.join("lib/nested.lua")).unwrap();
+        let direct_err = engine.eval(&direct).unwrap_err().to_string();
+        let direct_frame = direct_err
+            .lines()
+            .find(|line| line.contains("nested.lua:1: in main chunk"))
+            .unwrap();
+
+        let main = Script::from_file(root.join("main.lua")).unwrap();
+        let required_err = engine.eval(&main).unwrap_err().to_string();
+        let required_frame = required_err
+            .lines()
+            .find(|line| line.contains("nested.lua:1: in main chunk"))
+            .unwrap();
+
+        assert_eq!(
+            direct_frame.trim(),
+            required_frame.trim(),
+            "direct: {direct_err}\nrequired: {required_err}"
+        );
     }
 
     #[test]

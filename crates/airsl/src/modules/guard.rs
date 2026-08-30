@@ -114,11 +114,7 @@ impl PathGuard {
         let granted = if roots.is_empty() {
             String::from("none are granted")
         } else {
-            // These roots come straight from `FsGrant`, never through this guard's resolution, so
-            // there is nothing verbatim here to strip and no diagnostic that points at this line —
-            // it renders whatever spelling the grant itself was built with, unrelated to this
-            // fix's concern with `canonicalize()` output.
-            let names: Vec<_> = roots.iter().map(|r| r.display().to_string()).collect();
+            let names: Vec<_> = roots.iter().map(|r| native::to_script_string(r)).collect();
             names.join(", ")
         };
 
@@ -427,6 +423,23 @@ mod tests {
     }
 
     #[test]
+    fn a_refusal_renders_the_granted_roots_without_backslashes() {
+        // The offending path in a refusal renders through `to_script_string` (`resolved`,
+        // above), and so does the granted-roots list beside it — both sides of the colon use the
+        // same `/`-spelled vocabulary, so a Windows message never mixes separators. On unix
+        // `display()` and `to_script_string` already agree, so this assertion cannot distinguish
+        // the two renderings on this host; it is the mixed-separator case on Windows that this
+        // pins.
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().canonicalize().unwrap();
+        std::fs::write(root.join("a.txt"), "x").unwrap();
+
+        let guard = guard(|g| g.with_fs(|fs| fs.read(&root)));
+        let err = guard.read("read", "/etc/hostname").unwrap_err();
+        assert!(!err.to_string().contains('\\'), "{err}");
+    }
+
+    #[test]
     fn a_refusal_measured_against_the_write_roots_says_write() {
         // The message and the allowlist come from one value, so a refusal cannot report a
         // direction the check did not use.
@@ -471,11 +484,12 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn a_verbatim_path_with_a_hidden_dotdot_is_refused_rather_than_approved() {
-        // Before this fix, this exact path was approved: `/` is not a separator inside a verbatim
-        // spelling, so `a/../../Windows` parses as one `Component::Normal` and the `ParentDir` arm
-        // never fires, so resolution pops to the root, canonicalises, and re-appends the suffix —
-        // approving a path that leaves the root. Refusing every verbatim spelling at the door
-        // closes the class rather than chasing this one instance of it.
+        // This exact path is what makes the refusal necessary rather than tidy: `/` is not a
+        // separator inside a verbatim spelling, so `a/../../Windows` parses as one
+        // `Component::Normal` and the `ParentDir` arm never fires. Resolution would pop to the
+        // root, canonicalise, re-append the suffix, and approve a path that leaves the root.
+        // Refusing every verbatim spelling at the door closes the class rather than chasing this
+        // one instance of it.
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path().canonicalize().unwrap(); // canonicalize() returns a verbatim path
         let attack = format!("{}\\a/../../Windows\\System32\\x", root.display());

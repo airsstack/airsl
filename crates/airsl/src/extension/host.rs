@@ -22,6 +22,7 @@ use crate::extension::{
     ManifestApprover, Variables,
 };
 use crate::modules::ModuleSet;
+use crate::paths::rules::native::to_script_string;
 use crate::types::{EventName, ExtensionName, RootTable};
 
 /// Builds a [`ModuleSet`] for each load. The default is [`crate::modules::stdlib()`].
@@ -281,7 +282,7 @@ impl<A: Approver, F: ModuleFactory> ExtensionHost<A, F> {
         let root = root.as_ref();
         let io = |source: std::io::Error| Error::Io {
             operation: "read_dir",
-            path: root.display().to_string(),
+            path: to_script_string(root),
             source,
         };
 

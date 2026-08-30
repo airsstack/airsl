@@ -97,7 +97,7 @@ impl HostModule for Hash {
                     let target = g.read("hash_file", &path.to_str()?)?;
                     let body = std::fs::read(target.as_path()).map_err(|source| Error::Io {
                         operation: "hash_file",
-                        path: target.as_path().display().to_string(),
+                        path: target.to_script_string(),
                         source,
                     })?;
                     let algorithm = match algorithm.as_ref() {

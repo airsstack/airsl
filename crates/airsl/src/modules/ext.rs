@@ -20,6 +20,7 @@ use std::path::PathBuf;
 
 use crate::error::{Error, Result};
 use crate::modules::{HostModule, InstallContext};
+use crate::paths::rules::native;
 use crate::sandbox::{GrantSet, ResourceLimits};
 use crate::types::{EventName, ModuleName};
 
@@ -128,15 +129,19 @@ const GRANTED_KEY: &str = "airsl.ext.granted";
 /// a script has no way to observe independently. Two hosts granting the same roots in a different
 /// order would otherwise hand a script different `granted()` output for the same authority, which
 /// is the kind of instability determinism is meant to rule out.
-// `to_string_lossy` rather than `.display()`: the two render a non-UTF-8 root identically
-// (both substitute the replacement character), but `granted()` is machine-read by a script —
-// unlike a `Display` impl meant for a human — so the choice is made explicit here rather than
-// inherited from a formatting trait. Matches the convention `fs`'s own returned paths use
-// (`modules/fs.rs`, e.g. `target.to_string_lossy().into_owned()`).
+// The script vocabulary's rendering rather than `.display()` or `to_string_lossy` on their own:
+// `granted()` is machine-read by a script — unlike a `Display` impl meant for a human — so the
+// choice is made explicit here rather than inherited from a formatting trait. That argument now
+// reaches further than non-UTF-8 substitution. The sort below runs over these rendered strings,
+// so the separator this function renders with is not merely a spelling choice: `/` (0x2F) and `\`
+// (0x5C) straddle the ASCII letters, so a root list containing both `C:/a/b` and `C:/aZ` sorts one
+// way under `/` and the other way under `\`. Pinning the separator to the script vocabulary,
+// rather than letting it follow the compiling platform, is what keeps two hosts granting the same
+// roots in agreement.
 fn sorted_roots(roots: &[PathBuf]) -> Vec<String> {
     let mut rendered: Vec<String> = roots
         .iter()
-        .map(|path| path.to_string_lossy().into_owned())
+        .map(|path| native::to_script_string(path))
         .collect();
     rendered.sort();
     rendered
@@ -220,7 +225,9 @@ mod tests {
         reason = "tests unwrap known-valid fixtures; a panic is the intended failure signal"
     )]
 
-    use super::Ext;
+    use std::path::PathBuf;
+
+    use super::{Ext, sorted_roots};
     use crate::modules::stdlib;
     use crate::{Engine, EventName, GrantSet, Policy, Script};
 
@@ -338,6 +345,53 @@ mod tests {
         )
         .unwrap();
         assert_eq!(found, "true,true");
+    }
+
+    #[test]
+    fn to_script_string_renders_a_separator_that_is_itself_part_of_the_sort_key() {
+        // Pin the concrete case that makes the rendered separator part of the sort key, not only
+        // a spelling choice: `Z` (0x5A) sits between `/` (0x2F) and `\` (0x5C), so `C:/a/b` and
+        // `C:/aZ` compare one way when rendered with `/` and the other way when rendered with `\`.
+        // `sorted_roots` always renders through this crate's *compile-time* platform, so it cannot
+        // demonstrate the Windows case on a macOS host — this exercises the rendering rule
+        // directly with an explicit Windows flavor instead, which is exactly what
+        // `crate::paths::rules` is built to allow (its own module doc says so: a Windows rule
+        // "runs, and can fail, on this crate's Linux and macOS test hosts too").
+        use crate::paths::rules::{PathFlavor, to_script_string};
+        use std::path::Path;
+
+        let windows_a = to_script_string(Path::new(r"C:\a\b"), PathFlavor::Windows);
+        let windows_sibling = to_script_string(Path::new(r"C:\aZ"), PathFlavor::Windows);
+        assert_eq!(windows_a, "C:/a/b");
+        assert_eq!(windows_sibling, "C:/aZ");
+
+        // Under the `/` this crate's script vocabulary renders with, `C:/a/b` sorts first.
+        assert!(
+            windows_a < windows_sibling,
+            "{windows_a} vs {windows_sibling}"
+        );
+        // Under the native `\` spelling, the same two roots sort the other way (`C:\aZ` <
+        // `C:\a\b`, since `Z` < `\`) — the disagreement a byte-order sort over rendered strings
+        // must not expose to a script.
+    }
+
+    #[test]
+    fn sorted_roots_sorts_the_rendered_strings_not_the_paths_own_ordering() {
+        // `PathBuf`'s own `Ord` compares component-wise, so a `..` (`ParentDir`) component sorts
+        // before a `Normal` one regardless of its bytes — `PathBuf::from("..") < PathBuf::from("!")`
+        // holds even though `!` (0x21) is less than `.` (0x2E) byte-for-byte. `sorted_roots` sorts
+        // the strings it renders, so feeding it these two roots in `PathBuf` order and getting the
+        // byte-order result back proves it sorts *after* rendering rather than delegating to
+        // `PathBuf`'s comparison.
+        let roots = [PathBuf::from(".."), PathBuf::from("!")];
+        assert!(
+            roots[0] < roots[1],
+            "PathBuf's own ordering must place `..` first for this to test anything"
+        );
+        assert_eq!(
+            sorted_roots(&roots),
+            vec![String::from("!"), String::from("..")]
+        );
     }
 
     #[test]

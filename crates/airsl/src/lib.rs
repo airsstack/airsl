@@ -78,4 +78,6 @@ pub use sandbox::{
     ResourceLimits,
 };
 pub use script::Script;
-pub use types::{ChunkName, EventName, ExtensionName, ModuleName, RequireTarget, RootTable};
+pub use types::{
+    ChunkName, EnvName, EventName, ExtensionName, ModuleName, RequireTarget, RootTable,
+};

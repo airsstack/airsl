@@ -19,6 +19,7 @@
 
 use crate::paths::containment::contains_any;
 use crate::paths::rules::native::strip_verbatim;
+use crate::types::EnvName;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
@@ -145,9 +146,16 @@ pub(crate) fn resolve_root(root: PathBuf) -> PathBuf {
 /// An allowlist of names rather than a boolean, because the environment routinely carries
 /// credentials that have nothing to do with the script holding the grant. "May read the
 /// environment" is almost never the authority anyone means.
+///
+/// The derived `PartialEq` compares the underlying `BTreeSet<EnvName>`, which means it inherits
+/// `EnvName`'s fold: on Windows, `EnvGrant::none().read(["Path"])` and
+/// `EnvGrant::none().read(["PATH"])` compare equal, and so do the [`super::GrantSet`] values built
+/// from them. That is correct rather than incidental — the two grants authorise reading exactly
+/// the same variable on that platform — so it is left as the derive produces it rather than
+/// special-cased away.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct EnvGrant {
-    names: BTreeSet<String>,
+    names: BTreeSet<EnvName>,
 }
 
 impl EnvGrant {
@@ -166,14 +174,33 @@ impl EnvGrant {
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
-        self.names.extend(names.into_iter().map(Into::into));
+        self.names
+            .extend(names.into_iter().map(|name| EnvName::new(name.into())));
         self
     }
 
     /// Whether `name` is on the allowlist.
+    ///
+    /// The one behavioural delta this crate's `EnvName` identity introduces on `EnvGrant`: on
+    /// Windows, a grant of `PATH` now also allows `Path` and `path`, because that platform's
+    /// environment block does not distinguish them regardless of who wrote it. On unix, this is
+    /// unchanged — still an exact match.
+    ///
+    /// A linear scan comparing `name` against each entry, not a `BTreeSet` lookup keyed by
+    /// `&str`. Implementing `Borrow<str>` for `EnvName` so `&str` could be looked up directly is
+    /// unavailable here: `Borrow`'s contract requires the borrowed type's `Ord` to agree with the
+    /// owning type's, and that is exactly what the fold breaks on Windows, where two different
+    /// `&str` values (`"PATH"`, `"Path"`) must map to one `EnvName` identity — violating it would
+    /// give `BTreeSet` a wrong-but-safe answer (a lookup that silently fails to find an entry
+    /// that is logically present), not undefined behaviour. A grant set holds a handful of names,
+    /// so the scan costs nothing that matters, and it costs no allocation either.
     #[must_use]
     pub fn allows(&self, name: &str) -> bool {
-        self.names.contains(name)
+        use crate::types::env_name::{NATIVE, compare};
+
+        self.names
+            .iter()
+            .any(|entry| compare(entry.as_str(), name, NATIVE) == core::cmp::Ordering::Equal)
     }
 
     /// The allowed names, in sorted order.
@@ -181,7 +208,7 @@ impl EnvGrant {
     /// Sorted because this is what `airsl doctor` prints and what a script sees from `env.all`,
     /// and a set that enumerated differently between runs would make both non-deterministic.
     pub fn names(&self) -> impl Iterator<Item = &str> {
-        self.names.iter().map(String::as_str)
+        self.names.iter().map(EnvName::as_str)
     }
 
     /// Whether this grant permits nothing at all.
@@ -431,7 +458,21 @@ mod tests {
     fn env_names_are_matched_exactly_rather_than_by_prefix() {
         let grant = EnvGrant::none().read(["HOME"]);
         assert!(!grant.allows("HOMEBREW_PREFIX"));
-        assert!(!grant.allows("home"));
+    }
+
+    #[test]
+    fn env_names_fold_case_on_windows_and_compare_exactly_on_unix() {
+        let grant = EnvGrant::none().read(["PATH"]);
+        #[cfg(windows)]
+        {
+            assert!(grant.allows("Path"));
+            assert!(grant.allows("path"));
+        }
+        #[cfg(unix)]
+        {
+            assert!(!grant.allows("Path"));
+            assert!(!grant.allows("path"));
+        }
     }
 
     #[test]
@@ -456,6 +497,18 @@ mod tests {
         let grant = ProcGrant::none().allow(["git"]);
         assert!(!grant.allows("/usr/bin/git"));
         assert!(!grant.allows("./git"));
+    }
+
+    #[test]
+    fn a_proc_grant_does_not_admit_an_exe_suffix_or_a_case_variant_of_a_granted_name() {
+        // The `.exe` suffix lives in `proc::which`'s candidate list, never in the grant, so one
+        // script plus one grant spelled `git` works unchanged on both platforms. The comparison
+        // stays case-sensitive too — the narrowest available match, and therefore the one that
+        // fails closed rather than open on a platform where filenames are case-insensitive.
+        let grant = ProcGrant::none().allow(["git"]);
+        assert!(grant.allows("git"));
+        assert!(!grant.allows("git.exe"));
+        assert!(!grant.allows("GIT"));
     }
 
     #[test]

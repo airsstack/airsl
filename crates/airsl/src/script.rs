@@ -13,6 +13,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::error::{Error, Result};
+use crate::paths::rules::native::to_script_string;
 use crate::types::ChunkName;
 
 /// Lua source together with the name it reports, the directory it may `require` from, and the
@@ -63,7 +64,7 @@ impl Script {
     pub fn from_file(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
         let source = std::fs::read_to_string(path).map_err(|source| Error::ScriptRead {
-            path: path.display().to_string(),
+            path: to_script_string(path),
             source,
         })?;
         let root = Some(require_root(path));

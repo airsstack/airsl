@@ -11,6 +11,7 @@
 //! Non-responsibilities: reading the script. [`crate::Script`] owns the source text.
 
 use crate::error::{Error, Result};
+use crate::paths::rules::native::to_script_string;
 
 /// The name a chunk is compiled under.
 ///
@@ -58,10 +59,10 @@ impl ChunkName {
     /// placeholder discarded exactly the informative part.
     #[must_use]
     pub fn from_path(path: &std::path::Path) -> Self {
-        let sanitised = path
-            .display()
-            .to_string()
-            .replace(['\n', '\r', '\0'], "\u{fffd}");
+        // Rendered through the script vocabulary before `elide` runs, not after: `to_script_string`
+        // also strips a verbatim (`\\?\`) prefix, which shortens the string, and eliding first
+        // would spend the byte budget below on a prefix that is about to be removed.
+        let sanitised = to_script_string(path).replace(['\n', '\r', '\0'], "\u{fffd}");
         Self::new(elide(&sanitised)).unwrap_or_else(|_| Self(String::from("?")))
     }
 

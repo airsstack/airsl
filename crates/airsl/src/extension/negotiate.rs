@@ -21,6 +21,7 @@ use std::path::PathBuf;
 use crate::extension::ceiling::Ceiling;
 use crate::extension::manifest::{CapabilityRequest, Manifest};
 use crate::modules::ModuleSet;
+use crate::paths::rules::native::to_script_string;
 use crate::sandbox::{GrantSet, Policy, ResourceLimits};
 use crate::types::ModuleName;
 
@@ -43,8 +44,8 @@ pub enum Capability {
 impl core::fmt::Display for Capability {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::FsRead(p) => write!(f, "fs.read `{}`", p.display()),
-            Self::FsWrite(p) => write!(f, "fs.write `{}`", p.display()),
+            Self::FsRead(p) => write!(f, "fs.read `{}`", to_script_string(p)),
+            Self::FsWrite(p) => write!(f, "fs.write `{}`", to_script_string(p)),
             Self::ProcRun(x) => write!(f, "proc.run `{x}`"),
             Self::EnvRead(n) => write!(f, "env.read `{n}`"),
             Self::Module(m) => write!(f, "module `{m}`"),
@@ -251,7 +252,7 @@ fn roots(paths: &[PathBuf]) -> String {
     }
     paths
         .iter()
-        .map(|p| p.display().to_string())
+        .map(|p| to_script_string(p))
         .collect::<Vec<_>>()
         .join(", ")
 }

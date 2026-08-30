@@ -245,6 +245,15 @@ pub(crate) fn executable_candidates(program: &str, flavor: PathFlavor) -> Vec<St
 ///
 /// Under `Posix`, only `/` separates path components. Under `Windows`, both `/` and `\` do, since
 /// the Win32 API accepts either.
+#[cfg_attr(
+    not(any(windows, test)),
+    expect(
+        dead_code,
+        reason = "exercised directly by this module's own tests on every host, and by \
+                  `native::has_separator`'s Windows-only caller in `modules::proc` on Windows; a \
+                  non-test unix build has neither, which is genuinely dead rather than forgotten"
+    )
+)]
 pub(crate) fn has_separator(program: &str, flavor: PathFlavor) -> bool {
     match flavor {
         PathFlavor::Posix => program.contains('/'),
@@ -287,22 +296,19 @@ pub(crate) mod native {
     }
 
     /// See [`super::executable_candidates`].
-    #[expect(
-        dead_code,
-        reason = "modules::proc will call this to resolve a bare program name on PATH once its \
-                  Windows executable lookup is implemented"
-    )]
     pub(crate) fn executable_candidates(program: &str) -> Vec<String> {
         super::executable_candidates(program, FLAVOR)
     }
 
     /// See [`super::has_separator`].
-    #[expect(
-        dead_code,
-        reason = "modules::proc will call this to decide whether a program name is a bare \
-                  name or a path before searching PATH, once its Windows executable lookup is \
-                  implemented"
-    )]
+    ///
+    /// `#[cfg(windows)]` here, unlike its four siblings above: its one caller
+    /// ([`crate::modules::proc`]'s bare-name pre-resolution) is itself Windows-only by design —
+    /// unix keeps `execvp`'s own `PATH` search — so a unix build has no call site for this wrapper
+    /// at all. The rule it wraps, [`super::has_separator`], stays flavour-parameterised and
+    /// unconditionally compiled, so it is still exercised for both flavours from this crate's
+    /// unix test hosts; only the compile-time-bound convenience wrapper is native to one platform.
+    #[cfg(windows)]
     pub(crate) fn has_separator(program: &str) -> bool {
         super::has_separator(program, FLAVOR)
     }
