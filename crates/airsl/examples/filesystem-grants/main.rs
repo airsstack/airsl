@@ -12,7 +12,7 @@
 
 use std::path::Path;
 
-use airsl::{Engine, GrantSet, Policy, Script};
+use airsl::{Engine, FsGrant, GrantSet, Policy, Script};
 use tempfile::TempDir;
 
 /// Contents seeded into the read root, fixed so the byte count in the output does not drift.
@@ -22,16 +22,19 @@ const NOTES: &str = "the grant is checked inside the host function, before the o
 const SECRET: &str = "not reachable from the script\n";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Three separate directories, none of them inside the repository. Canonicalised because a
-    // refusal names the path the operation would actually touch, and on macOS a temporary
-    // directory reaches its real location through a symlink — without this the roots the script
-    // was told about would not be spelled the same way as the roots in the message.
+    // Three separate directories, none of them inside the repository. Resolved through
+    // `FsGrant::resolve_root` rather than `Path::canonicalize`, which is the call a host wants
+    // whenever a path is going to be both granted and handed to a script. It resolves symlinks —
+    // on macOS a temporary directory reaches its real location through one, and without that the
+    // roots the script was told about would not be spelled the same way as the roots a refusal
+    // names — and it also strips the `\\?\` prefix Windows canonicalisation adds, which a script
+    // may not be given: the runtime refuses a verbatim path as input rather than reason about one.
     let source = TempDir::new()?;
     let output = TempDir::new()?;
     let outside = TempDir::new()?;
-    let source_root = source.path().canonicalize()?;
-    let output_root = output.path().canonicalize()?;
-    let outside_root = outside.path().canonicalize()?;
+    let source_root = FsGrant::resolve_root(source.path());
+    let output_root = FsGrant::resolve_root(output.path());
+    let outside_root = FsGrant::resolve_root(outside.path());
 
     std::fs::write(source_root.join("notes.txt"), NOTES)?;
     std::fs::write(outside_root.join("secret.txt"), SECRET)?;
