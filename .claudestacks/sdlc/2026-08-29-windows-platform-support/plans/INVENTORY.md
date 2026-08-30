@@ -396,3 +396,284 @@ test it should carry.
   class C needs two fixes, not one.
 - **Plan 08:** the residual class-1 question — what an extension author on Windows should write in
   `extension.toml`, and an error message that names the cause.
+
+---
+
+## Disposition — every recorded failure, and where it was answered
+
+Added after plans 02-07. **Read the method note first: none of these is marked from a Windows run.**
+No Windows runner is reachable from the development host, and until plan 07's task 5 the crate's
+test target did not compile off unix at all (`cargo check --target x86_64-pc-windows-gnu -p airsl
+--all-targets` failed with seven `E0433`). Each row below is therefore marked from **reading the
+current tree**, cited by test name, plus the cross-target type-check that task 5 brought to zero
+errors. The CI leg is what turns these from *answered* into *observed*, and nothing here should be
+read as the second thing.
+
+| Class | Count | State | Where |
+| --- | --- | --- | --- |
+| 1 — escape-processing string literals | 2 | fixed | plan 07 task 4. Nine escape-processing sites converted, not the two measured here — the sweep found eleven interpolation sites where the plan named six. |
+| 2 — errors that cannot occur on Windows | 1 | fixed | plan 03. `a_dotdot_below_a_directory_that_does_not_exist_is_refused_rather_than_guessed` carries both platform arms with the reasoning written out. Plan 07 task 6 confirmed rather than redid it. |
+| 3 — natively-rendered paths | 9 | fixed | plans 04 and 07. Plan 04 re-spelled the renderings; plan 07 task 6 rebuilt the assertions that were still constructed with `.display()`. |
+| V — verbatim containment | 1 | fixed | plan 03 closed the false denial. The test's own input, built by `canonicalize()`, was class 4 and went to plan 07 task 5. |
+| C — `proc` measured through a stub | 1 | fixed | plan 05. `which_finds_a_granted_program_on_the_path` now has both arms, and `which_renders_the_found_path_without_backslashes` sits beside it. |
+| A — unix-absolute path literals | 13 | fixed, with a judgement recorded | plan 07 task 8, and see below. |
+| 4 — verbatim `canonicalize()` test input | not measured here | fixed | plan 07 task 5. Caused by plan 03's own door check, so it postdates this file's measurement entirely. |
+
+Nothing is closed as flaky, skipped or ignored. No test was deleted and none is `#[ignore]`d.
+
+### Class A carried a decision, not just a fix
+
+This file assigned class A's ten new failures to plans 04 and 06. **Neither took them**: plan 04's
+`is_absolute`/`absolute` work is `modules/path.rs`'s own functions, and plan 06 does not mention the
+subject. They were answered in plan 07 task 8, and the answer is that **the production behaviour is
+correct and does not change**. `extension/manifest.rs` refuses a path that is not absolute after
+expansion, and a driveless `/home/x/app` names a different file depending on the current drive, so
+refusing it is the fail-closed answer for a capability request. `sandbox/grants.rs` falls through to
+`std::path::absolute`, which resolves against the current drive — documented behaviour, and what the
+operating system would do. All thirteen were fixtures asking for "some absolute path" and spelling
+it in a way that is only absolute on one platform. They now build it through a helper.
+
+### What this file still does not cover, and why that matters more than the 27
+
+Its own coverage note already says the 27 are a floor. Two of its blind spots turned out to hide
+real defects, both found only in review of the plan-07 diff:
+
+- **`airsl-cli` has class-A sites of its own.** `cargo test` stops at the first failing target, so
+  only `airsl`'s library tests ever ran; the 82 CLI tests are unmeasured. Four fixtures in
+  `airsl-cli/src/ext_doctor.rs` hardcode a driveless absolute path and would fail on Windows. They
+  were invisible here and invisible to the task written from here.
+- **The examples are unmeasured too.** `crates/airsl/examples/extension-host/extensions/broken/extension.toml`
+  requests `fs.read = ["/"]`, so on Windows that example's failure changes from a ceiling denial to
+  an invalid manifest — falsifying a byte-for-byte output promise while the exit code stays 0.
+
+The lesson is the one this file already states and that four rounds of work then failed to apply:
+**a list measured from a run that stopped early is a floor for the targets it reached and says
+nothing at all about the ones it did not.**
+
+---
+
+## Docs sweep
+
+Run from the workspace root, verbatim:
+
+```
+grep -rniE 'unix|POSIX|/tmp|/etc|/bin|mode bits|CLOCK_|O_CREAT|O_EXCL|execvp|symlink|Linux|macOS' \
+    --include='*.rs' --include='*.md' --include='*.toml' --include='*.yml' --include='*.lua' \
+    crates/ *.md .github/ Makefile.toml
+```
+
+Measured on the tree with plans 02–10 landed and before this closing pass: **294 hits across 54
+files** — up from 261/48 recorded at the start of plan 07, because plans 02–07 added `paths/`,
+`test_support.rs`, and the Windows arms the earlier count predates. After the one fix this pass made
+(below), the count is **293 across 54 files** — verifiable by re-running the command above and
+piping through `wc -l` and `cut -d: -f1 | sort -u | wc -l`.
+
+### Arithmetic
+
+Per-file hit counts on the closing tree (`cut -d: -f1 sweep.txt | sort | uniq -c`), which sum to 293:
+
+```
+ 42 crates/airsl/src/paths/rules.rs
+ 30 crates/airsl/src/modules/proc.rs
+ 27 crates/airsl/src/test_support.rs
+ 25 crates/airsl/src/modules/path.rs
+ 23 crates/airsl/src/modules/guard.rs
+ 17 crates/airsl/src/modules/fs.rs
+  9 crates/airsl/src/sandbox/grants.rs
+  7 crates/airsl/docs/how-to.md
+  6 crates/airsl/src/modules/env.rs
+  6 crates/airsl-cli/src/test_support.rs
+  5 crates/airsl/src/extension/negotiate.rs
+  5 crates/airsl/docs/sandbox.md
+  5 crates/airsl-cli/src/ext_doctor.rs
+  4 Makefile.toml
+  4 crates/airsl/src/types/env_name.rs
+  4 crates/airsl/src/modules/time.rs
+  4 crates/airsl-cli/README.md
+  4 CHANGELOG.md
+  4 .github/workflows/ci.yml
+  3 crates/airsl/src/sandbox/grant_set.rs
+  3 crates/airsl/src/require_loader.rs
+  3 crates/airsl/src/extension/manifest.rs
+  3 crates/airsl/src/extension/loaded.rs
+  3 crates/airsl/README.md
+  3 crates/airsl/examples/text-toolkit/toolkit.lua
+  3 crates/airsl/docs/README.md
+  2 crates/airsl/src/types/require_target.rs
+  2 crates/airsl/src/paths/resolved.rs
+  2 crates/airsl/src/modules/glob.rs
+  2 crates/airsl/src/modules/ext.rs
+  2 crates/airsl/examples/text-toolkit/toolkit_test.lua
+  2 crates/airsl/examples/README.md
+  2 crates/airsl/examples/multi-file-project/README.md
+  2 crates/airsl/examples/filesystem-grants/README.md
+  2 crates/airsl/examples/filesystem-grants/main.rs
+  2 crates/airsl/examples/env-and-proc/README.md
+  2 crates/airsl/examples/env-and-proc/main.rs
+  2 crates/airsl/examples/denials-are-data/README.md
+  2 CLAUDE.md
+  1 README.md
+  1 crates/airsl/src/paths/containment.rs
+  1 crates/airsl/src/modules/hash.rs
+  1 crates/airsl/src/lib.rs
+  1 crates/airsl/examples/text-toolkit/README.md
+  1 crates/airsl/examples/multi-file-project/main.rs
+  1 crates/airsl/examples/extension-host/README.md
+  1 crates/airsl/examples/extension-host/main.rs
+  1 crates/airsl/examples/env-and-proc/child.lua
+  1 crates/airsl/examples/denials-are-data/denials.lua
+  1 crates/airsl/docs/tutorial.md
+  1 crates/airsl/docs/stdlib.md
+  1 crates/airsl/docs/architecture.md
+  1 crates/airsl-cli/src/test_runner.rs
+  1 crates/airsl-cli/src/cli.rs
+```
+
+54 files, sum of the column above is 293. Every one of these 293 hits is accounted for below; none
+is silently skipped.
+
+### Buckets
+
+**restate — 0 remaining, 1 survivor found and fixed by this pass.** Tasks 2–10 cleared every restate
+site named in the plan. One did not get cleared: `crates/airsl/examples/filesystem-grants/README.md`
+was outside plan 08's own file list (Task 5 restated `docs/stdlib.md` and `docs/how-to.md`'s
+`create_exclusive`/`atomic_write` prose but not this per-example README, which made the identical
+promise). Two lines there named POSIX mechanisms that do not hold on Windows:
+
+- `:59` said `create_exclusive`'s exclusivity "is `O_CREAT|O_EXCL`" — restated to name the property
+  (rests on `create_new`, wins/loses rather than raises) instead of the flag pair.
+- `:63` said `atomic_write` avoids `/tmp` "because a rename across filesystems is not atomic" —
+  restated to name both platforms' temp directories and both reasons a cross-volume rename is not
+  atomic, matching the wording already in `src/modules/fs.rs:449-459`'s doc comment.
+
+Both lines also carried stale `file:line` citations into `src/modules/fs.rs` and `src/sandbox/grants.rs`
+(the whole README's citation set had drifted — see "Citation re-verification" below); all nine
+citations in that file were corrected in the same pass.
+
+**correct — 0.** No sweep hit in this closing pass was a drifted `file:line` sitting inside the
+unix-vocabulary sweep pattern itself (`Cargo.toml:19` and other `.toml`/`.md` citation drift is
+tracked separately below, under citation re-verification, because the sweep regex does not match a
+bare `Cargo.toml:19` — it has no unix/POSIX/symlink/etc. vocabulary on that line).
+
+**no change — 292 (293 minus the one fixed `filesystem-grants/README.md` hit at `:63`, which now
+correctly describes both platforms and stays in the sweep as a `no change` hit going forward).**
+Grouped by file, all homogeneous within each file:
+
+| File | Hits | What they are |
+| --- | ---: | --- |
+| `crates/airsl/src/paths/rules.rs` | 42 | `PathFlavor::Posix` variant/arms, `#[cfg]`-free test names (`_under_posix`, `_on_windows`), doc comments explaining the unix/Windows split this module exists to hold |
+| `crates/airsl/src/modules/proc.rs` | 30 | `#[cfg(unix)]` test arms, mode-bit executability doc comments, `execvp` mentioned as what unix's shell does and this crate deliberately does not replicate |
+| `crates/airsl/src/test_support.rs` | 27 | the shared symlink-fixture helper — explicitly named a `no change` site by the task brief |
+| `crates/airsl/src/modules/path.rs` | 25 | `#[cfg(unix)]` test arms and comments marking `#[cfg(windows)]` siblings as unverified on this host |
+| `crates/airsl/src/modules/guard.rs` | 23 | `#[cfg(unix)]` symlink-containment test arms, `/etc/hostname` used as an arbitrary outside-the-grant path literal in test fixtures (parses fine in the crate's own `/`-vocabulary on every platform) |
+| `crates/airsl/src/modules/fs.rs` | 17 | the `atomic_write` doc comment naming `/tmp` and `%TEMP%` as the two platforms' temp dirs (already correctly dual-platform), `#[allow]`-free unix epoch comment, `/etc/hostname` test literals |
+| `crates/airsl/src/sandbox/grants.rs` | 9 | `#[cfg(unix)]` arms, macOS `/tmp` → `/private/tmp` symlink test comments |
+| `crates/airsl/docs/how-to.md` | 7 | the `atomic_write`/`create_exclusive`/denial-example prose Task 5–6 already restated for both platforms; each unix mention sits beside its Windows equivalent |
+| `crates/airsl/src/modules/env.rs` | 6 | `#[cfg(unix)]` case-identity test arms |
+| `crates/airsl-cli/src/test_support.rs` | 6 | the CLI's own copy of the unix-spelled-literal-to-platform-literal test helper — same bucket as the library's `test_support.rs` |
+| `crates/airsl/src/extension/negotiate.rs` | 5 | macOS `/var` → `/private/var` symlink test comments |
+| `crates/airsl/docs/sandbox.md` | 5 | symlink containment prose (platform-neutral concept) and the `proc` grant paragraph Task 6 restated with the Windows `.exe`/case-sensitivity addition |
+| `crates/airsl-cli/src/ext_doctor.rs` | 5 | unix-spelled-literal test helper comments, macOS `/var` symlink comments |
+| `Makefile.toml` | 4 | the `unix-only` marker-file mechanism doc comment, and the `publish-dry-run` task's unix-only release-cutting comment |
+| `crates/airsl/src/types/env_name.rs` | 4 | `#[cfg(unix)]` arm and doc comments explaining the Windows-fold-vs-unix-exact rule this type exists to hold |
+| `crates/airsl/src/modules/time.rs` | 4 | the module doc comment naming `/etc/localtime` as unix's mechanism beside Windows' bundled tzdb (already dual-platform, per Task 5) |
+| `crates/airsl-cli/README.md` | 4 | the restated supported-targets paragraph, the `sh` hook launcher (deliberately unix-only, Windows sentence added beside it), the single denial example |
+| `CHANGELOG.md` | 4 | the `## Unreleased` entry's "Linux and macOS" phrase (describing what stays true) and the historical `airsl 0.1.0` entry's "Unix only" line, correctly left as a record of what was true at that release |
+| `.github/workflows/ci.yml` | 4 | the matrix's `macos-latest`/`ubuntu-latest` legs and the Developer Mode step's symlink-privilege comment |
+| `crates/airsl/src/sandbox/grant_set.rs` | 3 | `#[cfg(unix)]`-adjacent doc example and test comments |
+| `crates/airsl/src/require_loader.rs` | 3 | symlink-escape test name and unix-identity-rendering comment |
+| `crates/airsl/src/extension/manifest.rs` | 3 | symlink test fixtures, macOS `/var` comment |
+| `crates/airsl/src/extension/loaded.rs` | 3 | symlink test name/comment, unix-identity-rendering comment |
+| `crates/airsl/README.md` | 3 | the restated supported-targets paragraph and two symlink-containment mentions |
+| `crates/airsl/examples/text-toolkit/toolkit.lua` | 3 | `/etc/shadow`/`/etc/hosts` literals used as arbitrary path-shaped strings in a log-parsing example |
+| `crates/airsl/docs/README.md` | 3 | the "Python, Node and POSIX sh" description of what `airsl` replaces (explicitly not a platform claim per the plan), the restated cross-platform build statement, the explicit not-implemented row naming the unix-only `env-and-proc` example |
+| `crates/airsl/src/types/require_target.rs` | 2 | symlink doc comment, unix-spelled literal in a test fixture list |
+| `crates/airsl/src/paths/resolved.rs` | 2 | doc comments on what canonicalisation does and does not resolve (symlinks) |
+| `crates/airsl/src/modules/glob.rs` | 2 | backslash-escape unix/Windows comment, `/etc` test literal |
+| `crates/airsl/src/modules/ext.rs` | 2 | a test comment about exercising the Windows rendering rule on a macOS/Linux host |
+| `crates/airsl/examples/text-toolkit/toolkit_test.lua` | 2 | same `/etc/...` literal usage as the example script it tests |
+| `crates/airsl/examples/README.md` | 2 | the byte-for-byte reproducibility promise (now naming all three platforms) and the `sh`-only carve-out naming Windows explicitly |
+| `crates/airsl/examples/multi-file-project/README.md` | 2 | symlink-containment prose |
+| `crates/airsl/examples/filesystem-grants/README.md` | 2 | symlink-containment prose (`:47`) and the now-corrected `atomic_write` temp-dir sentence (`:63`, both platforms named) |
+| `crates/airsl/examples/filesystem-grants/main.rs` | 2 | macOS `/tmp` symlink comment |
+| `crates/airsl/examples/env-and-proc/README.md` | 2 | `sh` resolving to `/bin/sh` on macOS vs `/usr/bin/sh` on usrmerge Linux — a unix-only example's own internals |
+| `crates/airsl/examples/env-and-proc/main.rs` | 2 | unix-only-example doc comment and grant-matching comment |
+| `crates/airsl/examples/denials-are-data/README.md` | 2 | `/` resolving identically on Linux and macOS — a unix-only example's own internals |
+| `CLAUDE.md` | 2 | the widened C-compiler build requirement (names Linux/macOS as what `cc` already covers) and the restated two-halves containment sentence |
+| `README.md` | 1 | the restated supported-targets paragraph |
+| `crates/airsl/src/paths/containment.rs` | 1 | doc comment on what inputs are assumed already symlink-resolved |
+| `crates/airsl/src/modules/hash.rs` | 1 | `/etc/hostname` test literal |
+| `crates/airsl/src/lib.rs` | 1 | the crate doc's restated supported-targets sentence |
+| `crates/airsl/examples/text-toolkit/README.md` | 1 | `/etc/hosts` literal used in an `is_absolute` example |
+| `crates/airsl/examples/multi-file-project/main.rs` | 1 | symlink-containment comment |
+| `crates/airsl/examples/extension-host/README.md` | 1 | "unix shows `/`" naming this platform's rendering beside the Windows equivalent |
+| `crates/airsl/examples/extension-host/main.rs` | 1 | `#[cfg(unix)]` |
+| `crates/airsl/examples/env-and-proc/child.lua` | 1 | unix-only-example internals |
+| `crates/airsl/examples/denials-are-data/denials.lua` | 1 | unix-only-example internals |
+| `crates/airsl/docs/tutorial.md` | 1 | a unix-spelled `--allow-read /etc` example, illustrative only |
+| `crates/airsl/docs/stdlib.md` | 1 | "a unix run and a Windows one" — naming both platforms |
+| `crates/airsl/docs/architecture.md` | 1 | symlink-containment mention |
+| `crates/airsl-cli/src/test_runner.rs` | 1 | `/etc/hostname` test literal |
+| `crates/airsl-cli/src/cli.rs` | 1 | unix-spelled-literal test helper comment |
+
+**covered elsewhere — 0.** Every plan in this chain (02–10) has landed; there is no remaining plan
+for a future edit to defer to.
+
+### Sweep blind spot
+
+Five sites carry **no** hit under this pattern and are reachable only from the plan's seed list, not
+from grep — confirmed against the current tree, each already correctly restated by Tasks 2–10:
+
+- `CLAUDE.md:87` — the containment sentence's opening line names no unix vocabulary itself; the
+  vocabulary sits two lines later (`:89`, `symlink-free`), which the sweep does catch.
+- `crates/airsl/src/error.rs:261-265` — `Error::UncheckablePath`'s doc, restated to "a spelling this
+  runtime will not reason about", names no platform word at all.
+- `crates/airsl/docs/stdlib.md:32-33` — the determinism paragraph's opening two lines name no unix
+  word; the platform-specific mechanism is a few lines further down, which the sweep does catch
+  (`:35`, `to_script_string`).
+- `crates/airsl/examples/README.md:82-83` — the "Only `sh` is ever executed" paragraph's own
+  citation line and the sentence naming Windows explicitly carry no sweep vocabulary.
+- `crates/airsl/docs/architecture.md:27` — the `Cargo.toml:19` mlua paragraph names no unix word on
+  that exact line; `mode bits`/`unix` do not appear until later in the surrounding prose.
+
+A grep-only sweep would have missed all five; each was verified by reading, per the plan's own
+two-halves method (mechanical sweep plus the seed list).
+
+### Citation re-verification (Task 11)
+
+Re-ran the sweep and confirmed every one of the 293 remaining hits above maps to `no change` — no
+untriaged hit and no surviving `restate` entry.
+
+Re-verified every `file:line` citation reachable from the Task 11 grep
+(`crates/airsl/docs/*.md`, `crates/airsl/examples/README.md`, `CLAUDE.md`, `README.md`,
+`crates/airsl/README.md`, `crates/airsl-cli/README.md`) against the current tree, starting from the
+existing citation audit at
+`.airsstack/cc/plugins/claudestacks/handoff/20260830-165350-25df/15-orchestrator-citation-audit.md`.
+Two of its "worth correcting" rows had already been fixed by the time this pass ran
+(`docs/stdlib.md`'s `time.rs` citation now lands on the `monotonic` binding); the rest were fixed in
+this pass:
+
+- `docs/extensions.md:169,203` — `src/modules/ext.rs:104` → `:89` (the `on` binding, not the
+  `.map_err(fail)?;` inside its closure).
+- `docs/extensions.md:204` — `src/modules/ext.rs:116` → `:111` (the `granted` binding).
+- `docs/stdlib.md:177` — `src/modules/ext.rs:149` (a blank line) → `:154` (`fn granted_table`).
+- `examples/README.md:111` — `src/script.rs:118` (a doc-comment fence) → `:119`
+  (`pub fn with_name`).
+
+The two borderline rows the audit named — `docs/README.md:44`/`extensions.md:201` and
+`examples/README.md:101`, both landing on a `#[must_use]` one line above the item's signature — were
+left, per the audit's own guidance.
+
+**Not corrected, and not to be re-litigated:** `crates/airsl/docs/sandbox.md:133-135` cite
+`src/state.rs` and `src/debug.rs`. Those are **mlua's own sources** (the embedded VM's crate, not
+this one), not files that exist anywhere in this crate. A mechanical citation check will flag them
+as unresolvable every time it runs; that is expected and is not a defect in the documentation.
+
+**Beyond the Task 11 grep's scope:** while restating `examples/filesystem-grants/README.md`'s
+`atomic_write`/`create_exclusive` prose (above), its own nine `file:line` citations into
+`src/modules/fs.rs`, `src/sandbox/grants.rs` and `src/modules/guard.rs` were found drifted too (code
+moved under it the same way it moved under the docs the Task 11 grep does cover) and were corrected
+in the same edit. The other per-example `README.md` files under `crates/airsl/examples/*/` were not
+built or edited by plan 08 and were not audited here — a full citation sweep of that directory is
+outside this pass's scope and is recorded as a gap for a future citation audit to pick up, not as a
+finding this pass answered.
