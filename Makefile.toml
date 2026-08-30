@@ -178,11 +178,15 @@ args = ["deny", "check"]
 [tasks.publish-dry-run]
 category = "Release"
 description = "Validate both crates against what crates.io enforces, publishing nothing"
-# `airsl-cli` cannot resolve a published `airsl` until `airsl` is actually on
-# crates.io, so its dry run is expected to fail on the first release and to
-# start passing from the second. Run it anyway: everything it checks before
-# dependency resolution — metadata, keyword count, category slugs, the packaged
-# file list — still reports.
+# `airsl` gets the full dry run; `airsl-cli` gets the file list only, and the
+# asymmetry is forced rather than chosen. A dry-run publish resolves every
+# dependency against the real index, and `airsl-cli` depends on the `airsl`
+# version this same commit is releasing — which is not on crates.io until the
+# first half of the release actually goes out. Running it here would therefore
+# fail on every release, reporting the publishing order rather than a defect.
+# `cargo package --list` stops short of resolution and still reports what the
+# rest of this task is for: metadata, keyword count, category slugs, and exactly
+# which files land in the archive.
 #
 # A release is cut from unix, so a Windows run of this task would only prove
 # that `cargo package`/`cargo publish` work on a platform that never runs them
@@ -195,6 +199,7 @@ script = '''
 set -x
 cargo package --list -p airsl
 cargo publish --dry-run -p airsl
+cargo package --list -p airsl-cli
 '''
 
 [tasks.publish-dry-run-unsupported]
