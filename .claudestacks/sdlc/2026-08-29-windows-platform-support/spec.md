@@ -340,6 +340,32 @@ This is the list plans must handle explicitly:
 | `crates/airsl/src/require_loader.rs:197` | the `require` chunk name |
 | `crates/airsl/src/modules/path.rs` | `join`, `dirname`, `basename`, `stem`, `ext`, `normalize`, `absolute`, `relative_to` — pure string math, no guard involved |
 
+**A fourth reading missed eleven more.** The table above was assembled by reading, and the
+paragraph introducing it records that the first draft missed six sites and the second missed four.
+A crate-wide `grep -rn --include="*.rs" "display()\|to_string_lossy" crates/airsl/src`, filtered to
+non-test code, finds eleven further renderings — every one an error or denial message, and so
+covered by this section's opening rule rather than by the table:
+
+| Site | Reaches a reader as |
+|---|---|
+| `crates/airsl/src/script.rs:66` | `Error::ScriptRead`'s `path` field |
+| `crates/airsl/src/extension/host.rs:284` | the error raised when an extension root will not resolve |
+| `crates/airsl/src/extension/negotiate.rs:46`, `:47` | `Capability: Display`, in every negotiation denial |
+| `crates/airsl/src/extension/negotiate.rs:254` | the `roots` helper that joins a root list into denial text |
+| `crates/airsl/src/extension/manifest.rs:179`, `:194` | manifest read and parse error paths |
+| `crates/airsl/src/extension/loaded.rs:150`, `:154`, `:158` | `recheck_entry`'s `Error::ManifestInvalid` messages |
+| `crates/airsl/src/sandbox/grant_set.rs:154`, `:157` | `GrantSet: Display`, which `airsl doctor` prints |
+
+The lesson is the one the section already half-states: **enumerate this by grepping, not by
+reading.** Four attempts at reading have now missed twenty-one sites between them. The residue
+table is a starting point for a plan, never the completion criterion; the sweep is.
+
+`grant_set.rs:154`/`:157` is the only judgement call among them. `GrantSet: Display` is
+host-facing terminal output, where a Windows reader could reasonably expect `C:\a`. It converts
+anyway, because the same roots already render `/`-spelled through the guard's refusal message and
+`ext.granted()`, and one runtime spelling one root two ways is worse than departing from shell
+convention in one of three places.
+
 `guard.rs:114` is worth singling out: the grant roots it renders come from `resolve_root`
 (§3.5), so they are already verbatim-stripped, but they still need the `/` conversion — and
 because they arrive as a plain `&[PathBuf]`, no diagnostic will ever point at them.
@@ -387,6 +413,25 @@ semantics for their own sake" as a non-goal; this is not that — it is a defect
 surfaces, and leaving `"..//"` in place while fixing the Windows twin would encode the bug as
 intended behaviour. The affected expectations are named in the plans rather than left for a plan
 author to discover.
+
+**Open question, raised in review after implementation: a bare `Disk` prefix is treated as a
+root, and arguably should not be.** The rule above says "`RootDir` or a Windows `Prefix`". On
+Windows `C:a` is *drive-relative* — it means `<the current directory on drive C>/a`, not `C:\a` —
+so a `..` above it does not climb above a root at all. Absorbing it silently drops one real parent
+step: the delivered code returns `"C:"` for `normalize("C:a/../..")`, and would return `"C:b"` for
+`normalize("C:a/../../b")` where the target is `C:..\b`. Lexically, `C:..` preserves the
+information and `C:` loses it.
+
+The narrower rule would be: set `rooted` on `RootDir`, and on those `Prefix` kinds that are
+inherently rooted (`UNC`, `VerbatimUNC`, `DeviceNS`, `Verbatim`), but **not** on a bare `Disk`
+prefix unless a `RootDir` follows it. `C:/a/../..` → `"C:/"` is unaffected either way, because the
+`RootDir` after the prefix is what makes it rooted.
+
+This is recorded rather than changed. The current behaviour is what this section specifies and
+what the delivered tests assert; drive-relative paths are a rare input form; and no host here can
+run the Windows arm to confirm the alternative empirically. Changing it is a semantic decision
+about what `airsl` promises on Windows, which belongs to whoever owns this chain rather than to
+the plan that happened to surface it.
 
 ### 4.2 Glob patterns
 
@@ -583,13 +628,24 @@ directory cases (`crates/airsl/src/modules/guard.rs:265`,
 `crates/airsl/src/extension/manifest.rs:822`, `crates/airsl/src/extension/loaded.rs:515`) take
 `symlink_file`. Getting that split wrong yields a link that resolves but is not traversable.
 
-The count and the citations above are as of this spec's baseline. Implementing §3 changed both:
-one directory case in `modules/guard.rs` gained inline `#[cfg(unix)]`/`#[cfg(windows)]` arms
-because a Windows test body was needed before the shared helper existed, and a new
-`#[cfg(windows)]` `symlink_dir` site was added for the §3.4 pin — nine sites, not eight, and no
-longer all spelled `std::os::unix::fs::symlink`. The re-derived list lives in the plan that owns
-the helper; a verification that greps only for the unix spelling now reports success while two
-sites remain unrouted.
+The count and the citations above are as of this spec's baseline. Implementing §3, §4 and §5
+changed both, twice. The current re-derived list is **ten** sites, verified by
+`grep -rn --include="*.rs" "os::unix::fs::symlink\|symlink_dir\|symlink_file" crates/airsl/src`:
+
+| Site | Spelling |
+|---|---|
+| `crates/airsl/src/require_loader.rs:347`, `:416` | `std::os::unix::fs::symlink`, unconditional |
+| `crates/airsl/src/extension/negotiate.rs:516` | `std::os::unix::fs::symlink`, unconditional |
+| `crates/airsl/src/sandbox/grants.rs:318` | `std::os::unix::fs::symlink`, unconditional |
+| `crates/airsl/src/extension/manifest.rs:827` | `std::os::unix::fs::symlink`, unconditional |
+| `crates/airsl/src/extension/loaded.rs:557` | `std::os::unix::fs::symlink`, unconditional |
+| `crates/airsl/src/modules/guard.rs:298` | `std::os::unix::fs::symlink`, unconditional |
+| `crates/airsl/src/modules/guard.rs:319`, `:321` | `#[cfg]`-branched pair added while implementing §3 |
+| `crates/airsl/src/modules/guard.rs:543` | `#[cfg(windows)] symlink_dir`, the §3.4 pin |
+
+The first seven are **unconditional**, which has a consequence no artifact had stated: the crate's
+test target does not compile on Windows at all today. A verification that greps only for the unix
+spelling reports success while three sites go unrouted.
 
 An earlier draft used directory *junctions* for the three directory cases on the theory that they
 need no privilege. That is doubly wrong: `std` exposes no junction-creation API, and creating one
@@ -668,6 +724,39 @@ test bodies themselves (`check.rs:188-196`, `test_runner.rs:240-243`) by
 separator in their own test bodies. `airsl`'s public API is deliberately not widened for this:
 the CLI renders those paths only for its own assertions, and exporting a path-spelling helper to
 fix two test expectations would put a permanent item on the public surface to serve test code.
+
+### 9.1 Windows code can be compile-checked locally
+
+Every claim in this section about what "cannot be verified on a unix host" was written on the
+assumption that a `#[cfg(windows)]` item is unreachable off Windows. That is true of *running*
+one and false of *type-checking* one, and the difference matters more than it sounds: a
+`#[cfg(windows)]` item is not even parsed for name resolution on the host it is not compiled for,
+so a typo, a renamed function or a changed signature inside one is invisible until CI reaches a
+Windows runner.
+
+A cross target closes that gap:
+
+```
+$ rustup target add x86_64-pc-windows-gnu     # needs the mingw linker for anything past `check`
+$ cargo check --target x86_64-pc-windows-gnu -p airsl --lib
+```
+
+This type-checks every Windows arm in the crate in about two seconds warm, and it caught a real
+`clippy::missing_const_for_fn` on a `#[cfg(windows)]` stub that no unix build could see. Use it
+before finishing any change that adds a `#[cfg(windows)]` item.
+
+Two limits, both real:
+
+- **It is `check`, never `test`.** No Windows binary runs here. The behavioural assertions still
+  belong to the CI leg, and a comment claiming a local green covers a Windows arm is wrong.
+- **`--all-targets` is currently useless for this** — the seven unconditional
+  `std::os::unix::fs::symlink` calls above fail the test-target build, drowning any real
+  diagnostic. Once the shared link helper lands, `--all-targets` becomes the more useful form.
+
+The `gnu` target is the one that works without a Windows host, because `mlua`'s vendored Lua needs
+a C compiler for the target and mingw supplies one. `x86_64-pc-windows-msvc` type-checks Rust but
+cannot build the vendored C, so it is not a substitute. Neither is a substitute for the CI leg;
+both are cheaper than waiting for it.
 
 ## 10. Build, CI, and tooling
 

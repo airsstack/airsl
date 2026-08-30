@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-08-30
 depends-on: [02]
 ---
@@ -9,7 +9,7 @@ depends-on: [02]
 **Goal:** Give environment variable names one identity that matches the platform's own.
 
 **Architecture:** A new `types::EnvName` becomes the single key type for the two places a variable
-name is compared — `EnvGrant`'s allowlist (`crates/airsl/src/sandbox/grants.rs:143`) and
+name is compared — `EnvGrant`'s allowlist (`crates/airsl/src/sandbox/grants.rs:150`) and
 `Overlay`'s map (`crates/airsl/src/modules/env.rs:29-32`). Its `Eq`, `Ord` and `Hash` fold ASCII
 case on Windows and compare exactly on unix, so the crate stops holding two different opinions
 about whether `Path` and `PATH` are the same name. The fold rule itself is a pure function taking
@@ -62,7 +62,7 @@ line.
 
    - `EnvName::new` is infallible. It wraps a `String` and rejects nothing — no `Result`, no
      `# Errors` section, no error type.
-   - The surrounding API forces it. `EnvGrant::read` (`crates/airsl/src/sandbox/grants.rs:155-164`)
+   - The surrounding API forces it. `EnvGrant::read` (`crates/airsl/src/sandbox/grants.rs:162-171`)
      is `#[must_use]` and returns `Self`, not `Result<Self, _>`; a rejecting constructor would have
      nowhere to report a failure. Widening `read` to fallible would be a breaking change to a
      public builder that spec §6 explicitly holds fixed.
@@ -128,7 +128,7 @@ line.
 
 6. Make it `pub` and re-export it: `pub mod env_name;` plus `pub use env_name::EnvName;` in
    `crates/airsl/src/types/mod.rs:20-32`, and add `EnvName` to the list at
-   `crates/airsl/src/lib.rs:79`. Its six siblings are all public and re-exported there; a
+   `crates/airsl/src/lib.rs:81`. Its six siblings are all public and re-exported there; a
    `pub(crate)` item inside a `pub mod` whose `mod.rs` is export-only would need a `pub(crate) use`
    that reads as an unexplained exception. Update the `Responsibilities:` list in
    `crates/airsl/src/types/mod.rs:1-18` with an `EnvName` bullet — note that the module doc's
@@ -159,27 +159,30 @@ line.
 
 1. **Confirm the public-API claim before relying on it.** Read `crates/airsl/src/sandbox/grants.rs`
    and check each of these against the code, because the whole task is scoped by them:
-   - the `names` field at `:143` is private (no `pub`);
-   - `read` (`:155-164`) is generic over `S: Into<String>` and returns `Self`;
-   - `allows` (`:166-170`) takes `&str` and returns `bool`;
-   - `names` (`:172-178`) returns `impl Iterator<Item = &str>`;
-   - `is_empty` (`:180-184`) returns `bool`.
+   - the `names` field at `:150` is private (no `pub`);
+   - `read` (`:162-171`) is generic over `S: Into<String>` and returns `Self`;
+   - `allows` (`:173-177`) takes `&str` and returns `bool`;
+   - `names` (`:179-185`) returns `impl Iterator<Item = &str>`;
+   - `is_empty` (`:187-191`) returns `bool`.
+
+   (Every number in this list was re-derived against the delivered tree; as approved they were
+   each about ten lines low, and `allows`/`read` overlapped the wrong methods.)
 
    All five signatures survive this change unchanged. The **one** behavioural difference is
    `allows` on Windows. Record in the commit message and in the `EnvGrant` doc that this is the
    only public-behaviour delta.
 
 2. Write the failing tests in `grants.rs`'s test module:
-   - Split `env_names_are_matched_exactly_rather_than_by_prefix` (`:366-370`). The prefix half —
+   - Split `env_names_are_matched_exactly_rather_than_by_prefix` (`:430-435`). The prefix half —
      a `HOME` grant does not admit `HOMEBREW_PREFIX` — is platform-independent and stays under that
      name. The case half, `!grant.allows("home")`, moves out: it is false on Windows.
    - Add `env_names_fold_case_on_windows_and_compare_exactly_on_unix`, with `#[cfg]`-conditional
      expectations: a grant of `PATH` admits `Path` and `path` on Windows and admits neither on
      unix. This is the test spec §9 names.
-   - Check `env_names_enumerate_in_sorted_order` (`:373-377`) needs nothing: `ZED`/`ALPHA`/`MID`
+   - Check `env_names_enumerate_in_sorted_order` (`:437-442`) needs nothing: `ZED`/`ALPHA`/`MID`
      are already uppercase, so folded and exact ordering agree. Leave it.
-   - `an_env_grant_admits_only_the_names_it_lists` (`:358-363`) and `every_grant_reports_emptiness`
-     (`:397-402`) are unaffected.
+   - `an_env_grant_admits_only_the_names_it_lists` (`:422-428`) and `every_grant_reports_emptiness`
+     (`:473-479`) are unaffected.
 
 3. Change the field to `BTreeSet<EnvName>`. `read` maps `Into::<String>::into` then `EnvName::new`;
    `names` maps `EnvName::as_str`; `is_empty` and `none()` are untouched (`BTreeSet::new` is `const`
@@ -191,14 +194,14 @@ line.
    owner's — which is exactly what folding breaks. One allocation per `env.get`/`env.set` is the
    price of not lying to `BTreeSet`.
 
-5. Note the derived-`PartialEq` consequence on `EnvGrant` (`:141`) and, through it, `GrantSet`
+5. Note the derived-`PartialEq` consequence on `EnvGrant` (`:148-151`) and, through it, `GrantSet`
    (`crates/airsl/src/sandbox/grant_set.rs:46`): on Windows two grants spelled with different
    casing now compare equal. That is correct — they authorise the same thing — and it is consistent
    rather than incidental, so it is documented, not worked around.
 
 6. Confirm the two crate-internal readers need no change, since both consume `names()`'s `&str`:
-   `crates/airsl/src/modules/ext.rs:176` (`ext.granted()`'s env table) and
-   `crates/airsl/src/extension/negotiate.rs:220-228` (ceiling negotiation). On Windows a ceiling of
+   `crates/airsl/src/modules/ext.rs:181` (`ext.granted()`'s env table) and
+   `crates/airsl/src/extension/negotiate.rs:220-232` (ceiling negotiation). On Windows a ceiling of
    `PATH` now admits a manifest requesting `Path`, and the negotiated grant stores `Path` — the
    same name under the platform's own identity. Verify by reading, not by assuming.
 
@@ -406,9 +409,9 @@ line.
    ```
    $ rg -n "env\(\)\.(allows|names)|overlay\(\)|child_entries" crates/
    ```
-   Expected hits and verdicts: `crates/airsl/src/modules/ext.rs:176` (consumes `&str`, unchanged),
-   `crates/airsl/src/extension/negotiate.rs:220-228` (consumes `&str`, Windows behaviour follows
-   the fold as intended), `crates/airsl/src/modules/proc.rs:99` and `:163` (`which`'s PATH lookup —
+   Expected hits and verdicts: `crates/airsl/src/modules/ext.rs:181` (consumes `&str`, unchanged),
+   `crates/airsl/src/extension/negotiate.rs:220-232` (consumes `&str`, Windows behaviour follows
+   the fold as intended), `crates/airsl/src/modules/proc.rs:214` (`which`'s PATH lookup —
    the §6.1 beneficiary, and the reason no change is needed there is that `Overlay::get` now folds),
    `crates/airsl-cli/src/cli.rs:118` (builds a grant from CLI flags, unchanged).
 
@@ -459,3 +462,15 @@ line.
 - `all_does_not_leak_the_hosts_environment` carries a positive control, so it can fail.
 - `merged_names` filters `=`-prefixed host names, prefers host spelling, and is deterministic
   regardless of host iteration order.
+
+---
+
+## Amendments after approval
+
+| What | Why |
+|---|---|
+| Task 1's `Hash`/`Eq` agreement test could not fail, and has been replaced | `names_that_compare_equal_also_hash_equal` hashed `"PATH"` against `"PATH"` - two identical strings, which agree under any deterministic `Hash`. The discriminating pair was `#[cfg(windows)]`-only, so on a unix host nothing checked the property at all. The `Hash` logic is now extracted into a rule-parameterised `hash_under(name, rule, state)` mirroring `compare(a, b, rule)`, and `hashing_agrees_with_comparison_under_either_rule` exercises both rules on any host - the same reason the comparison takes a rule explicitly. |
+| Task 2's `Borrow` rustdoc made a false soundness claim, now corrected | It said violating `Borrow`'s contract "would be undefined behaviour for `BTreeSet`". It would not: `BTreeSet` is safe code and the standard library specifies only unspecified or incorrect results. The doc now describes the real consequence, a wrong-but-safe lookup miss. The decision not to implement `Borrow<str>` stands and is correctly reasoned. `allows` also moved from an allocating `contains` call to an allocation-free linear scan, since grant sets hold a handful of names and the old comment's "one allocation per call is the price" overstated the alternative. |
+| Thirteen citations re-derived against the delivered tree | Every `EnvGrant` member number was roughly ten lines low and two pointed at the wrong method: `:143`→`:150` (the field), `read` `:155-164`→`:162-171`, `allows` `:166-170`→`:173-177`, `names` `:172-178`→`:179-185`, `is_empty` `:180-184`→`:187-191`, the `EnvGrant` derive `:141`→`:148-151`. Four test ranges in `grants.rs` were off by roughly sixty lines: `:358-363`→`:422-428`, `:366-370`→`:430-435`, `:373-377`→`:437-442`, `:397-402`→`:461-467`. `lib.rs:79`→`:81` (`:79` is the closing `};` of the `sandbox::{…}` block, not the `types::{…}` re-export). `proc.rs:99`→`:162-163` (`:99` is inside `run`, not `which`). `negotiate.rs:220-228`→`:219-228`. Task 2 step 1 already required confirming these before relying on them; doing so up front is the same check, run earlier. |
+| Task 5's premise re-confirmed verbatim rather than assumed | `all_does_not_leak_the_hosts_environment` (`env.rs:298-304`) probes exactly one key, `.PATH`, with no case-folded scan and no positive control — the false-green shape the task describes. Reading it before rewriting it is what makes the task's claim checkable rather than asserted. |
+| Two more citations re-derived at execution time, since two further plans had landed in `sandbox/grants.rs` after this plan's approval | `every_grant_reports_emptiness` `:461-467`→`:473-479` (a `ProcGrant` case-variant test was added just above it, pushing it down twelve lines). Task 6's caller sweep: `ext.rs:176`→`:181` (`for name in grants.env().names()`, the `granted()` env table), `negotiate.rs:219-228`→`:220-232` (the `env_read` block now spans slightly further, including its closing brace), `proc.rs:162-163`→`:214` (`which`'s own `env::overlay().get("PATH")` call — the earlier amendment's replacement citation still pointed inside `run`'s `Error::Io` construction, not `which`). |

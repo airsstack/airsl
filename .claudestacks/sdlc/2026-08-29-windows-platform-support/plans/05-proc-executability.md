@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-08-30
 depends-on: [02]
 ---
@@ -34,9 +34,11 @@ crates/airsl/src/sandbox/grants.rs — modify  one added test only; ProcGrant it
 ```
 
 `crates/airsl/src/modules/proc.rs:172` is the **only** non-test `std::os::unix` use in the
-workspace — verified by `grep -rn "std::os::unix" crates --include="*.rs"`, whose other nine hits
-are all `symlink` calls inside `#[cfg(test)] mod tests` (the symlink-helper plan's work) plus the comment at
-`crates/airsl/src/lib.rs:34`. After Task 1 no production code in the workspace names a unix-only
+workspace — verified by `grep -rn "std::os::unix" crates --include="*.rs"`, which returns ten
+lines: this one, the comment at `crates/airsl/src/lib.rs:34`, and **eight** `symlink` calls all
+inside `#[cfg(test)] mod tests` (the symlink-helper plan's work). As approved this read "nine"
+symlink hits; the substantive claim — `proc.rs:172` is the sole production use — holds, only the
+numeral was wrong. After Task 1 no production code in the workspace names a unix-only
 `std` module outside a `#[cfg(unix)]` item.
 
 Every task below is verified on this macOS host with `cargo test -p airsl modules::proc`, which
@@ -141,8 +143,10 @@ local green covers them.
      absolute `where.exe` before spawning
    - under `Policy::trusted()`, `run{'C:\\Windows\\System32\\where.exe', 'where'}` succeeds — the
      separator branch, passed through unresolved. This is the only way that branch is reachable,
-     because a `ProcGrant` refuses a path (`crates/airsl/src/sandbox/grants.rs:221`, pinned by
-     `grants.rs:388-394`), which is exactly what the comment in the code must say
+     because a `ProcGrant` refuses a path (`crates/airsl/src/sandbox/grants.rs:227-230` — `allows`
+     is a `contains` on the name as written), pinned by
+     `a_proc_grant_does_not_admit_a_path_to_a_granted_name` (`grants.rs:452-458`), which is exactly
+     what the comment in the code must say
 2. Insert the pre-resolution immediately above `crates/airsl/src/modules/proc.rs:109`, shadowing
    `program`, in the form spec §5.1 gives:
    ```rust
@@ -226,11 +230,11 @@ local green covers them.
 
 **Steps:**
 
-1. `crates/airsl/src/sandbox/grants.rs:193-235` — `ProcGrant`, its `allow`, its `allows` at
-   `:219-223`, and its `executables` — is **unchanged**. Nothing in this task edits it. The grant
+1. `crates/airsl/src/sandbox/grants.rs:194-241` — `ProcGrant`, its `allow` at `:219-223`, its
+   `allows` at `:227-230`, and its `executables` — is **unchanged**. Nothing in this task edits it. The grant
    stays an exact, case-sensitive comparison on the program name as written.
 2. Add a test to `grants.rs`'s `mod tests`, next to
-   `a_proc_grant_does_not_admit_a_path_to_a_granted_name` (`grants.rs:387-394`), pinning that the
+   `a_proc_grant_does_not_admit_a_path_to_a_granted_name` (`grants.rs:452-458`), pinning that the
    `.exe` suffix is **not** part of the grant vocabulary: `ProcGrant::none().allow(["git"])` allows
    `git` and does **not** allow `git.exe` or `GIT`. It runs on every platform, because it is a
    statement about the grant type rather than about the filesystem. Its comment records why the
@@ -381,3 +385,16 @@ resolution. Rewriting them for Windows would add platform branching that proves 
   §8 diagnostic, and it is commented as such at the point it runs.
 - No new `Error` variant, no new `run` result field.
 - `proc.rs:129-130`'s comment no longer describes a state Windows cannot reach.
+
+---
+
+## Amendments after approval
+
+| What | Why |
+|---|---|
+| Task 4's `.cmd`-shim test mutated the process-wide environment overlay and has been rewritten | It called `airsstack.env.set('PATH', ...)` and restored it inside the same Lua chunk. `cargo test` runs tests as threads in one process, so on the Windows leg a concurrent `which`/`run` test could observe the temp directory on `PATH`. The rule against this is already recorded in the environment plan. `shim_probe` and `unresolvable` were each split into an overlay-reading form and a pure form; the test now drives the pure forms with a hand-built `PATH` and touches nothing global. |
+| The plan's `proc.rs` citations are pre-execution and the file has since been restructured | Noted rather than re-derived. Task 1 split `is_executable` into a lexical and a filesystem half, task 2 rewrote `which`, task 3 added a Windows-only pre-resolution block in `run` and task 4 added `unresolvable`/`shim_probe`, so most cited lines no longer denote what they did. The citations served their purpose — locating the work before it was done — and re-numbering an executed plan against a tree it already changed would record a fact of no use to anyone. |
+| Task 8 ("Run the gate") deferred to the end of the multi-plan run | Three plans land in the same crate in this session; running the full workspace gate per plan would compile the workspace three times on a resource-constrained machine for no additional signal. Scoped `fmt`, `clippy --all-targets --all-features -D warnings`, rustdoc and the relevant `cargo test` filters were run per task, plus `cargo check --target x86_64-pc-windows-gnu`. |
+| Four `sandbox/grants.rs` citations corrected: `ProcGrant` `:193-235`→`:194-241`, `allows` `:219-223`→`:227-230` (`:219-223` is `allow`, not `allows`), and the pinning test `:387-394`/`:388-394`→`:452-458` | Re-derived against the delivered tree before execution. `:219-223` pointed at the wrong method of the same type — the shape of error the chain's `file:line` rule exists to make loud rather than silent — and `:387-394` landed inside `mod tests` but on no test at all. |
+| The `std::os::unix` sweep restated: ten grep hits, **eight** test-only `symlink` calls, not nine | Counted. The substantive claim is unaffected — `proc.rs:172` is still the only production use, and after Task 1 no production code names a unix-only `std` module outside a `#[cfg(unix)]` item. |
+| Recorded that `paths::rules::native::executable_candidates` and `has_separator` currently carry `#[expect(dead_code, reason = …)]` (`rules.rs:290-294`, `:300-305`) | This plan is their first consumer, so wiring them in must also delete those attributes. `#[expect]` fails once unfulfilled, so leaving them in place turns a successful task into a build error — the attribute is doing exactly the job it was chosen for, but the plan did not say who removes it. |
