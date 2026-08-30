@@ -339,7 +339,7 @@ mod tests {
     fn a_relative_root_resolves_against_the_working_directory() {
         // `--allow-read .` is the obvious thing to type. Stored verbatim it grants nothing at all,
         // because every path it is checked against is absolute.
-        let here = std::env::current_dir().unwrap().canonicalize().unwrap();
+        let here = crate::test_support::canonical(&std::env::current_dir().unwrap());
         let grant = FsGrant::none().read(".");
         assert_eq!(grant.read_roots(), std::slice::from_ref(&here));
         assert!(grant.allows_read(&here.join("Cargo.toml")));
@@ -350,7 +350,7 @@ mod tests {
         // Otherwise granting the link grants nothing: a path under it canonicalises past the link,
         // and the refusal names a root that looks exactly right.
         let dir = tempfile::tempdir().unwrap();
-        let base = dir.path().canonicalize().unwrap();
+        let base = crate::test_support::canonical(dir.path());
         std::fs::create_dir(base.join("real")).unwrap();
         crate::test_support::link_dir(&base.join("real"), &base.join("link")).unwrap();
 

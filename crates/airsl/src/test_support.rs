@@ -125,6 +125,21 @@ pub(crate) fn script_path(path: &Path) -> String {
         .to_owned()
 }
 
+/// Canonicalises `path` into the spelling a grant root is actually stored in.
+///
+/// `canonicalize()` alone is not that spelling: on Windows it returns a `\\?\` prefix, while
+/// `sandbox::grants::resolve_root` strips one from every root it stores. A test that builds its
+/// *expectation* straight from `canonicalize()` therefore compares a verbatim path against a
+/// stripped one and fails, even though the code under test did exactly the right thing.
+///
+/// # Panics
+///
+/// When `path` cannot be canonicalised, which for a fixture directory means the test's own setup
+/// did not run.
+pub(crate) fn canonical(path: &Path) -> std::path::PathBuf {
+    crate::paths::rules::native::strip_verbatim(path.canonicalize().unwrap())
+}
+
 /// Turns a unix-spelled absolute path literal like `"/repo"` into whatever counts as absolute on
 /// the platform actually running the test: unchanged on unix, prefixed with a drive letter on
 /// Windows.
@@ -187,12 +202,13 @@ mod tests {
 
     #[test]
     fn script_path_leaves_an_ordinary_absolute_path_unchanged() {
-        // `strip_verbatim` is a no-op on unix, so this only proves `script_path` does not corrupt
-        // a path that never carried a verbatim prefix; `script_path_strips_a_verbatim_prefix`,
-        // below, is what actually exercises the branch this function exists for.
+        // Deliberately *not* canonicalised: on Windows `canonicalize()` returns a verbatim path,
+        // which `script_path` is supposed to change, so canonicalising here would assert the
+        // opposite of this test's name. A temp directory's own path carries no verbatim prefix on
+        // either platform, so passing it through must be an identity — which is what proves
+        // `script_path` does not corrupt a path that never needed stripping.
         let dir = tempfile::tempdir().unwrap();
-        let canonical = dir.path().canonicalize().unwrap();
-        assert_eq!(Path::new(&script_path(&canonical)), canonical.as_path());
+        assert_eq!(Path::new(&script_path(dir.path())), dir.path());
     }
 
     #[cfg(windows)]

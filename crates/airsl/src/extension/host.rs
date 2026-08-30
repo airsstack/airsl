@@ -643,7 +643,7 @@ mod tests {
     #[test]
     fn variables_reach_the_manifest() {
         let home = TempDir::new().unwrap();
-        let data = home.path().canonicalize().unwrap().join("data");
+        let data = crate::test_support::canonical(home.path()).join("data");
         fs::create_dir(&data).unwrap();
         let dir = fixture(
             "var-ext",

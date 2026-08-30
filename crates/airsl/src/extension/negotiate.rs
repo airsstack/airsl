@@ -487,7 +487,7 @@ mod tests {
         // absolute but does not resolve symlinks, so the manifest has to be written against the
         // same canonical spelling the ceiling's existing-directory root resolves to, or the two
         // sides would never agree on what "inside" means.
-        let canonical = dir.path().canonicalize().unwrap();
+        let canonical = crate::test_support::canonical(dir.path());
         let m = manifest(&canonical, "fs.read=['$HOME/does-not-exist-yet']", "", "");
         let n = negotiate(&m, &ceiling(&canonical), &stdlib().unwrap());
         assert!(n.is_satisfied(), "{:?}", n.denied());
