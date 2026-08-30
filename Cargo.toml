@@ -48,7 +48,7 @@ clap       = { version = "4", features = ["derive"] }
 # Internal workspace member — path for local builds, version for publish-readiness.
 # `airsl-cli` inherits this with `{ workspace = true }`. Cargo strips the path and
 # keeps the version when packaging, so the published crate depends on crates.io.
-airsl      = { version = "0.1.3", path = "crates/airsl" }
+airsl      = { version = "0.1.4", path = "crates/airsl" }
 
 [workspace.lints.rust]
 unsafe_code        = "forbid"

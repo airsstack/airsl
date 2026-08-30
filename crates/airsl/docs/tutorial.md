@@ -18,7 +18,7 @@ https://github.com/airsstack/airsl --locked airsl-cli`. Working inside a clone,
 `cargo install --path crates/airsl-cli --force` builds from the checked-out sources.
 
 ```
-airsl 0.1.2
+airsl 0.1.3
   lua:          Lua 5.4
   language:     restricted
   root table:   airsstack

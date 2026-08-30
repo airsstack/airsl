@@ -6,13 +6,15 @@ Notable changes to both crates in this workspace, newest first. The format follo
 the slot Cargo treats as breaking, so a compatible change ships as a `z` bump.
 
 The two crates are versioned independently and have released together so far, so each entry names
-both. Every release is tagged per crate — `airsl-v0.1.3`, `airsl-cli-v0.1.2` — because one commit
+both. Every release is tagged per crate — `airsl-v0.1.4`, `airsl-cli-v0.1.3` — because one commit
 has shipped two crates under two different numbers, which a single `vX.Y.Z` tag cannot name.
 
-## Unreleased
+## airsl 0.1.4 — airsl-cli 0.1.3 — 2026-08-30
 
-Version numbers deliberately not chosen. Publishing a release that advertises the new target is a
-separate piece of work from building it, and does not happen here.
+A third platform, and no public item changed shape to get there: one type is added, `Error` is
+`#[non_exhaustive]`, and every existing signature is untouched. A `z` bump in both crates, per the
+rule above — the two behaviour differences below are corrections to contracts the code already
+claimed, and neither stops anything compiling.
 
 ### Added
 
@@ -21,6 +23,13 @@ separate piece of work from building it, and does not happen here.
   on every target. A path a script sees is always `/`-separated regardless of the platform
   underneath, and `airsstack.proc` resolves and runs only `.exe` programs there, so a grant of
   `npm` does not reach the `.cmd` shim `npm` installs as.
+
+- **`EnvName`**, the identity two environment variable names are compared and hashed under. The
+  only new public item in this release. It exists because the allowlist and the environment
+  overlay both need the same answer to "are these two names the same variable", and that answer is
+  not a constant: the Windows environment block folds ASCII case unconditionally, a unix one does
+  not. `EnvGrant` is built on it, so `EnvGrant::none().read(["Path"])` and `.read(["PATH"])` are
+  the same grant on Windows and two different ones on unix — the platform's own answer either way.
 
 ### Changed — behaviour worth checking before upgrading
 
@@ -31,6 +40,15 @@ rules behind them are now shared code rather than written once per target.
 - A path spelling containing an interior NUL byte is now refused where the sandbox first resolves
   it, as `Error::UncheckablePath`, rather than reaching the operating system and failing later as
   `Error::Io`.
+
+### Fixed
+
+- `airsl ext doctor` rendered the `requested:` entry path with the platform's own separator while
+  every grant line a few rows below it used `/`, so one report spelled two paths two ways. Windows
+  only — on unix the two spellings were already the same string.
+
+`airsl-cli`'s dependency floor moves to `airsl` 0.1.4, so `cargo install --locked` picks up this
+release rather than pinning the previous one.
 
 ## airsl 0.1.3 — airsl-cli 0.1.2 — 2026-08-23
 

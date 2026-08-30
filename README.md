@@ -64,7 +64,7 @@ the same command.
 ## Releases
 
 [CHANGELOG.md](CHANGELOG.md) covers both crates in one timeline. Each release is tagged per crate —
-`airsl-v0.1.3`, `airsl-cli-v0.1.2` — because one commit has shipped two crates under two different
+`airsl-v0.1.4`, `airsl-cli-v0.1.3` — because one commit has shipped two crates under two different
 version numbers, which a single `vX.Y.Z` tag cannot name.
 
 ## License
