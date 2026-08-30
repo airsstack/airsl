@@ -14,6 +14,7 @@ use std::sync::Arc;
 use crate::error::{Error, Result};
 use crate::modules::guard::PathGuard;
 use crate::modules::{HostModule, InstallContext};
+use crate::paths::rules::native::to_script_string;
 use crate::types::ModuleName;
 
 /// Installs `airsstack.glob`.
@@ -62,6 +63,15 @@ impl Default for Glob {
 fn matcher(pattern: &str) -> Result<globset::GlobMatcher> {
     globset::GlobBuilder::new(pattern)
         .literal_separator(true)
+        // `globset` otherwise defaults this to `!is_separator('\\')` (globset-0.4.20/src/glob.rs:244),
+        // which is `false` on Windows — there `\` is a path separator, not an escape, so an
+        // inherited default would let a pattern meaning "literal asterisk" become a wildcard again.
+        // That is a widening, the direction the comment above already rules out for
+        // `literal_separator`, so this is pinned for the same reason. Patterns are always written
+        // in the `/` vocabulary and `globset` normalises a candidate's own separators before
+        // comparing, so no candidate-side conversion belongs here either — the decision the `walk`
+        // closure above already records from the other side.
+        .backslash_escape(true)
         .build()
         .map(|glob| glob.compile_matcher())
         .map_err(|source| Error::Denied {
@@ -103,19 +113,23 @@ impl HostModule for Glob {
                     let selected = matcher(&pattern.to_str()?)?;
 
                     let mut found = Vec::new();
-                    for entry in walkdir::WalkDir::new(&base).sort_by_file_name() {
+                    for entry in walkdir::WalkDir::new(base.as_path()).sort_by_file_name() {
                         let entry = entry.map_err(|source| Error::Io {
                             operation: "walk",
-                            path: base.display().to_string(),
+                            path: base.to_script_string(),
                             source: source.into(),
                         })?;
-                        let Ok(relative) = entry.path().strip_prefix(&base) else {
+                        let Ok(relative) = entry.path().strip_prefix(base.as_path()) else {
                             continue;
                         };
                         // Matched against the path relative to the root, so a pattern does not have to
-                        // know where the root happens to live on this machine.
+                        // know where the root happens to live on this machine. Matched as a native
+                        // `Path`, not the `/`-rendered string: `globset` normalises a candidate's own
+                        // separators before comparing, so matching natively and rendering the result
+                        // in the vocabulary a script expects are two different decisions, not one
+                        // inconsistency.
                         if !relative.as_os_str().is_empty() && selected.is_match(relative) {
-                            found.push(relative.to_string_lossy().into_owned());
+                            found.push(to_script_string(relative));
                         }
                     }
                     lua.create_sequence_from(found)
@@ -215,6 +229,21 @@ mod tests {
     }
 
     #[test]
+    fn a_backslash_escapes_a_literal_wildcard_on_every_platform() {
+        // `globset` defaults `backslash_escape` to whatever the compiled-for platform's own
+        // separator rule implies, which is `false` on Windows — there `\` stays a path separator
+        // and a pattern meaning "literal asterisk" would silently become a wildcard again. Pinning
+        // it `true` keeps `a\*.rs` meaning the same thing everywhere, matching on unix (where the
+        // default already agrees) as well as on Windows (where it would otherwise disagree).
+        let escaped = matcher(r"a\*.rs").unwrap();
+        assert!(escaped.is_match(Path::new("a*.rs")), "the literal survives");
+        assert!(
+            !escaped.is_match(Path::new("ab.rs")),
+            "an escaped `*` must not act as a wildcard"
+        );
+    }
+
+    #[test]
     fn match_answers_from_lua_too() {
         assert_eq!(
             eval("return tostring(airsstack.glob.match('**/Cargo.toml', 'Cargo.toml'))"),
@@ -263,7 +292,7 @@ mod tests {
             "t",
         )
         .unwrap()
-        .with_args([root.to_string_lossy().into_owned()]);
+        .with_args([crate::test_support::script_path(&root)]);
 
         assert_eq!(
             engine.eval_to::<String>(&script).unwrap(),

@@ -10,6 +10,7 @@
 //! Non-responsibilities: enforcement. A grant is a promise the host module keeps, checked inside
 //! the Rust function before the operation it guards. Nothing here reaches the VM.
 
+use crate::paths::rules::native::to_script_string;
 use crate::sandbox::grants::{EnvGrant, FsGrant, ProcGrant};
 
 /// How far the grants in a [`GrantSet`] reach.
@@ -34,14 +35,19 @@ enum GrantReach {
 /// ```
 /// use airsl::{GrantSet, Policy};
 ///
+/// // Built from the working directory, not a hardcoded literal: a unix-spelled absolute path has
+/// // no drive on Windows, so it would resolve against whichever drive this doctest happens to run
+/// // from rather than matching the paths checked below.
+/// let repo = std::env::current_dir().unwrap().join("repo");
+/// let index = repo.join(".index");
 /// let policy = Policy::confined().with_grants(
 ///     GrantSet::declared()
-///         .with_fs(|fs| fs.read("/repo").write("/repo/.index"))
+///         .with_fs(|fs| fs.read(&repo).write(&index))
 ///         .with_env(|env| env.read(["HOME"]))
 ///         .with_proc(|proc| proc.allow(["git"])),
 /// );
-/// assert!(policy.grants().fs().allows_read(std::path::Path::new("/repo/src")));
-/// assert!(!policy.grants().fs().allows_write(std::path::Path::new("/repo/src")));
+/// assert!(policy.grants().fs().allows_read(&repo.join("src")));
+/// assert!(!policy.grants().fs().allows_write(&repo.join("src")));
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
@@ -149,12 +155,18 @@ impl core::fmt::Display for GrantSet {
             return f.write_str("none");
         }
 
+        // This `Display` is what `airsl doctor` prints to a human terminal, where a Windows
+        // reader might reasonably expect `C:\a` back. It renders through the script vocabulary
+        // anyway: the same roots already appear `/`-spelled in the guard's refusal message and in
+        // `ext.granted()`, so a native `Display` here would spell one root two ways depending on
+        // which message a reader happened to hit. One vocabulary, uniformly, beats matching shell
+        // convention in one of three places.
         let mut parts = Vec::new();
         for root in self.fs.read_roots() {
-            parts.push(format!("read {}", root.display()));
+            parts.push(format!("read {}", to_script_string(root)));
         }
         for root in self.fs.write_roots() {
-            parts.push(format!("write {}", root.display()));
+            parts.push(format!("write {}", to_script_string(root)));
         }
         if !self.env.is_empty() {
             parts.push(format!(
@@ -204,5 +216,21 @@ mod tests {
     fn each_reach_renders_for_a_report() {
         assert_eq!(GrantSet::declared().to_string(), "none");
         assert_eq!(GrantSet::unrestricted().to_string(), "unrestricted");
+    }
+
+    #[test]
+    fn display_renders_roots_through_the_script_vocabulary_not_native_spelling() {
+        // `to_script_string` renders with the platform separator converted to the script's `/`,
+        // same reasoning as the sibling vocabulary tests in `modules::path`: identical on this
+        // unix host, where `/` is already both the native and the script separator, and proved
+        // for real by `paths::rules::to_script_string`'s own flavour-taking test.
+        //
+        // `abs`, not the unix-spelled literals directly: a bare `/a` has a root but no drive, so
+        // `FsGrant::read`'s `resolve_root` would resolve it against whichever drive the test
+        // happens to run from on Windows, instead of the drive the expectation below names.
+        let a = crate::test_support::abs("/a");
+        let b = crate::test_support::abs("/b");
+        let grants = GrantSet::declared().with_fs(|fs| fs.read(a.as_str()).write(b.as_str()));
+        assert_eq!(grants.to_string(), format!("read {a}; write {b}"));
     }
 }

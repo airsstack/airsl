@@ -8,10 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 one workspace: `crates/airsl` (the library) and `crates/airsl-cli` (the `airsl` binary — `run`,
 `test`, `check`, `doctor`, `ext doctor`/`ext fire`).
 
-Build requirements that are not negotiable: **unix only** (`lib.rs` has a `compile_error!` off unix,
-because `modules::proc` decides executability from mode bits) and **a C compiler** (`mlua`'s
-`vendored` feature compiles Lua 5.4 from C source and links it statically — no system Lua, no
-`pkg-config`).
+Build requirement that is not negotiable: **a C compiler** (`mlua`'s `vendored` feature compiles
+Lua 5.4 from C source and links it statically — no system Lua, no `pkg-config`). On Linux and macOS
+that is whatever `cc` the platform provides; on `x86_64-pc-windows-msvc` it is MSVC Build Tools,
+preinstalled on `windows-latest`.
 
 ## Commands
 
@@ -84,8 +84,13 @@ Key seams:
   policy, so what a module enforces and what `airsl doctor` reports cannot diverge.
 - `modules::stdlib()` (`src/modules/stdlib.rs`) is the single list of built-ins; the engine, the
   doctor output, and tests all read it. A new module is registered there.
-- `modules/guard.rs` (`PathGuard`) is the *only* place the filesystem containment rule is written.
-  Every `fs` call, plus `hash.hash_file` and `glob.walk`, funnels through it.
+- The filesystem containment rule is written in two places, each the only place for its half.
+  `modules/guard.rs` (`PathGuard::resolve`) turns a path a script wrote into the absolute,
+  symlink-free path an operation would actually touch. `paths/containment.rs` holds the root
+  comparison itself, shared by `sandbox/grants.rs`'s `FsGrant::allows_read`/`allows_write` (what
+  `PathGuard` consults) and, outside `fs`, by `require_loader`, `extension::manifest::validate_entry`
+  and `extension::loaded::recheck_entry`. Every `fs` call, plus `hash.hash_file` and `glob.walk`,
+  funnels through `PathGuard`.
 - `Engine` is `Send + Sync` and holds a lock spanning a whole evaluation (`engine.rs`) — `mlua`'s
   per-operation locking was memory-safe but not correct across the four steps of an eval. A shared
   engine avoids rebuilding state; it never buys parallelism.

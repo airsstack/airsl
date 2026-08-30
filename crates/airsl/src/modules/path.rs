@@ -20,6 +20,7 @@ use std::path::{Component, PathBuf};
 
 use crate::error::{Error, Result};
 use crate::modules::{HostModule, InstallContext};
+use crate::paths::rules::native::to_script_string;
 use crate::types::ModuleName;
 
 /// Installs `airsstack.path`.
@@ -72,7 +73,7 @@ impl HostModule for Path {
                 for part in parts.iter() {
                     out.push(part.to_str()?.as_ref());
                 }
-                Ok(out.to_string_lossy().into_owned())
+                Ok(to_script_string(&out))
             })
             .map_err(fail)?;
         table.set("join", join).map_err(fail)?;
@@ -109,6 +110,14 @@ impl HostModule for Path {
             .map_err(fail)?;
         table.set("relative_to", relative_to).map_err(fail)?;
 
+        // `is_absolute` and `absolute` are deliberately left out of the `/`-vocabulary conversion
+        // that the rest of this module applies. Absoluteness is a property of the platform's path
+        // grammar, not of which separator a rendering uses: `Path::is_absolute` already answers
+        // "does this path's grammar make it absolute" correctly per platform (a bare `/a` is
+        // absolute on unix and merely drive-relative on Windows), and re-deriving that from a
+        // `/`-normalised string would have to reimplement the same platform grammar by hand. This
+        // is the one place in the module where the outward vocabulary a script sees stays uniform
+        // (`/`-separated) while the semantics underneath it are not.
         let is_absolute = lua
             .create_function(|_, path: mlua::LuaString| {
                 Ok(std::path::Path::new(path.to_str()?.as_ref()).is_absolute())
@@ -134,7 +143,7 @@ impl HostModule for Path {
 /// not.
 fn dirname(path: &str) -> String {
     match std::path::Path::new(path).parent() {
-        Some(parent) if !parent.as_os_str().is_empty() => parent.to_string_lossy().into_owned(),
+        Some(parent) if !parent.as_os_str().is_empty() => to_script_string(parent),
         Some(_) => String::from("."),
         None => path.to_owned(),
     }
@@ -142,6 +151,9 @@ fn dirname(path: &str) -> String {
 
 /// The final component of `path`, or the path itself when it has no components to strip.
 fn basename(path: &str) -> String {
+    // `file_name` yields a single path component, which by definition holds no separator on
+    // either platform — this is the "cannot matter" case, not a missed conversion, so
+    // `to_string_lossy` stays unconverted here.
     std::path::Path::new(path).file_name().map_or_else(
         || path.to_owned(),
         |name| name.to_string_lossy().into_owned(),
@@ -150,6 +162,8 @@ fn basename(path: &str) -> String {
 
 /// The final component with its extension removed.
 fn stem(path: &str) -> String {
+    // Same reasoning as `basename`: `file_stem` is a fragment of a single component, so it cannot
+    // carry a separator on either platform.
     std::path::Path::new(path)
         .file_stem()
         .map_or_else(String::new, |stem| stem.to_string_lossy().into_owned())
@@ -160,6 +174,8 @@ fn stem(path: &str) -> String {
 /// Empty rather than `nil` so that a script can concatenate the result without checking it, and so
 /// that "no extension" and "the call failed" are not the same value.
 fn extension(path: &str) -> String {
+    // Same reasoning as `basename`: `extension` is a fragment of a single component, so it cannot
+    // carry a separator on either platform.
     std::path::Path::new(path)
         .extension()
         .map_or_else(String::new, |ext| ext.to_string_lossy().into_owned())
@@ -172,31 +188,47 @@ fn extension(path: &str) -> String {
 /// the start of a relative path to cancel it against.
 fn normalize(path: &str) -> String {
     let mut out = PathBuf::new();
-    let mut leading: Vec<&str> = Vec::new();
+    let mut rooted = false;
+    let mut leading: usize = 0;
 
     for component in std::path::Path::new(path).components() {
         match component {
-            Component::CurDir => {}
-            Component::ParentDir => {
-                // Popping a normal component cancels it; popping nothing means the `..` escapes
-                // the start of a relative path and has to survive into the result.
-                if !out.pop() {
-                    leading.push("..");
-                }
+            Component::RootDir | Component::Prefix(_) => {
+                rooted = true;
+                out.push(component.as_os_str());
             }
-            other => out.push(other.as_os_str()),
+            // Popping a normal component cancels it; otherwise the `..` walks above what `out`
+            // holds, which is either the filesystem root (every operating system already
+            // absorbs that rather than rejecting it — `/..` is `/`) or, on a relative path, the
+            // start of the path, with nothing above it to cancel against, so the `..` has to
+            // survive into the result.
+            Component::ParentDir if !out.pop() && !rooted => leading += 1,
+            Component::CurDir | Component::ParentDir => {}
+            Component::Normal(_) => out.push(component.as_os_str()),
         }
     }
 
-    let rest = out.to_string_lossy();
-    let text = if leading.is_empty() {
-        rest.into_owned()
-    } else if rest.is_empty() {
-        leading.join("/")
+    // `leading > 0` only happens when `rooted` is false — a rooted `..` above the root is
+    // absorbed above and never reaches this count — so `out` is itself relative here and
+    // pushing it onto a `PathBuf` that already holds the leading `..`s cannot have it replace
+    // that prefix the way pushing a rooted path would. What `push` does not guard against is
+    // `out` being empty: pushing an empty component still appends a trailing separator, so a
+    // result that is purely leading `..`s (`".."`, `"../.."`) needs `out`'s components appended
+    // one at a time rather than pushed as a (possibly empty) whole.
+    let assembled = if leading == 0 {
+        out
     } else {
-        format!("{}/{rest}", leading.join("/"))
+        let mut prefix = PathBuf::new();
+        for _ in 0..leading {
+            prefix.push("..");
+        }
+        for component in out.components() {
+            prefix.push(component);
+        }
+        prefix
     };
 
+    let text = to_script_string(&assembled);
     if text.is_empty() {
         String::from(".")
     } else {
@@ -225,23 +257,30 @@ fn relative_to(path: &str, base: &str) -> Result<String> {
             base: root.clone(),
         })?;
 
-    let text = stripped.to_string_lossy();
+    let text = to_script_string(stripped);
     Ok(if text.is_empty() {
         String::from(".")
     } else {
-        text.into_owned()
+        text
     })
 }
 
 /// Makes `path` absolute against the process working directory, without resolving symlinks.
 ///
 /// [`std::path::absolute`] rather than `canonicalize`: the latter requires every component to
-/// exist, which a script building an output path has no reason to satisfy.
+/// exist, which a script building an output path has no reason to satisfy. Kept as
+/// [`std::path::absolute`] rather than reimplemented over the `/`-normalised vocabulary — see the
+/// comment above this module's `is_absolute`/`absolute` registration for why absoluteness is
+/// judged by the platform's own path grammar rather than by separator spelling.
 ///
 /// # Errors
 ///
 /// Returns [`Error::PathResolution`] when the working directory cannot be read.
 fn absolute(path: &str) -> Result<String> {
+    // Renders through `normalize` rather than converting the resolved path directly: `normalize`
+    // already renders once through the `/`-vocabulary rule as its last step, so this inherits
+    // that conversion (and the `/..`-absorption fix that comes with it) for free and needs no
+    // conversion of its own.
     std::path::absolute(path)
         .map(|resolved| normalize(&resolved.to_string_lossy()))
         .map_err(|source| Error::PathResolution {
@@ -292,6 +331,15 @@ mod tests {
     }
 
     #[test]
+    fn join_renders_in_the_script_vocabulary_regardless_of_platform() {
+        // `PathBuf::push` joins with the platform separator (`\` on Windows), so the assembled
+        // path is converted before it reaches Lua. Identity on unix, where this run happens — the
+        // conversion itself is proved by `paths::rules::to_script_string`'s own flavour-taking
+        // test, not by a difference this assertion can observe on this host.
+        assert_eq!(eval("return airsstack.path.join('a', 'b')"), "a/b");
+    }
+
+    #[test]
     fn dirname_gives_the_directory_part() {
         assert_eq!(eval("return airsstack.path.dirname('/a/b/c.lua')"), "/a/b");
     }
@@ -306,6 +354,14 @@ mod tests {
     #[test]
     fn dirname_of_the_root_is_the_root() {
         assert_eq!(eval("return airsstack.path.dirname('/')"), "/");
+    }
+
+    #[test]
+    fn dirname_renders_in_the_script_vocabulary_regardless_of_platform() {
+        // `Path::parent` on a multi-component result carries the platform separator, same
+        // reasoning as `join`'s sibling test above: identity on this unix host, proved for real by
+        // `paths::rules::to_script_string`'s own flavour-taking test.
+        assert_eq!(eval("return airsstack.path.dirname('a/b/c')"), "a/b");
     }
 
     #[test]
@@ -364,6 +420,17 @@ mod tests {
     }
 
     #[test]
+    fn normalize_of_a_purely_leading_dotdot_result_has_no_trailing_separator() {
+        // `PathBuf::push` appends a separator even when the pushed component is empty, so a result
+        // that is entirely leading `..`s must not be assembled by pushing an empty remainder onto
+        // the `..` prefix.
+        assert_eq!(eval("return airsstack.path.normalize('..')"), "..");
+        assert_eq!(eval("return airsstack.path.normalize('../..')"), "../..");
+        assert_eq!(eval("return airsstack.path.normalize('a/../..')"), "..");
+        assert_eq!(eval("return airsstack.path.normalize('./..')"), "..");
+    }
+
+    #[test]
     fn normalize_of_an_empty_or_dot_path_is_the_current_directory() {
         assert_eq!(eval("return airsstack.path.normalize('')"), ".");
         assert_eq!(eval("return airsstack.path.normalize('./.')"), ".");
@@ -374,6 +441,45 @@ mod tests {
         assert_eq!(
             eval("return airsstack.path.normalize('/nonexistent/a/../b')"),
             "/nonexistent/b"
+        );
+    }
+
+    #[test]
+    fn normalize_absorbs_a_dotdot_at_the_filesystem_root() {
+        // Unix-observable: every operating system already applies this rule to `/..` itself, so
+        // `normalize` absorbs it the same way rather than reporting an escape above the root.
+        assert_eq!(eval("return airsstack.path.normalize('/..')"), "/");
+    }
+
+    #[test]
+    fn normalize_absorbs_a_dotdot_that_reaches_the_root_through_deeper_components() {
+        assert_eq!(eval("return airsstack.path.normalize('/a/../..')"), "/");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn normalize_absorbs_a_dotdot_above_a_drive_relative_root() {
+        // `#[cfg(windows)]`: this does not even compile, let alone run, on the unix host this
+        // change was authored and verified on. It is exercised by CI's Windows runner only.
+        assert_eq!(eval("return airsstack.path.normalize('C:a/../..')"), "C:");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn normalize_absorbs_a_dotdot_at_a_drive_absolute_root() {
+        // `#[cfg(windows)]`: unverified on this unix host; see the sibling test above.
+        assert_eq!(eval("return airsstack.path.normalize('C:/a/../..')"), "C:/");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn normalize_converts_backslashes_while_absorbing_a_dotdot() {
+        // `#[cfg(windows)]`: unverified on this unix host; see the sibling tests above.
+        // Lua's long-bracket string (`[[...]]`) rather than a quoted literal, so the backslashes
+        // reach `normalize` unescaped instead of being read as Lua escape sequences.
+        assert_eq!(
+            eval("return airsstack.path.normalize([[C:\\a\\..\\b]])"),
+            "C:/b"
         );
     }
 
@@ -413,6 +519,17 @@ mod tests {
     }
 
     #[test]
+    fn relative_to_renders_in_the_script_vocabulary_regardless_of_platform() {
+        // `strip_prefix`'s multi-component remainder carries the platform separator, same
+        // reasoning as `join` and `dirname` above: identity on this unix host, proved for real by
+        // `paths::rules::to_script_string`'s own flavour-taking test.
+        assert_eq!(
+            eval("return airsstack.path.relative_to('a/b/c', 'a')"),
+            "b/c"
+        );
+    }
+
+    #[test]
     fn a_sibling_sharing_a_name_prefix_is_not_under_the_base() {
         // String prefix matching would accept this; component matching does not.
         assert_eq!(
@@ -423,10 +540,28 @@ mod tests {
 
     #[test]
     fn is_absolute_distinguishes_the_two_kinds_of_path() {
+        // Absoluteness is a property of the platform's own path grammar (`is_absolute` is one of
+        // this module's two deliberate exceptions to the uniform `/`-vocabulary rule), so a bare
+        // `/a` is absolute on unix but only drive-relative on Windows, where a drive prefix is
+        // required. `#[cfg(windows)]` here does not even compile-check on this unix host; CI's
+        // Windows runner is what exercises it.
+        #[cfg(unix)]
         assert_eq!(
             eval("return tostring(airsstack.path.is_absolute('/a'))"),
             "true"
         );
+        #[cfg(windows)]
+        {
+            assert_eq!(
+                eval("return tostring(airsstack.path.is_absolute('/a'))"),
+                "false"
+            );
+            assert_eq!(
+                eval("return tostring(airsstack.path.is_absolute('C:/a'))"),
+                "true"
+            );
+        }
+        // Holds on both platforms: a bare relative name is never absolute either way.
         assert_eq!(
             eval("return tostring(airsstack.path.is_absolute('a'))"),
             "false"
@@ -435,26 +570,57 @@ mod tests {
 
     #[test]
     fn absolute_leaves_an_absolute_path_alone() {
+        // `#[cfg(windows)]` arm below is unverified on this unix host; see the comment on
+        // `is_absolute_distinguishes_the_two_kinds_of_path`.
+        #[cfg(unix)]
         assert_eq!(eval("return airsstack.path.absolute('/a/b')"), "/a/b");
+        #[cfg(windows)]
+        assert_eq!(eval("return airsstack.path.absolute('C:/a/b')"), "C:/a/b");
     }
 
     #[test]
     fn absolute_makes_a_relative_path_absolute() {
         let resolved = eval("return airsstack.path.absolute('a')");
+        // `starts_with('/')` only proves absoluteness on unix; on Windows a rooted path can start
+        // with a drive letter instead, so the platform's own `is_absolute` judgement is asserted
+        // there rather than the unix-specific leading-slash shape. `#[cfg(windows)]` arm is
+        // unverified on this unix host; see the comment on
+        // `is_absolute_distinguishes_the_two_kinds_of_path`.
+        #[cfg(unix)]
         assert!(resolved.starts_with('/'), "{resolved}");
+        #[cfg(windows)]
+        assert!(std::path::Path::new(&resolved).is_absolute(), "{resolved}");
+        // Holds on both platforms: this is the vocabulary claim itself — the rendering is
+        // `/`-separated regardless of which platform produced it.
         assert!(resolved.ends_with("/a"), "{resolved}");
     }
 
     #[test]
     fn absolute_normalises_what_it_produces() {
+        // `#[cfg(windows)]` arm is unverified on this unix host; see the comment on
+        // `is_absolute_distinguishes_the_two_kinds_of_path`.
+        #[cfg(unix)]
         assert_eq!(eval("return airsstack.path.absolute('/a/b/../c')"), "/a/c");
+        #[cfg(windows)]
+        assert_eq!(
+            eval("return airsstack.path.absolute('C:/a/b/../c')"),
+            "C:/a/c"
+        );
     }
 
     #[test]
     fn absolute_does_not_require_the_path_to_exist() {
+        // `#[cfg(windows)]` arm is unverified on this unix host; see the comment on
+        // `is_absolute_distinguishes_the_two_kinds_of_path`.
+        #[cfg(unix)]
         assert_eq!(
             eval("return airsstack.path.absolute('/nonexistent/deep/file.lua')"),
             "/nonexistent/deep/file.lua"
+        );
+        #[cfg(windows)]
+        assert_eq!(
+            eval("return airsstack.path.absolute('C:/nonexistent/deep/file.lua')"),
+            "C:/nonexistent/deep/file.lua"
         );
     }
 

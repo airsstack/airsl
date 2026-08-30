@@ -260,14 +260,19 @@ pub enum Error {
 
     /// A path could not be resolved to something a grant can be checked against.
     ///
-    /// Separate from [`Error::Denied`]: the policy did not refuse this, the path could not be
-    /// given a meaning to refuse. A `..` that climbs through a directory which does not exist has
-    /// no filesystem answer, and guessing one lexically is how a containment check gets bypassed.
+    /// Covers two distinct causes, both separate from [`Error::Denied`] for the same reason: the
+    /// policy did not refuse either one, so a grant change could not make either succeed. The first
+    /// is a path with no filesystem answer — a `..` that climbs through a directory which does not
+    /// exist, where guessing an answer lexically is how a containment check gets bypassed. The
+    /// second is a spelling this runtime declines to reason about at all, such as a verbatim or
+    /// device-namespace path: it is not that no meaning exists, but that this runtime does not
+    /// choose one. `reason` names which of the two a given refusal is.
     #[error("cannot resolve `{path}` to check it against the policy: {reason}")]
     UncheckablePath {
         /// The path as the script wrote it.
         path: String,
-        /// Why no answer could be given.
+        /// Why this path was refused: no filesystem answer exists, or this runtime declines to
+        /// reason about the spelling.
         reason: &'static str,
     },
 

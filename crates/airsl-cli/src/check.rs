@@ -111,6 +111,7 @@ mod tests {
     )]
 
     use super::{discover, run};
+    use crate::test_support::script_literal;
     use std::path::Path;
 
     fn write(dir: &Path, name: &str, body: &str) {
@@ -157,7 +158,7 @@ mod tests {
         write(
             dir.path(),
             "side-effect.lua",
-            &format!("error('ran: {}')\n", witness.display()),
+            &format!("error('ran: {}')\n", script_literal(&witness)),
         );
         assert_eq!(run(dir.path()), 0, "a chunk that raises still compiles");
         assert!(!witness.exists());
@@ -186,6 +187,10 @@ mod tests {
         write(dir.path(), "a_test.lua", "return {}");
         write(dir.path(), "notes.md", "text");
 
+        // `discover` is this crate's own — the paths it returns never cross an `airsl` module
+        // boundary, so no separator conversion in the library can reach them. Normalising here, at
+        // the point the relative path becomes a string, keeps the expectation below `/`-joined on
+        // every platform without weakening what it asserts.
         let found: Vec<String> = discover(dir.path())
             .unwrap()
             .iter()
@@ -193,7 +198,7 @@ mod tests {
                 p.strip_prefix(dir.path())
                     .unwrap()
                     .to_string_lossy()
-                    .into_owned()
+                    .replace('\\', "/")
             })
             .collect();
         assert_eq!(found, vec!["a.lua", "a_test.lua", "lib/m.lua", "z.lua"]);

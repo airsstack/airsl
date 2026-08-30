@@ -16,7 +16,7 @@ use std::sync::{Arc, RwLock};
 use crate::error::{Error, Result};
 use crate::modules::{HostModule, InstallContext};
 use crate::sandbox::GrantSet;
-use crate::types::ModuleName;
+use crate::types::{EnvName, ModuleName};
 
 /// The environment as one engine's scripts see it.
 ///
@@ -28,7 +28,7 @@ use crate::types::ModuleName;
 /// behaviour it expects while keeping the blast radius inside the engine.
 #[derive(Debug, Default)]
 pub(crate) struct Overlay {
-    entries: RwLock<BTreeMap<String, Option<String>>>,
+    entries: RwLock<BTreeMap<EnvName, Option<String>>>,
 }
 
 impl Overlay {
@@ -40,18 +40,26 @@ impl Overlay {
     }
 
     /// Records that `name` reads as `value`, or as unset when `value` is `None`.
+    ///
+    /// `BTreeMap::insert` replaces the value for an existing key but keeps the key exactly as it
+    /// was first inserted. On Windows, a script that calls `set("Path", ..)` then later
+    /// `set("PATH", ..)` therefore stores one entry whose key is spelled `Path` — first spelling
+    /// wins. That is deterministic, which is the property that matters; it is not a defect to
+    /// "fix" toward last-spelling-wins, which would make the stored casing depend on call order
+    /// instead of being fixed by it.
     fn set(&self, name: &str, value: Option<String>) {
         if let Ok(mut entries) = self.entries.write() {
-            entries.insert(name.to_owned(), value);
+            entries.insert(EnvName::new(name), value);
         }
     }
 
     /// The value `name` has for a script: the overlay if it carries one, else the real environment.
     pub(crate) fn get(&self, name: &str) -> Option<String> {
+        let key = EnvName::new(name);
         self.entries
             .read()
             .ok()
-            .and_then(|entries| entries.get(name).cloned())
+            .and_then(|entries| entries.get(&key).cloned())
             .unwrap_or_else(|| std::env::var(name).ok())
     }
 
@@ -59,10 +67,21 @@ impl Overlay {
     ///
     /// `None` means the child should not inherit the name at all, which is what `env.set(name)`
     /// with no value asked for.
+    ///
+    /// `std::process::Command`'s own environment map folds case on Windows, exactly as
+    /// [`EnvName`] does — so no change is needed here to keep the two agreeing. At most one
+    /// overlay entry can exist per folded identity, since the map is now keyed by `EnvName`
+    /// itself, so `Command`'s map can never collapse two of this overlay's entries into one; and
+    /// the order this returns entries in is not something a script can observe, since it only
+    /// ever reaches the *child's* environment block, not back into this engine.
     pub(crate) fn child_entries(&self) -> Vec<(String, Option<String>)> {
         self.entries
             .read()
-            .map(|e| e.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+            .map(|e| {
+                e.iter()
+                    .map(|(k, v)| (k.as_str().to_owned(), v.clone()))
+                    .collect()
+            })
             .unwrap_or_default()
     }
 
@@ -70,7 +89,7 @@ impl Overlay {
     fn names(&self) -> Vec<String> {
         self.entries
             .read()
-            .map(|e| e.keys().cloned().collect())
+            .map(|e| e.keys().map(|k| k.as_str().to_owned()).collect())
             .unwrap_or_default()
     }
 }
@@ -125,6 +144,44 @@ fn denied(grants: &GrantSet, operation: &'static str, name: &str) -> Error {
     }
 }
 
+/// The names `env.all()` reports for the unrestricted branch, host spelling preferred, in a
+/// deterministic order that does not depend on `host`'s iteration order.
+///
+/// A free function, rather than logic inlined in the closure `install` builds, so it can be
+/// tested directly — without an engine, and without depending on the real process environment for
+/// its inputs.
+///
+/// Host names beginning with `=` are dropped: `std::env::vars()` surfaces Windows' per-drive
+/// current-directory pseudo-variables (`=C:`, `=ExitCode`, …), which are process-private state,
+/// not environment a script should ever see. An overlay name beginning with `=` is **not**
+/// filtered the same way — the `=` rule exists to hide what the host volunteers involuntarily, and
+/// an overlay entry is something the script itself wrote under a grant; hiding a script's own
+/// write from `all()` while `get()` still returns it would be the more surprising behaviour of the
+/// two.
+///
+/// Deduplication is by [`EnvName`] identity: on Windows a host `Path` and an overlay `PATH` are
+/// one name, and the host spelling is kept, because `all()` should describe what a script's own
+/// process actually inherited under the identity the platform itself uses, and only fall back to
+/// the overlay's spelling for a name the host never had at all.
+fn merged_names(
+    host: impl IntoIterator<Item = String>,
+    overlay: impl IntoIterator<Item = String>,
+) -> Vec<String> {
+    let mut by_identity: BTreeMap<EnvName, String> = BTreeMap::new();
+    for name in host {
+        if name.starts_with('=') {
+            continue;
+        }
+        by_identity.insert(EnvName::new(name.clone()), name);
+    }
+    for name in overlay {
+        by_identity
+            .entry(EnvName::new(name.clone()))
+            .or_insert(name);
+    }
+    by_identity.into_values().collect()
+}
+
 impl HostModule for Env {
     fn name(&self) -> &ModuleName {
         &self.name
@@ -162,20 +219,25 @@ impl HostModule for Env {
             .create_function(move |lua, ()| {
                 let out = lua.create_table()?;
                 if g.is_unrestricted() {
-                    // Sorted: `std::env::vars` has no defined order, and a table whose iteration
-                    // depended on it would make every script reading it non-deterministic.
-                    let mut names: Vec<String> = std::env::vars().map(|(k, _)| k).collect();
-                    names.extend(o.names());
-                    names.sort();
-                    names.dedup();
+                    // Sorted, and deduplicated by platform identity rather than by exact
+                    // spelling: `std::env::vars` has no defined order, so a table whose iteration
+                    // depended on it would make every script reading it non-deterministic, and on
+                    // Windows a host `Path` and an overlay `PATH` are one name, not two, so both
+                    // must not appear.
+                    let names = merged_names(std::env::vars().map(|(k, _)| k), o.names());
                     for name in names {
                         if let Some(value) = o.get(&name) {
                             out.set(name, value)?;
                         }
                     }
                 } else {
-                    // Only the granted names, and only those actually set. This is the point of
-                    // the allowlist: a script sees what it declared, not what the host inherited.
+                    // Only the granted names, spelled the way the grant spells them, and only
+                    // those actually set. This is the point of the allowlist: a script sees what
+                    // it declared, not what the host inherited — host casing has no bearing here,
+                    // because this branch enumerates no host names at all. It cannot produce a
+                    // duplicate either: `EnvGrant`'s own `BTreeSet<EnvName>` is already
+                    // fold-deduped, so two grant entries can never share an identity to begin
+                    // with.
                     for name in g.env().names() {
                         if let Some(value) = o.get(name) {
                             out.set(name, value)?;
@@ -227,7 +289,7 @@ mod tests {
         reason = "tests unwrap known-valid fixtures; a panic is the intended failure signal"
     )]
 
-    use super::Env;
+    use super::{Env, Overlay, merged_names};
     use crate::{Engine, GrantSet, HostModule as _, Policy, Script};
 
     fn granted(names: &[&str]) -> Engine {
@@ -297,10 +359,32 @@ mod tests {
 
     #[test]
     fn all_does_not_leak_the_hosts_environment() {
-        // PATH is set in essentially every environment this runs in, and is not granted here.
+        // A single-key probe (`.PATH`) would prove nothing on Windows: a leak there would surface
+        // under the key `Path`, a Lua table index is an exact byte match, and `.PATH` would stay
+        // `nil` regardless of whether the leak happened. Scanning every key with a fold-insensitive
+        // comparison instead makes the assertion about the property — no PATH-shaped key reaches
+        // the script — rather than about one spelling of it.
+        let scan = "
+            local leaked = 0
+            for name in pairs(airsstack.env.all()) do
+                if name:upper() == 'PATH' then leaked = leaked + 1 end
+            end
+            return leaked";
+
         let engine = granted(&["AIRSL_TEST_ALL_2"]);
-        let found: bool = eval(&engine, "return airsstack.env.all().PATH ~= nil").unwrap();
-        assert!(!found, "an ungranted variable reached the script");
+        let leaked: i64 = eval(&engine, scan).unwrap();
+        assert_eq!(leaked, 0, "an ungranted variable reached the script");
+
+        // The positive control: a probe that can never fire is indistinguishable from a probe
+        // that finds nothing. Running the identical scan under a trusted policy — where PATH is
+        // not withheld — establishes that the scan does detect a PATH-shaped key when one really
+        // is present, so the assertion above is not simply true regardless of the outcome.
+        let trusted_engine = Engine::builder().policy(Policy::trusted()).build().unwrap();
+        let present: i64 = eval(&trusted_engine, scan).unwrap();
+        assert!(
+            present > 0,
+            "the positive control did not find PATH under a trusted policy"
+        );
     }
 
     #[test]
@@ -354,5 +438,111 @@ mod tests {
         let engine = Engine::builder().policy(Policy::trusted()).build().unwrap();
         let kind: String = eval(&engine, "return type(airsstack.env.get('PATH'))").unwrap();
         assert_eq!(kind, "string");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn an_overlay_entry_is_found_under_every_casing_the_platform_calls_the_same_name() {
+        // Before the fold this returned the *host's* PATH: `set` wrote the key `Path`, the
+        // case-sensitive map missed on `PATH`, and `get` fell through to `std::env::var`, which
+        // on Windows is case-insensitive and answers. `proc::which` looks up `PATH`, so it
+        // resolved against the host while the child spawned by `proc.run` — whose `Command` env
+        // map folds — received the script's. `which` and `run` disagreed.
+        let overlay = Overlay::new();
+        overlay.set("Path", Some(String::from(r"C:\fixture")));
+        assert_eq!(overlay.get("PATH").as_deref(), Some(r"C:\fixture"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_overlay_entry_is_found_only_under_the_casing_it_was_written_with() {
+        // The unix twin of the test above: `Path` and `PATH` are two names here, so a `Path`
+        // entry must not answer for `PATH`. Folding on unix would be a widening, not a fix.
+        let overlay = Overlay::new();
+        overlay.set("Path", Some(String::from("/fixture")));
+        assert_ne!(overlay.get("PATH").as_deref(), Some("/fixture"));
+    }
+
+    #[test]
+    fn merged_names_filters_windows_pseudo_variables_from_the_host_list() {
+        // Testable on macOS with a synthetic host list, which is the point of taking one rather
+        // than reading `std::env::vars()` directly.
+        let names = merged_names(
+            [
+                String::from("=C:"),
+                String::from("=ExitCode"),
+                String::from("HOME"),
+            ],
+            [],
+        );
+        assert_eq!(names, vec![String::from("HOME")]);
+    }
+
+    #[test]
+    fn merged_names_includes_an_overlay_only_name() {
+        let names = merged_names([String::from("HOME")], [String::from("EXTRA")]);
+        assert_eq!(names, vec![String::from("EXTRA"), String::from("HOME")]);
+    }
+
+    #[test]
+    fn merged_names_output_order_does_not_depend_on_host_iteration_order() {
+        let forward = merged_names(
+            [
+                String::from("ZED"),
+                String::from("ALPHA"),
+                String::from("MID"),
+            ],
+            [],
+        );
+        let shuffled = merged_names(
+            [
+                String::from("MID"),
+                String::from("ZED"),
+                String::from("ALPHA"),
+            ],
+            [],
+        );
+        assert_eq!(forward, shuffled);
+    }
+
+    #[test]
+    fn an_overlay_name_beginning_with_equals_is_not_filtered() {
+        // The `=` filter exists for what the host volunteers involuntarily; a script's own write
+        // under a grant is not that, and hiding it here while `get()` still answers it would be
+        // the more surprising behaviour.
+        let names = merged_names([], [String::from("=SCRIPT_WROTE_THIS")]);
+        assert_eq!(names, vec![String::from("=SCRIPT_WROTE_THIS")]);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn merged_names_prefers_host_casing_when_the_overlay_repeats_the_same_name_on_windows() {
+        // One entry, not two: `Path` (host) and `PATH` (overlay) are the same identity there.
+        let names = merged_names([String::from("Path")], [String::from("PATH")]);
+        assert_eq!(names, vec![String::from("Path")]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn merged_names_keeps_differently_cased_host_and_overlay_names_as_two_names_on_unix() {
+        let names = merged_names([String::from("PATH")], [String::from("Path")]);
+        assert_eq!(names, vec![String::from("PATH"), String::from("Path")]);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn setting_a_name_under_two_casings_keeps_the_first_spelling_as_the_stored_key() {
+        // `BTreeMap::insert` replaces the value for an existing key but keeps the key as first
+        // inserted, so `set("Path", ..)` followed by `set("PATH", ..)` stores one entry spelled
+        // `Path`. That is deterministic, which is what matters here — not a bug to "fix" into
+        // last-spelling-wins, which would make the stored casing depend on call order instead.
+        let overlay = Overlay::new();
+        overlay.set("Path", Some(String::from("first")));
+        overlay.set("PATH", Some(String::from("second")));
+        let entries = overlay.child_entries();
+        assert_eq!(
+            entries,
+            vec![(String::from("Path"), Some(String::from("second")))]
+        );
     }
 }

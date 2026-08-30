@@ -166,7 +166,7 @@ what every script running on this runtime is.
 
 **Registered extensions** load once, register handlers, and are called repeatedly by the host as
 events occur. This is the Redis model and what "extension system" normally means. The pieces it
-runs on are implemented — registration (`airsstack.ext.on`, `src/modules/ext.rs:104`), dispatch
+runs on are implemented — registration (`airsstack.ext.on`, `src/modules/ext.rs:89`), dispatch
 (`Engine::dispatch`, `src/engine.rs:353`), and a **persistent engine across calls** (below) — and
 `ExtensionHost` turns a manifest into one: `Extension` owns the engine `Approved::start`
 (`src/extension/loaded.rs:96`) builds, and `ExtensionHost::broadcast`
@@ -200,8 +200,8 @@ dispatches has to be built.
 | `Ceiling` | implemented — `src/extension/ceiling.rs:18` |
 | Negotiation (`negotiate`, `Negotiation`, `Reduction`, `Denial`) | implemented — `src/extension/negotiate.rs:274` |
 | `Approver`, `ManifestApprover`, `DenyAll` | implemented — `src/extension/approver.rs:68,75,95` |
-| `ext.on` registration and host dispatcher | implemented — `src/modules/ext.rs:104` (`on`), `src/engine.rs:353` (`dispatch`) |
-| Capability introspection (`ext.granted`) | implemented — `src/modules/ext.rs:116` (`granted`) |
+| `ext.on` registration and host dispatcher | implemented — `src/modules/ext.rs:89` (`on`), `src/engine.rs:353` (`dispatch`) |
+| Capability introspection (`ext.granted`) | implemented — `src/modules/ext.rs:111` (`granted`) |
 | `ExtensionHost`, `Extension` — the loader tying the above together | implemented — `src/extension/host.rs:251` (`ExtensionHost::load`), `src/extension/loaded.rs:175` (`Extension::approve`), `src/extension/loaded.rs:96` (`Approved::start`) |
 | CLI — `airsl ext doctor` / `airsl ext fire` | implemented — `crates/airsl-cli/src/ext_doctor.rs:198` (`run`), `crates/airsl-cli/src/ext_fire.rs:91` (`run`) |
 

@@ -27,20 +27,13 @@
 //! Third-party scripts load as [`extension`]s: a directory with its own `extension.toml` manifest,
 //! negotiated against the host's ceiling and run through an [`ExtensionHost`] that owns the
 //! resulting engines.
+//!
+//! Supported targets are Linux, macOS, and `x86_64-pc-windows-msvc`. Where a platform difference
+//! exists it is decided in one place rather than restated here: `src/paths/rules.rs` holds the
+//! lexical rules (what a path spells like, `/`- vs `\`-separated, which spellings are refused), and
+//! `src/paths/containment.rs` holds the root-comparison predicate every containment check shares.
 
 #![forbid(unsafe_code)]
-
-// Unix only, and deliberately loud about it. `modules::proc` decides whether a program is
-// executable from the mode bits, and the sandbox tests build symlinks through `std::os::unix::fs`.
-// Neither has a meaning on Windows, where executability is decided by the file extension and
-// `PATHEXT`. Supporting it is a decision about what "executable" should mean there, not a
-// portability patch — so the crate refuses to build with a sentence a reader can act on, instead of
-// nine resolution errors pointing at std.
-#[cfg(not(unix))]
-compile_error!(
-    "airsl supports unix targets only (Linux and macOS). Windows is not supported: \
-     `airsstack.proc` resolves executables by unix mode bits, which have no Windows equivalent."
-);
 
 mod builder;
 mod convert;
@@ -48,8 +41,11 @@ mod engine;
 mod error;
 mod failure_policy;
 mod instruction_budget;
+mod paths;
 mod require_loader;
 mod script;
+#[cfg(test)]
+mod test_support;
 
 pub mod extension;
 pub mod modules;
@@ -76,4 +72,6 @@ pub use sandbox::{
     ResourceLimits,
 };
 pub use script::Script;
-pub use types::{ChunkName, EventName, ExtensionName, ModuleName, RequireTarget, RootTable};
+pub use types::{
+    ChunkName, EnvName, EventName, ExtensionName, ModuleName, RequireTarget, RootTable,
+};

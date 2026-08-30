@@ -37,31 +37,32 @@ is one nobody can check.
 
 ## What it demonstrates
 
-- **Read and write are separate roots.** `FsGrant::read` (`src/sandbox/grants.rs:44`) and
-  `FsGrant::write` (`src/sandbox/grants.rs:54`) build independent allowlists, checked by
-  `allows_read` (`:61`) and `allows_write` (`:67`). The second and third refusals above are the
+- **Read and write are separate roots.** `FsGrant::read` (`src/sandbox/grants.rs:49`) and
+  `FsGrant::write` (`src/sandbox/grants.rs:59`) build independent allowlists, checked by
+  `allows_read` (`:66`) and `allows_write` (`:72`). The second and third refusals above are the
   script failing to read files it had just written.
 - **Containment is decided in exactly one place.** Every `fs` call — plus `hash.hash_file` and
-  `glob.walk` — funnels through `PathGuard` (`src/modules/guard.rs:57`), whose `read` (`:74`) and
-  `write` (`:87`) resolve the path before checking it. `resolve` (`:145`) canonicalises the deepest
+  `glob.walk` — funnels through `PathGuard` (`src/modules/guard.rs:60`), whose `read` (`:77`) and
+  `write` (`:90`) resolve the path before checking it. `resolve` (`:164`) canonicalises the deepest
   existing part of the path, so a symlink out of a granted root is caught, and refuses a `..` below
   that point rather than resolving it lexically.
-- **A refusal names the roots that *were* granted** — `PathGuard::deny` (`src/modules/guard.rs:105`).
+- **A refusal names the roots that *were* granted** — `PathGuard::deny` (`src/modules/guard.rs:108`).
   The usual cause of a denial is a grant one directory too deep, which is invisible without the
   list. Which allowlist a refusal was measured against is carried as an `Access` value
-  (`src/modules/guard.rs:31`) rather than a string, so the message and the check cannot name
+  (`src/modules/guard.rs:34`) rather than a string, so the message and the check cannot name
   different directions.
 - **Interrogation counts as reading.** `list`, `stat` and `exists` refuse an ungranted path rather
-  than answering `false` for it (`src/modules/fs.rs:183`); answering would conflate "you may not
+  than answering `false` for it (`src/modules/fs.rs:200`); answering would conflate "you may not
   ask" with "there is nothing there".
 - **`create_exclusive` returns `false` rather than raising** when the file already exists
-  (`src/modules/fs.rs:171`). Losing that race is the expected *other outcome*, not a failure —
-  this is `O_CREAT|O_EXCL`, and a read-then-write would let several concurrent callers all believe
-  they won.
+  (`src/modules/fs.rs:187`). Losing that race is the expected *other outcome*, not a failure — the
+  creation itself is atomic (rests on `create_new`, not on a read-then-check), so several
+  concurrent callers cannot all believe they won.
 - **`atomic_write` stages in the target's own directory and renames over it**
-  (`src/modules/fs.rs:419`), so a concurrent reader sees the old bytes or the new ones, never half
-  of each. `/tmp` is not used, because a rename across filesystems is not atomic.
-- **`fs.list` sorts** (`src/modules/fs.rs:271`). Directory order is whatever the filesystem returns
+  (`src/modules/fs.rs:462`), so a concurrent reader sees the old bytes or the new ones, never half
+  of each. The temporary directory the platform reports (`/tmp` on unix, `%TEMP%` on Windows) is
+  not used, because a rename across volumes is not atomic on either platform.
+- **`fs.list` sorts** (`src/modules/fs.rs:297`). Directory order is whatever the filesystem returns
   and differs between machines.
 
 ### `Script::from_file` is not governed by the grants

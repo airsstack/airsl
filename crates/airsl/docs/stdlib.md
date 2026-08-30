@@ -30,8 +30,16 @@ pure string math and needs no authority, file access needs a grant. A function t
 grant onto a previously-pure module is a design change, not a detail.
 
 **Deterministic by default.** Sorted JSON keys, sorted directory listings, C-locale byte ordering,
-stable iteration. Non-determinism here surfaces as spurious diffs and irreproducible builds rather
-than as errors, which makes it expensive to find later.
+stable iteration — and each of these holds on every supported platform, not only on the one the
+example was recorded on. Every path a module hands back to a script is rendered `/`-separated and
+never verbatim (`paths::rules::to_script_string`, `src/paths/rules.rs:196`), so a listing does not
+change shape between a unix run and a Windows one. Directory listings are sorted by
+`walkdir::sort_by_file_name`, an `OsStr` byte comparison (`src/modules/fs.rs:430`,
+`src/modules/glob.rs:116`), so a case-insensitive filesystem does not perturb the order a
+case-sensitive one would produce. Glob matching pins `globset`'s `backslash_escape` to `true`
+(`src/modules/glob.rs:74`) rather than inheriting it from the compiled-for platform, so `\*` escapes
+a literal `*` the same way everywhere. Non-determinism here surfaces as spurious diffs and
+irreproducible builds rather than as errors, which makes it expensive to find later.
 
 **No shell, ever.** `proc.run` takes an argv array. There is no string form, so quoting bugs are
 unrepresentable rather than merely discouraged. `io.popen` takes a shell string, and that is the
@@ -102,9 +110,10 @@ with `hash`, so the dependency list keeps meaning "something uses this".
 
 `time` names two backing crates because `monotonic` is not a date. `now`, `format` and `parse` are
 calendar operations and go through `jiff`; `monotonic` reads `std::time::Instant`
-(`src/modules/time.rs:103`), which is `CLOCK_MONOTONIC` and therefore unaffected by the wall clock
-being adjusted under a running script. No datetime crate can supply that — a `DateTime` is a point
-on a calendar, and a calendar point is defined by the wall clock, so `jiff` and `chrono` alike
+(`src/modules/time.rs:106`), which is unaffected by the wall clock being adjusted under a running
+script on every platform this crate builds for — the property the module depends on, not any one
+platform's name for the mechanism behind it. No datetime crate can supply that — a `DateTime` is a
+point on a calendar, and a calendar point is defined by the wall clock, so `jiff` and `chrono` alike
 bottom out in `SystemTime::now`. It follows that a `monotonic` reading is seconds since an
 unspecified origin, meaningful only when subtracted from another one, and never a timestamp.
 
@@ -126,11 +135,15 @@ capability anyone meant to grant. `env.get`, `env.all` and `proc.run` all read t
 from inside Lua the behaviour is what a script expects — what does not change is what the host
 process itself sees.
 
-**`fs.create_exclusive` is a concurrency primitive, not a convenience.** It is `O_CREAT|O_EXCL` — an
-atomic claim, and the only way a script gets one. A script that must act exactly once per event
-cannot do it with read-then-append: several copies racing on the same sentinel all read an absent
-marker, all append, and all act. Measured on one such corpus, 3 of 4 concurrent runs fired where
-one should have. Without an atomic create, that guarantee can only be approximated.
+**`fs.create_exclusive` is a concurrency primitive, not a convenience.** It rests on `create_new`,
+not on any particular platform flag — an atomic claim, and the only way a script gets one. A script
+that must act exactly once per event cannot do it with read-then-append: several copies racing on
+the same sentinel all read an absent marker, all append, and all act. Measured on one such corpus,
+3 of 4 concurrent runs fired where one should have. Without an atomic create, that guarantee can
+only be approximated. The loser is told it lost — `create_exclusive` returns `false` rather than
+raising — because losing the race is the expected other outcome of an atomic claim, not a failure.
+On a case-insensitive volume the name space this claims into is coarser: `CLAIM` and `claim` are one
+file, so the primitive is stronger there, not weaker, though it changes which names collide.
 
 **`hash` needs SHA-1, not only SHA-256.** A script that derives a directory or cache key from
 `sha1(path)[:8]` — the Lua form of a `shasum | cut -c1-8` pipeline — is not picking a hash for its
@@ -161,7 +174,7 @@ extension instead gets a copy built with `Ext::with_events(...)`, naming the eve
 declared, and `on` accepts registrations only for names in that set. `granted()` returns a table
 built once at install time from the engine's grants and resource limits, so a script can introspect
 what it actually received without needing a grant of its own to ask
-(`src/modules/ext.rs:123`, `GRANTED_KEY`; `granted_table` at `src/modules/ext.rs:149`).
+(`src/modules/ext.rs:123`, `GRANTED_KEY`; `granted_table` at `src/modules/ext.rs:154`).
 
 All four ship. `airsl test` deserves emphasis: a script corpus typically has test files that no
 Rust gate executes — they run under `sh` and `python3` by hand — and porting several thousand lines

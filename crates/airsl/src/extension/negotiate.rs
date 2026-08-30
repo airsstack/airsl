@@ -21,6 +21,7 @@ use std::path::PathBuf;
 use crate::extension::ceiling::Ceiling;
 use crate::extension::manifest::{CapabilityRequest, Manifest};
 use crate::modules::ModuleSet;
+use crate::paths::rules::native::to_script_string;
 use crate::sandbox::{GrantSet, Policy, ResourceLimits};
 use crate::types::ModuleName;
 
@@ -43,8 +44,8 @@ pub enum Capability {
 impl core::fmt::Display for Capability {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::FsRead(p) => write!(f, "fs.read `{}`", p.display()),
-            Self::FsWrite(p) => write!(f, "fs.write `{}`", p.display()),
+            Self::FsRead(p) => write!(f, "fs.read `{}`", to_script_string(p)),
+            Self::FsWrite(p) => write!(f, "fs.write `{}`", to_script_string(p)),
             Self::ProcRun(x) => write!(f, "proc.run `{x}`"),
             Self::EnvRead(n) => write!(f, "env.read `{n}`"),
             Self::Module(m) => write!(f, "module `{m}`"),
@@ -251,7 +252,7 @@ fn roots(paths: &[PathBuf]) -> String {
     }
     paths
         .iter()
-        .map(|p| p.display().to_string())
+        .map(|p| to_script_string(p))
         .collect::<Vec<_>>()
         .join(", ")
 }
@@ -326,6 +327,7 @@ mod tests {
     use crate::extension::manifest::{MANIFEST_FILE, Manifest};
     use crate::extension::variables::Variables;
     use crate::modules::stdlib;
+    use crate::test_support::abs;
     use crate::{GrantSet, InstructionLimit, MemoryLimit, Policy, ResourceLimits};
 
     /// Writes a manifest whose `[capabilities]` body is `required` and optional body is
@@ -340,7 +342,10 @@ mod tests {
             ),
         )
         .unwrap();
-        let vars = Variables::none().with("HOME", dir.display().to_string());
+        // `script_path`, not `dir.display()`: a caller that canonicalised `dir` first would
+        // otherwise hand this TOML value a `\\?\`-prefixed spelling on Windows, which the runtime
+        // refuses as input before the request under test is ever negotiated.
+        let vars = Variables::none().with("HOME", crate::test_support::script_path(dir));
         Manifest::from_dir(dir, &vars).unwrap()
     }
 
@@ -379,10 +384,15 @@ mod tests {
     #[test]
     fn a_required_read_outside_the_ceiling_is_denied_naming_the_roots() {
         let dir = tempfile::tempdir().unwrap();
-        let m = manifest(dir.path(), "fs.read=['/']", "", "");
+        // `abs("/")`, not a bare `"/"`: the manifest validator requires an absolute path, and a
+        // driveless `/` fails that check on Windows before this test's denial is ever reached.
+        let outside = abs("/");
+        let m = manifest(dir.path(), &format!("fs.read=['{outside}']"), "", "");
         let n = negotiate(&m, &ceiling(dir.path()), &stdlib().unwrap());
         assert_eq!(n.denied().len(), 1);
-        assert!(matches!(n.denied()[0].capability(), Capability::FsRead(p) if p == Path::new("/")));
+        assert!(
+            matches!(n.denied()[0].capability(), Capability::FsRead(p) if p == Path::new(&outside))
+        );
         assert!(
             n.denied()[0].detail().contains("granted read roots"),
             "{}",
@@ -477,7 +487,7 @@ mod tests {
         // absolute but does not resolve symlinks, so the manifest has to be written against the
         // same canonical spelling the ceiling's existing-directory root resolves to, or the two
         // sides would never agree on what "inside" means.
-        let canonical = dir.path().canonicalize().unwrap();
+        let canonical = crate::test_support::canonical(dir.path());
         let m = manifest(&canonical, "fs.read=['$HOME/does-not-exist-yet']", "", "");
         let n = negotiate(&m, &ceiling(&canonical), &stdlib().unwrap());
         assert!(n.is_satisfied(), "{:?}", n.denied());
@@ -512,7 +522,7 @@ mod tests {
     fn a_symlink_pointing_out_of_the_root_is_denied_when_it_exists() {
         let dir = tempfile::tempdir().unwrap();
         let outside = tempfile::tempdir().unwrap();
-        std::os::unix::fs::symlink(outside.path(), dir.path().join("link")).unwrap();
+        crate::test_support::link_dir(outside.path(), &dir.path().join("link")).unwrap();
         let m = manifest(dir.path(), "fs.read=['$HOME/link']", "", "");
         let n = negotiate(&m, &ceiling(dir.path()), &stdlib().unwrap());
         assert!(

@@ -1,0 +1,4 @@
+This example grants and spawns `sh` so a refusal has a real permitted program to be measured
+against. Its documented output is byte-for-byte, and no program ships on both unix and Windows
+that would reproduce that output the same way — so the example does not run there, and only
+there.

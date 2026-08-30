@@ -36,12 +36,16 @@ failed: broken — extension `broken` was not loaded: fs.read `/`: outside the g
 word-count: {"longest":"quick","words":9}
 ```
 
+The `fs.read` value above is this platform's filesystem root — unix shows `/`; an equivalent
+Windows build shows the drive root `main.rs`'s `OUTSIDE_ROOT` supplies instead.
+
 ## What it demonstrates
 
-- **`load_dir` never short-circuits.** `extensions/broken` asks for `fs.read = ["/"]`, and the host
-  is built with `Ceiling::new(Policy::confined())` (`src/extension/ceiling.rs:27`), whose grants
-  start empty — `/` is outside every read root the ceiling allows, so negotiation denies the
-  request before `broken/main.lua` is opened for evaluation. `word-count` loads regardless: one
+- **`load_dir` never short-circuits.** `extensions/broken` asks for `fs.read = ["$OUTSIDE"]`, which
+  `main.rs` expands to the filesystem root, and the host is built with
+  `Ceiling::new(Policy::confined())` (`src/extension/ceiling.rs:27`), whose grants start empty — the
+  root is outside every read root the ceiling allows, so negotiation denies the request before
+  `broken/main.lua` is opened for evaluation. `word-count` loads regardless: one
   directory's manifest error is data in the returned [`LoadReport`]
   (`src/extension/load_report.rs:20`), never an early return that would have stopped `word-count`
   from being tried.

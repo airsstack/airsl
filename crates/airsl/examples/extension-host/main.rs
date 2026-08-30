@@ -4,9 +4,9 @@
 //! host embeds one script" into "a host runs a plugin directory it never audited line by line" —
 //! `load_dir` negotiates each manifest against a ceiling the host chose, never against what the
 //! manifest asked for, and one denial does not stop the rest from loading. `extensions/broken`
-//! exists to prove that: it asks for `fs.read = ["/"]`, which is outside every ceiling this
-//! example builds, so it is refused before its `main.lua` ever runs, while `word-count` loads and
-//! answers the broadcast normally.
+//! exists to prove that: it asks for `fs.read = ["$OUTSIDE"]`, which this host expands to the
+//! filesystem root and which is outside every ceiling this example builds, so it is refused before
+//! its `main.lua` ever runs, while `word-count` loads and answers the broadcast normally.
 //!
 //! Responsibilities: building a host with a [`Ceiling`], loading a directory, reading a
 //! [`LoadReport`] that never short-circuits, and rendering a [`Dispatch`] as byte-stable JSON.
@@ -21,6 +21,16 @@ use airsl::extension::Ceiling;
 use airsl::{EventName, ExtensionHost, Policy};
 use serde_json::json;
 
+/// The value `extensions/broken/extension.toml`'s `$OUTSIDE` expands to: the filesystem root,
+/// spelled the way each platform requires an absolute path to be spelled. A bare `/` is rooted but
+/// driveless on Windows, so the manifest validator would refuse it before negotiation ever ran —
+/// this keeps the extension demonstrating a ceiling denial on both platforms, rather than turning
+/// into a manifest error on one of them.
+#[cfg(unix)]
+const OUTSIDE_ROOT: &str = "/";
+#[cfg(windows)]
+const OUTSIDE_ROOT: &str = "C:\\";
+
 fn main() -> Result<(), Box<dyn StdError>> {
     let extensions =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/extension-host/extensions");
@@ -28,6 +38,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
     let mut host = ExtensionHost::builder()
         .ceiling(Ceiling::new(Policy::confined())?)
         .events(["count"])?
+        .variables([("OUTSIDE", OUTSIDE_ROOT)])
         .build()?;
 
     let report = host.load_dir(&extensions)?;

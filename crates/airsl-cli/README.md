@@ -9,9 +9,9 @@ cargo install --locked airsl-cli
 airsl doctor
 ```
 
-**Linux and macOS only.** `airsstack.proc` resolves executables by unix mode bits, which have no
-Windows equivalent, so the runtime refuses to build off unix rather than pretending. Supporting
-Windows is a decision about what "executable" means there, not a portability patch.
+**Supported targets: Linux, macOS, and `x86_64-pc-windows-msvc`.** On Windows, `airsstack.proc` runs
+`.exe` programs only — `npm`, `npx`, `yarn` and `tsc`, which ship as `.cmd` shims, are not reachable
+through it.
 
 **A C compiler is required.** `mlua`'s `vendored` feature builds Lua 5.4 from the C sources shipped
 by `lua-src` and links it statically, so there is no system Lua and no `pkg-config` — but `cc` must
@@ -24,14 +24,14 @@ https://github.com/airsstack/airsl --locked airsl-cli`. Working inside a clone,
 `doctor` prints the runtime version and the policy a script would actually run under:
 
 ```
-airsl 0.1.0
+airsl 0.1.3
   lua:          Lua 5.4
   language:     restricted
   root table:   airsstack
   grants:       none
   memory:       67108864 bytes
   instructions: 100000000 instructions
-  modules:      json, path, fs, env, proc, regex, hash, time, glob, stdio, hook
+  modules:      json, path, fs, env, proc, regex, hash, time, glob, stdio, hook, ext
 ```
 
 Pass `--policy` to describe a different preset rather than the default.
@@ -104,6 +104,9 @@ A refusal names what was granted, because the usual cause is a root one director
 ```
 airsl: fs.read denied: `/etc/hostname` is outside the granted read roots: /home/me/journal
 ```
+
+The roots list is rendered in the `/` vocabulary on every platform, so a Windows reader sees
+`C:/home/me/journal` rather than a backslash spelling — this one example stands in for both.
 
 Under `--policy trusted` these flags are ignored: that preset waives containment entirely, so a
 declared list would narrow nothing and would make `airsl doctor` report something meaningless.
@@ -294,6 +297,9 @@ exit 0
 Every path exits 0, and `exec` is deliberately not used — it would replace the shell and hand the
 child's exit status straight back to the caller.
 
+A Windows host needs its own launcher — a `.cmd` or PowerShell equivalent making the same three
+decisions (missing directory, missing binary, and always exiting 0). None is shipped.
+
 ## Documentation
 
 The reference layer is the library's rustdoc at [docs.rs/airsl](https://docs.rs/airsl) — this crate
@@ -322,7 +328,7 @@ Each document marks which parts ship and which are design.
 
 [CHANGELOG.md](https://github.com/airsstack/airsl/blob/main/CHANGELOG.md) — one timeline covering
 this binary and the `airsl` library it carries, which are numbered independently. Releases are
-tagged per crate: `airsl-cli-v0.1.2`, `airsl-v0.1.3`.
+tagged per crate: `airsl-cli-v0.1.3`, `airsl-v0.1.4`.
 
 This binary's behaviour changes when the library beneath it does, so an entry naming an `airsl`
 version is describing this crate too.

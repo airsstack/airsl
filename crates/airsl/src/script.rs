@@ -13,6 +13,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::error::{Error, Result};
+use crate::paths::rules::native::to_script_string;
 use crate::types::ChunkName;
 
 /// Lua source together with the name it reports, the directory it may `require` from, and the
@@ -63,7 +64,7 @@ impl Script {
     pub fn from_file(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
         let source = std::fs::read_to_string(path).map_err(|source| Error::ScriptRead {
-            path: path.display().to_string(),
+            path: to_script_string(path),
             source,
         })?;
         let root = Some(require_root(path));
@@ -180,7 +181,7 @@ mod tests {
         reason = "tests unwrap known-valid fixtures; a panic is the intended failure signal"
     )]
 
-    use super::{Script, require_root};
+    use super::{Script, require_root, to_script_string};
     use std::io::Write as _;
     use std::path::Path;
 
@@ -216,7 +217,10 @@ mod tests {
 
         let script = Script::from_file(&path).unwrap();
         assert_eq!(script.source().trim(), "return 42");
-        assert_eq!(script.name().as_str(), path.display().to_string());
+        // `to_script_string`, not `path.display()`: the chunk name is `/`-spelled (see
+        // `Script::from_file`), so the expectation has to be built the same way or the two
+        // disagree on Windows.
+        assert_eq!(script.name().as_str(), to_script_string(&path));
         assert_eq!(script.root(), Some(dir.path()));
     }
 
@@ -271,11 +275,15 @@ mod tests {
 
         let script = Script::from_file(&path).unwrap().with_name("hook").unwrap();
         assert_eq!(script.name().as_str(), "hook");
+        // `to_script_string`, not `dir.path().display()`: the needle has to be built in the same
+        // `/`-spelled vocabulary the name would carry if the bug this pins ever regressed — a
+        // `\`-spelled needle can never match a `/`-spelled name, which would make this assertion
+        // pass without testing anything.
         assert!(
             !script
                 .name()
                 .as_str()
-                .contains(&dir.path().display().to_string()),
+                .contains(&to_script_string(dir.path())),
             "the absolute path should not survive into the traceback name: {}",
             script.name()
         );

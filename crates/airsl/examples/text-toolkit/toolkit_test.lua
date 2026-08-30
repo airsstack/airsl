@@ -87,8 +87,12 @@ return {
     assert(not pcall(path.relative_to, "a/b", "c"))
   end,
 
-  is_absolute_reads_the_leading_separator_and_nothing_else = function()
-    assert(path.is_absolute("/etc/hosts"))
+  is_absolute_distinguishes_a_rooted_path_from_a_relative_one = function()
+    -- Absoluteness is a property of the path grammar, and the grammar differs: a leading
+    -- separator is enough on unix, while Windows also wants a drive, so no single literal is
+    -- absolute everywhere. `absolute` produces whatever the host counts as one, which makes the
+    -- relationship between the two functions the thing worth asserting.
+    assert(path.is_absolute(path.absolute("x")))
     assert(not path.is_absolute("etc/hosts"))
   end,
 

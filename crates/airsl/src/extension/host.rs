@@ -22,6 +22,7 @@ use crate::extension::{
     ManifestApprover, Variables,
 };
 use crate::modules::ModuleSet;
+use crate::paths::rules::native::to_script_string;
 use crate::types::{EventName, ExtensionName, RootTable};
 
 /// Builds a [`ModuleSet`] for each load. The default is [`crate::modules::stdlib()`].
@@ -281,7 +282,7 @@ impl<A: Approver, F: ModuleFactory> ExtensionHost<A, F> {
         let root = root.as_ref();
         let io = |source: std::io::Error| Error::Io {
             operation: "read_dir",
-            path: root.display().to_string(),
+            path: to_script_string(root),
             source,
         };
 
@@ -361,6 +362,7 @@ mod tests {
     use crate::extension::approver::{ApprovalRequest, Decision};
     use crate::modules::{HostModule, InstallContext, stdlib};
     use crate::sandbox::{GrantSet, Policy};
+    use crate::test_support::abs;
     use crate::types::ModuleName;
 
     /// Writes `extension.toml` + `main.lua` into a fresh directory and returns it.
@@ -467,13 +469,16 @@ mod tests {
             format!(
                 "[extension]\nname = \"dup\"\nversion = \"0.1.0\"\nentry = \"main.lua\"\napi = 1\n\
                  [capabilities]\nfs.write = [\"{}\"]\n",
-                second.path().display()
+                to_script_string(second.path())
             ),
         )
         .unwrap();
         fs::write(
             second.path().join("main.lua"),
-            format!("airsstack.fs.write('{}', 'ran')\n", marker.display()),
+            format!(
+                "airsstack.fs.write('{}', 'ran')\n",
+                to_script_string(&marker)
+            ),
         )
         .unwrap();
 
@@ -516,10 +521,16 @@ mod tests {
         }
         let broken = root.path().join("c-broken");
         fs::create_dir(&broken).unwrap();
+        // `abs("/")`, not a bare `"/"`: the manifest validator requires an absolute path before
+        // negotiation ever runs, and a driveless `/` fails that check on Windows instead of
+        // reaching the ceiling denial this test means to exercise.
         fs::write(
             broken.join("extension.toml"),
-            "[extension]\nname = \"c-broken\"\nversion = \"0.1.0\"\nentry = \"main.lua\"\napi = 1\n\
-             [capabilities]\nfs.read = [\"/\"]\n",
+            format!(
+                "[extension]\nname = \"c-broken\"\nversion = \"0.1.0\"\nentry = \"main.lua\"\napi = 1\n\
+                 [capabilities]\nfs.read = [\"{}\"]\n",
+                abs("/")
+            ),
         )
         .unwrap();
         fs::write(broken.join("main.lua"), "return 1").unwrap();
@@ -632,7 +643,7 @@ mod tests {
     #[test]
     fn variables_reach_the_manifest() {
         let home = TempDir::new().unwrap();
-        let data = home.path().canonicalize().unwrap().join("data");
+        let data = crate::test_support::canonical(home.path()).join("data");
         fs::create_dir(&data).unwrap();
         let dir = fixture(
             "var-ext",

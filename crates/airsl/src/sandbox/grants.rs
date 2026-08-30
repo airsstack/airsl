@@ -9,12 +9,17 @@
 //!
 //! - [`FsGrant`], [`EnvGrant`] and [`ProcGrant`], each an allowlist with the containment rule that
 //!   fits it.
-//! - The containment checks themselves, which are the only place the rules are written down.
+//! - `FsGrant`'s root resolution, which puts a grant root into the same spelling the paths checked
+//!   against it will be in; the comparison itself is `paths::containment`'s, shared with every
+//!   other site in this crate that checks a path against a root.
 //!
 //! Non-responsibilities: resolving a path against the filesystem. A grant is asked about a path
 //! that has already been made absolute and canonical as far as it exists; deciding what that means
 //! is the `fs` module's job, because only it knows whether the target is being read or created.
 
+use crate::paths::containment::contains_any;
+use crate::paths::rules::native::strip_verbatim;
+use crate::types::EnvName;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
@@ -116,21 +121,24 @@ impl FsGrant {
 /// A root that does not exist yet is made absolute but not canonical, since there is nothing to
 /// resolve; that is the ordinary case for a write root the script is about to create.
 ///
+/// The result is stripped of any verbatim prefix regardless of which branch produced it — not
+/// only the `canonicalize()` branch — so a caller can never end up with a verbatim root. The
+/// `std::path::absolute` fallback never produces one, and neither does the final `unwrap_or`
+/// fallback ordinarily, but a **host-supplied** root can already be verbatim (a caller writing
+/// `FsGrant::write(r"\\?\C:\out")` directly), and that value flows through `unwrap_or` unchanged
+/// unless it is stripped here too. Stripping once, over the whole expression, closes that gap
+/// instead of leaving it open in the one branch this function does not construct itself: an
+/// unstripped root compares unequal to every resolved path checked against it, so the grant would
+/// silently match nothing rather than fail loudly.
+///
 /// `pub(crate)` so [`crate::extension::negotiate`] can canonicalise a requested root the same way
 /// a grant would, without allocating a whole [`FsGrant`] just to read back its first element.
 pub(crate) fn resolve_root(root: PathBuf) -> PathBuf {
-    root.canonicalize()
+    let resolved = root
+        .canonicalize()
         .or_else(|_| std::path::absolute(&root))
-        .unwrap_or(root)
-}
-
-/// Whether `path` is inside any of `roots`.
-///
-/// Compared component-wise via [`Path::starts_with`] rather than as strings, so `/repo-extra` is
-/// not inside `/repo`. A string prefix test accepts that, and it is the classic way a containment
-/// check turns out to have never contained anything.
-fn contains_any(roots: &[PathBuf], path: &Path) -> bool {
-    roots.iter().any(|root| path.starts_with(root))
+        .unwrap_or(root);
+    strip_verbatim(resolved)
 }
 
 /// Which environment variables a script may read.
@@ -138,9 +146,16 @@ fn contains_any(roots: &[PathBuf], path: &Path) -> bool {
 /// An allowlist of names rather than a boolean, because the environment routinely carries
 /// credentials that have nothing to do with the script holding the grant. "May read the
 /// environment" is almost never the authority anyone means.
+///
+/// The derived `PartialEq` compares the underlying `BTreeSet<EnvName>`, which means it inherits
+/// `EnvName`'s fold: on Windows, `EnvGrant::none().read(["Path"])` and
+/// `EnvGrant::none().read(["PATH"])` compare equal, and so do the [`super::GrantSet`] values built
+/// from them. That is correct rather than incidental — the two grants authorise reading exactly
+/// the same variable on that platform — so it is left as the derive produces it rather than
+/// special-cased away.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct EnvGrant {
-    names: BTreeSet<String>,
+    names: BTreeSet<EnvName>,
 }
 
 impl EnvGrant {
@@ -159,14 +174,33 @@ impl EnvGrant {
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
-        self.names.extend(names.into_iter().map(Into::into));
+        self.names
+            .extend(names.into_iter().map(|name| EnvName::new(name.into())));
         self
     }
 
     /// Whether `name` is on the allowlist.
+    ///
+    /// The one behavioural delta this crate's `EnvName` identity introduces on `EnvGrant`: on
+    /// Windows, a grant of `PATH` now also allows `Path` and `path`, because that platform's
+    /// environment block does not distinguish them regardless of who wrote it. On unix, this is
+    /// unchanged — still an exact match.
+    ///
+    /// A linear scan comparing `name` against each entry, not a `BTreeSet` lookup keyed by
+    /// `&str`. Implementing `Borrow<str>` for `EnvName` so `&str` could be looked up directly is
+    /// unavailable here: `Borrow`'s contract requires the borrowed type's `Ord` to agree with the
+    /// owning type's, and that is exactly what the fold breaks on Windows, where two different
+    /// `&str` values (`"PATH"`, `"Path"`) must map to one `EnvName` identity — violating it would
+    /// give `BTreeSet` a wrong-but-safe answer (a lookup that silently fails to find an entry
+    /// that is logically present), not undefined behaviour. A grant set holds a handful of names,
+    /// so the scan costs nothing that matters, and it costs no allocation either.
     #[must_use]
     pub fn allows(&self, name: &str) -> bool {
-        self.names.contains(name)
+        use crate::types::env_name::{NATIVE, compare};
+
+        self.names
+            .iter()
+            .any(|entry| compare(entry.as_str(), name, NATIVE) == core::cmp::Ordering::Equal)
     }
 
     /// The allowed names, in sorted order.
@@ -174,7 +208,7 @@ impl EnvGrant {
     /// Sorted because this is what `airsl doctor` prints and what a script sees from `env.all`,
     /// and a set that enumerated differently between runs would make both non-deterministic.
     pub fn names(&self) -> impl Iterator<Item = &str> {
-        self.names.iter().map(String::as_str)
+        self.names.iter().map(EnvName::as_str)
     }
 
     /// Whether this grant permits nothing at all.
@@ -242,6 +276,7 @@ mod tests {
     )]
 
     use super::{EnvGrant, FsGrant, ProcGrant};
+    use crate::test_support::abs;
     use std::path::Path;
 
     #[test]
@@ -254,48 +289,57 @@ mod tests {
 
     #[test]
     fn a_read_root_covers_itself_and_its_descendants() {
-        let grant = FsGrant::none().read("/repo");
-        assert!(grant.allows_read(Path::new("/repo")));
-        assert!(grant.allows_read(Path::new("/repo/crates/airsl")));
+        // `abs`, not the unix-spelled literal directly: a bare `/repo` has a root but no drive, so
+        // it is not absolute on Windows and would resolve against whichever drive the test runs
+        // from instead of matching the checked path below.
+        let grant = FsGrant::none().read(abs("/repo"));
+        assert!(grant.allows_read(Path::new(&abs("/repo"))));
+        assert!(grant.allows_read(Path::new(&abs("/repo/crates/airsl"))));
     }
 
     #[test]
     fn a_read_root_does_not_cover_its_parent_or_a_sibling() {
-        let grant = FsGrant::none().read("/repo");
-        assert!(!grant.allows_read(Path::new("/")));
-        assert!(!grant.allows_read(Path::new("/elsewhere")));
+        // `abs`: see `a_read_root_covers_itself_and_its_descendants`.
+        let grant = FsGrant::none().read(abs("/repo"));
+        assert!(!grant.allows_read(Path::new(&abs("/"))));
+        assert!(!grant.allows_read(Path::new(&abs("/elsewhere"))));
     }
 
     #[test]
     fn a_sibling_sharing_a_name_prefix_is_not_inside_the_root() {
         // The string test `"/repo-extra".starts_with("/repo")` is true; the component test is not.
-        let grant = FsGrant::none().read("/repo");
-        assert!(!grant.allows_read(Path::new("/repo-extra")));
-        assert!(!grant.allows_read(Path::new("/repo-extra/src")));
+        // `abs`: see `a_read_root_covers_itself_and_its_descendants`.
+        let grant = FsGrant::none().read(abs("/repo"));
+        assert!(!grant.allows_read(Path::new(&abs("/repo-extra"))));
+        assert!(!grant.allows_read(Path::new(&abs("/repo-extra/src"))));
     }
 
     #[test]
     fn read_and_write_are_independent_authorities() {
-        let grant = FsGrant::none().read("/repo").write("/repo/.index");
-        assert!(grant.allows_read(Path::new("/repo/src")));
-        assert!(!grant.allows_write(Path::new("/repo/src")));
-        assert!(grant.allows_write(Path::new("/repo/.index/a.json")));
+        // `abs`: see `a_read_root_covers_itself_and_its_descendants`.
+        let grant = FsGrant::none()
+            .read(abs("/repo"))
+            .write(abs("/repo/.index"));
+        assert!(grant.allows_read(Path::new(&abs("/repo/src"))));
+        assert!(!grant.allows_write(Path::new(&abs("/repo/src"))));
+        assert!(grant.allows_write(Path::new(&abs("/repo/.index/a.json"))));
         // A write root is not implicitly readable, but here it happens to sit under a read root.
-        assert!(grant.allows_read(Path::new("/repo/.index/a.json")));
+        assert!(grant.allows_read(Path::new(&abs("/repo/.index/a.json"))));
     }
 
     #[test]
     fn a_write_root_outside_every_read_root_is_not_readable() {
-        let grant = FsGrant::none().read("/repo").write("/var/state");
-        assert!(grant.allows_write(Path::new("/var/state/a")));
-        assert!(!grant.allows_read(Path::new("/var/state/a")));
+        // `abs`: see `a_read_root_covers_itself_and_its_descendants`.
+        let grant = FsGrant::none().read(abs("/repo")).write(abs("/var/state"));
+        assert!(grant.allows_write(Path::new(&abs("/var/state/a"))));
+        assert!(!grant.allows_read(Path::new(&abs("/var/state/a"))));
     }
 
     #[test]
     fn a_relative_root_resolves_against_the_working_directory() {
         // `--allow-read .` is the obvious thing to type. Stored verbatim it grants nothing at all,
         // because every path it is checked against is absolute.
-        let here = std::env::current_dir().unwrap().canonicalize().unwrap();
+        let here = crate::test_support::canonical(&std::env::current_dir().unwrap());
         let grant = FsGrant::none().read(".");
         assert_eq!(grant.read_roots(), std::slice::from_ref(&here));
         assert!(grant.allows_read(&here.join("Cargo.toml")));
@@ -306,9 +350,9 @@ mod tests {
         // Otherwise granting the link grants nothing: a path under it canonicalises past the link,
         // and the refusal names a root that looks exactly right.
         let dir = tempfile::tempdir().unwrap();
-        let base = dir.path().canonicalize().unwrap();
+        let base = crate::test_support::canonical(dir.path());
         std::fs::create_dir(base.join("real")).unwrap();
-        std::os::unix::fs::symlink(base.join("real"), base.join("link")).unwrap();
+        crate::test_support::link_dir(&base.join("real"), &base.join("link")).unwrap();
 
         let grant = FsGrant::none().read(base.join("link"));
         assert_eq!(grant.read_roots(), [base.join("real")]);
@@ -338,20 +382,83 @@ mod tests {
 
     #[test]
     fn a_root_that_does_not_exist_yet_is_made_absolute_but_kept() {
-        // The ordinary case for a write root: the script is about to create it.
-        let grant = FsGrant::none().write("/definitely/not/here");
+        // The ordinary case for a write root: the script is about to create it. `abs`: see
+        // `a_read_root_covers_itself_and_its_descendants` — an unresolvable, driveless root would
+        // otherwise be re-rooted onto the current drive by `resolve_root`'s `std::path::absolute`
+        // fallback, so the exact-equality check below would fail on Windows for a reason that has
+        // nothing to do with the property this test pins.
+        let grant = FsGrant::none().write(abs("/definitely/not/here"));
         assert_eq!(
             grant.write_roots(),
-            [std::path::PathBuf::from("/definitely/not/here")]
+            [std::path::PathBuf::from(abs("/definitely/not/here"))]
+        );
+    }
+
+    #[test]
+    fn a_write_root_that_does_not_exist_yet_still_matches_a_path_resolved_beneath_it_once_created()
+    {
+        // What this test establishes: the ordinary, positive-path case works end to end — a write
+        // root granted before it exists still matches a path resolved beneath it once the
+        // directory is created and canonicalised. `resolved_after_creation` is stripped with
+        // `native::strip_verbatim` because that is what every real caller does before comparing
+        // against a grant (`PathGuard::resolve`, in this crate); comparing a bare, unstripped
+        // `canonicalize()` result would fail on Windows regardless of `resolve_root`, since that
+        // is not the input shape this grant is ever actually checked against.
+        //
+        // What this test does **not** establish: that it would go red on a Windows host with the
+        // whole-expression `strip_verbatim` removed from `resolve_root` (see that function's doc
+        // comment for the gap it closes). Reasoning about that would require knowing whether
+        // `std::path::absolute` preserves or discards an already-verbatim prefix on an input that
+        // inherited one — a real Windows API behaviour this crate cannot observe from this host
+        // (no rust-src, no Windows runner) or settle by reading the standard library source. A
+        // more targeted test for the specific gap `resolve_root`'s fix closes —
+        // `a_verbatim_root_the_host_supplies_directly_is_never_stored_verbatim`, below — is
+        // `#[cfg(windows)]` for the same reason and is honest about the same limit.
+        let dir = tempfile::tempdir().unwrap();
+        // Canonicalised up front, the same way the sibling symlink test does: `tempdir()` on
+        // macOS returns a path through `/tmp`, itself a symlink to `/private/tmp`, and that
+        // unrelated indirection would fail this assertion for reasons that have nothing to do
+        // with the fix under test.
+        let base = dir.path().canonicalize().unwrap();
+        let root = base.join("not-created-yet");
+        let grant = FsGrant::none().write(&root);
+        assert!(!root.exists());
+
+        std::fs::create_dir(&root).unwrap();
+        let resolved_after_creation =
+            crate::paths::rules::native::strip_verbatim(root.canonicalize().unwrap());
+
+        assert!(grant.allows_write(&resolved_after_creation.join("output.json")));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_verbatim_root_the_host_supplies_directly_is_never_stored_verbatim() {
+        // Targets the specific gap `resolve_root`'s whole-expression `strip_verbatim` closes: a
+        // host that writes `FsGrant::write(r"\\?\C:\...")` directly, rather than a root this crate
+        // derived from its own `canonicalize()` call. The location does not exist, so
+        // `root.canonicalize()` fails and the function falls through to `std::path::absolute` (or,
+        // failing that, `unwrap_or(root)`); before the fix only the `canonicalize()` branch was
+        // stripped, so a verbatim root reaching either of the other two flowed through unchanged.
+        // A stored verbatim root compares unequal to every ordinary resolved path checked against
+        // it via `starts_with`, so the grant would silently match nothing.
+        let grant = FsGrant::none().write(r"\\?\C:\definitely\not\here");
+        assert!(
+            !grant.write_roots()[0]
+                .to_string_lossy()
+                .starts_with(r"\\?\"),
+            "a stored grant root must never be verbatim: {}",
+            grant.write_roots()[0].display()
         );
     }
 
     #[test]
     fn several_roots_are_all_honoured() {
-        let grant = FsGrant::none().read("/a").read("/b");
-        assert!(grant.allows_read(Path::new("/a/x")));
-        assert!(grant.allows_read(Path::new("/b/x")));
-        assert!(!grant.allows_read(Path::new("/c/x")));
+        // `abs`: see `a_read_root_covers_itself_and_its_descendants`.
+        let grant = FsGrant::none().read(abs("/a")).read(abs("/b"));
+        assert!(grant.allows_read(Path::new(&abs("/a/x"))));
+        assert!(grant.allows_read(Path::new(&abs("/b/x"))));
+        assert!(!grant.allows_read(Path::new(&abs("/c/x"))));
     }
 
     #[test]
@@ -366,7 +473,21 @@ mod tests {
     fn env_names_are_matched_exactly_rather_than_by_prefix() {
         let grant = EnvGrant::none().read(["HOME"]);
         assert!(!grant.allows("HOMEBREW_PREFIX"));
-        assert!(!grant.allows("home"));
+    }
+
+    #[test]
+    fn env_names_fold_case_on_windows_and_compare_exactly_on_unix() {
+        let grant = EnvGrant::none().read(["PATH"]);
+        #[cfg(windows)]
+        {
+            assert!(grant.allows("Path"));
+            assert!(grant.allows("path"));
+        }
+        #[cfg(unix)]
+        {
+            assert!(!grant.allows("Path"));
+            assert!(!grant.allows("path"));
+        }
     }
 
     #[test]
@@ -391,6 +512,18 @@ mod tests {
         let grant = ProcGrant::none().allow(["git"]);
         assert!(!grant.allows("/usr/bin/git"));
         assert!(!grant.allows("./git"));
+    }
+
+    #[test]
+    fn a_proc_grant_does_not_admit_an_exe_suffix_or_a_case_variant_of_a_granted_name() {
+        // The `.exe` suffix lives in `proc::which`'s candidate list, never in the grant, so one
+        // script plus one grant spelled `git` works unchanged on both platforms. The comparison
+        // stays case-sensitive too — the narrowest available match, and therefore the one that
+        // fails closed rather than open on a platform where filenames are case-insensitive.
+        let grant = ProcGrant::none().allow(["git"]);
+        assert!(grant.allows("git"));
+        assert!(!grant.allows("git.exe"));
+        assert!(!grant.allows("GIT"));
     }
 
     #[test]

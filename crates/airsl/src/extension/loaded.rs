@@ -25,6 +25,8 @@ use crate::extension::{
 };
 use crate::modules::ModuleSet;
 use crate::modules::ext::Ext;
+use crate::paths::containment::is_within;
+use crate::paths::rules::native::{strip_verbatim, to_script_string};
 use crate::sandbox::Policy;
 use crate::script::Script;
 use crate::types::{EventName, ExtensionName, RootTable};
@@ -112,12 +114,18 @@ impl<A: Approver> Approved<'_, A> {
             .stdlib(context.modules)
             .build()?;
 
+        // `manifest.entry()` is manifest-declared and never guard-derived, so it renders however
+        // the manifest spelled it rather than through this crate's own separator — a manifest
+        // written on Windows with `\` would otherwise put a `\` into a chunk name next to file
+        // route and require route names that are always `/`-spelled. Rendering it through the
+        // script vocabulary here is what keeps all three sources in agreement regardless of how
+        // the manifest was written.
         let script = Script::from_file(&entry)?
             .with_root(&dir)
             .with_name(format!(
                 "{}/{}",
                 manifest.name(),
-                manifest.entry().display()
+                to_script_string(manifest.entry())
             ))?;
         engine.eval(&script)?;
 
@@ -139,18 +147,18 @@ impl<A: Approver> Approved<'_, A> {
         };
         let root = dir
             .canonicalize()
-            .map_err(|e| invalid(format!("{}: {e}", dir.display())))?;
+            .map_err(|e| invalid(format!("{}: {e}", to_script_string(dir))))?;
         let full = dir.join(entry);
         let resolved = full
             .canonicalize()
-            .map_err(|e| invalid(format!("{}: {e}", full.display())))?;
-        if !resolved.starts_with(&root) {
+            .map_err(|e| invalid(format!("{}: {e}", to_script_string(&full))))?;
+        if !is_within(&resolved, &root) {
             return Err(invalid(format!(
                 "`{}` resolves outside the extension directory",
-                entry.display()
+                to_script_string(entry)
             )));
         }
-        Ok(resolved)
+        Ok(strip_verbatim(resolved))
     }
 }
 
@@ -341,6 +349,40 @@ mod tests {
     }
 
     #[test]
+    fn the_chunk_name_renders_the_manifest_entry_through_the_script_vocabulary() {
+        // The chunk name is `"{manifest name}/{entry}"`; `entry` here has a subdirectory so the
+        // test exercises a multi-component rendering rather than a single filename that would
+        // look identical under any rule.
+        //
+        // On unix `to_script_string` is the identity, so this assertion is green before and after
+        // the conversion on this host — it cannot demonstrate the Windows case, where a manifest
+        // entry written with `\` would otherwise reach this script-visible traceback unconverted
+        // while the file-loaded and required chunk names beside it are always `/`-spelled.
+        let dir = TempDir::new().unwrap();
+        fs::create_dir_all(dir.path().join("lib")).unwrap();
+        fs::write(
+            dir.path().join("extension.toml"),
+            "[extension]\nname = \"nested\"\nversion = \"0.1.0\"\nentry = \"lib/main.lua\"\napi = 1\n",
+        )
+        .unwrap();
+        fs::write(dir.path().join("lib/main.lua"), "error('boom')").unwrap();
+
+        let ceiling = Ceiling::new(Policy::confined()).unwrap();
+        let events = events(&[]);
+        let variables = Variables::none();
+        let approver = ManifestApprover;
+        let root = RootTable::default();
+
+        let err = Extension::load(
+            dir.path(),
+            context(&ceiling, &events, &variables, &approver, &root),
+        )
+        .unwrap_err();
+
+        assert!(err.to_string().contains("nested/lib/main.lua"), "{err}");
+    }
+
+    #[test]
     fn an_event_with_no_handler_answers_none() {
         let dir = fixture("echo", "", ECHO);
         let ceiling = Ceiling::new(Policy::confined()).unwrap();
@@ -363,25 +405,30 @@ mod tests {
 
     #[test]
     fn a_required_capability_outside_the_ceiling_is_denied_before_any_engine_exists() {
-        // The manifest requests both a denied capability (`fs.read` of `/`, which no ceiling in
-        // this test grants) and a granted one (`fs.write` of the extension's own directory), so
-        // that the entry script *could* prove it ran by writing a marker — if it were ever given
-        // the chance to. `dir` has to be known before the manifest and script are written, so this
-        // test builds its fixture directly rather than through the shared `fixture` helper.
+        // The manifest requests both a denied capability (`fs.read` of `abs("/")`, which no
+        // ceiling in this test grants) and a granted one (`fs.write` of the extension's own
+        // directory), so that the entry script *could* prove it ran by writing a marker — if it
+        // were ever given the chance to. `dir` has to be known before the manifest and script are
+        // written, so this test builds its fixture directly rather than through the shared
+        // `fixture` helper.
         let dir = TempDir::new().unwrap();
         let marker = dir.path().join("marker");
         fs::write(
             dir.path().join("extension.toml"),
             format!(
                 "[extension]\nname = \"x\"\nversion = \"0.1.0\"\nentry = \"main.lua\"\napi = 1\n\
-                 [capabilities]\nfs.read = [\"/\"]\nfs.write = [\"{}\"]\n",
-                dir.path().display()
+                 [capabilities]\nfs.read = [\"{}\"]\nfs.write = [\"{}\"]\n",
+                crate::test_support::abs("/"),
+                to_script_string(dir.path())
             ),
         )
         .unwrap();
         fs::write(
             dir.path().join("main.lua"),
-            format!("airsstack.fs.write('{}', 'ran')\n", marker.display()),
+            format!(
+                "airsstack.fs.write('{}', 'ran')\n",
+                to_script_string(&marker)
+            ),
         )
         .unwrap();
 
@@ -512,7 +559,7 @@ mod tests {
         let outside_file = outside.path().join("evil.lua");
         fs::write(&outside_file, "return 1").unwrap();
         fs::remove_file(dir.path().join("main.lua")).unwrap();
-        std::os::unix::fs::symlink(&outside_file, dir.path().join("main.lua")).unwrap();
+        crate::test_support::link_file(&outside_file, &dir.path().join("main.lua")).unwrap();
 
         let err = pending.start().unwrap_err();
         assert!(

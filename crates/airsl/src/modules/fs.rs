@@ -20,6 +20,8 @@ use std::sync::Arc;
 use crate::error::{Error, Result};
 use crate::modules::guard::PathGuard;
 use crate::modules::{HostModule, InstallContext};
+use crate::paths::ResolvedPath;
+use crate::paths::rules::native::to_script_string;
 use crate::types::ModuleName;
 
 /// Installs `airsstack.fs`.
@@ -50,11 +52,19 @@ impl Default for Fs {
 }
 
 /// Wraps an I/O failure with what was being attempted.
-fn io(operation: &'static str, path: &StdPath) -> impl FnOnce(std::io::Error) -> Error {
-    let path = path.display().to_string();
+fn io(operation: &'static str, path: &ResolvedPath) -> impl FnOnce(std::io::Error) -> Error {
+    io_at(operation, path.to_script_string())
+}
+
+/// As [`io`], for a rendering that did not come from a [`ResolvedPath`].
+///
+/// `atomic_write`'s staging directory is derived with `target.parent()` rather than resolved
+/// through the guard, so it cannot honestly be typed as a `ResolvedPath` — this is the seam that
+/// lets it still render through the shared rule instead of a second, hand-rolled one.
+fn io_at(operation: &'static str, rendered: String) -> impl FnOnce(std::io::Error) -> Error {
     move |source| Error::Io {
         operation,
-        path,
+        path: rendered,
         source,
     }
 }
@@ -83,7 +93,7 @@ impl HostModule for Fs {
         let read = lua
             .create_function(move |_, path: mlua::LuaString| {
                 let target = g.read("read", &path.to_str()?)?;
-                std::fs::read_to_string(&target)
+                std::fs::read_to_string(target.as_path())
                     .map_err(io("read", &target))
                     .map_err(mlua::Error::from)
             })
@@ -94,7 +104,8 @@ impl HostModule for Fs {
         let read_lines = lua
             .create_function(move |lua, path: mlua::LuaString| {
                 let target = g.read("read_lines", &path.to_str()?)?;
-                let text = std::fs::read_to_string(&target).map_err(io("read_lines", &target))?;
+                let text =
+                    std::fs::read_to_string(target.as_path()).map_err(io("read_lines", &target))?;
                 // A trailing newline terminates the last line rather than starting an empty one,
                 // which is what every line-oriented tool means by it.
                 let body = text.strip_suffix('\n').unwrap_or(&text);
@@ -116,7 +127,7 @@ impl HostModule for Fs {
         let write = lua
             .create_function(move |_, (path, body): (mlua::LuaString, mlua::LuaString)| {
                 let target = g.write("write", &path.to_str()?)?;
-                std::fs::write(&target, body.as_bytes())
+                std::fs::write(target.as_path(), body.as_bytes())
                     .map_err(io("write", &target))
                     .map_err(mlua::Error::from)
             })
@@ -130,7 +141,7 @@ impl HostModule for Fs {
                 let mut file = std::fs::OpenOptions::new()
                     .create(true)
                     .append(true)
-                    .open(&target)
+                    .open(target.as_path())
                     .map_err(io("append", &target))?;
                 file.write_all(&body.as_bytes())
                     .map_err(io("append", &target))
@@ -148,6 +159,13 @@ impl HostModule for Fs {
             .map_err(fail)?;
         table.set("atomic_write", atomic_write).map_err(fail)?;
 
+        // Exclusivity rests on `create_new`, not on a POSIX flag pair, so the property that exactly
+        // one claimant wins holds on both platforms. What is coarser on Windows is which spellings
+        // count as the same claim: on a case-insensitive volume `CLAIM` and `claim` name one file, so
+        // a single claim there excludes a wider set of claimants than the equivalent claim on a
+        // case-sensitive one. Wider is the safe direction for a mutual-exclusion primitive, so this is
+        // documented rather than folded away — and NTFS's per-directory case sensitivity means this
+        // runtime cannot know, from the path alone, which behaviour a given call got.
         let g = guard.clone();
         let create_exclusive = lua
             .create_function(
@@ -157,7 +175,7 @@ impl HostModule for Fs {
                     match std::fs::OpenOptions::new()
                         .write(true)
                         .create_new(true)
-                        .open(&target)
+                        .open(target.as_path())
                     {
                         Ok(mut file) => {
                             if let Some(bytes) = contents {
@@ -188,7 +206,7 @@ impl HostModule for Fs {
         let g = guard.clone();
         let exists = lua
             .create_function(move |_, path: mlua::LuaString| {
-                Ok(g.read("exists", &path.to_str()?)?.exists())
+                Ok(g.read("exists", &path.to_str()?)?.as_path().exists())
             })
             .map_err(fail)?;
         table.set("exists", exists).map_err(fail)?;
@@ -196,7 +214,7 @@ impl HostModule for Fs {
         let g = guard.clone();
         let is_file = lua
             .create_function(move |_, path: mlua::LuaString| {
-                Ok(g.read("is_file", &path.to_str()?)?.is_file())
+                Ok(g.read("is_file", &path.to_str()?)?.as_path().is_file())
             })
             .map_err(fail)?;
         table.set("is_file", is_file).map_err(fail)?;
@@ -204,7 +222,7 @@ impl HostModule for Fs {
         let g = guard.clone();
         let is_dir = lua
             .create_function(move |_, path: mlua::LuaString| {
-                Ok(g.read("is_dir", &path.to_str()?)?.is_dir())
+                Ok(g.read("is_dir", &path.to_str()?)?.as_path().is_dir())
             })
             .map_err(fail)?;
         table.set("is_dir", is_dir).map_err(fail)?;
@@ -213,7 +231,8 @@ impl HostModule for Fs {
         let stat = lua
             .create_function(move |lua, path: mlua::LuaString| {
                 let target = g.read("stat", &path.to_str()?)?;
-                let meta = std::fs::symlink_metadata(&target).map_err(io("stat", &target))?;
+                let meta =
+                    std::fs::symlink_metadata(target.as_path()).map_err(io("stat", &target))?;
                 let out = lua.create_table()?;
                 out.set("size", meta.len())?;
                 out.set(
@@ -226,6 +245,11 @@ impl HostModule for Fs {
                         "file"
                     },
                 )?;
+                // `readonly()` reads mode bits on unix and `FILE_ATTRIBUTE_READONLY` on Windows — a
+                // per-file attribute with no owner/group/other dimension, and one that says nothing
+                // about ACLs, which are the access control that actually governs a Windows file. A
+                // script cannot use this field as a portable permission model, only as the one bit
+                // both platforms happen to expose under the same name.
                 out.set("readonly", meta.permissions().readonly())?;
                 out.set("modified", modified_seconds(&meta))?;
                 Ok(out)
@@ -237,7 +261,7 @@ impl HostModule for Fs {
         let canonicalize = lua
             .create_function(move |_, path: mlua::LuaString| {
                 let target = g.read("canonicalize", &path.to_str()?)?;
-                Ok(target.to_string_lossy().into_owned())
+                Ok(target.to_script_string())
             })
             .map_err(fail)?;
         table.set("canonicalize", canonicalize).map_err(fail)?;
@@ -248,8 +272,8 @@ impl HostModule for Fs {
                 move |_, (left, right): (mlua::LuaString, mlua::LuaString)| {
                     let a = g.read("same_content", &left.to_str()?)?;
                     let b = g.read("same_content", &right.to_str()?)?;
-                    let left = std::fs::read(&a).map_err(io("same_content", &a))?;
-                    let right = std::fs::read(&b).map_err(io("same_content", &b))?;
+                    let left = std::fs::read(a.as_path()).map_err(io("same_content", &a))?;
+                    let right = std::fs::read(b.as_path()).map_err(io("same_content", &b))?;
                     Ok(left == right)
                 },
             )
@@ -263,8 +287,11 @@ impl HostModule for Fs {
             .create_function(move |lua, path: mlua::LuaString| {
                 let target = g.read("list", &path.to_str()?)?;
                 let mut names = Vec::new();
-                for entry in std::fs::read_dir(&target).map_err(io("list", &target))? {
+                for entry in std::fs::read_dir(target.as_path()).map_err(io("list", &target))? {
                     let entry = entry.map_err(io("list", &target))?;
+                    // A single directory-entry name, not a path: it cannot contain a separator on
+                    // either platform, so there is nothing here for the script vocabulary to
+                    // convert.
                     names.push(entry.file_name().to_string_lossy().into_owned());
                 }
                 // Directory order is whatever the filesystem returns and differs between machines.
@@ -287,7 +314,7 @@ impl HostModule for Fs {
         let mkdir = lua
             .create_function(move |_, path: mlua::LuaString| {
                 let target = g.write("mkdir", &path.to_str()?)?;
-                std::fs::create_dir_all(&target)
+                std::fs::create_dir_all(target.as_path())
                     .map_err(io("mkdir", &target))
                     .map_err(mlua::Error::from)
             })
@@ -298,7 +325,7 @@ impl HostModule for Fs {
         let remove = lua
             .create_function(move |_, path: mlua::LuaString| {
                 let target = g.write("remove", &path.to_str()?)?;
-                std::fs::remove_file(&target)
+                std::fs::remove_file(target.as_path())
                     .map_err(io("remove", &target))
                     .map_err(mlua::Error::from)
             })
@@ -309,7 +336,7 @@ impl HostModule for Fs {
         let remove_dir = lua
             .create_function(move |_, path: mlua::LuaString| {
                 let target = g.write("remove_dir", &path.to_str()?)?;
-                std::fs::remove_dir_all(&target)
+                std::fs::remove_dir_all(target.as_path())
                     .map_err(io("remove_dir", &target))
                     .map_err(mlua::Error::from)
             })
@@ -321,7 +348,7 @@ impl HostModule for Fs {
             .create_function(move |_, (from, to): (mlua::LuaString, mlua::LuaString)| {
                 let source = g.read("copy", &from.to_str()?)?;
                 let target = g.write("copy", &to.to_str()?)?;
-                std::fs::copy(&source, &target).map_err(io("copy", &target))?;
+                std::fs::copy(source.as_path(), target.as_path()).map_err(io("copy", &target))?;
                 Ok(())
             })
             .map_err(fail)?;
@@ -334,7 +361,7 @@ impl HostModule for Fs {
                 // `remove` does.
                 let source = g.write("rename", &from.to_str()?)?;
                 let target = g.write("rename", &to.to_str()?)?;
-                std::fs::rename(&source, &target)
+                std::fs::rename(source.as_path(), target.as_path())
                     .map_err(io("rename", &target))
                     .map_err(mlua::Error::from)
             })
@@ -347,12 +374,15 @@ impl HostModule for Fs {
         let tempdir = lua
             .create_function(move |_, ()| {
                 let base = std::env::temp_dir();
+                // `base` feeds `g.write`, which accepts a path in either separator form, as every
+                // other guard input does — so no conversion belongs here even though the sibling
+                // return value two lines down needs one.
                 let checked = g.write("tempdir", &base.to_string_lossy())?;
                 let made = tempfile::Builder::new()
                     .prefix("airsl-")
-                    .tempdir_in(&checked)
+                    .tempdir_in(checked.as_path())
                     .map_err(io("tempdir", &checked))?;
-                Ok(made.keep().to_string_lossy().into_owned())
+                Ok(to_script_string(&made.keep()))
             })
             .map_err(fail)?;
         table.set("tempdir", tempdir).map_err(fail)?;
@@ -361,17 +391,18 @@ impl HostModule for Fs {
         let temp_file = lua
             .create_function(move |_, ()| {
                 let base = std::env::temp_dir();
+                // Same reasoning as `tempdir` above: `base` is input to the guard, not a rendering.
                 let checked = g.write("tempfile", &base.to_string_lossy())?;
                 let made = tempfile::Builder::new()
                     .prefix("airsl-")
-                    .tempfile_in(&checked)
+                    .tempfile_in(checked.as_path())
                     .map_err(io("tempfile", &checked))?;
                 let (_, path) = made.keep().map_err(|e| Error::Io {
                     operation: "tempfile",
-                    path: checked.display().to_string(),
+                    path: checked.to_script_string(),
                     source: e.error,
                 })?;
-                Ok(path.to_string_lossy().into_owned())
+                Ok(to_script_string(&path))
             })
             .map_err(fail)?;
         table.set("tempfile", temp_file).map_err(fail)?;
@@ -394,19 +425,19 @@ fn modified_seconds(meta: &std::fs::Metadata) -> i64 {
 }
 
 /// Every entry under `root`, as paths relative to it, in sorted order.
-fn walk(root: &StdPath) -> Result<Vec<String>> {
+fn walk(root: &ResolvedPath) -> Result<Vec<String>> {
     let mut found = Vec::new();
-    for entry in walkdir::WalkDir::new(root).sort_by_file_name() {
+    for entry in walkdir::WalkDir::new(root.as_path()).sort_by_file_name() {
         let entry = entry.map_err(|e| Error::Io {
             operation: "walk",
-            path: root.display().to_string(),
+            path: root.to_script_string(),
             source: e.into(),
         })?;
-        if entry.path() == root {
+        if entry.path() == root.as_path() {
             continue;
         }
-        if let Ok(relative) = entry.path().strip_prefix(root) {
-            found.push(relative.to_string_lossy().into_owned());
+        if let Ok(relative) = entry.path().strip_prefix(root.as_path()) {
+            found.push(to_script_string(relative));
         }
     }
     Ok(found)
@@ -415,19 +446,34 @@ fn walk(root: &StdPath) -> Result<Vec<String>> {
 /// Writes `body` to `target` so that a reader sees either the old contents or the new ones.
 ///
 /// The temporary file is created in the same directory as the target, because a rename across
-/// filesystems is not atomic and `/tmp` is routinely a different filesystem.
-fn atomic_write(target: &StdPath, body: &[u8]) -> Result<()> {
-    let directory = target.parent().unwrap_or_else(|| StdPath::new("."));
+/// volumes is not atomic on either platform — though for different reasons. On unix `/tmp` is
+/// routinely a different filesystem from the target, and a rename across filesystems falls back to
+/// copy-then-delete. On Windows `%TEMP%` is routinely a different volume, and `MoveFileEx` across
+/// volumes is a copy, not a rename. Staying in the target's own directory is what keeps the finishing
+/// rename on a single volume on both platforms.
+///
+/// The property that survives is narrower than it looks: the finishing step still either fully
+/// succeeds or leaves the old contents in place, but it does not always succeed just because the
+/// directory is writable. `NamedTempFile::persist` can fail with a sharing violation on Windows in a
+/// case where unix would have succeeded — another process holding `target` open blocks the replace,
+/// where unix would have detached that process's handle from the old inode and let the rename
+/// proceed underneath it. *Atomic on success* holds; *succeeds whenever the directory is writable*
+/// does not.
+fn atomic_write(target: &ResolvedPath, body: &[u8]) -> Result<()> {
+    let directory = target
+        .as_path()
+        .parent()
+        .unwrap_or_else(|| StdPath::new("."));
     let mut staged = tempfile::Builder::new()
         .prefix(".airsl-")
         .tempfile_in(directory)
-        .map_err(io("atomic_write", directory))?;
+        .map_err(io_at("atomic_write", to_script_string(directory)))?;
 
     staged.write_all(body).map_err(io("atomic_write", target))?;
     staged.flush().map_err(io("atomic_write", target))?;
-    staged.persist(target).map_err(|e| Error::Io {
+    staged.persist(target.as_path()).map_err(|e| Error::Io {
         operation: "atomic_write",
-        path: target.display().to_string(),
+        path: target.to_script_string(),
         source: e.error,
     })?;
     Ok(())
@@ -460,11 +506,15 @@ mod tests {
     }
 
     /// Evaluates `source` with `root` available to the script as `arg[1]`.
+    ///
+    /// `arg[1]` is built through `script_path`, not `root.to_string_lossy()`: `root` comes from
+    /// `sandbox()`'s `canonicalize()`, and a raw canonical spelling on Windows carries a `\\?\`
+    /// prefix that the door check in `PathGuard::resolve` would refuse before `source` ever runs.
     fn run<T: mlua::FromLuaMulti>(root: &StdPath, source: &str) -> crate::Result<T> {
         let engine = engine(root);
         let script = Script::from_source(source, "test")
             .unwrap()
-            .with_args([root.to_string_lossy().into_owned()]);
+            .with_args([crate::test_support::script_path(root)]);
         engine.eval_to::<T>(&script)
     }
 
@@ -765,6 +815,41 @@ mod tests {
     }
 
     #[test]
+    fn tempdir_and_tempfile_return_a_path_containing_no_backslash() {
+        // On macOS `to_script_string` is the identity and `std::env::temp_dir()` never contains a
+        // backslash to begin with, so this assertion holds before and after the conversion it
+        // guards — it does not exercise the Windows behaviour, only pin the contract for it.
+        let (_dir, root) = sandbox();
+        let out: String = run(
+            &root,
+            "local d = airsstack.fs.tempdir()
+             local f = airsstack.fs.tempfile()
+             return d .. ',' .. f",
+        )
+        .unwrap();
+        assert!(!out.contains('\\'), "{out:?} contains a backslash");
+    }
+
+    #[test]
+    fn canonicalize_returns_no_backslash_and_no_verbatim_prefix() {
+        // Same caveat as the temp-path test above: on macOS `to_script_string` is the identity, so
+        // this test is green before and after the conversion it guards. It documents the contract
+        // rather than proving it holds on Windows.
+        let (_dir, root) = sandbox();
+        let out: String = run(
+            &root,
+            "airsstack.fs.write(arg[1] .. '/a.txt', '')
+             return airsstack.fs.canonicalize(arg[1] .. '/a.txt')",
+        )
+        .unwrap();
+        assert!(!out.contains('\\'), "{out:?} contains a backslash");
+        assert!(
+            !out.starts_with(r"\\?\"),
+            "{out:?} starts with a verbatim prefix"
+        );
+    }
+
+    #[test]
     fn a_policy_granting_nothing_refuses_every_operation() {
         let (_dir, root) = sandbox();
         let engine = Engine::builder()
@@ -776,7 +861,7 @@ mod tests {
             "probe",
         )
         .unwrap()
-        .with_args([root.to_string_lossy().into_owned()]);
+        .with_args([crate::test_support::script_path(&root)]);
         assert!(!engine.eval_to::<bool>(&script).unwrap());
     }
 
@@ -787,7 +872,7 @@ mod tests {
         let engine = Engine::builder().policy(Policy::trusted()).build().unwrap();
         let script = Script::from_source("return airsstack.fs.read(arg[1] .. '/a.txt')", "probe")
             .unwrap()
-            .with_args([root.to_string_lossy().into_owned()]);
+            .with_args([crate::test_support::script_path(&root)]);
         assert_eq!(engine.eval_to::<String>(&script).unwrap(), "body");
     }
 }

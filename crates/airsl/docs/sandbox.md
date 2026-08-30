@@ -225,9 +225,19 @@ than the surface. It is gone; contributions go through `HostModule`, which the r
   and would have to carry `require` into loaded modules too, so it is a design pass rather than a
   patch. Nothing needs it until registered extensions exist.
 - **Grant granularity for `proc`.** Still an allowlist of executable names, matched on the program
-  as written — so `/bin/echo` is refused when `echo` is granted, and a wrapper earlier on `PATH`
-  defeats it. Whether that matters depends on whether the `fs` write grants can reach anywhere on
-  `PATH`, which is a question about a specific policy rather than about the mechanism.
+  as written (`ProcGrant::allows`, `src/sandbox/grants.rs:255`) — so `/bin/echo` is refused when
+  `echo` is granted, and a wrapper earlier on `PATH` defeats it. Whether that matters depends on
+  whether the `fs` write grants can reach anywhere on `PATH`, which is a question about a specific
+  policy rather than about the mechanism.
+
+  The `.exe` suffix a Windows executable needs lives entirely in resolution
+  (`paths::rules::executable_candidates`, `src/paths/rules.rs:224`), never in the grant itself, so a
+  grant of `git` permits `run{'git'}` on Windows exactly as it does on unix — the same script and
+  the same grant work on both platforms unchanged. The comparison the grant performs stays exact and
+  case-sensitive, so `run{'GIT'}` under a `git` grant is refused on Windows even though the
+  filesystem underneath would resolve `git.exe` for either spelling. That is the narrowest
+  comparison available and it fails closed by design, not by omission — a reader who finds the
+  refusal by experiment should read it as the intended behaviour, not a bug.
 
 Settled since this document was first written: **`utf8` is on every surface.** It was absent below
 `trusted` by accident rather than decision — the bit was simply never named in the library set — and
