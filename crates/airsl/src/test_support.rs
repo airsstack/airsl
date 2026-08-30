@@ -98,20 +98,14 @@ const ERROR_PRIVILEGE_NOT_HELD: i32 = 1314;
 /// A silent skip here would convert a containment test into decoration: the property these
 /// fixtures exist to prove would stop being checked and nothing would say so.
 #[cfg(windows)]
-#[expect(
-    clippy::panic,
-    reason = "a symlink test that cannot create its own fixture must fail loudly, not silently \
-              pass on a fixture it never built"
-)]
 fn panic_on_missing_privilege(err: io::Error) -> io::Error {
-    if err.raw_os_error() == Some(ERROR_PRIVILEGE_NOT_HELD) {
-        panic!(
-            "creating a symlink was denied: Windows requires Developer Mode (or an elevated \
-             process) for unprivileged symlink creation. Enable it with `reg add \
-             \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock\" /t REG_DWORD \
-             /f /v AllowDevelopmentWithoutDevLicense /d 1`, then re-run the suite. ({err})"
-        );
-    }
+    assert!(
+        err.raw_os_error() != Some(ERROR_PRIVILEGE_NOT_HELD),
+        "creating a symlink was denied: Windows requires Developer Mode (or an elevated \
+         process) for unprivileged symlink creation. Enable it with `reg add \
+         \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock\" /t REG_DWORD \
+         /f /v AllowDevelopmentWithoutDevLicense /d 1`, then re-run the suite. ({err})"
+    );
     err
 }
 
