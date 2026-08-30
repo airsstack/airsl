@@ -64,7 +64,7 @@ pub(crate) fn render(
         manifest.name(),
         manifest.version(),
         manifest.api().get(),
-        manifest.entry().display(),
+        rendered(manifest.entry()),
     );
     let _ = writeln!(out, "{:<LABEL_WIDTH$}{}", "events:", events_summary(events));
 
@@ -127,22 +127,32 @@ fn requested_lines(manifest: &Manifest) -> Vec<(&'static str, String, Capability
     lines
 }
 
+/// Renders a path the way every other line of this report spells one: `/`-separated.
+///
+/// The grant lines come from the library, which spells a path outward in one vocabulary on every
+/// platform. A report that renders its `requested:` column natively would print two spellings of
+/// the same root a few lines apart, and a reader comparing "what was asked for" against "what was
+/// granted" would see a difference that is not there.
+///
+/// Written here rather than taken from the library: `airsl` normalises the same way internally,
+/// but that helper is not part of its public surface, and widening the surface to serve this
+/// report is a larger decision than the report needs.
+fn rendered(path: &Path) -> String {
+    path.display().to_string().replace('\\', "/")
+}
+
 /// Appends one capability block's requests, resolving filesystem roots the way [`negotiate`]
 /// does so the [`Capability`] built here compares equal to the one a denial or reduction carries.
 fn push_block(lines: &mut Vec<(&'static str, String, Capability)>, block: &CapabilityRequest) {
     for root in block.fs_read() {
         let resolved = airsl::FsGrant::resolve_root(root);
-        lines.push((
-            "fs.read",
-            resolved.display().to_string(),
-            Capability::FsRead(resolved),
-        ));
+        lines.push(("fs.read", rendered(&resolved), Capability::FsRead(resolved)));
     }
     for root in block.fs_write() {
         let resolved = airsl::FsGrant::resolve_root(root);
         lines.push((
             "fs.write",
-            resolved.display().to_string(),
+            rendered(&resolved),
             Capability::FsWrite(resolved),
         ));
     }
@@ -439,7 +449,7 @@ mod tests {
         // `push_block` actually agreed on, proving the two sides stayed in sync either way.
         let resolved = airsl::FsGrant::resolve_root(&requested);
         assert!(
-            out.contains(&format!("fs.read      {}", resolved.display())),
+            out.contains(&format!("fs.read      {}", super::rendered(&resolved))),
             "{out}"
         );
         assert!(out.contains(" denied    ("), "{out}");
