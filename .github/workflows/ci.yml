@@ -29,8 +29,9 @@ jobs:
     # from C. A platform-specific break in that build — or in the host modules that
     # touch paths, processes and time — is invisible on a single runner.
     #
-    # Unix only, deliberately. `lib.rs` refuses to build off unix and says why; adding
-    # windows-latest back here without doing that work first only re-reports it.
+    # Windows is `x86_64-pc-windows-msvc` only. The GNU target is not gated here: it
+    # links a different C runtime under the vendored Lua build, and supporting a second
+    # Windows ABI is a promise the crate does not make.
     strategy:
       fail-fast: false
       matrix:

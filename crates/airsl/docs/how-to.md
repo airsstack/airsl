@@ -30,8 +30,17 @@ airsstack.fs.atomic_write(
 ```
 
 The staging file is created in the target's own directory and renamed over it, so a concurrent
-reader sees either the old contents or the new ones and never half of each. `/tmp` is not used,
-because a rename across filesystems is not atomic.
+reader sees either the old contents or the new ones and never half of each. The system temp
+directory is not used, because a rename across volumes is not atomic on either platform, though for
+different reasons: on unix `/tmp` is routinely a different filesystem, and a cross-filesystem rename
+falls back to copy-then-delete; on Windows `%TEMP%` is routinely a different volume, and a rename
+across volumes is a copy, not a rename.
+
+*Atomic on success* holds on both platforms, but *succeeds whenever the directory is writable* does
+not. Finishing the write calls `NamedTempFile::persist`, which can fail with a sharing violation on
+Windows in a case where unix would have succeeded — another process holding the target file open
+blocks the replace there, where unix would have detached that process's handle from the old inode
+and let the rename proceed underneath it.
 
 JSON object keys always sort, so the same table produces the same bytes on every run — which is what
 makes an index file diffable.
@@ -50,8 +59,11 @@ false
 ```
 
 `create_exclusive` returns `false` rather than raising when the file already exists, because losing
-that race is the expected *other outcome*, not a failure. This is `O_CREAT|O_EXCL`: a read-then-write
-would let several concurrent callers all believe they won.
+that race is the expected *other outcome*, not a failure. It rests on `create_new` rather than a
+platform-specific flag pair, so this is an atomic claim on both platforms — a read-then-write would
+let several concurrent callers all believe they won. On a case-insensitive volume the name space it
+claims into is coarser: `CLAIM` and `claim` name one file, so the claim excludes a wider set of
+callers there than the equivalent claim on a case-sensitive one.
 
 ### Find files by pattern
 
@@ -91,7 +103,9 @@ airsl run --allow-exec git script.lua
 quoting bug available to you. A non-zero status is a *result*, not an error — the script asked what
 happened, so it gets told.
 
-The grant matches the program name as written: `--allow-exec git` does not permit `/usr/bin/git`.
+The grant matches the program name as written: `--allow-exec git` does not permit `/usr/bin/git`. A
+bare name is the portable spelling — a path-shaped program is reachable only under `trusted`, on
+either platform.
 
 ### Read environment variables
 
@@ -174,6 +188,9 @@ Read the whole message — it names the roots that *were* granted:
 ```
 airsl: fs.read denied: `/etc/hostname` is outside the granted read roots: /home/me/journal
 ```
+
+The roots list is rendered in the `/` vocabulary on every platform, so a Windows reader sees
+`C:/home/me/journal` rather than a backslash spelling — this one example stands in for both.
 
 The usual cause is a grant one directory too deep. If the roots list looks right but nothing matches,
 check `airsl doctor --policy <preset>` to see the resolved policy.

@@ -19,6 +19,13 @@ approval, the extension loader (`ExtensionHost`) and the `airsl ext` CLI (`docto
 built too; what remains unbuilt is Tier 3. Every document marks each piece, and the table below is
 the summary.
 
+The crate builds and runs the same way on Linux, macOS and `x86_64-pc-windows-msvc`: one script,
+one grant set, the same host modules on every target. A handful of platform differences are
+unavoidable rather than unbuilt — a path reaching a script is always `/`-separated regardless of
+the native spelling underneath, and `airsstack.proc` runs only `.exe` programs, so a grant of `npm`
+does not reach the `.cmd` shim npm installs as. Those are named where the behaviour lives
+(`docs/sandbox.md`, `docs/stdlib.md`), not repeated here.
+
 | Area | State |
 |---|---|
 | Embedded Lua 5.4 VM, statically linked | **implemented** |
@@ -38,6 +45,15 @@ the summary.
 | `Approver` trait, `ManifestApprover`, `DenyAll` | **implemented** (`src/extension/approver.rs:68`) |
 | Extension host / loader — `ExtensionHost`, `ExtensionHost::load` | **implemented** (`src/extension/host.rs:251`) |
 | `airsl ext` CLI — `doctor`, `fire` | **implemented** (`crates/airsl-cli/src/ext_doctor.rs:198`, `crates/airsl-cli/src/ext_fire.rs:91`) |
+| `x86_64-pc-windows-msvc` as a supported CI target | **implemented** (`.github/workflows/ci.yml:38`) |
+| Platform path rules, and the outward `/` vocabulary a script always sees | **implemented** (`src/paths/rules.rs:196`, `src/paths/resolved.rs:54`) |
+| The shared root-containment predicate every grant check funnels through | **implemented** (`src/paths/containment.rs:36`) |
+| `EnvName` case identity — folded on Windows, byte-exact elsewhere | **implemented** (`src/types/env_name.rs:133`) |
+| `.exe` resolution in `proc` — a bare grant reaches the platform's executable unchanged | **implemented** (`src/modules/proc.rs:212`) |
+| `%PATHEXT%` walking | **not implemented** — `proc` resolves only `program` and `program.exe` itself; it does not consult or extend the `%PATHEXT%` list the platform loader would |
+| Long-path (`>MAX_PATH`) support as an engineered feature | **not implemented** — no verbatim-prefix opt-in is exposed to a script; a spelling past the traditional limit is refused the same as any other path this runtime will not reason about |
+| A Windows `proc` example | **not implemented** — the shipped `env-and-proc` example spawns `sh` and stays unix-only; nothing replaces it on Windows |
+| A `.cmd` hook launcher | **not implemented** — the shipped hook launcher (`crates/airsl-cli/README.md`) is `sh`-only; no Windows equivalent ships |
 
 Do not cite these documents as evidence that something works. Where a claim is about code that
 exists, it carries a `file:line`. Where it is about code that does not, it says so.

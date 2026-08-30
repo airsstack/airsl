@@ -35,14 +35,19 @@ enum GrantReach {
 /// ```
 /// use airsl::{GrantSet, Policy};
 ///
+/// // Built from the working directory, not a hardcoded literal: a unix-spelled absolute path has
+/// // no drive on Windows, so it would resolve against whichever drive this doctest happens to run
+/// // from rather than matching the paths checked below.
+/// let repo = std::env::current_dir().unwrap().join("repo");
+/// let index = repo.join(".index");
 /// let policy = Policy::confined().with_grants(
 ///     GrantSet::declared()
-///         .with_fs(|fs| fs.read("/repo").write("/repo/.index"))
+///         .with_fs(|fs| fs.read(&repo).write(&index))
 ///         .with_env(|env| env.read(["HOME"]))
 ///         .with_proc(|proc| proc.allow(["git"])),
 /// );
-/// assert!(policy.grants().fs().allows_read(std::path::Path::new("/repo/src")));
-/// assert!(!policy.grants().fs().allows_write(std::path::Path::new("/repo/src")));
+/// assert!(policy.grants().fs().allows_read(&repo.join("src")));
+/// assert!(!policy.grants().fs().allows_write(&repo.join("src")));
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
@@ -219,7 +224,13 @@ mod tests {
         // same reasoning as the sibling vocabulary tests in `modules::path`: identical on this
         // unix host, where `/` is already both the native and the script separator, and proved
         // for real by `paths::rules::to_script_string`'s own flavour-taking test.
-        let grants = GrantSet::declared().with_fs(|fs| fs.read("/a").write("/b"));
-        assert_eq!(grants.to_string(), "read /a; write /b");
+        //
+        // `abs`, not the unix-spelled literals directly: a bare `/a` has a root but no drive, so
+        // `FsGrant::read`'s `resolve_root` would resolve it against whichever drive the test
+        // happens to run from on Windows, instead of the drive the expectation below names.
+        let a = crate::test_support::abs("/a");
+        let b = crate::test_support::abs("/b");
+        let grants = GrantSet::declared().with_fs(|fs| fs.read(a.as_str()).write(b.as_str()));
+        assert_eq!(grants.to_string(), format!("read {a}; write {b}"));
     }
 }

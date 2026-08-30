@@ -600,9 +600,14 @@ mod tests {
 
     #[test]
     fn resolve_ceiling_is_confined_plus_flags_and_never_trusted() {
+        // `abs`, not the unix-spelled literal directly: `resolve_ceiling` resolves the granted
+        // root through `FsGrant::read`, which on a driveless root falls back to
+        // `std::path::absolute` against whichever drive the test happens to run from — a raw
+        // `/d/f` below would then compare against a different drive than the grant resolved to.
+        let root = crate::test_support::abs("/d");
         let flags = ExtFlags {
             grants: Grants {
-                read: vec![std::path::PathBuf::from("/d")],
+                read: vec![std::path::PathBuf::from(&root)],
                 ..Grants::default()
             },
             ..ExtFlags::default()
@@ -614,7 +619,7 @@ mod tests {
                 .policy()
                 .grants()
                 .fs()
-                .allows_read(std::path::Path::new("/d/f"))
+                .allows_read(std::path::Path::new(&format!("{root}/f")))
         );
     }
 }

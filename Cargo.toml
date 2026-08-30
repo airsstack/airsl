@@ -31,8 +31,9 @@ sha2       = "0.10"
 # or `hashlib.sha1(...)[:8]` need it; shipping only SHA-256 would silently re-key
 # every such project and orphan its artifacts.
 sha1       = "0.10"
-# Time formatting. `jiff` over `time` because it reads /etc/localtime directly
-# instead of libc `tzset`, so local time resolves in multi-threaded embedders.
+# Time formatting. `jiff` over `time` because it never goes through libc `tzset`, which is not
+# thread-safe, so local time resolves correctly in multi-threaded embedders. On unix it reads
+# /etc/localtime directly; on Windows, where there is no /etc/localtime, it carries its own tzdb.
 jiff       = "0.2"
 # Extension manifests (`extension.toml`). `toml` rather than a hand parser because the
 # manifest is the one file a third party writes for this runtime, and the error messages a

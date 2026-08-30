@@ -9,6 +9,29 @@ The two crates are versioned independently and have released together so far, so
 both. Every release is tagged per crate — `airsl-v0.1.3`, `airsl-cli-v0.1.2` — because one commit
 has shipped two crates under two different numbers, which a single `vX.Y.Z` tag cannot name.
 
+## Unreleased
+
+Version numbers deliberately not chosen. Publishing a release that advertises the new target is a
+separate piece of work from building it, and does not happen here.
+
+### Added
+
+- **Windows support.** `airsl` and `airsl-cli` build and run on `x86_64-pc-windows-msvc`, under the
+  same policy model as Linux and macOS — the same script, the same grant, the same host modules,
+  on every target. A path a script sees is always `/`-separated regardless of the platform
+  underneath, and `airsstack.proc` resolves and runs only `.exe` programs there, so a grant of
+  `npm` does not reach the `.cmd` shim `npm` installs as.
+
+### Changed — behaviour worth checking before upgrading
+
+These two are the only differences an existing unix user's `cargo update` would notice; the path
+rules behind them are now shared code rather than written once per target.
+
+- `path.normalize("/..")` returns `"/"`. It previously returned `"..//"`.
+- A path spelling containing an interior NUL byte is now refused where the sandbox first resolves
+  it, as `Error::UncheckablePath`, rather than reaching the operating system and failing later as
+  `Error::Io`.
+
 ## airsl 0.1.3 — airsl-cli 0.1.2 — 2026-08-23
 
 One feature, additive end to end: no public item changed shape, `Error` is `#[non_exhaustive]`

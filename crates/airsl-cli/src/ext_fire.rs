@@ -161,6 +161,7 @@ mod tests {
         reason = "tests unwrap known-valid fixtures; a panic is the intended failure signal"
     )]
 
+    use crate::test_support::script_literal;
     use std::fs;
     use std::io::Cursor;
     use std::path::Path;
@@ -317,13 +318,13 @@ mod tests {
             format!(
                 "[extension]\nname = \"marker\"\nversion = \"0.1.0\"\nentry = \"main.lua\"\napi = 1\n\
                  [capabilities]\nfs.write = [\"{}\"]\n",
-                dir.path().display()
+                script_literal(dir.path())
             ),
         )
         .unwrap();
         fs::write(
             dir.path().join("main.lua"),
-            format!("airsstack.fs.write('{}', 'ran')\n", marker.display()),
+            format!("airsstack.fs.write('{}', 'ran')\n", script_literal(&marker)),
         )
         .unwrap();
         let flags = ExtFlags {
@@ -350,7 +351,7 @@ mod tests {
             format!(
                 "[extension]\nname = \"writer\"\nversion = \"0.1.0\"\nentry = \"main.lua\"\napi = 1\n\
                  [capabilities]\nfs.write = [\"{}\"]\n",
-                dir.path().display()
+                script_literal(dir.path())
             ),
         )
         .unwrap();
@@ -358,7 +359,7 @@ mod tests {
             dir.path().join("main.lua"),
             format!(
                 r#"airsstack.ext.on("count", function() airsstack.fs.write("{}", "ran") end)"#,
-                marker.display()
+                script_literal(&marker)
             ),
         )
         .unwrap();

@@ -344,8 +344,11 @@ mod tests {
         write(outside.path(), "secrets.lua", "return 'leaked'");
 
         let dir = tempfile::tempdir().unwrap();
-        std::os::unix::fs::symlink(outside.path().join("secrets.lua"), dir.path().join("s.lua"))
-            .unwrap();
+        crate::test_support::link_file(
+            &outside.path().join("secrets.lua"),
+            &dir.path().join("s.lua"),
+        )
+        .unwrap();
 
         let err = resolve(dir.path(), "s").unwrap_err();
         assert!(err.to_string().contains("outside"), "{err}");
@@ -413,7 +416,7 @@ mod tests {
         std::fs::create_dir_all(&root).unwrap();
         write(&decoy, "m.lua", "return 1");
 
-        std::os::unix::fs::symlink(decoy.join("m.lua"), root.join("m.lua")).unwrap();
+        crate::test_support::link_file(&decoy.join("m.lua"), &root.join("m.lua")).unwrap();
         let err = resolve(&root, "m").unwrap_err();
         assert!(err.to_string().contains("outside"), "{err}");
     }

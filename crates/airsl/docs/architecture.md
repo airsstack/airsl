@@ -24,11 +24,12 @@ graph TD
     L3 --> L2 --> L1
 ```
 
-**Layer 1 — the VM.** `mlua` with the `vendored` feature (`Cargo.toml:44`) compiles Lua 5.4's C
+**Layer 1 — the VM.** `mlua` with the `vendored` feature (`Cargo.toml:19`) compiles Lua 5.4's C
 sources from the `lua-src` crate and links them statically. A C compiler is therefore a build
-requirement; nothing is installed on the machine and `pkg-config` is not involved. Lua 5.4 rather
-than 5.1 or LuaJIT because only 5.3 and later distinguish integers from floats in the VM, and
-byte-stable JSON output depends on that distinction.
+requirement; nothing is installed on the machine and `pkg-config` is not involved. On
+`x86_64-pc-windows-msvc` that compiler is MSVC Build Tools, and `windows-latest` preinstalls them, so
+CI needs no extra step for this target. Lua 5.4 rather than 5.1 or LuaJIT because only 5.3 and later
+distinguish integers from floats in the VM, and byte-stable JSON output depends on that distinction.
 
 This layer is finished. `nm` on the built binary finds 93 `lua_*` C API symbols compiled in, and
 `ldd` shows no Lua library among its dynamic dependencies.

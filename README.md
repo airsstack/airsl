@@ -28,9 +28,9 @@ cargo add airsl              # embed the runtime
 cargo install airsl-cli      # get the `airsl` binary
 ```
 
-**Linux and macOS only.** `airsstack.proc` resolves executables by unix mode bits, which have no
-Windows equivalent; the crate refuses to build off unix rather than pretending. Supporting Windows
-is a decision about what "executable" means there, not a portability patch.
+**Supported targets: Linux, macOS, and `x86_64-pc-windows-msvc`.** On Windows, `airsstack.proc` runs
+`.exe` programs only — `npm`, `npx`, `yarn` and `tsc`, which ship as `.cmd` shims, are not reachable
+through it.
 
 **A C compiler is required.** `mlua`'s `vendored` feature builds Lua 5.4 from the C sources shipped
 by `lua-src` and links it statically, so there is no system Lua and no `pkg-config` — but `cc` must

@@ -405,25 +405,30 @@ mod tests {
 
     #[test]
     fn a_required_capability_outside_the_ceiling_is_denied_before_any_engine_exists() {
-        // The manifest requests both a denied capability (`fs.read` of `/`, which no ceiling in
-        // this test grants) and a granted one (`fs.write` of the extension's own directory), so
-        // that the entry script *could* prove it ran by writing a marker — if it were ever given
-        // the chance to. `dir` has to be known before the manifest and script are written, so this
-        // test builds its fixture directly rather than through the shared `fixture` helper.
+        // The manifest requests both a denied capability (`fs.read` of `abs("/")`, which no
+        // ceiling in this test grants) and a granted one (`fs.write` of the extension's own
+        // directory), so that the entry script *could* prove it ran by writing a marker — if it
+        // were ever given the chance to. `dir` has to be known before the manifest and script are
+        // written, so this test builds its fixture directly rather than through the shared
+        // `fixture` helper.
         let dir = TempDir::new().unwrap();
         let marker = dir.path().join("marker");
         fs::write(
             dir.path().join("extension.toml"),
             format!(
                 "[extension]\nname = \"x\"\nversion = \"0.1.0\"\nentry = \"main.lua\"\napi = 1\n\
-                 [capabilities]\nfs.read = [\"/\"]\nfs.write = [\"{}\"]\n",
-                dir.path().display()
+                 [capabilities]\nfs.read = [\"{}\"]\nfs.write = [\"{}\"]\n",
+                crate::test_support::abs("/"),
+                to_script_string(dir.path())
             ),
         )
         .unwrap();
         fs::write(
             dir.path().join("main.lua"),
-            format!("airsstack.fs.write('{}', 'ran')\n", marker.display()),
+            format!(
+                "airsstack.fs.write('{}', 'ran')\n",
+                to_script_string(&marker)
+            ),
         )
         .unwrap();
 
@@ -554,7 +559,7 @@ mod tests {
         let outside_file = outside.path().join("evil.lua");
         fs::write(&outside_file, "return 1").unwrap();
         fs::remove_file(dir.path().join("main.lua")).unwrap();
-        std::os::unix::fs::symlink(&outside_file, dir.path().join("main.lua")).unwrap();
+        crate::test_support::link_file(&outside_file, &dir.path().join("main.lua")).unwrap();
 
         let err = pending.start().unwrap_err();
         assert!(

@@ -488,10 +488,14 @@ mod tests {
 
     use super::{CapabilityRequest, MANIFEST_FILE, Manifest};
     use crate::extension::variables::Variables;
+    use crate::test_support::abs;
     use crate::types::ModuleName;
 
     fn vars() -> Variables {
-        Variables::none().with("APP_HOME", "/home/x/app")
+        // `abs`: `$APP_HOME` expands into a manifest path that `expand_paths` requires to be
+        // absolute; a bare `/home/x/app` has a root but no drive, so it fails that check on
+        // Windows instead of naming the location the fixtures below expect.
+        Variables::none().with("APP_HOME", abs("/home/x/app"))
     }
 
     fn write_manifest(dir: &Path, text: &str) {
@@ -584,10 +588,13 @@ instructions = 50_000_000
         assert_eq!(m.version(), "0.2.0");
         assert_eq!(m.entry(), Path::new("main.lua"));
         assert_eq!(m.api().get(), 1);
-        assert_eq!(m.required().fs_read(), [Path::new("/home/x/app/journal")]);
+        assert_eq!(
+            m.required().fs_read(),
+            [Path::new(&abs("/home/x/app/journal"))]
+        );
         assert_eq!(
             m.required().fs_write(),
-            [Path::new("/home/x/app/journal/.index")]
+            [Path::new(&abs("/home/x/app/journal/.index"))]
         );
         assert_eq!(m.required().proc_run().collect::<Vec<_>>(), ["git"]);
         assert_eq!(
@@ -814,8 +821,14 @@ instructions = 50_000_000
              [capabilities.optional]\nfs.read=['$APP_HOME/journal', '$APP_HOME/other']\n",
         );
         let m = Manifest::from_dir(dir.path(), &vars()).unwrap();
-        assert_eq!(m.required().fs_read(), [Path::new("/home/x/app/journal")]);
-        assert_eq!(m.optional().fs_read(), [Path::new("/home/x/app/other")]);
+        assert_eq!(
+            m.required().fs_read(),
+            [Path::new(&abs("/home/x/app/journal"))]
+        );
+        assert_eq!(
+            m.optional().fs_read(),
+            [Path::new(&abs("/home/x/app/other"))]
+        );
     }
 
     #[test]
@@ -824,7 +837,7 @@ instructions = 50_000_000
         let outside = tempfile::tempdir().unwrap();
         let target = outside.path().join("secret.lua");
         std::fs::write(&target, "return 1").unwrap();
-        std::os::unix::fs::symlink(&target, dir.path().join("main.lua")).unwrap();
+        crate::test_support::link_file(&target, &dir.path().join("main.lua")).unwrap();
 
         std::fs::write(
             dir.path().join(MANIFEST_FILE),

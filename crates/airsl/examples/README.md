@@ -69,8 +69,10 @@ does not run one, which is the difference between "it builds" and "it works" —
 ## Conventions these examples follow
 
 - **Output is deterministic.** No wall-clock timestamps, no absolute paths, no figures that differ
-  between Linux and macOS. Every `## Output` block in a per-example README is real captured stdout,
-  and running the example again reproduces it byte for byte.
+  between Linux, macOS and Windows. Every `## Output` block in a per-example README is real captured
+  stdout, and running the example again reproduces it byte for byte — the twelve examples that run
+  on Windows included, because `airsl` returns `/`-separated paths on every platform precisely so an
+  identical script produces identical bytes there too.
 - **Nothing is written inside the repository.** Examples that need a writable directory use a
   temporary one, removed when the example ends.
 - **Printing from both sides is safe, and several examples do.** Lua's `print` writes to C `stdout`
@@ -80,7 +82,13 @@ does not run one, which is the difference between "it builds" and "it works" —
   (`src/modules/stdio.rs:109`). So a run piped into a file has the same line order as a run on a
   terminal, which is what lets an `## Output` block be captured through a pipe and still be true.
 - **Only `sh` is ever executed.** An example that wanted some other program would be an example that
-  fails on a machine without it.
+  fails on a machine without it — and that reasoning is why [`env-and-proc`](env-and-proc/) and
+  [`denials-are-data`](denials-are-data/) do not run on Windows: `sh` is the program not present
+  there, and nothing replaces them. Each carries a `unix-only` marker file in its own directory,
+  its text stating the reason. `cargo make examples` still discovers every directory by glob and
+  reports what it skipped, rather than the marked directory silently vanishing from the log
+  (`Makefile.toml:108-110`) — a newly added example with no marker runs on Windows and fails loudly
+  there, which is the property the glob exists to protect.
 - **A shipped `*_test.lua` runs under `confined` with no grants.** `cargo make examples` finishes by
   running `airsl test` over this whole tree, and that command's default policy is confined with an
   empty grant set. Discovery is by directory rather than a list, for the reason the run above is: a
@@ -100,7 +108,7 @@ does not run one, which is the difference between "it builds" and "it works" —
 
   This is worth knowing outside the examples: a hook loaded from an absolute path puts that path in
   every diagnostic it emits, and a hook's stderr often ends up in someone else's log. `with_name`
-  (`src/script.rs:118`) changes only the label — the source, the arguments and the root the file was
+  (`src/script.rs:119`) changes only the label — the source, the arguments and the root the file was
   read from are untouched, so a renamed script still `require`s exactly what it could before.
 
 ## See also

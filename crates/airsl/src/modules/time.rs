@@ -1,8 +1,9 @@
 //! The `airsstack.time` host module.
 //!
-//! `jiff` rather than `time` or `chrono` because it reads `/etc/localtime` directly instead of
-//! going through libc `tzset`, which is not thread-safe — and this crate's whole point is being
-//! embeddable in a host that has other threads.
+//! `jiff` rather than `time` or `chrono` because it never goes through libc `tzset`, which is not
+//! thread-safe — and this crate's whole point is being embeddable in a host that has other
+//! threads. On unix it reads `/etc/localtime` directly; on Windows, where there is no
+//! `/etc/localtime`, it carries its own tzdb.
 //!
 //! Needs no authority. It is nonetheless the module most able to make a script's output
 //! irreproducible, so `format` takes an explicit instant rather than defaulting to "now", and the
@@ -90,11 +91,13 @@ impl HostModule for Time {
 
         // Seconds since `ORIGIN`, for measuring how long something took.
         //
-        // `Instant` and not `SystemTime`: this reads `CLOCK_MONOTONIC`, so it is unaffected by the
-        // clock being adjusted underneath a running script — which is the entire reason to reach
-        // for it rather than subtracting two `now` readings. `SystemTime` here would be `now`
-        // under a second name, and an NTP step between two readings would make the later one
-        // smaller, handing a script a negative duration or a timeout that never elapses.
+        // `Instant` and not `SystemTime`: this is unaffected by the wall clock being adjusted
+        // underneath a running script — which is the entire reason to reach for it rather than
+        // subtracting two `now` readings. `SystemTime` here would be `now` under a second name,
+        // and an NTP step between two readings would make the later one smaller, handing a script
+        // a negative duration or a timeout that never elapses. `Instant` reaches the platform's own
+        // monotonic clock on every target this crate builds for; that property, not any one
+        // platform's name for the mechanism, is what this module depends on.
         //
         // No datetime crate offers this. A `DateTime` is a point on a calendar and a calendar
         // point is defined by the wall clock, so `jiff` and `chrono` both bottom out in

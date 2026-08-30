@@ -107,33 +107,53 @@ description = "Run every example end to end, and compile every shipped .lua"
 #
 # Discovery is by directory rather than a hand-kept list: an example that is
 # added but not listed would silently never run, which is the failure mode a
-# coverage suite can least afford.
-script_runner = "@shell"
+# coverage suite can least afford. A platform carve-out is a marker file named
+# `unix-only` inside the example's own directory, its text the reason, rather
+# than a skip list kept here — a list would recreate the same silent-never-run
+# failure one platform at a time. The glob still visits a marked directory, so
+# a skip is printed and named rather than the directory simply vanishing from
+# the log; a newly added example with no marker runs everywhere and fails
+# loudly wherever it cannot, which is the property this whole scheme protects.
+script_runner = "@duckscript"
 script = '''
-set -eu
-for dir in crates/airsl/examples/*/; do
-    name="$(basename "${dir}")"
-    # A directory without a `main.rs` is not an example target — cargo ignores
-    # it, and so does this.
-    [ -f "${dir}main.rs" ] || continue
-    echo "--- ${name}"
-    cargo run -q -p airsl --example "${name}"
-done
+dirs = glob_array crates/airsl/examples/*/
+for dir in ${dirs}
+    name = basename ${dir}
+    # A directory without a `main.rs` is not an example target — cargo
+    # ignores it, and so does this.
+    main_rs = set ${dir}/main.rs
+    has_main = is_file ${main_rs}
+    if ${has_main}
+        marker = set ${dir}/unix-only
+        marked = is_file ${marker}
+        on_windows = is_windows
+        if ${marked} and ${on_windows}
+            reason = readfile ${marker}
+            reason = trim ${reason}
+            echo --- ${name} SKIPPED on Windows: ${reason}
+        else
+            echo --- ${name}
+            exec --fail-on-error cargo run -q -p airsl --example ${name}
+        end
+    end
+end
 # Every shipped script still compiles against the current runtime. `check`
-# loads and compiles without running, so this costs a parse and nothing else.
-echo "--- airsl check"
-cargo run -q -p airsl-cli -- check crates/airsl/examples/
+# loads and compiles without running, so this costs a parse and nothing else —
+# it still runs over marked directories too, since a Windows-incompatible run
+# and a Windows-incompatible parse are different claims.
+echo --- airsl check
+exec --fail-on-error cargo run -q -p airsl-cli -- check crates/airsl/examples/
 # `airsl test` is a documented entry point of the CLI, and until this line it
 # was one no gate exercised — a test runner nobody runs is the one piece of a
 # toolchain that can rot without anyone noticing. It runs over the whole
-# examples tree for the reason discovery above is by directory: a shipped test
-# file that no command picks up is worse than none.
+# examples tree, markers included, for the same reason `check` does: the
+# tree's only test file is portable, so narrowing the scan would buy nothing.
 #
 # Confined with no grants, which is this command's default, so a shipped test
 # file has to be one — the modules that need no authority are the ones a test
 # can lean on here.
-echo "--- airsl test"
-cargo run -q -p airsl-cli -- test crates/airsl/examples/
+echo --- airsl test
+exec --fail-on-error cargo run -q -p airsl-cli -- test crates/airsl/examples/
 '''
 
 # ---------------------------------------------------------------------------
@@ -163,11 +183,26 @@ description = "Validate both crates against what crates.io enforces, publishing 
 # start passing from the second. Run it anyway: everything it checks before
 # dependency resolution — metadata, keyword count, category slugs, the packaged
 # file list — still reports.
+#
+# A release is cut from unix, so a Windows run of this task would only prove
+# that `cargo package`/`cargo publish` work on a platform that never runs them
+# for real — not a goal this workspace has taken on. `windows_alias` redirects
+# to a task that says so and exits clean, rather than leaving the task
+# unported.
+windows_alias = "publish-dry-run-unsupported"
 script_runner = "@shell"
 script = '''
 set -x
 cargo package --list -p airsl
 cargo publish --dry-run -p airsl
+'''
+
+[tasks.publish-dry-run-unsupported]
+category = "Release"
+description = "Windows stand-in for publish-dry-run: explains the skip and exits clean"
+script_runner = "@duckscript"
+script = '''
+echo "publish-dry-run is skipped on Windows: releases are cut from unix, so this task is not ported here. Run it on macOS or Linux."
 '''
 
 # ---------------------------------------------------------------------------
@@ -204,17 +239,45 @@ category = "Development"
 description = "The gate scoped to one crate: cargo make dod-crate airsl"
 # While developing a single-crate change, `-p <crate>` replaces `--workspace`.
 # Cross-crate changes and pre-release runs use the unscoped `dod`.
-script_runner = "@shell"
+#
+# `airsl-cli` ships no `[lib]` target — every public item lives in `airsl` —
+# so `cargo test -p airsl-cli --doc` has nothing to doctest and fails outright
+# rather than reporting zero, unlike `cargo test --workspace --doc`, which
+# skips a bin-only member instead of erroring on it. The doctest step below
+# detects a missing library target and skips just that step, naming why,
+# rather than reproducing the failure or dropping the step for every crate:
+# `airsl` has doctests and they still run.
+#
+# The detection is a path convention — `crates/<crate>/src/lib.rs` exists —
+# not a query against `cargo metadata`, which would be the precise answer and
+# would also catch a `[lib] path = ...` override no member declares today.
+# Duckscript, this task's script runner, carries no JSON parser, and a shell
+# pipeline through `jq` to read `cargo metadata` would depend on a tool this
+# workspace does not otherwise require on every platform `dod-crate` runs on.
+# The convention holds for every crate here as of this writing; a member that
+# ever overrides its library path would silently lose this step rather than
+# fail it, and this check would need rewriting against `cargo metadata` to
+# catch that.
+script_runner = "@duckscript"
 script = '''
-crate="${1}"
-if [ -z "${crate}" ]; then
-    echo "usage: cargo make dod-crate <crate-name>" >&2
-    exit 1
-fi
-set -x
-cargo fmt -p "${crate}" -- --check
-cargo clippy -p "${crate}" --all-targets --all-features -- -D warnings
-RUSTDOCFLAGS="-D warnings" cargo doc -p "${crate}" --all-features --no-deps
-cargo test -p "${crate}" --all-targets --all-features
-cargo test -p "${crate}" --all-features --doc
+crate = set ${1}
+if is_empty ${crate}
+    trigger_error "usage: cargo make dod-crate <crate-name>"
+end
+exec --fail-on-error cargo fmt -p ${crate} -- --check
+exec --fail-on-error cargo clippy -p ${crate} --all-targets --all-features -- -D warnings
+# RUSTDOCFLAGS is set on the environment for this one step and cleared right
+# after — it must not leak into the two `cargo test` steps below, which never
+# wanted it.
+set_env RUSTDOCFLAGS "-D warnings"
+exec --fail-on-error cargo doc -p ${crate} --all-features --no-deps
+unset_env RUSTDOCFLAGS
+exec --fail-on-error cargo test -p ${crate} --all-targets --all-features
+lib_path = set crates/${crate}/src/lib.rs
+has_lib = is_file ${lib_path}
+if ${has_lib}
+    exec --fail-on-error cargo test -p ${crate} --all-features --doc
+else
+    echo "doctest step skipped: ${crate} has no library target (no ${lib_path})"
+end
 '''

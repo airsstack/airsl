@@ -214,7 +214,7 @@ mod tests {
             .unwrap();
         let script = Script::from_source("return airsstack.hash.hash_file(arg[1])", "t")
             .unwrap()
-            .with_args([root.join("a.txt").to_string_lossy().into_owned()]);
+            .with_args([crate::test_support::script_path(&root.join("a.txt"))]);
         assert_eq!(
             engine.eval_to::<String>(&script).unwrap(),
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
@@ -236,7 +236,7 @@ mod tests {
             .unwrap();
         let script = Script::from_source("return airsstack.hash.hash_file(arg[1], 'sha1')", "t")
             .unwrap()
-            .with_args([root.join("a.txt").to_string_lossy().into_owned()]);
+            .with_args([crate::test_support::script_path(&root.join("a.txt"))]);
         assert_eq!(
             engine.eval_to::<String>(&script).unwrap(),
             "a9993e364706816aba3e25717850c26c9cd0d89d"
@@ -271,7 +271,7 @@ mod tests {
             .unwrap();
         let script = Script::from_source("return airsstack.hash.hash_file(arg[1], 'md5')", "t")
             .unwrap()
-            .with_args([root.join("a.txt").to_string_lossy().into_owned()]);
+            .with_args([crate::test_support::script_path(&root.join("a.txt"))]);
         let err = engine.eval_to::<String>(&script).unwrap_err();
         assert!(err.to_string().contains("md5"), "{err}");
     }

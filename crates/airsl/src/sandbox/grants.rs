@@ -276,6 +276,7 @@ mod tests {
     )]
 
     use super::{EnvGrant, FsGrant, ProcGrant};
+    use crate::test_support::abs;
     use std::path::Path;
 
     #[test]
@@ -288,41 +289,50 @@ mod tests {
 
     #[test]
     fn a_read_root_covers_itself_and_its_descendants() {
-        let grant = FsGrant::none().read("/repo");
-        assert!(grant.allows_read(Path::new("/repo")));
-        assert!(grant.allows_read(Path::new("/repo/crates/airsl")));
+        // `abs`, not the unix-spelled literal directly: a bare `/repo` has a root but no drive, so
+        // it is not absolute on Windows and would resolve against whichever drive the test runs
+        // from instead of matching the checked path below.
+        let grant = FsGrant::none().read(abs("/repo"));
+        assert!(grant.allows_read(Path::new(&abs("/repo"))));
+        assert!(grant.allows_read(Path::new(&abs("/repo/crates/airsl"))));
     }
 
     #[test]
     fn a_read_root_does_not_cover_its_parent_or_a_sibling() {
-        let grant = FsGrant::none().read("/repo");
-        assert!(!grant.allows_read(Path::new("/")));
-        assert!(!grant.allows_read(Path::new("/elsewhere")));
+        // `abs`: see `a_read_root_covers_itself_and_its_descendants`.
+        let grant = FsGrant::none().read(abs("/repo"));
+        assert!(!grant.allows_read(Path::new(&abs("/"))));
+        assert!(!grant.allows_read(Path::new(&abs("/elsewhere"))));
     }
 
     #[test]
     fn a_sibling_sharing_a_name_prefix_is_not_inside_the_root() {
         // The string test `"/repo-extra".starts_with("/repo")` is true; the component test is not.
-        let grant = FsGrant::none().read("/repo");
-        assert!(!grant.allows_read(Path::new("/repo-extra")));
-        assert!(!grant.allows_read(Path::new("/repo-extra/src")));
+        // `abs`: see `a_read_root_covers_itself_and_its_descendants`.
+        let grant = FsGrant::none().read(abs("/repo"));
+        assert!(!grant.allows_read(Path::new(&abs("/repo-extra"))));
+        assert!(!grant.allows_read(Path::new(&abs("/repo-extra/src"))));
     }
 
     #[test]
     fn read_and_write_are_independent_authorities() {
-        let grant = FsGrant::none().read("/repo").write("/repo/.index");
-        assert!(grant.allows_read(Path::new("/repo/src")));
-        assert!(!grant.allows_write(Path::new("/repo/src")));
-        assert!(grant.allows_write(Path::new("/repo/.index/a.json")));
+        // `abs`: see `a_read_root_covers_itself_and_its_descendants`.
+        let grant = FsGrant::none()
+            .read(abs("/repo"))
+            .write(abs("/repo/.index"));
+        assert!(grant.allows_read(Path::new(&abs("/repo/src"))));
+        assert!(!grant.allows_write(Path::new(&abs("/repo/src"))));
+        assert!(grant.allows_write(Path::new(&abs("/repo/.index/a.json"))));
         // A write root is not implicitly readable, but here it happens to sit under a read root.
-        assert!(grant.allows_read(Path::new("/repo/.index/a.json")));
+        assert!(grant.allows_read(Path::new(&abs("/repo/.index/a.json"))));
     }
 
     #[test]
     fn a_write_root_outside_every_read_root_is_not_readable() {
-        let grant = FsGrant::none().read("/repo").write("/var/state");
-        assert!(grant.allows_write(Path::new("/var/state/a")));
-        assert!(!grant.allows_read(Path::new("/var/state/a")));
+        // `abs`: see `a_read_root_covers_itself_and_its_descendants`.
+        let grant = FsGrant::none().read(abs("/repo")).write(abs("/var/state"));
+        assert!(grant.allows_write(Path::new(&abs("/var/state/a"))));
+        assert!(!grant.allows_read(Path::new(&abs("/var/state/a"))));
     }
 
     #[test]
@@ -342,7 +352,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let base = dir.path().canonicalize().unwrap();
         std::fs::create_dir(base.join("real")).unwrap();
-        std::os::unix::fs::symlink(base.join("real"), base.join("link")).unwrap();
+        crate::test_support::link_dir(&base.join("real"), &base.join("link")).unwrap();
 
         let grant = FsGrant::none().read(base.join("link"));
         assert_eq!(grant.read_roots(), [base.join("real")]);
@@ -372,11 +382,15 @@ mod tests {
 
     #[test]
     fn a_root_that_does_not_exist_yet_is_made_absolute_but_kept() {
-        // The ordinary case for a write root: the script is about to create it.
-        let grant = FsGrant::none().write("/definitely/not/here");
+        // The ordinary case for a write root: the script is about to create it. `abs`: see
+        // `a_read_root_covers_itself_and_its_descendants` — an unresolvable, driveless root would
+        // otherwise be re-rooted onto the current drive by `resolve_root`'s `std::path::absolute`
+        // fallback, so the exact-equality check below would fail on Windows for a reason that has
+        // nothing to do with the property this test pins.
+        let grant = FsGrant::none().write(abs("/definitely/not/here"));
         assert_eq!(
             grant.write_roots(),
-            [std::path::PathBuf::from("/definitely/not/here")]
+            [std::path::PathBuf::from(abs("/definitely/not/here"))]
         );
     }
 
@@ -440,10 +454,11 @@ mod tests {
 
     #[test]
     fn several_roots_are_all_honoured() {
-        let grant = FsGrant::none().read("/a").read("/b");
-        assert!(grant.allows_read(Path::new("/a/x")));
-        assert!(grant.allows_read(Path::new("/b/x")));
-        assert!(!grant.allows_read(Path::new("/c/x")));
+        // `abs`: see `a_read_root_covers_itself_and_its_descendants`.
+        let grant = FsGrant::none().read(abs("/a")).read(abs("/b"));
+        assert!(grant.allows_read(Path::new(&abs("/a/x"))));
+        assert!(grant.allows_read(Path::new(&abs("/b/x"))));
+        assert!(!grant.allows_read(Path::new(&abs("/c/x"))));
     }
 
     #[test]

@@ -159,6 +159,13 @@ impl HostModule for Fs {
             .map_err(fail)?;
         table.set("atomic_write", atomic_write).map_err(fail)?;
 
+        // Exclusivity rests on `create_new`, not on a POSIX flag pair, so the property that exactly
+        // one claimant wins holds on both platforms. What is coarser on Windows is which spellings
+        // count as the same claim: on a case-insensitive volume `CLAIM` and `claim` name one file, so
+        // a single claim there excludes a wider set of claimants than the equivalent claim on a
+        // case-sensitive one. Wider is the safe direction for a mutual-exclusion primitive, so this is
+        // documented rather than folded away — and NTFS's per-directory case sensitivity means this
+        // runtime cannot know, from the path alone, which behaviour a given call got.
         let g = guard.clone();
         let create_exclusive = lua
             .create_function(
@@ -238,6 +245,11 @@ impl HostModule for Fs {
                         "file"
                     },
                 )?;
+                // `readonly()` reads mode bits on unix and `FILE_ATTRIBUTE_READONLY` on Windows — a
+                // per-file attribute with no owner/group/other dimension, and one that says nothing
+                // about ACLs, which are the access control that actually governs a Windows file. A
+                // script cannot use this field as a portable permission model, only as the one bit
+                // both platforms happen to expose under the same name.
                 out.set("readonly", meta.permissions().readonly())?;
                 out.set("modified", modified_seconds(&meta))?;
                 Ok(out)
@@ -434,10 +446,19 @@ fn walk(root: &ResolvedPath) -> Result<Vec<String>> {
 /// Writes `body` to `target` so that a reader sees either the old contents or the new ones.
 ///
 /// The temporary file is created in the same directory as the target, because a rename across
-/// filesystems is not atomic and `/tmp` is routinely a different filesystem. `/tmp` is a unix
-/// example, but the constraint it illustrates is not: a rename across drives is not atomic on
-/// Windows either, so staying in the target's own directory is what keeps the rename that
-/// finishes the write on a single volume on both platforms.
+/// volumes is not atomic on either platform — though for different reasons. On unix `/tmp` is
+/// routinely a different filesystem from the target, and a rename across filesystems falls back to
+/// copy-then-delete. On Windows `%TEMP%` is routinely a different volume, and `MoveFileEx` across
+/// volumes is a copy, not a rename. Staying in the target's own directory is what keeps the finishing
+/// rename on a single volume on both platforms.
+///
+/// The property that survives is narrower than it looks: the finishing step still either fully
+/// succeeds or leaves the old contents in place, but it does not always succeed just because the
+/// directory is writable. `NamedTempFile::persist` can fail with a sharing violation on Windows in a
+/// case where unix would have succeeded — another process holding `target` open blocks the replace,
+/// where unix would have detached that process's handle from the old inode and let the rename
+/// proceed underneath it. *Atomic on success* holds; *succeeds whenever the directory is writable*
+/// does not.
 fn atomic_write(target: &ResolvedPath, body: &[u8]) -> Result<()> {
     let directory = target
         .as_path()
@@ -485,11 +506,15 @@ mod tests {
     }
 
     /// Evaluates `source` with `root` available to the script as `arg[1]`.
+    ///
+    /// `arg[1]` is built through `script_path`, not `root.to_string_lossy()`: `root` comes from
+    /// `sandbox()`'s `canonicalize()`, and a raw canonical spelling on Windows carries a `\\?\`
+    /// prefix that the door check in `PathGuard::resolve` would refuse before `source` ever runs.
     fn run<T: mlua::FromLuaMulti>(root: &StdPath, source: &str) -> crate::Result<T> {
         let engine = engine(root);
         let script = Script::from_source(source, "test")
             .unwrap()
-            .with_args([root.to_string_lossy().into_owned()]);
+            .with_args([crate::test_support::script_path(root)]);
         engine.eval_to::<T>(&script)
     }
 
@@ -836,7 +861,7 @@ mod tests {
             "probe",
         )
         .unwrap()
-        .with_args([root.to_string_lossy().into_owned()]);
+        .with_args([crate::test_support::script_path(&root)]);
         assert!(!engine.eval_to::<bool>(&script).unwrap());
     }
 
@@ -847,7 +872,7 @@ mod tests {
         let engine = Engine::builder().policy(Policy::trusted()).build().unwrap();
         let script = Script::from_source("return airsstack.fs.read(arg[1] .. '/a.txt')", "probe")
             .unwrap()
-            .with_args([root.to_string_lossy().into_owned()]);
+            .with_args([crate::test_support::script_path(&root)]);
         assert_eq!(engine.eval_to::<String>(&script).unwrap(), "body");
     }
 }

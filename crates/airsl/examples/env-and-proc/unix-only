@@ -1,0 +1,3 @@
+This example grants and spawns `sh` to show a process the sandbox actually launched. Its
+documented output is byte-for-byte, and no program ships on both unix and Windows that would
+reproduce that output the same way — so the example does not run there, and only there.

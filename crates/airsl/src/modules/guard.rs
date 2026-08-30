@@ -236,27 +236,13 @@ mod tests {
     )]
 
     use super::PathGuard;
+    use crate::paths::rules::native;
     use crate::sandbox::GrantSet;
+    use crate::test_support::script_path;
     use std::sync::Arc;
 
     fn guard(build: impl FnOnce(GrantSet) -> GrantSet) -> PathGuard {
         PathGuard::new(Arc::new(build(GrantSet::declared())), "fs")
-    }
-
-    /// Renders `path` the way a script actually hands a path to this guard: absolute, but never
-    /// verbatim.
-    ///
-    /// `canonicalize()` is the only way to get an existing directory's real, symlink-resolved
-    /// spelling, but on Windows it returns a `\\?\`-prefixed string. Interpolating that directly
-    /// into a test's input string would make the door check in `native::reject_unrepresentable`
-    /// refuse the input before the behaviour under test ever runs — the grant **root** may stay
-    /// canonicalised, because `sandbox::grants::resolve_root` strips it, but the string built here
-    /// stands in for what a script would type, which is never verbatim.
-    fn non_verbatim(path: &std::path::Path) -> String {
-        crate::paths::rules::native::strip_verbatim(path.to_path_buf())
-            .to_str()
-            .unwrap()
-            .to_owned()
     }
 
     #[test]
@@ -268,7 +254,7 @@ mod tests {
         let guard = guard(|g| g.with_fs(|fs| fs.read(&root)));
         assert!(
             guard
-                .read("read", root.join("a.txt").to_str().unwrap())
+                .read("read", &format!("{}/a.txt", script_path(&root)))
                 .is_ok()
         );
     }
@@ -295,11 +281,11 @@ mod tests {
 
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path().canonicalize().unwrap();
-        std::os::unix::fs::symlink(outside.path().join("secret"), root.join("link")).unwrap();
+        crate::test_support::link_file(&outside.path().join("secret"), &root.join("link")).unwrap();
 
         let guard = guard(|g| g.with_fs(|fs| fs.read(&root)));
         let err = guard
-            .read("read", root.join("link").to_str().unwrap())
+            .read("read", &format!("{}/link", script_path(&root)))
             .unwrap_err();
         assert!(err.to_string().contains("denied"), "{err}");
     }
@@ -315,16 +301,13 @@ mod tests {
 
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path().canonicalize().unwrap();
-        #[cfg(unix)]
-        std::os::unix::fs::symlink(outside_root.join("sub"), root.join("link")).unwrap();
-        #[cfg(windows)]
-        std::os::windows::fs::symlink_dir(outside_root.join("sub"), root.join("link")).unwrap();
+        crate::test_support::link_dir(&outside_root.join("sub"), &root.join("link")).unwrap();
 
         let guard = guard(|g| g.with_fs(|fs| fs.read(&root)));
-        // `non_verbatim`, not `root.display()`: on Windows, `root` came from `canonicalize()` and
+        // `script_path`, not `root.display()`: on Windows, `root` came from `canonicalize()` and
         // is `\\?\`-prefixed, which the door check in `resolve` refuses before this test's `..`
         // ever gets a chance to matter.
-        let attack = format!("{}/link/../secret", non_verbatim(&root));
+        let attack = format!("{}/link/../secret", script_path(&root));
         let result = guard.read("read", &attack);
 
         // Unix resolves `link` before it sees the `..`, so the escape is caught. Windows collapses
@@ -346,17 +329,10 @@ mod tests {
         let root = dir.path().canonicalize().unwrap();
 
         let guard = guard(|g| g.with_fs(|fs| fs.write(&root)));
+        let root = script_path(&root);
         // Writing a new file, and creating directories that do not exist yet, both have to work.
-        assert!(
-            guard
-                .write("write", root.join("new.txt").to_str().unwrap())
-                .is_ok()
-        );
-        assert!(
-            guard
-                .write("mkdir", root.join("a/b/c").to_str().unwrap())
-                .is_ok()
-        );
+        assert!(guard.write("write", &format!("{root}/new.txt")).is_ok());
+        assert!(guard.write("mkdir", &format!("{root}/a/b/c")).is_ok());
     }
 
     #[test]
@@ -365,11 +341,8 @@ mod tests {
         let root = dir.path().canonicalize().unwrap();
 
         let guard = guard(|g| g.with_fs(|fs| fs.write(&root)));
-        // `non_verbatim`, not `root.display()`: see the comment on `non_verbatim` for why.
-        let result = guard.write(
-            "write",
-            &format!("{}/absent/../ok.txt", non_verbatim(&root)),
-        );
+        // `script_path`, not `root.display()`: see the comment on `script_path` for why.
+        let result = guard.write("write", &format!("{}/absent/../ok.txt", script_path(&root)));
 
         // Unix reaches the `ParentDir` arm, because `absent` never gets created and `..` is never
         // collapsed lexically. Windows collapses `..` out of the string before the guard ever sees
@@ -392,9 +365,9 @@ mod tests {
         std::fs::write(root.join("a.txt"), "x").unwrap();
 
         let guard = guard(|g| g.with_fs(|fs| fs.read(&root)));
-        let target = root.join("a.txt");
-        assert!(guard.read("read", target.to_str().unwrap()).is_ok());
-        let err = guard.write("write", target.to_str().unwrap()).unwrap_err();
+        let target = format!("{}/a.txt", script_path(&root));
+        assert!(guard.read("read", &target).is_ok());
+        let err = guard.write("write", &target).unwrap_err();
         assert!(err.to_string().contains("fs.write denied"), "{err}");
     }
 
@@ -412,8 +385,11 @@ mod tests {
 
         let guard = guard(|g| g.with_fs(|fs| fs.read(&root)));
         let err = guard.read("read", "/etc/hostname").unwrap_err();
+        // `native::to_script_string`, not `root.display()`: the refusal renders the granted
+        // roots in the `/`-spelled script vocabulary (`deny`, above), so the expectation has to
+        // be built the same way or the two disagree on Windows.
         assert!(
-            err.to_string().contains(&root.display().to_string()),
+            err.to_string().contains(&native::to_script_string(&root)),
             "the refusal should say what was granted: {err}"
         );
         assert!(
@@ -540,11 +516,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path().canonicalize().unwrap();
         std::fs::write(root.join("secret"), "granted").unwrap();
-        std::os::windows::fs::symlink_dir(&outside_root, root.join("link")).unwrap();
+        crate::test_support::link_dir(&outside_root, &root.join("link")).unwrap();
 
         let guard = guard(|g| g.with_fs(|fs| fs.read(&root)));
-        // `non_verbatim`, not `root.display()`: see the comment on `non_verbatim` for why.
-        let attack = format!("{}/link/../secret", non_verbatim(&root));
+        // `script_path`, not `root.display()`: see the comment on `script_path` for why.
+        let attack = format!("{}/link/../secret", script_path(&root));
 
         let resolved = guard.read("read", &attack).unwrap();
         let opened = std::fs::read_to_string(resolved.as_path()).unwrap();

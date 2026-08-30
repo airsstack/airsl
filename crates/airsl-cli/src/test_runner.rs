@@ -233,6 +233,10 @@ mod tests {
         write(&dir.path().join("sub"), "m_test.lua", "return {}");
         write(dir.path(), "ignored.lua", "return {}");
 
+        // `discover` is this crate's own — the paths it returns never cross an `airsl` module
+        // boundary, so no separator conversion in the library can reach them. Normalising here, at
+        // the point the relative path becomes a string, keeps the expectation below `/`-joined on
+        // every platform without weakening what it asserts.
         let found: Vec<String> = discover(dir.path())
             .unwrap()
             .iter()
@@ -240,7 +244,7 @@ mod tests {
                 path.strip_prefix(dir.path())
                     .unwrap()
                     .to_string_lossy()
-                    .into_owned()
+                    .replace('\\', "/")
             })
             .collect();
         // Sorted, and the nested file sorts with its directory rather than by its own name.

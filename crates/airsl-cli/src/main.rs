@@ -18,6 +18,8 @@ mod ext_doctor;
 mod ext_fire;
 mod run;
 mod test_runner;
+#[cfg(test)]
+mod test_support;
 
 use std::io;
 

@@ -5,4 +5,4 @@ entry   = "main.lua"
 api     = 1
 
 [capabilities]
-fs.read = ["/"]
+fs.read = ["$OUTSIDE"]

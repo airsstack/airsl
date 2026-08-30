@@ -292,7 +292,7 @@ mod tests {
             "t",
         )
         .unwrap()
-        .with_args([root.to_string_lossy().into_owned()]);
+        .with_args([crate::test_support::script_path(&root)]);
 
         assert_eq!(
             engine.eval_to::<String>(&script).unwrap(),

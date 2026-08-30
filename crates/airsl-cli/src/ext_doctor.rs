@@ -246,7 +246,10 @@ mod tests {
     use airsl::{GrantSet, MemoryLimit, Policy};
     use tempfile::TempDir;
 
-    use super::{ApprovalRequest, Manifest, ManifestApprover, Variables, negotiate, render, run};
+    use super::{
+        ApprovalRequest, KIND_WIDTH, Manifest, ManifestApprover, VALUE_WIDTH, Variables, negotiate,
+        render, run,
+    };
     use crate::cli::ExtFlags;
 
     /// Writes `extension.toml` (built from `required`/`optional`/`limits` bodies) plus a
@@ -288,9 +291,16 @@ mod tests {
         // `negotiated:` carry different memory values below — a swap of the two `policy_block`
         // arguments in `render` would leave every value present but under the wrong label, which
         // the whole-output comparison below catches and an independent `contains` check would not.
+        //
+        // `abs`, not the unix-spelled literals directly: `/data/in` has a root but no drive, so
+        // the manifest validator refuses it on Windows before negotiation ever runs, and the
+        // ceiling's own grant has to resolve onto the same drive the manifest value does or the
+        // two would silently stop matching.
+        let read_root = crate::test_support::abs("/data");
+        let read_requested = crate::test_support::abs("/data/in");
         let dir = fixture(
             "journal-indexer",
-            "fs.read=['/data/in']\nproc.run=['git']\nregex=true",
+            &format!("fs.read=['{read_requested}']\nproc.run=['git']\nregex=true"),
             "proc.run=['tar']",
             "memory='8MB'",
         );
@@ -298,7 +308,7 @@ mod tests {
         let ceiling = Ceiling::new(
             Policy::confined().with_grants(
                 GrantSet::declared()
-                    .with_fs(|fs| fs.read("/data"))
+                    .with_fs(|fs| fs.read(read_root.as_str()))
                     .with_proc(|p| p.allow(["git"])),
             ),
         )
@@ -309,27 +319,41 @@ mod tests {
 
         let out = render(&m, &ceiling, &negotiation, &decision, &[]);
 
+        // The `fs.read` request line's value column is built with the same width the production
+        // format string uses, rather than hand-counted padding, so it stays correct however long
+        // `read_requested` is on the platform actually running the test.
+        let requested_fs_read = format!(
+            "  {:<w1$} {:<w2$} granted\n",
+            "fs.read",
+            read_requested,
+            w1 = KIND_WIDTH,
+            w2 = VALUE_WIDTH,
+        );
+
         assert_eq!(
             out,
-            concat!(
-                "extension:    journal-indexer 0.2.0 (api 1, entry main.lua)\n",
-                "events:       none\n",
-                "ceiling:\n",
-                "  language:     restricted\n",
-                "  grants:       read /data; exec git\n",
-                "  memory:       67108864 bytes\n",
-                "  instructions: 100000000 instructions\n",
-                "negotiated:\n",
-                "  language:     restricted\n",
-                "  grants:       read /data/in; exec git\n",
-                "  memory:       8388608 bytes\n",
-                "  instructions: 100000000 instructions\n",
-                "requested:\n",
-                "  fs.read      /data/in                 granted\n",
-                "  proc.run     git                      granted\n",
-                "  module       regex                    granted\n",
-                "  proc.run     tar                      reduced   (not among the granted executables: git)\n",
-                "decision:     approve\n",
+            format!(
+                concat!(
+                    "extension:    journal-indexer 0.2.0 (api 1, entry main.lua)\n",
+                    "events:       none\n",
+                    "ceiling:\n",
+                    "  language:     restricted\n",
+                    "  grants:       read {}; exec git\n",
+                    "  memory:       67108864 bytes\n",
+                    "  instructions: 100000000 instructions\n",
+                    "negotiated:\n",
+                    "  language:     restricted\n",
+                    "  grants:       read {}; exec git\n",
+                    "  memory:       8388608 bytes\n",
+                    "  instructions: 100000000 instructions\n",
+                    "requested:\n",
+                    "{}",
+                    "  proc.run     git                      granted\n",
+                    "  module       regex                    granted\n",
+                    "  proc.run     tar                      reduced   (not among the granted executables: git)\n",
+                    "decision:     approve\n",
+                ),
+                read_root, read_requested, requested_fs_read
             )
         );
     }
@@ -350,7 +374,10 @@ mod tests {
 
     #[test]
     fn a_required_denial_is_listed_and_the_decision_is_deny() {
-        let dir = fixture("t", "fs.read=['/']", "", "");
+        // `abs`, not the unix-spelled `/` directly: a bare `/` has a root but no drive, so the
+        // manifest validator refuses it before negotiation ever runs on Windows.
+        let denied = crate::test_support::abs("/");
+        let dir = fixture("t", &format!("fs.read=['{denied}']"), "", "");
         let m = manifest(&dir);
         let ceiling = Ceiling::new(Policy::confined()).unwrap();
         let negotiation = negotiate(&m, &ceiling, &stdlib().unwrap());
@@ -359,11 +386,18 @@ mod tests {
 
         let out = render(&m, &ceiling, &negotiation, &decision, &[]);
 
+        let requested_fs_read = format!(
+            "  {:<w1$} {:<w2$} denied    (",
+            "fs.read",
+            denied,
+            w1 = KIND_WIDTH,
+            w2 = VALUE_WIDTH,
+        );
+        assert!(out.contains(&requested_fs_read), "{out}");
         assert!(
-            out.contains("  fs.read      /                        denied    ("),
+            out.contains(&format!("decision:     deny — fs.read `{denied}`:")),
             "{out}"
         );
-        assert!(out.contains("decision:     deny — fs.read `/`:"), "{out}");
     }
 
     #[test]
@@ -382,7 +416,10 @@ mod tests {
             format!(
                 "[extension]\nname='t'\nversion='0.2.0'\nentry='main.lua'\napi=1\n\
                  [capabilities]\nfs.read=['{}']\n[capabilities.optional]\n[limits]\n",
-                requested.display()
+                // `script_literal`, not `requested.display()`: a temp path on Windows carries
+                // backslashes, which a TOML basic string reads as escape sequences, so a raw
+                // `display()` would fail to parse instead of exercising this test.
+                crate::test_support::script_literal(&requested)
             ),
         )
         .unwrap();
@@ -419,7 +456,13 @@ mod tests {
 
     #[test]
     fn run_exits_zero_on_a_denial_and_one_on_a_parse_error() {
-        let denied = fixture("t", "fs.read=['/']", "", "");
+        // `abs`, not the unix-spelled `/` directly: see `a_required_denial_is_listed_and_the_decision_is_deny`.
+        let denied = fixture(
+            "t",
+            &format!("fs.read=['{}']", crate::test_support::abs("/")),
+            "",
+            "",
+        );
         assert_eq!(doctor(denied.path(), ExtFlags::default()).0, 0);
 
         let unparsable = TempDir::new().unwrap();
