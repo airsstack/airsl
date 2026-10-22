@@ -20,9 +20,9 @@ and stays at 0.1.4.
   Linux (x86_64 and ARM64, each as a glibc build and a fully static musl build) and Windows
   (x86_64), and published as a GitHub Release with a SHA-256 checksum and a GitHub artifact
   attestation per archive. A shell installer (macOS, Linux) and a PowerShell installer (Windows)
-  pick the archive for the machine and install `airsl` into `~/.local/bin`. Running `airsl` no
-  longer needs a Rust toolchain or a C compiler; `cargo install --locked airsl-cli` works as
-  before.
+  pick the archive for the machine and install `airsl` into `~/.local/bin`. Every archive is
+  smoke-tested on its own platform before the release is published. Running `airsl` no longer
+  needs a Rust toolchain or a C compiler; `cargo install --locked airsl-cli` works as before.
 
 ## airsl 0.1.4 — airsl-cli 0.1.3 — 2026-08-30
 

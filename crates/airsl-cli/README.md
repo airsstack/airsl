@@ -52,6 +52,11 @@ not been measured for this runtime.
 
 ### Verifying a download
 
+Before a release is published, every archive is unpacked and run on the platform it targets — musl
+builds inside Alpine, which has no glibc — and must report its version, compile every example
+script, pass the example test suite, and refuse what the sandbox did not grant. An archive that
+fails is not published.
+
 Every archive has a `.sha256` file beside it, and the installer checks the archive against it when
 `sha256sum` is available — without it, the installer says it is skipping the check and installs
 anyway. Every archive also carries a GitHub artifact attestation, which ties it to this repository

@@ -82,7 +82,13 @@ builds every target, the installers, checksums and attestations, and publishes t
 an `airsl-v*` tag has no binary to ship and starts nothing. The release workflow,
 `.github/workflows/airsl-cli-release.yml`, is generated from `dist-workspace.toml` — change the
 config and run `dist generate`, never edit the workflow, because the release's own plan step fails
-on a workflow that no longer matches its config. GitHub Release notes carry install instructions
+on a workflow that no longer matches its config. Before anything is published,
+`.github/workflows/airsl-cli-smoke.yml` — written by hand, and wired in through dist's
+`global-artifacts-jobs` — unpacks every archive on its own platform and runs the example scripts
+through it; the Release waits for it.
+
+The release workflow does not wait for `ci.yml`, so a tag is not proof the gate passed. Tag only a
+commit on `main` whose pull request passed `cargo make dod`. GitHub Release notes carry install instructions
 only: dist finds release notes by a heading that starts with the version, which a changelog naming
 two crates cannot offer, so the notes for a version stay in CHANGELOG.md.
 
