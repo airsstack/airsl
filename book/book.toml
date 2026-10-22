@@ -1,0 +1,12 @@
+[book]
+title = "The airsl Book"
+authors = ["airsstack"]
+language = "en"
+src = "src"
+
+[output.html]
+# Pages serves this repository as a project site under /airsl/, so the 404 page
+# needs the prefix to load its own stylesheets.
+site-url = "/airsl/"
+git-repository-url = "https://github.com/airsstack/airsl"
+edit-url-template = "https://github.com/airsstack/airsl/edit/main/book/{path}"

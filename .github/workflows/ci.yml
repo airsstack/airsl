@@ -116,3 +116,106 @@ jobs:
       # and every suppression live in deny.toml.
       - name: cargo deny check
         run: cargo deny check
+
+  book:
+    name: Book
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # pages.yml only builds the book after a merge, when a broken build would
+    # already be on main. This is the same build, on every pull request.
+    steps:
+      - uses: actions/checkout@v5
+
+      # Pinned to the version the book is written against; keep in step with
+      # pages.yml and min_version in Makefile.toml.
+      - name: Install mdBook
+        uses: taiki-e/install-action@v2
+        with:
+          tool: mdbook@0.4.52
+
+      - name: mdbook build
+        run: mdbook build book
+
+  installer:
+    name: Installer (${{ matrix.os }})
+    # The wrappers in install/ go live the moment they merge, and they are the
+    # first thing a new user runs. Each leg installs the latest release through
+    # the wrapper for its platform, pins a version, and asks for one that does
+    # not exist. They test the wrappers, not the release: a release's archives
+    # are smoke-tested by airsl-cli-smoke.yml before they are published.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    env:
+      # A directory of its own, with no PATH edits and no install receipt, so
+      # the runner's environment stays as it was.
+      AIRSL_CLI_UNMANAGED_INSTALL: ${{ github.workspace }}/.install-test
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: shellcheck
+        if: runner.os == 'Linux'
+        run: shellcheck --shell=sh install/install.sh
+
+      # `sh -s < file` is the shape `curl ... | sh` runs in: the script arrives
+      # on stdin, not as a path.
+      - name: install.sh installs the latest release
+        if: runner.os != 'Windows'
+        run: |
+          sh -s -- --quiet < install/install.sh
+          "$AIRSL_CLI_UNMANAGED_INSTALL/airsl" --version
+
+      - name: install.sh installs a pinned version
+        if: runner.os != 'Windows'
+        run: |
+          rm -rf "$AIRSL_CLI_UNMANAGED_INSTALL"
+          AIRSL_VERSION=0.1.4 sh install/install.sh --quiet
+          test "$("$AIRSL_CLI_UNMANAGED_INSTALL/airsl" --version)" = "airsl 0.1.4"
+
+      - name: install.sh refuses a version that was never released
+        if: runner.os != 'Windows'
+        run: |
+          if AIRSL_VERSION=0.0.0 sh install/install.sh 2> err.txt; then
+            echo "::error::install.sh succeeded for a version that does not exist"
+            exit 1
+          fi
+          cat err.txt
+          grep -q 'is 0.0.0 a released version' err.txt
+
+      # Windows PowerShell 5.1 is what `powershell -c "irm ... | iex"` starts,
+      # and PowerShell 7 is what a developer is likely to have open. Piping the
+      # file's text into iex is the shape `irm | iex` runs in.
+      - name: install.ps1 installs the latest release (Windows PowerShell)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          Get-Content -Raw install/install.ps1 | Invoke-Expression
+          & "$env:AIRSL_CLI_UNMANAGED_INSTALL/airsl.exe" --version
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: install.ps1 installs a pinned version (PowerShell 7)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force $env:AIRSL_CLI_UNMANAGED_INSTALL
+          $env:AIRSL_VERSION = '0.1.4'
+          Get-Content -Raw install/install.ps1 | Invoke-Expression
+          $got = & "$env:AIRSL_CLI_UNMANAGED_INSTALL/airsl.exe" --version
+          if ($got -ne 'airsl 0.1.4') { throw "airsl --version printed '$got'" }
+
+      - name: install.ps1 refuses a version that was never released
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:AIRSL_VERSION = '0.0.0'
+          try {
+            Get-Content -Raw install/install.ps1 | Invoke-Expression
+          } catch {
+            $_.Exception.Message
+            if ($_.Exception.Message -notmatch 'is 0\.0\.0 a released version') { throw }
+            exit 0
+          }
+          throw 'install.ps1 succeeded for a version that does not exist'
