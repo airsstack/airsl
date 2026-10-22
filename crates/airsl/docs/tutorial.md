@@ -9,13 +9,14 @@ Everything here is run from one directory. Nothing is installed except the binar
 ## Install the binary
 
 ```bash
-cargo install --locked airsl-cli
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/airsstack/airsl/releases/latest/download/airsl-cli-installer.sh | sh
 airsl doctor
 ```
 
-To track unreleased `main` instead of the last release, `cargo install --git
-https://github.com/airsstack/airsl --locked airsl-cli`. Working inside a clone,
-`cargo install --path crates/airsl-cli --force` builds from the checked-out sources.
+That installs a prebuilt binary into `~/.local/bin`; open a new shell if `airsl` is not found yet,
+since the installer put that directory on `PATH` through your shell profile. The Windows installer,
+the per-platform archives, and building with `cargo install` are in
+[`airsl-cli`'s install section](../../airsl-cli/README.md#install).
 
 ```
 airsl 0.1.3

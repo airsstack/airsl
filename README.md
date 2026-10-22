@@ -25,16 +25,26 @@ assert_eq!(engine.eval_to::<String>(&script)?, r#"{"ok":true}"#);
 
 ```
 cargo add airsl              # embed the runtime
-cargo install airsl-cli      # get the `airsl` binary
 ```
+
+The `airsl` binary ships prebuilt for macOS, Linux and Windows from `airsl-cli` 0.1.4 on, so running
+scripts needs no Rust toolchain:
+
+```
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/airsstack/airsl/releases/latest/download/airsl-cli-installer.sh | sh
+```
+
+The Windows installer, the per-platform archives, and `cargo install` are in
+[`airsl-cli`'s install section](crates/airsl-cli/README.md#install).
 
 **Supported targets: Linux, macOS, and `x86_64-pc-windows-msvc`.** On Windows, `airsstack.proc` runs
 `.exe` programs only — `npm`, `npx`, `yarn` and `tsc`, which ship as `.cmd` shims, are not reachable
 through it.
 
-**A C compiler is required.** `mlua`'s `vendored` feature builds Lua 5.4 from the C sources shipped
-by `lua-src` and links it statically, so there is no system Lua and no `pkg-config` — but `cc` must
-be present.
+**Building needs a C compiler** — embedding the library, or installing the binary with `cargo`; the
+prebuilt binaries do not. `mlua`'s `vendored` feature builds Lua 5.4 from the C sources shipped by
+`lua-src` and links it statically, so there is no system Lua and no `pkg-config` — but `cc` must be
+present.
 
 ## Documentation
 
@@ -66,6 +76,23 @@ the same command.
 [CHANGELOG.md](CHANGELOG.md) covers both crates in one timeline. Each release is tagged per crate —
 `airsl-v0.1.4`, `airsl-cli-v0.1.3` — because one commit has shipped two crates under two different
 version numbers, which a single `vX.Y.Z` tag cannot name.
+
+Only an `airsl-cli-v*` tag starts the binary release. [`dist`](https://github.com/axodotdev/cargo-dist)
+builds every target, the installers, checksums and attestations, and publishes the GitHub Release;
+an `airsl-v*` tag has no binary to ship and starts nothing. The release workflow,
+`.github/workflows/airsl-cli-release.yml`, is generated from `dist-workspace.toml` — change the
+config and run `dist generate`, never edit the workflow, because the release's own plan step fails
+on a workflow that no longer matches its config. Before anything is published,
+`.github/workflows/airsl-cli-smoke.yml` — written by hand, and wired in through dist's
+`global-artifacts-jobs` — unpacks every archive on its own platform and runs the example scripts
+through it; the Release waits for it. Every pull request runs the same builds and smoke tests
+and stops short of publishing, so a change that breaks a release target fails on its pull request
+rather than on the tag.
+
+The release workflow does not wait for `ci.yml`, so a tag is not proof the gate passed. Tag only a
+commit on `main` whose pull request passed `cargo make dod`. GitHub Release notes carry install instructions
+only: dist finds release notes by a heading that starts with the version, which a changelog naming
+two crates cannot offer, so the notes for a version stay in CHANGELOG.md.
 
 ## License
 

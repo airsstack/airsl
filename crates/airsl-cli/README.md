@@ -4,14 +4,80 @@ The `airsl` binary: runs Lua scripts on the [`airsl`](https://crates.io/crates/a
 
 ## Install
 
+From 0.1.4 on, every release ships prebuilt binaries on
+[GitHub Releases](https://github.com/airsstack/airsl/releases), so neither a Rust toolchain nor a C
+compiler is needed to run `airsl`.
+
 ```bash
-cargo install --locked airsl-cli
+# macOS and Linux
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/airsstack/airsl/releases/latest/download/airsl-cli-installer.sh | sh
+```
+
+```powershell
+# Windows
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/airsstack/airsl/releases/latest/download/airsl-cli-installer.ps1 | iex"
+```
+
+```bash
 airsl doctor
 ```
+
+The installer puts `airsl` in `~/.local/bin` (`%USERPROFILE%\.local\bin` on Windows) and adds that
+directory to `PATH` — through your shell profile on unix, through the user `PATH` on Windows. Set
+`AIRSL_CLI_NO_MODIFY_PATH=1` to leave both alone. An `airsl` that an earlier `cargo install` put in
+`~/.cargo/bin` can still come first on `PATH`; the installer warns that the command is shadowed, and
+`cargo uninstall airsl-cli` removes the old copy.
 
 **Supported targets: Linux, macOS, and `x86_64-pc-windows-msvc`.** On Windows, `airsstack.proc` runs
 `.exe` programs only — `npm`, `npx`, `yarn` and `tsc`, which ship as `.cmd` shims, are not reachable
 through it.
+
+### Choosing an archive
+
+Each release carries one archive per target, and any of them can be downloaded by hand instead of
+running the installer:
+
+| Archive target | Runs on | Links against at runtime |
+|---|---|---|
+| `aarch64-apple-darwin` | macOS, Apple Silicon | macOS system libraries only |
+| `x86_64-apple-darwin` | macOS, Intel | macOS system libraries only |
+| `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu` | glibc distributions | the host's glibc, which must be at least the build machine's |
+| `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl` | any Linux, Alpine included | nothing — fully static |
+| `x86_64-pc-windows-msvc` | Windows | Windows system DLLs only; the C runtime is linked in |
+
+On Linux the installer takes the gnu build when the host's glibc is new enough, and the musl build
+otherwise, or on a musl distribution. Both run the same scripts under the same policy. glibc's
+allocator is generally faster than musl's, and the Lua VM allocates constantly; that difference has
+not been measured for this runtime.
+
+### Verifying a download
+
+Before a release is published, every archive is unpacked and run on the platform it targets — musl
+builds inside Alpine, which has no glibc — and must report its version, compile every example
+script, pass the example test suite, and refuse what the sandbox did not grant. An archive that
+fails is not published.
+
+Every archive has a `.sha256` file beside it, and the installer checks the archive against it when
+`sha256sum` is available — without it, the installer says it is skipping the check and installs
+anyway. Every archive also carries a GitHub artifact attestation, which ties it to this repository
+and the workflow run that built it, so a checksum file swapped together with its archive is still
+caught:
+
+```bash
+gh attestation verify airsl-cli-x86_64-unknown-linux-musl.tar.xz --repo airsstack/airsl
+```
+
+The binaries are not signed with an Apple Developer ID or a Windows code-signing certificate. That
+matters only for an archive downloaded through a browser, which marks the file as coming from the
+internet: on macOS, Gatekeeper then refuses to run `airsl` until the mark is removed with
+`xattr -d com.apple.quarantine airsl`, and on Windows SmartScreen warns on first run. The installers
+download archives themselves, so the mark is never set.
+
+### From source
+
+```bash
+cargo install --locked airsl-cli
+```
 
 **A C compiler is required.** `mlua`'s `vendored` feature builds Lua 5.4 from the C sources shipped
 by `lua-src` and links it statically, so there is no system Lua and no `pkg-config` — but `cc` must
@@ -20,6 +86,8 @@ be present before `cargo install` will get anywhere.
 To track unreleased `main` instead of the last release, `cargo install --git
 https://github.com/airsstack/airsl --locked airsl-cli`. Working inside a clone,
 `cargo install --path crates/airsl-cli --force` builds from the checked-out sources.
+
+### Checking the install
 
 `doctor` prints the runtime version and the policy a script would actually run under:
 
@@ -297,6 +365,12 @@ exit 0
 Every path exits 0, and `exec` is deliberately not used — it would replace the shell and hand the
 child's exit status straight back to the caller.
 
+That silence has a cost when the binary came from the installer. It added `~/.local/bin` to `PATH`
+through your shell profile, and a hook runner may start a shell that never reads that profile — so
+`command -v airsl` finds nothing and the hook quietly does nothing. If a hook never seems to fire,
+check that first; resolving the binary by its absolute path, `"$HOME/.local/bin/airsl"`, removes the
+question.
+
 A Windows host needs its own launcher — a `.cmd` or PowerShell equivalent making the same three
 decisions (missing directory, missing binary, and always exiting 0). None is shipped.
 
@@ -328,7 +402,8 @@ Each document marks which parts ship and which are design.
 
 [CHANGELOG.md](https://github.com/airsstack/airsl/blob/main/CHANGELOG.md) — one timeline covering
 this binary and the `airsl` library it carries, which are numbered independently. Releases are
-tagged per crate: `airsl-cli-v0.1.3`, `airsl-v0.1.4`.
+tagged per crate: `airsl-cli-v0.1.3`, `airsl-v0.1.4`. From 0.1.4 on, an `airsl-cli` tag also
+produces the GitHub Release that carries the prebuilt binaries.
 
 This binary's behaviour changes when the library beneath it does, so an entry naming an `airsl`
 version is describing this crate too.
