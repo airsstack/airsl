@@ -85,7 +85,9 @@ config and run `dist generate`, never edit the workflow, because the release's o
 on a workflow that no longer matches its config. Before anything is published,
 `.github/workflows/airsl-cli-smoke.yml` — written by hand, and wired in through dist's
 `global-artifacts-jobs` — unpacks every archive on its own platform and runs the example scripts
-through it; the Release waits for it.
+through it; the Release waits for it. Every pull request runs the same builds and smoke tests
+and stops short of publishing, so a change that breaks a release target fails on its pull request
+rather than on the tag.
 
 The release workflow does not wait for `ci.yml`, so a tag is not proof the gate passed. Tag only a
 commit on `main` whose pull request passed `cargo make dod`. GitHub Release notes carry install instructions

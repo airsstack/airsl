@@ -29,3 +29,7 @@ github-attestations = true
 # every archive is built and `host` waits for it, so an archive that fails its
 # smoke test is never published. See .github/workflows/airsl-cli-smoke.yml.
 global-artifacts-jobs = ["./airsl-cli-smoke"]
+# Pull requests build and smoke-test every archive too, publishing nothing. The
+# gate in ci.yml never builds musl or this profile, so without this a change that
+# breaks a release target would first fail on the release tag itself.
+pr-run-mode = "upload"
