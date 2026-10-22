@@ -5,9 +5,24 @@ Notable changes to both crates in this workspace, newest first. The format follo
 [SemVer](https://semver.org/) — with the caveat that for a `0.1.z` version the *middle* number is
 the slot Cargo treats as breaking, so a compatible change ships as a `z` bump.
 
-The two crates are versioned independently and have released together so far, so each entry names
-both. Every release is tagged per crate — `airsl-v0.1.4`, `airsl-cli-v0.1.3` — because one commit
-has shipped two crates under two different numbers, which a single `vX.Y.Z` tag cannot name.
+The two crates are versioned independently, and each entry names every crate it releases. Every
+release is tagged per crate — `airsl-v0.1.4`, `airsl-cli-v0.1.3` — because one commit has shipped
+two crates under two different numbers, which a single `vX.Y.Z` tag cannot name.
+
+## Unreleased — airsl-cli 0.1.4
+
+How the binary reaches a machine changes; what it does once there does not. `airsl` has no change
+and stays at 0.1.4.
+
+### Added
+
+- **Prebuilt binaries.** Each `airsl-cli` release is built for macOS (Apple Silicon and Intel),
+  Linux (x86_64 and ARM64, each as a glibc build and a fully static musl build) and Windows
+  (x86_64), and published as a GitHub Release with a SHA-256 checksum and a GitHub artifact
+  attestation per archive. A shell installer (macOS, Linux) and a PowerShell installer (Windows)
+  pick the archive for the machine and install `airsl` into `~/.local/bin`. Running `airsl` no
+  longer needs a Rust toolchain or a C compiler; `cargo install --locked airsl-cli` works as
+  before.
 
 ## airsl 0.1.4 — airsl-cli 0.1.3 — 2026-08-30
 
