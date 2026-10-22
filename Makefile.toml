@@ -5,6 +5,7 @@
 #   cargo make fmt        # rewrite formatting (the only task that mutates the tree)
 #   cargo make clippy     # a single gate step
 #   cargo make examples   # run every example end to end
+#   cargo make book       # serve the book locally with live reload
 #   cargo make --list-all-steps
 #
 # The five gate steps are the canonical command set for this repository: fmt, clippy,
@@ -155,6 +156,30 @@ exec --fail-on-error cargo run -q -p airsl-cli -- check crates/airsl/examples/
 echo --- airsl test
 exec --fail-on-error cargo run -q -p airsl-cli -- test crates/airsl/examples/
 '''
+
+# ---------------------------------------------------------------------------
+# Book
+# ---------------------------------------------------------------------------
+
+# Both tasks install mdBook on first use rather than failing with a missing
+# binary: the book is the one part of this repository a docs-only contributor
+# touches, and that contributor should not need to know the tool's name first.
+# The output lands in `book/book/`, which is ignored — the published copy is
+# built by the Pages workflow, never committed.
+
+[tasks.book]
+category = "Book"
+description = "Serve the book at http://localhost:3000, rebuilding on every edit"
+install_crate = { crate_name = "mdbook", binary = "mdbook", test_arg = "--version", min_version = "0.4.52" }
+command = "mdbook"
+args = ["serve", "book", "--open"]
+
+[tasks.book-build]
+category = "Book"
+description = "Build the book once into book/book/, the same build Pages publishes"
+install_crate = { crate_name = "mdbook", binary = "mdbook", test_arg = "--version", min_version = "0.4.52" }
+command = "mdbook"
+args = ["build", "book"]
 
 # ---------------------------------------------------------------------------
 # Supply chain
