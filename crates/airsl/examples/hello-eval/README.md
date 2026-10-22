@@ -40,5 +40,5 @@ the empty grant set is never consulted.
 
 ## See also
 
-- [tutorial](../../docs/tutorial.md) — the guided version of this, extended into a working hook.
+- [Your First Engine](https://airsstack.github.io/airsl/ch06-01-first-engine.html) — the guided version of this.
 - [`filesystem-grants`](../filesystem-grants/) — the next step: handing a script authority.

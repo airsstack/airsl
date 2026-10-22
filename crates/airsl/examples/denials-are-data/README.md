@@ -69,7 +69,7 @@ which keeps the message identical on Linux and macOS. `<granted>` is substituted
 
 ## See also
 
-- [sandbox](../../docs/sandbox.md) — what a grant is and where it is enforced.
-- [host standard library](../../docs/stdlib.md) — the full roster and the rules every module follows.
+- [Asking Permission](https://airsstack.github.io/airsl/ch03-00-asking-permission.html) — what a grant is and what it covers.
+- [Module Reference](https://airsstack.github.io/airsl/appendix-02-modules.html) — every module and the grant each one needs.
 - [`filesystem-grants`](../filesystem-grants/) and [`env-and-proc`](../env-and-proc/) — what the
   grants permit, rather than what their edges refuse.

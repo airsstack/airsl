@@ -128,9 +128,10 @@ writer that adds a byte of its own is the wrong tool no matter what it is asked 
 
 ## See also
 
-- [tutorial](../../docs/tutorial.md) — step 6 builds a hook from the CLI side, with `airsl run` and
-  a shell pipe instead of an embedded engine.
+- [Standard Streams and Hooks](https://airsstack.github.io/airsl/ch05-04-streams-and-hooks.html) — a hook built from the
+  CLI side, with `airsl run` and a launcher script instead of an embedded engine.
 - [`failure-policy`](../failure-policy/) — the decision this example refuses to take: whether a
   failed hook exits non-zero.
 - [`values-and-json`](../values-and-json/) — why the keys in both documents above come out sorted.
-- [stdlib](../../docs/stdlib.md) — the full `airsstack.hook` and `airsstack.stdio` roster.
+- [Module Reference](https://airsstack.github.io/airsl/appendix-02-modules.html) — the full `airsstack.hook` and
+  `airsstack.stdio` roster.

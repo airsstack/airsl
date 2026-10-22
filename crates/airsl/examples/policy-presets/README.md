@@ -75,9 +75,9 @@ decline the *confined* loader, so a predicate asking only about that gave them o
 
 ## See also
 
-- [sandbox](../../docs/sandbox.md) — the three questions a policy answers, at length.
+- [Presets](https://airsstack.github.io/airsl/ch03-05-presets.html) — the three presets side by side, from the command line.
 - [resource-limits](../resource-limits/) — the ceilings in the second block, made to fire.
 - [`multi-file-project`](../multi-file-project/) — that confined `require`, given a module tree to
   resolve against.
-- [architecture](../../docs/architecture.md) — the confined `require` that `restricted` gets, and
-  why `full` keeps Lua's own instead.
+- [Three Layers](https://airsstack.github.io/airsl/ch09-01-three-layers.html) — the language surface, the grants and the
+  limits as three separate questions a policy answers.

@@ -74,6 +74,6 @@ grant points at a temporary directory. Handing a script a path it could not itse
 
 ## See also
 
-- [sandbox](../../docs/sandbox.md) — what a grant is and where it is enforced.
+- [Asking Permission](https://airsstack.github.io/airsl/ch03-00-asking-permission.html) — what a grant is and what it covers.
 - [`env-and-proc`](../env-and-proc/) — the other two grant axes.
 - [`denials-are-data`](../denials-are-data/) — what a module does when it has no grant at all.

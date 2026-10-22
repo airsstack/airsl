@@ -151,8 +151,9 @@ characters, so a sibling directory whose name merely begins with the root's — 
 
 - [policy-presets](../policy-presets/) — where `require` reports present on two rows and the
   difference between them cannot be shown.
-- [architecture](../../docs/architecture.md) — why the confined `require` is built rather than
-  narrowed, and what an engine keeps between evaluations.
-- [sandbox](../../docs/sandbox.md) — the three questions a policy answers, at length.
+- [A First Project](https://airsstack.github.io/airsl/ch02-00-first-project.html) — splitting a script into modules, and
+  where the confined `require` may look.
+- [One Engine, Many Scripts](https://airsstack.github.io/airsl/ch06-04-reuse.html) — what an engine keeps between
+  evaluations, the `require` cache included.
 - [hello-eval](../hello-eval/) — `Script::from_source`, the constructor that leaves a script with
   no root and therefore no `require`.

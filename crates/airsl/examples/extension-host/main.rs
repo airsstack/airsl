@@ -12,7 +12,7 @@
 //! [`LoadReport`] that never short-circuits, and rendering a [`Dispatch`] as byte-stable JSON.
 //!
 //! Non-responsibilities: the manifest format and the negotiation it goes through — see
-//! `crates/airsl/docs/extensions.md`.
+//! the Extensions chapter of the book, `book/src/ch08-00-extensions.md`.
 
 use std::error::Error as StdError;
 use std::path::Path;

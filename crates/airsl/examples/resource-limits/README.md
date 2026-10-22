@@ -61,4 +61,4 @@ it was given less than it needed.
 ## See also
 
 - [`failure-policy`](../failure-policy/) — what a caller does with the error this produces.
-- [sandbox](../../docs/sandbox.md) — ceilings as one of the three independent policy questions.
+- [Memory and Time Limits](https://airsstack.github.io/airsl/ch04-01-limits.html) — the same limits, met from the command line.

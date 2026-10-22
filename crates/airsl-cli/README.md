@@ -1,409 +1,95 @@
 # airsl-cli
 
-The `airsl` binary: runs Lua scripts on the [`airsl`](https://crates.io/crates/airsl) runtime.
+The `airsl` command. It runs Lua scripts that can only touch what the command line allows.
 
 ## Install
 
-From 0.1.4 on, every release ships prebuilt binaries on
-[GitHub Releases](https://github.com/airsstack/airsl/releases), so neither a Rust toolchain nor a C
-compiler is needed to run `airsl`.
-
-```bash
+```sh
 # macOS and Linux
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/airsstack/airsl/releases/latest/download/airsl-cli-installer.sh | sh
+curl -LsSf https://airsstack.github.io/airsl/install.sh | sh
 ```
 
 ```powershell
 # Windows
-powershell -ExecutionPolicy Bypass -c "irm https://github.com/airsstack/airsl/releases/latest/download/airsl-cli-installer.ps1 | iex"
+powershell -ExecutionPolicy Bypass -c "irm https://airsstack.github.io/airsl/install.ps1 | iex"
 ```
 
-```bash
-airsl doctor
-```
+The installer puts `airsl` in `~/.local/bin` and adds that folder to your `PATH`. Set
+`AIRSL_VERSION=0.1.4` to install a particular release instead of the latest. The prebuilt binary
+needs no Rust, Lua or C compiler.
 
-The installer puts `airsl` in `~/.local/bin` (`%USERPROFILE%\.local\bin` on Windows) and adds that
-directory to `PATH` — through your shell profile on unix, through the user `PATH` on Windows. Set
-`AIRSL_CLI_NO_MODIFY_PATH=1` to leave both alone. An `airsl` that an earlier `cargo install` put in
-`~/.cargo/bin` can still come first on `PATH`; the installer warns that the command is shadowed, and
-`cargo uninstall airsl-cli` removes the old copy.
+To build it yourself instead, with a Rust toolchain and a C compiler:
 
-**Supported targets: Linux, macOS, and `x86_64-pc-windows-msvc`.** On Windows, `airsstack.proc` runs
-`.exe` programs only — `npm`, `npx`, `yarn` and `tsc`, which ship as `.cmd` shims, are not reachable
-through it.
-
-### Choosing an archive
-
-Each release carries one archive per target, and any of them can be downloaded by hand instead of
-running the installer:
-
-| Archive target | Runs on | Links against at runtime |
-|---|---|---|
-| `aarch64-apple-darwin` | macOS, Apple Silicon | macOS system libraries only |
-| `x86_64-apple-darwin` | macOS, Intel | macOS system libraries only |
-| `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu` | glibc distributions | the host's glibc, which must be at least the build machine's |
-| `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl` | any Linux, Alpine included | nothing — fully static |
-| `x86_64-pc-windows-msvc` | Windows | Windows system DLLs only; the C runtime is linked in |
-
-On Linux the installer takes the gnu build when the host's glibc is new enough, and the musl build
-otherwise, or on a musl distribution. Both run the same scripts under the same policy. glibc's
-allocator is generally faster than musl's, and the Lua VM allocates constantly; that difference has
-not been measured for this runtime.
-
-### Verifying a download
-
-Before a release is published, every archive is unpacked and run on the platform it targets — musl
-builds inside Alpine, which has no glibc — and must report its version, compile every example
-script, pass the example test suite, and refuse what the sandbox did not grant. An archive that
-fails is not published.
-
-Every archive has a `.sha256` file beside it, and the installer checks the archive against it when
-`sha256sum` is available — without it, the installer says it is skipping the check and installs
-anyway. Every archive also carries a GitHub artifact attestation, which ties it to this repository
-and the workflow run that built it, so a checksum file swapped together with its archive is still
-caught:
-
-```bash
-gh attestation verify airsl-cli-x86_64-unknown-linux-musl.tar.xz --repo airsstack/airsl
-```
-
-The binaries are not signed with an Apple Developer ID or a Windows code-signing certificate. That
-matters only for an archive downloaded through a browser, which marks the file as coming from the
-internet: on macOS, Gatekeeper then refuses to run `airsl` until the mark is removed with
-`xattr -d com.apple.quarantine airsl`, and on Windows SmartScreen warns on first run. The installers
-download archives themselves, so the mark is never set.
-
-### From source
-
-```bash
+```sh
 cargo install --locked airsl-cli
 ```
 
-**A C compiler is required.** `mlua`'s `vendored` feature builds Lua 5.4 from the C sources shipped
-by `lua-src` and links it statically, so there is no system Lua and no `pkg-config` — but `cc` must
-be present before `cargo install` will get anywhere.
+## A quick tour
 
-To track unreleased `main` instead of the last release, `cargo install --git
-https://github.com/airsstack/airsl --locked airsl-cli`. Working inside a clone,
-`cargo install --path crates/airsl-cli --force` builds from the checked-out sources.
+A script gets its arguments in `arg`, the way a shell script gets `$1`:
 
-### Checking the install
-
-`doctor` prints the runtime version and the policy a script would actually run under:
-
-```
-airsl 0.1.4
-  lua:          Lua 5.4
-  language:     restricted
-  root table:   airsstack
-  grants:       none
-  memory:       67108864 bytes
-  instructions: 100000000 instructions
-  modules:      json, path, fs, env, proc, regex, hash, time, glob, stdio, hook, ext
+```console
+$ airsl run greet.lua airsl
+hello, airsl
 ```
 
-Pass `--policy` to describe a different preset rather than the default.
+Nothing outside the script is reachable until you grant it. Each grant is a flag, so whoever reads
+the command can see what the script may touch:
 
-## Usage
-
-```
-airsl run  [--policy <trusted|confined|pure>]
-           [--allow-read <DIR>] [--allow-write <DIR>]
-           [--allow-env <NAME>] [--allow-exec <PROGRAM>]
-           [--memory-limit <BYTES|none>]
-           [--instruction-limit <COUNT|none>]
-           [--fail-open]
-           <script.lua> [args…]
-airsl test [--policy <trusted|confined|pure>] [--allow-…] [<path>]
-airsl check [<path>]
-airsl doctor [--policy <trusted|confined|pure>]
-airsl ext doctor <DIR> [--allow-…] [--memory-limit <BYTES|none>] [--instruction-limit <COUNT|none>]
-                       [--event <NAME>] [--var <NAME=VALUE>]
-airsl ext fire   <DIR> <EVENT> [--allow-…] [--memory-limit <BYTES|none>] [--instruction-limit <COUNT|none>]
-                       [--event <NAME>] [--var <NAME=VALUE>]
+```console
+$ airsl run --allow-read config --allow-write backups backup.lua config/app.toml backups/app.toml
+copied 12 bytes
 ```
 
-Arguments after the script path reach it in the global `arg` table — `arg[1]` where a shell script
-read `$1`, and `arg[0]` for the script's own name. They are passed through untouched, including ones
-beginning with `-`.
+| Flag | Lets the script |
+|---|---|
+| `--allow-read DIR` | read files under `DIR` |
+| `--allow-write DIR` | write files under `DIR` |
+| `--allow-env NAME` | read and set the environment variable `NAME` |
+| `--allow-exec PROGRAM` | run `PROGRAM` |
 
-## `--policy`
+Every script also runs under a memory limit and an instruction limit, so one that loops forever is
+stopped instead of hanging:
 
-What the script may reach, and what it may spend.
-
-| Preset | Language surface | Ceilings | `require` |
-|---|---|---|---|
-| `trusted` | everything except `debug` — `io`, `os`, `package` included | none | Lua's own, unconfined |
-| `confined` *(default)* | `string`, `table`, `math`, `utf8`, `coroutine`, pure `os` | 64 MiB, 100M instructions | confined to the script's directory |
-| `pure` | `string`, `table`, `math`, `utf8` | 16 MiB, 10M instructions | none |
-
-`trusted` is for first-party scripts only: one can read and write arbitrary files and spawn
-processes without going through a host module, so none of the containment the host modules provide
-applies to it.
-
-A script under `confined` may `require` its siblings, including files in subdirectories
-(`require("lib.index")`). It cannot name anything outside its own directory: a target may not
-contain a path separator or a `..` component, and the resolved path is checked for containment, so a
-symlink pointing out of the directory is refused too.
-
-## Grant flags
-
-Nothing is granted below `--policy trusted`. A script that reads a file, reads an environment
-variable or runs a program says so on the command line, so the authority is visible to whoever reads
-the invocation:
-
-| Flag | Grants | Repeatable |
-|---|---|---|
-| `--allow-read DIR` | reading under `DIR` | yes |
-| `--allow-write DIR` | writing under `DIR` — not implicitly readable | yes |
-| `--allow-env NAME` | reading and setting the variable `NAME` | yes |
-| `--allow-exec PROGRAM` | running `PROGRAM`, matched on the name as written | yes |
-
-```bash
-airsl run --allow-read "$APP_HOME" \
-          --allow-write "$APP_HOME/index" \
-          --allow-env APP_HOME \
-          --allow-exec git \
-          hooks/index.lua
+```console
+$ airsl run forever.lua
+airsl: script `forever.lua` exceeded its instruction limit of 100000000
 ```
 
-A refusal names what was granted, because the usual cause is a root one directory too deep:
+## Commands
 
-```
-airsl: fs.read denied: `/etc/hostname` is outside the granted read roots: /home/me/journal
-```
+| Command | What it does |
+|---|---|
+| `airsl run SCRIPT [ARGS…]` | run a script |
+| `airsl test [PATH]` | run every `*_test.lua` and `test_*.lua` file under `PATH` |
+| `airsl check [PATH]` | compile every `.lua` file under `PATH` without running any of it |
+| `airsl doctor` | show the version, and what a script would be allowed to do |
+| `airsl ext doctor DIR` | show what an extension asks for, and what it would be given |
+| `airsl ext fire DIR EVENT` | load an extension and send it one event, with the payload on stdin |
 
-The roots list is rendered in the `/` vocabulary on every platform, so a Windows reader sees
-`C:/home/me/journal` rather than a backslash spelling — this one example stands in for both.
+`--policy trusted|confined|pure` picks a preset, `--memory-limit` and `--instruction-limit` change
+the limits, and `--fail-open` keeps a failing script from failing whatever ran it, which is what an
+editor or agent hook needs.
 
-Under `--policy trusted` these flags are ignored: that preset waives containment entirely, so a
-declared list would narrow nothing and would make `airsl doctor` report something meaningless.
+## Learn more
 
-## `airsl test`
+[The airsl Book](https://airsstack.github.io/airsl/) walks through all of this with examples:
 
-Runs the Lua test files under a directory, with the same policy and grant flags as `airsl run`.
-
-```bash
-airsl test --allow-read . scripts/
-```
-
-A test file is named `*_test.lua` or `test_*.lua` and returns a table whose named function values
-are the tests. A test passes by returning and fails by raising, so Lua's own `assert` is the whole
-assertion surface:
-
-```lua
--- index_test.lua
-return {
-  joins_paths = function()
-    assert(airsstack.path.join("a", "b") == "a/b")
-  end,
-}
-```
-
-Each file gets a fresh engine, so one file cannot leave globals behind for the next. Finding no test
-files at all exits non-zero — "no tests" and "all tests passed" must not read the same to CI.
-
-## `airsl check`
-
-Compiles every `.lua` file under a directory without running a line of any of it.
-
-```bash
-airsl check scripts
-```
-
-It exists because `airsl test` covers only what a test file loads, and a hook's entry point is
-usually loaded by nothing — the tests exercise the modules underneath it. A syntax error in a
-driver therefore survives a green test run, and `--fail-open` then swallows it when the hook fires:
-CI says nothing, the session says nothing, and the hook has quietly stopped working. Measured on one
-such script suite before this existed, a missing `end` in the dispatcher left 244 tests passing and
-the hook exiting 0.
-
-It takes no policy and no grants, because nothing is executed and parsing never consults the
-globals table — a chunk compiles or does not compile identically under every preset. Finding no
-Lua files at all exits non-zero, for the same reason `airsl test` does.
-
-What it does not catch is everything past the parser: a misspelled field, a `nil` arithmetic, a
-module that raises the moment it is required. Those compile, and they are a test's job.
-
-## `airsl ext`
-
-`ext doctor` shows what a ceiling would grant, reduce and deny for one extension's manifest,
-without running a line of its entry script:
-
-```bash
-airsl ext doctor ./word-count
-```
-
-```
-extension:    word-count 0.1.0 (api 1, entry main.lua)
-events:       none
-ceiling:
-  language:     restricted
-  grants:       none
-  memory:       67108864 bytes
-  instructions: 100000000 instructions
-negotiated:
-  language:     restricted
-  grants:       none
-  memory:       8388608 bytes
-  instructions: 1000000 instructions
-requested:
-  module       regex                    granted
-decision:     approve
-```
-
-`ceiling:` is the host's real bound — `confined` plus whatever `--allow-…`/`--memory-limit`/
-`--instruction-limit` widened it to — unmodified by anything the manifest asked for. `negotiated:`
-is the policy this extension would actually run under, which differs wherever the manifest's own
-`[limits]` asked for a tighter ceiling than the host offers, as it does here (this manifest asks for
-8 MiB and 1M instructions, well under the host's 64 MiB / 100M default). `events:` is the sorted,
-deduplicated set the host declared with `--event` — the names `ext fire` is allowed to dispatch —
-and reads `none` when the flag was never passed; `ext doctor` never dispatches anything, so the line
-is informational here.
-
-A denied or reduced request is tagged in place, and the decision line names why:
-
-```
-extension:    broken 0.1.0 (api 1, entry main.lua)
-events:       none
-ceiling:
-  language:     restricted
-  grants:       none
-  memory:       67108864 bytes
-  instructions: 100000000 instructions
-negotiated:
-  language:     restricted
-  grants:       none
-  memory:       67108864 bytes
-  instructions: 100000000 instructions
-requested:
-  fs.read      /                        denied    (outside the granted read roots: none)
-decision:     deny — fs.read `/`: outside the granted read roots: none
-```
-
-`ext fire` loads the extension for real and dispatches one event, with the payload on stdin and the
-result on stdout as byte-stable JSON (`null` when nothing handled the event):
-
-```bash
-echo '{"text":"the quick brown fox"}' | airsl ext fire ./word-count count
-```
-
-```
-{"longest":"quick","words":4}
-```
-
-Both subcommands take the same grant flags as `airsl run` — `--allow-read`, `--allow-write`,
-`--allow-env`, `--allow-exec` (see "Grant flags" above) — plus `--memory-limit` and
-`--instruction-limit` (see "`--memory-limit` and `--instruction-limit`" below), `--event NAME` to
-declare an event beyond the one being fired or inspected (repeatable), and `--var NAME=VALUE` to
-supply a manifest variable (repeatable). There is no `--policy`: `ext` negotiates against `confined`
-plus whatever the flags widen — `trusted` waives containment entirely, which is not a ceiling an
-extension manifest can be held against.
-
-| Command | Exit 0 | Exit 1 |
-|---|---|---|
-| `ext doctor` | any decision, including a deny | the manifest cannot be read or parsed, or the ceiling itself is invalid |
-| `ext fire` | the event dispatched and a result (or `null`) was written | any error — invalid JSON on stdin, a denied manifest, a handler error |
-
-`ext doctor` never builds an engine; `ext fire` goes through `ExtensionHost` exactly the way a host
-program would, so what it does is by construction what embedding this crate does. A resource-limit
-breach is always reported on stderr, whether or not `ext fire` otherwise succeeds — there is no
-`--fail-open` for this subcommand, so every failure, breach included, is reported and exits 1.
-
-## `--memory-limit` and `--instruction-limit`
-
-Override whatever the preset supplied. Pass `none` to lift a ceiling the preset imposed, or a count
-to impose one it did not:
-
-```bash
-airsl run --policy pure --instruction-limit 500000 report.lua
-airsl run --policy confined --memory-limit none big-index.lua
-```
-
-The instruction ceiling is the only thing that stops a script that never terminates — no policy
-decision helps against `while true do end`, because it reaches nothing. It costs roughly a quarter of
-the evaluation path, since the check runs inside the VM, which is why lifting it is available.
-
-The memory ceiling caps the whole Lua state rather than each script, and the instruction ceiling is
-enforced to within a check interval rather than exactly.
-
-## `--fail-open`
-
-Discards errors and exits 0.
-
-This exists for scripts run as editor or agent hooks, where a non-zero exit is read as a signal
-rather than a diagnostic. A `PreToolUse` hook that exits 2 blocks the tool call that triggered it,
-and the matcher for such hooks commonly covers `Read` — so a script that merely failed would block
-every file read in the session.
-
-The flag lives on the command line rather than inside the script because a syntax error happens
-before any in-script setting could take effect, and that is precisely the case the behaviour exists
-for.
-
-Set `AIRSL_DEBUG=1` to see the error on stderr anyway. The exit code stays 0.
-
-**One exception, deliberately.** A script stopped for exhausting a memory or instruction ceiling is
-always reported on stderr, `AIRSL_DEBUG` or not. The exit code still stays 0 — the fail-open
-contract does not bend — but a hook consuming the host's memory or looping until it is killed is a
-fact about the machine rather than a diagnostic the script chose to emit, and staying silent about
-it makes a misbehaving hook impossible to find.
-
-## Calling it from a hook
-
-The binary is not ambient the way `sh` and `python3` are: until it has been installed, it is not
-there. A launcher that checks first keeps a missing runtime silent rather than broken:
-
-```sh
-#!/bin/sh
-DIR=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd) || exit 0
-[ -n "$DIR" ] || exit 0
-command -v airsl >/dev/null 2>&1 || exit 0
-airsl run --fail-open "$DIR/enforce.lua" || exit 0
-exit 0
-```
-
-Every path exits 0, and `exec` is deliberately not used — it would replace the shell and hand the
-child's exit status straight back to the caller.
-
-That silence has a cost when the binary came from the installer. It added `~/.local/bin` to `PATH`
-through your shell profile, and a hook runner may start a shell that never reads that profile — so
-`command -v airsl` finds nothing and the hook quietly does nothing. If a hook never seems to fire,
-check that first; resolving the binary by its absolute path, `"$HOME/.local/bin/airsl"`, removes the
-question.
-
-A Windows host needs its own launcher — a `.cmd` or PowerShell equivalent making the same three
-decisions (missing directory, missing binary, and always exiting 0). None is shipped.
-
-## Documentation
-
-The reference layer is the library's rustdoc at [docs.rs/airsl](https://docs.rs/airsl) — this crate
-publishes none of its own, because every public item lives in `airsl` and the binary is a thin shell
-over it.
-
-Everything else is in [`crates/airsl/docs/`](https://github.com/airsstack/airsl/tree/main/crates/airsl/docs),
-organised on [Diátaxis](https://diataxis.fr/):
-
-- **[Tutorial](https://github.com/airsstack/airsl/blob/main/crates/airsl/docs/tutorial.md)** — from
-  installing this binary to a working agent hook, hitting the sandbox once on purpose along the way.
-- **[How-to](https://github.com/airsstack/airsl/blob/main/crates/airsl/docs/how-to.md)** — recipes
-  for a specific job, from Lua and from Rust.
-- **[Sandbox](https://github.com/airsstack/airsl/blob/main/crates/airsl/docs/sandbox.md)** — what a
-  grant is, where enforcement lives, and what the resource ceilings can and cannot promise.
-- **[Host standard library](https://github.com/airsstack/airsl/blob/main/crates/airsl/docs/stdlib.md)**
-  — every module a script sees under the `airsstack` global.
-- **[Architecture](https://github.com/airsstack/airsl/blob/main/crates/airsl/docs/architecture.md)**
-  — the three layers and why it is shaped this way.
-- **[Extensions](https://github.com/airsstack/airsl/blob/main/crates/airsl/docs/extensions.md)** —
-  the manifest format, ceilings and negotiation `ext doctor`/`ext fire` are built on.
-
-Each document marks which parts ship and which are design.
+- [Getting Started](https://airsstack.github.io/airsl/ch01-00-getting-started.html): install, and
+  run your first script
+- [Asking Permission](https://airsstack.github.io/airsl/ch03-00-asking-permission.html): files,
+  environment variables, programs and presets
+- [When Scripts Misbehave](https://airsstack.github.io/airsl/ch04-00-when-scripts-misbehave.html):
+  limits, and failing safely in hooks
+- [Testing and Checking](https://airsstack.github.io/airsl/ch05-05-testing.html): `airsl test` and
+  `airsl check`
+- [Command-Line Reference](https://airsstack.github.io/airsl/appendix-01-cli.html): every command
+  and flag
+- [Installation Details](https://airsstack.github.io/airsl/appendix-04-installation.html): archives,
+  checksums, attestations and unsigned binaries
 
 ## Releases
 
-[CHANGELOG.md](https://github.com/airsstack/airsl/blob/main/CHANGELOG.md) — one timeline covering
-this binary and the `airsl` library it carries, which are numbered independently. Releases are
-tagged per crate: `airsl-cli-v0.1.4`, `airsl-v0.1.4`. From 0.1.4 on, an `airsl-cli` tag also
-produces the GitHub Release that carries the prebuilt binaries.
-
-This binary's behaviour changes when the library beneath it does, so an entry naming an `airsl`
-version is describing this crate too.
+See [CHANGELOG.md](https://github.com/airsstack/airsl/blob/main/CHANGELOG.md). This crate and the
+`airsl` library it is built on are versioned independently and share one changelog, so an entry for
+`airsl` describes this command too.

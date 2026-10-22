@@ -74,9 +74,9 @@ fn script(file: &str) -> Result<Script, Box<dyn Error>> {
 
 /// Runs `script` and reports what `policy` would have the caller do about the outcome.
 ///
-/// This is the shape from the how-to guide, with the reaction printed instead of performed: the
-/// breach test is `||`, not `&&`, because a caller that discards ordinary script failures usually
-/// still wants to hear that the host's memory or CPU was consumed.
+/// This is the shape from the book's "Handling Failures" chapter, with the reaction printed instead
+/// of performed: the breach test is `||`, not `&&`, because a caller that discards ordinary script
+/// failures usually still wants to hear that the host's memory or CPU was consumed.
 fn describe(policy: FailurePolicy, engine: &Engine, script: &Script) {
     let Err(error) = engine.eval(script) else {
         println!("{policy:?}: succeeded, nothing to react to");

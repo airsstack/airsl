@@ -73,8 +73,8 @@ error when the engine is built rather than a module that silently replaces anoth
 
 ## See also
 
-- [extensions](../../docs/extensions.md) — the extension host: manifests, negotiation, dispatch,
-  and the `airsl ext` CLI built on top of them are all implemented, per the status table in
-  `docs/README.md`. What this example uses — `HostModule`, `ModuleSet`, `InstallContext`,
-  `RootTable` — is a layer below that, and implemented too.
+- [Writing Your Own Module](https://airsstack.github.io/airsl/ch07-00-your-own-module.html) — the guided version of this
+  example: `HostModule`, `ModuleSet`, `InstallContext` and `RootTable`.
+- [Extensions](https://airsstack.github.io/airsl/ch08-00-extensions.html) — the layer above: manifests, negotiation,
+  dispatch, and the `airsl ext` CLI.
 - [`hello-eval`](../hello-eval/) — the builder this example adds two calls to.

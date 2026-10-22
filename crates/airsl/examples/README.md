@@ -113,7 +113,7 @@ does not run one, which is the difference between "it builds" and "it works" —
 
 ## See also
 
-- [tutorial](../docs/tutorial.md) — from nothing to a working hook, in ten minutes.
-- [how-to](../docs/how-to.md) — recipes, shorter than an example and without the scaffolding.
-- [sandbox](../docs/sandbox.md) — what a grant is and where it is enforced.
-- [host standard library](../docs/stdlib.md) — the full module roster.
+- [The airsl Book](https://airsstack.github.io/airsl/) — the guided version of everything here, from a first script to
+  hosting extensions.
+- [Asking Permission](https://airsstack.github.io/airsl/ch03-00-asking-permission.html) — what a grant is and what it covers.
+- [Module Reference](https://airsstack.github.io/airsl/appendix-02-modules.html) — every function a script can call.
