@@ -92,7 +92,7 @@ https://github.com/airsstack/airsl --locked airsl-cli`. Working inside a clone,
 `doctor` prints the runtime version and the policy a script would actually run under:
 
 ```
-airsl 0.1.3
+airsl 0.1.4
   lua:          Lua 5.4
   language:     restricted
   root table:   airsstack
@@ -402,7 +402,7 @@ Each document marks which parts ship and which are design.
 
 [CHANGELOG.md](https://github.com/airsstack/airsl/blob/main/CHANGELOG.md) — one timeline covering
 this binary and the `airsl` library it carries, which are numbered independently. Releases are
-tagged per crate: `airsl-cli-v0.1.3`, `airsl-v0.1.4`. From 0.1.4 on, an `airsl-cli` tag also
+tagged per crate: `airsl-cli-v0.1.4`, `airsl-v0.1.4`. From 0.1.4 on, an `airsl-cli` tag also
 produces the GitHub Release that carries the prebuilt binaries.
 
 This binary's behaviour changes when the library beneath it does, so an entry naming an `airsl`

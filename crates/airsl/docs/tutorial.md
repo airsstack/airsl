@@ -19,7 +19,7 @@ the per-platform archives, and building with `cargo install` are in
 [`airsl-cli`'s install section](../../airsl-cli/README.md#install).
 
 ```
-airsl 0.1.3
+airsl 0.1.4
   lua:          Lua 5.4
   language:     restricted
   root table:   airsstack

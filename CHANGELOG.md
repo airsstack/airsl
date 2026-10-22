@@ -9,7 +9,7 @@ The two crates are versioned independently, and each entry names every crate it 
 release is tagged per crate — `airsl-v0.1.4`, `airsl-cli-v0.1.3` — because one commit has shipped
 two crates under two different numbers, which a single `vX.Y.Z` tag cannot name.
 
-## Unreleased — airsl-cli 0.1.4
+## airsl-cli 0.1.4 — 2026-10-22
 
 How the binary reaches a machine changes; what it does once there does not. `airsl` has no change
 and stays at 0.1.4.
