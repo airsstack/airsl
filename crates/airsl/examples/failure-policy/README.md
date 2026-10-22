@@ -81,5 +81,5 @@ run on its own. The genuinely malicious chunks live inline in
 
 - [`resource-limits`](../resource-limits/) — where the breach in the middle of this output comes
   from.
-- [how-to](../../docs/how-to.md) — "React to a failure without propagating it", the pattern
-  `describe` is built from.
+- [Handling Failures](https://airsstack.github.io/airsl/ch06-05-failures.html) — telling a stopped script from a failed
+  one, and failing open from Rust.

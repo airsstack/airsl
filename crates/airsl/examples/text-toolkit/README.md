@@ -163,4 +163,4 @@ without the grant.
 
 - [`policy-presets`](../policy-presets/) — what each preset's language surface withholds.
 - [`filesystem-grants`](../filesystem-grants/) — the other half of the roster, and what it costs.
-- [host standard library](../../docs/stdlib.md) — the full module roster and the grant each carries.
+- [Module Reference](https://airsstack.github.io/airsl/appendix-02-modules.html) — every module and the grant each one needs.

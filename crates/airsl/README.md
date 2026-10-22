@@ -1,184 +1,95 @@
 # airsl
 
-Embeddable Lua runtime with a host standard library, written in Rust on top of [`mlua`].
+Run Lua scripts from Rust, and decide what each one may reach.
 
-`airsl` runs sandboxed Lua and gives those scripts the capabilities a shell or Python script would
-otherwise reach for — JSON, filesystem access, subprocesses, real regular expressions — through host
-modules implemented in Rust. Everything a script can do arrives under a single `airsstack` global,
-so the host decides the surface rather than the Lua standard library deciding it.
+`airsl` embeds Lua 5.4 in your program. Every engine is built with a policy: which folders a script
+may read or write, which environment variables and programs it may use, and how much memory and time
+it may spend. Scripts get JSON, files, regular expressions, hashing, time and subprocesses through
+one `airsstack` table, and every call is checked against that policy in Rust before it runs.
 
 ```rust
 use airsl::{Engine, Policy, Script};
 
-let engine = Engine::builder().policy(Policy::confined()).build()?;
-let script = Script::from_source("return airsstack.json.encode({ok = true})", "demo")?;
-assert_eq!(engine.eval_to::<String>(&script)?, r#"{"ok":true}"#);
-# Ok::<(), airsl::Error>(())
+fn main() -> Result<(), airsl::Error> {
+    let engine = Engine::builder().policy(Policy::confined()).build()?;
+
+    let script = Script::from_source("return airsstack.json.encode({ ok = true })", "demo")?;
+    let json: String = engine.eval_to(&script)?;
+
+    assert_eq!(json, r#"{"ok":true}"#);
+    Ok(())
+}
 ```
+
+## Granting access
+
+Nothing is granted unless you say so. Here a script may read the project, write only its `build`
+folder, read `HOME`, and run `git`:
+
+```rust
+use airsl::{Engine, GrantSet, Policy};
+
+fn main() -> Result<(), airsl::Error> {
+    let policy = Policy::confined().with_grants(
+        GrantSet::declared()
+            .with_fs(|fs| fs.read("/repo").write("/repo/build"))
+            .with_env(|env| env.read(["HOME"]))
+            .with_proc(|proc| proc.allow(["git"])),
+    );
+    let _engine = Engine::builder().policy(policy).build()?;
+    Ok(())
+}
+```
+
+Anything else is refused with an error that names what was granted, so a script that asks for the
+wrong folder tells you which folder it was allowed.
+
+## Telling a stopped script from a failed one
+
+A script that loops forever or allocates without end is stopped by the engine. That is reported
+differently from an ordinary error, and a script cannot fake it:
+
+```rust
+use airsl::{Engine, ExhaustedLimit, Policy, Script};
+
+fn main() -> Result<(), airsl::Error> {
+    let engine = Engine::builder().policy(Policy::confined()).build()?;
+    let script = Script::from_source("while true do end", "spin")?;
+
+    if let Err(error) = engine.eval(&script) {
+        match error.exhausted_limit() {
+            Some(ExhaustedLimit::Instructions) => eprintln!("stopped: it never finished"),
+            Some(ExhaustedLimit::Memory) => eprintln!("stopped: it used too much memory"),
+            Some(_) => eprintln!("stopped: it hit a limit"),
+            None => eprintln!("the script failed: {error}"),
+        }
+    }
+    Ok(())
+}
+```
+
+## Learn more
+
+[The airsl Book](https://airsstack.github.io/airsl/) teaches all of this step by step:
+
+- [Embedding airsl in Rust](https://airsstack.github.io/airsl/ch06-00-embedding.html): engines,
+  values, grants, reuse and failures
+- [Writing Your Own Module](https://airsstack.github.io/airsl/ch07-00-your-own-module.html): give
+  scripts a capability of your own
+- [Extensions](https://airsstack.github.io/airsl/ch08-00-extensions.html): load third-party scripts
+  with permissions negotiated against a ceiling you set
+- [Module Reference](https://airsstack.github.io/airsl/appendix-02-modules.html): every function a
+  script can call
+
+The API reference is on [docs.rs](https://docs.rs/airsl). Runnable examples live in
+[`examples/`](https://github.com/airsstack/airsl/tree/main/crates/airsl/examples).
 
 ## Building
 
-**Supported targets: Linux, macOS, and `x86_64-pc-windows-msvc`.** On Windows, `airsstack.proc` runs
-`.exe` programs only — `npm`, `npx`, `yarn` and `tsc`, which ship as `.cmd` shims, are not reachable
-through it.
-
-A **C compiler is required**. `mlua`'s `vendored` feature compiles Lua 5.4 from the C sources
-shipped by the `lua-src` crate and links it statically, so there is nothing to install and no
-`pkg-config` involved — but `cc` must be present.
-
-Lua 5.4 rather than 5.1 or LuaJIT: only 5.3 and later distinguish integers from floats in the VM.
-On 5.1 a JSON `3` and a JSON `3.0` are the same value, which breaks byte-stable JSON output.
-
-## What scripts can see
-
-| Module | Purpose | Needs a grant |
-|---|---|---|
-| `airsstack.json` | `encode`, `encode_pretty`, `decode` — keys always sort | no |
-| `airsstack.path` | join, split, normalise, relativise — pure string arithmetic | no |
-| `airsstack.fs` | read, write, walk, stat, atomic and exclusive writes | read roots, write roots |
-| `airsstack.env` | read and overlay environment variables | name allowlist |
-| `airsstack.proc` | run a program from an argv array; no shell, ever | executable allowlist |
-| `airsstack.regex` | real regular expressions, one-shot or compiled | no |
-| `airsstack.hash` | SHA-256 and SHA-1, over strings or files | only `hash_file` |
-| `airsstack.time` | timestamps, formatting and parsing, in UTC | no |
-| `airsstack.glob` | glob matching, and walking a tree by pattern | only `walk` |
-| `airsstack.stdio` | the process's own standard streams | no |
-| `airsstack.hook` | the agent-hook payload and output contract | no |
-| `airsstack.ext` | event registration (`on`) and capability introspection (`granted`) for a registered extension | no |
-
-Every module is installed under every preset. One the policy has granted nothing is present and
-refuses each call — the authority is in the grant, not in whether the table is there.
-
-## Policy
-
-A policy answers three independent questions: which of Lua's own libraries a script sees, what the
-host modules it reaches may touch, and how much it may consume. Three presets cover the cases worth
-naming.
-
-| Preset | Language surface | Grants | Ceilings |
-|---|---|---|---|
-| `Policy::trusted()` | everything except `debug`, including `io`, `os`, `package` | unrestricted | none |
-| `Policy::confined()` *(default)* | `string`, `table`, `math`, `coroutine`, pure `os` | declared only | 64 MiB, 100M instructions |
-| `Policy::pure()` | `string`, `table`, `math` | declared only | 16 MiB, 10M instructions |
-
-Below `trusted`, a script does **not** get `io`, `debug`, `package`, the chunk loaders (`load`,
-`loadstring`, `dofile`, `loadfile`), or the `os` functions that reach outside the process
-(`execute`, `exit`, `getenv`, `remove`, `rename`, `tmpname`, `setlocale`). `pure` additionally drops
-`os` and `coroutine` entirely.
-
-`os.setlocale` is withheld for a subtler reason than the rest: Lua compares strings with `strcoll`,
-so a script that changes the locale changes the sort order of every subsequent `table.sort`.
-
-Adjust any preset with a wither:
-
-```rust
-use airsl::{Policy, ResourceLimits, InstructionLimit};
-
-let policy = Policy::confined()
-    .with_limits(ResourceLimits::none().with_instructions(Some(InstructionLimit::count(1_000))));
-```
-
-Nothing is granted by default below `trusted`. A host says what a script may reach:
-
-```rust
-let policy = Policy::confined().with_grants(
-    GrantSet::declared()
-        .with_fs(|fs| fs.read("/repo").write("/repo/.index"))
-        .with_env(|env| env.read(["HOME"]))
-        .with_proc(|proc| proc.allow(["git"])),
-);
-```
-
-A grant is checked inside the Rust function before the operation it guards, never in Lua. `fs`
-canonicalises the deepest existing part of a path and accepts only ordinary names below it, so a
-symlink inside a granted root that points outside is caught.
-
-## Ceilings
-
-The memory ceiling turns an allocation past the cap into a catchable error rather than an OOM that
-takes the host process with it. The instruction ceiling is the only defence against a script that
-never terminates; no capability decision helps against `while true do end`, because it reaches
-nothing.
-
-Both surface as their own error variants, so a script stopped for consuming the host's resources is
-distinguishable from one that merely failed:
-
-```rust
-use airsl::ExhaustedLimit;
-# use airsl::{Engine, Policy, Script};
-# let engine = Engine::builder().policy(Policy::confined()).build()?;
-# let script = Script::from_source("error('boom')", "demo")?;
-if let Err(error) = engine.eval(&script) {
-    match error.exhausted_limit() {
-        Some(ExhaustedLimit::Instructions) => eprintln!("the script did not terminate"),
-        Some(ExhaustedLimit::Memory) => eprintln!("the script exhausted its memory"),
-        None => eprintln!("the script failed: {error}"),
-    }
-}
-# Ok::<(), airsl::Error>(())
-```
-
-The classification is structural — the engine's own instruction counter, and the VM error chain —
-never the message text, so a script cannot disguise its own failure as a resource breach.
-
-Two things worth knowing. The memory ceiling caps the whole state rather than each script, so an
-engine that has run several scripts carries whatever garbage they left until the collector runs.
-And the instruction ceiling is enforced to within a check interval rather than exactly.
-
-## `require`
-
-A script loaded from a file may `require` its siblings; a script built from source may not, because
-it has no directory. Targets cannot contain a path separator or a `..` component, so an escape
-cannot be spelled, and the resolved path is canonicalised and checked for containment, which catches
-a symlink pointing out of the root. Cycles raise an error rather than recursing.
-
-Under `trusted` Lua's own `require` is left in place. Under `pure` there is none at all.
-
-## Failure policy
-
-`FailurePolicy` makes explicit what is otherwise a convention. A script run as an editor or agent
-hook must not turn its own failure into a non-zero exit, because the caller reads that as a signal
-rather than a diagnostic. `FailurePolicy::FailOpen` says so in the type system;
-`FailurePolicy::Report` is the default for anything a person invoked directly.
-
-## Extending it
-
-Implement `HostModule` and add it to a `ModuleSet`. The module becomes a subtable of the engine's
-root table alongside the built-ins, and the host crate never has to modify `airsl` to contribute
-one. `mlua` is re-exported as `airsl::mlua`, so a contributor stays on the version the engine was
-built with.
-
-`install` receives an `InstallContext` carrying the policy the engine was built with, so a module
-that guards an operation reads its authority from the same object `airsl doctor` reports — rather
-than from a copy that could disagree with it.
-
-An engine's root table defaults to `airsstack` and can be named per engine, so a module contributed
-by a third party need not land in a namespace named after somebody else's system.
-
-`Engine` is `Send + Sync`, so it can be shared between threads. Evaluations on one engine are
-serialised, so each gets its own arguments, its own `require` root and the whole instruction
-budget — a shared engine is a way to avoid rebuilding a state, not a way to get parallelism, since
-one Lua state cannot execute in parallel anyway.
-
-## Documentation
-
-[`docs/`](docs/README.md) is organised on [Diátaxis](https://diataxis.fr/):
-
-- **[Tutorial](docs/tutorial.md)** — from installing the binary to a working agent hook.
-- **[How-to](docs/how-to.md)** — recipes for a specific job, from Lua and from Rust.
-- **[Architecture](docs/architecture.md)**, **[Sandbox](docs/sandbox.md)**,
-  **[Host stdlib](docs/stdlib.md)**, **[Extensions](docs/extensions.md)** — the explanation layer.
-  Extensions covers manifests, capability negotiation, and `ExtensionHost` — the host loads a
-  directory of third-party Lua extensions into running, negotiated engines and dispatches events
-  to them, and the `airsl ext` CLI (`doctor`, `fire`) is built on the same loader.
-- Reference is the rustdoc: `cargo doc -p airsl --no-deps --open`.
-
-Each document says which parts are shipped and which are design.
+`airsl` builds on Linux, macOS and Windows (`x86_64-pc-windows-msvc`). It needs a C compiler: Lua is
+compiled from its C source and linked in statically, so there is no system Lua to install.
 
 ## Releases
 
-[CHANGELOG.md](https://github.com/airsstack/airsl/blob/main/CHANGELOG.md) — one timeline covering
-this crate and `airsl-cli`, which are numbered independently. Releases are tagged per crate:
-`airsl-v0.1.4`, `airsl-cli-v0.1.3`.
-
-[`mlua`]: https://crates.io/crates/mlua
+See [CHANGELOG.md](https://github.com/airsstack/airsl/blob/main/CHANGELOG.md). This crate and
+`airsl-cli` are versioned independently and share one changelog.

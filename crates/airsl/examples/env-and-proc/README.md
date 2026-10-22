@@ -60,6 +60,6 @@ resolved: `sh` is `/bin/sh` on macOS and `/usr/bin/sh` on a usrmerge Linux.
 
 ## See also
 
-- [sandbox](../../docs/sandbox.md) — what a grant is and where it is enforced.
+- [Asking Permission](https://airsstack.github.io/airsl/ch03-00-asking-permission.html) — what a grant is and what it covers.
 - [`filesystem-grants`](../filesystem-grants/) — the third axis, and the containment rule.
 - [`denials-are-data`](../denials-are-data/) — what a module does when it has no grant at all.

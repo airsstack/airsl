@@ -132,8 +132,8 @@ fn globals_outlive_the_evaluation(engine: &Engine) -> Result<(), Box<dyn Error>>
 
     // There is no per-evaluation environment restore to prevent this below `trusted`: `mlua`'s
     // one-call version is Luau-only, so isolating successive scripts on one engine would have to be
-    // built rather than borrowed (`docs/architecture.md`). Give one engine scripts that trust each
-    // other; give an untrusted script an engine of its own.
+    // built rather than borrowed. Give one engine scripts that trust each other; give an untrusted
+    // script an engine of its own.
     println!(
         "  SESSION, read back by an unrelated script: {}",
         engine.eval_to::<String>(&recall)?

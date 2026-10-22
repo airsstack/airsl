@@ -75,5 +75,5 @@ Windows build shows the drive root `main.rs`'s `OUTSIDE_ROOT` supplies instead.
 - [custom-module](../custom-module/) — the module seam this example's `word-count` extension
   reaches through (`airsstack.regex`), from the host-authoring side rather than the third-party
   side.
-- [extensions](../../docs/extensions.md) — the extension host in full: the manifest format,
+- [Extensions](https://airsstack.github.io/airsl/ch08-00-extensions.html) — the extension host in full: the manifest format,
   negotiation, and what an approver can override.

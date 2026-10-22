@@ -1,5 +1,30 @@
 # D. Installation Details
 
+## What the install commands run
+
+`install.sh` and `install.ps1` are small. They download the installer published with a release and
+run it. Without `AIRSL_VERSION` that is the latest release. With it, it is the release you named, and
+a version that was never released is refused with a link to the releases page.
+
+Anything you pass along reaches the release's installer unchanged: its flags (`--no-modify-path`,
+`--quiet`), and its settings, such as `AIRSL_CLI_INSTALL_DIR` to put `airsl` in a folder other than
+`~/.local/bin`.
+
+```console
+$ curl -LsSf https://airsstack.github.io/airsl/install.sh | sh -s -- --no-modify-path
+$ curl -LsSf https://airsstack.github.io/airsl/install.sh | AIRSL_CLI_INSTALL_DIR="$HOME/bin" sh
+```
+
+On Windows, set the variable in a PowerShell session, then run the installer from that session:
+
+```powershell
+$env:AIRSL_VERSION = '0.1.4'; irm https://airsstack.github.io/airsl/install.ps1 | iex
+```
+
+The installer only runs when the session allows scripts. If it refuses, run
+`Set-ExecutionPolicy RemoteSigned -Scope CurrentUser` once, or use the `powershell -ExecutionPolicy
+Bypass` command from [Installation](ch01-01-installation.md).
+
 ## Archives
 
 Each [release](https://github.com/airsstack/airsl/releases) has one archive per platform. You can

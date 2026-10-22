@@ -63,4 +63,4 @@ from disk while running on the confined preset's empty grant set.
 ## See also
 
 - [hello-eval](../hello-eval/) — the smaller version, with the Lua inline.
-- [stdlib](../../docs/stdlib.md) — the full `airsstack.json` roster.
+- [Text: JSON and Regular Expressions](https://airsstack.github.io/airsl/ch05-01-text.html) — the full `airsstack.json` roster.

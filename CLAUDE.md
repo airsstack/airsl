@@ -52,8 +52,8 @@ cargo run -p airsl-cli -- check path/        # compiles every .lua without runni
 
 ## Architecture
 
-Three independent layers; collapsing them is the most common mistake. `crates/airsl/docs/architecture.md`
-is the long form.
+Three independent layers; collapsing them is the most common mistake. The book's
+`book/src/ch09-01-three-layers.md` is the long form.
 
 1. **The VM** — `mlua` with `lua54,vendored,serialize,send`. Lua 5.4 specifically, because only
    5.3+ distinguishes integers from floats, which byte-stable JSON depends on.
@@ -134,18 +134,28 @@ Workspace lints: `unsafe_code = forbid`, `clippy::pedantic` + `nursery` warn, `u
 
 ### Documentation
 
-`crates/airsl/docs/` follows [Diátaxis](https://diataxis.fr/): tutorial, how-to, architecture,
-sandbox, stdlib, extensions. Reference is the rustdoc, not a file there.
+User documentation is **The airsl Book**, an mdBook in `book/` published to
+<https://airsstack.github.io/airsl/> by `.github/workflows/pages.yml`, alongside the `install/`
+scripts. `cargo make book` serves it locally; `book/book/` is build output and is ignored. Reference
+is the rustdoc, not the book.
 
-Evidence rules those documents follow, and that edits to them must keep: a claim about code that
-exists carries a `file:line`; a claim about code that does not exist says so explicitly. The status
-table in `docs/README.md` marks each area **implemented** or **proposed** this way — the extension
-manifest parser's row reads implemented, and names `extension/manifest.rs:189`, the function a
-reader can go check, rather than a bare "yes". Every extension-system area — manifest parser,
-ceiling, negotiation, approver, event dispatch, the extension host / loader, and the `airsl ext` CLI
-(`doctor`, `fire`) — is implemented as of this writing; the next area to go from proposed to
-implemented is the one to model this citation style on. Quoted measurements are a snapshot from
-`cargo bench -p airsl` on one machine, not a guarantee.
+The book is written for a reader using `airsl`, not for one maintaining it:
+
+- Plain, short sentences that tell the reader what to do and what happens. It describes what the
+  code does now; no `file:line` citations, no implemented/proposed status, no history of how a
+  decision was reached, no internal vocabulary.
+- Each chapter carries its own small, self-contained example. Every Lua snippet, CLI transcript and
+  Rust example is run against the current checkout before it lands, and output is pasted, not
+  written from memory.
+- A fact lives in one chapter; other chapters link to it rather than restate it.
+
+The three READMEs (root, `crates/airsl`, `crates/airsl-cli`) are short front doors into the book.
+Crate READMEs render on crates.io, so they link to the book with absolute
+`https://airsstack.github.io/airsl/…` URLs, and their Rust examples are complete programs rather
+than rustdoc snippets with hidden `#` lines. They are not doctested, so compile any example you
+change in them.
+
+Quoted measurements are a snapshot from `cargo bench -p airsl` on one machine, not a guarantee.
 
 Commits follow Conventional Commits with a scope naming the affected area (`fix(ci):`,
 `chore(workspace):`, `docs:`).

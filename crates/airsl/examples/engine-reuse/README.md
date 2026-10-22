@@ -58,8 +58,9 @@ not this example's to choose, and every `## Output` block here has to reproduce 
 
 - **Reuse is the shape, not an optimisation.** Building a state and evaluating on one differ by
   roughly thirty-fold — `benches/eval.rs` times construction, evaluation on a reused engine and
-  evaluation on a fresh engine per call, and [docs/README.md](../../docs/README.md) tabulates the
-  result. Those are a snapshot from one machine at 1000 iterations, not a guarantee; re-take them
+  evaluation on a fresh engine per call, and the book's
+  [Performance appendix](https://airsstack.github.io/airsl/appendix-05-performance.html) tabulates
+  the result. Those are a snapshot from one machine at 1000 iterations, not a guarantee; re-take them
   with `cargo bench -p airsl` before relying on them. Nothing is measured *inside* this example,
   because a printed duration would give it a different output on every run.
 - **The `arg` table is per evaluation.** `set_arguments` builds a fresh table and assigns the global
@@ -84,7 +85,7 @@ not this example's to choose, and every `## Output` block here has to reproduce 
 - **Globals persist, and that is the sharp edge.** Nothing between evaluations restores the
   environment: `mlua`'s one-call version (`Lua::sandbox`) is Luau-only, so isolating successive
   scripts on one engine has to be built rather than borrowed
-  ([architecture](../../docs/architecture.md)). A script writes `SESSION` and an unrelated chunk
+  ([One Engine, Many Scripts](https://airsstack.github.io/airsl/ch06-04-reuse.html)). A script writes `SESSION` and an unrelated chunk
   reads it back. **A dispatch loop that reuses one engine across untrusted scripts is leaking state
   between them** — give one engine scripts that trust each other, and give an untrusted script an
   engine of its own. The memory ceiling has the same shape: it caps the state, not the script, so an
@@ -109,6 +110,5 @@ in the output is the limit that was set, not a measurement, so it is identical o
 - [`resource-limits`](../resource-limits/) — arming the ceilings this example only resets.
 - [`custom-module`](../custom-module/) — why a `HostModule` must be `Send + Sync`: an engine is
   shareable, so everything installed into one has to be too.
-- [architecture](../../docs/architecture.md) — the engine-lifecycle table, and what `Engine: Sync`
-  does and does not buy.
-- [how-to](../../docs/how-to.md) — the same two recipes without the scaffolding.
+- [One Engine, Many Scripts](https://airsstack.github.io/airsl/ch06-04-reuse.html) — what starts fresh and what carries
+  over, and what `Engine: Sync` does and does not buy.

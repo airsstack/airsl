@@ -9,6 +9,16 @@ The two crates are versioned independently, and each entry names every crate it 
 release is tagged per crate — `airsl-v0.1.4`, `airsl-cli-v0.1.3` — because one commit has shipped
 two crates under two different numbers, which a single `vX.Y.Z` tag cannot name.
 
+## Unreleased
+
+### Changed
+
+- **Documentation is now [The airsl Book](https://airsstack.github.io/airsl/).** It replaces
+  `crates/airsl/docs/`, which is removed. Both crates' READMEs are rewritten as short introductions
+  that link into it, and both crates name it as their `homepage`.
+- **Shorter install commands.** `curl -LsSf https://airsstack.github.io/airsl/install.sh | sh` and
+  its PowerShell counterpart install the latest release, or the one `AIRSL_VERSION` names.
+
 ## airsl-cli 0.1.4 — 2026-10-22
 
 How the binary reaches a machine changes; what it does once there does not. `airsl` has no change

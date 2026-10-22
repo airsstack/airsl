@@ -6,13 +6,13 @@ a C compiler to run it.
 ## macOS and Linux
 
 ```console
-$ curl --proto '=https' --tlsv1.2 -LsSf https://github.com/airsstack/airsl/releases/latest/download/airsl-cli-installer.sh | sh
+$ curl -LsSf https://airsstack.github.io/airsl/install.sh | sh
 ```
 
 ## Windows
 
 ```powershell
-powershell -ExecutionPolicy Bypass -c "irm https://github.com/airsstack/airsl/releases/latest/download/airsl-cli-installer.ps1 | iex"
+powershell -ExecutionPolicy Bypass -c "irm https://airsstack.github.io/airsl/install.ps1 | iex"
 ```
 
 The installer puts `airsl` in `~/.local/bin` (`%USERPROFILE%\.local\bin` on Windows) and adds that
@@ -25,6 +25,13 @@ airsl 0.1.4
 
 If you would rather the installer left your `PATH` alone, set `AIRSL_CLI_NO_MODIFY_PATH=1` before
 running it.
+
+These commands always install the newest release. To install a particular one instead, name it in
+`AIRSL_VERSION`:
+
+```console
+$ curl -LsSf https://airsstack.github.io/airsl/install.sh | AIRSL_VERSION=0.1.4 sh
+```
 
 ## Building from source
 
