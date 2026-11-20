@@ -33,3 +33,8 @@ global-artifacts-jobs = ["./airsl-cli-smoke"]
 # gate in ci.yml never builds musl or this profile, so without this a change that
 # breaks a release target would first fail on the release tag itself.
 pr-run-mode = "upload"
+
+# GitHub retired the macos-14 image dist picks by default for Apple Silicon ("The configuration
+# 'macos-14-arm64-us-default' is not supported"), so name its successor.
+[dist.github-custom-runners]
+aarch64-apple-darwin = "macos-15"
