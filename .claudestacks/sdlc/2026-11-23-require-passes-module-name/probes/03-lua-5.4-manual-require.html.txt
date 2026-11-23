@@ -1,0 +1,22 @@
+<p>
+Once a loader is found,
+<code>require</code> calls the loader with two arguments:
+<code>modname</code> and an extra value,
+a <em>loader data</em>,
+also returned by the searcher.
+The loader data can be any value useful to the module;
+for the default searchers,
+it indicates where the loader was found.
+(For instance, if the loader came from a file,
+this extra value is the file path.)
+If the loader returns any non-nil value,
+<code>require</code> assigns the returned value to <code>package.loaded[modname]</code>.
+If the loader does not return a non-nil value and
+has not assigned any value to <code>package.loaded[modname]</code>,
+then <code>require</code> assigns <b>true</b> to this entry.
+In any case, <code>require</code> returns the
+final value of <code>package.loaded[modname]</code>.
+Besides that value, <code>require</code> also returns as a second result
+the loader data returned by the searcher,
+which indicates how <code>require</code> found the module.
+source: https://www.lua.org/manual/5.4/manual.html lines 8701-8721, fetched 2026-11-23

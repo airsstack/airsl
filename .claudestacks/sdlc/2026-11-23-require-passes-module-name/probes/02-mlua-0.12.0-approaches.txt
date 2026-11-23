@@ -1,0 +1,40 @@
+--- block returning ...: "return (...)"
+  eval (0.1.4)      : Ok(Nil)
+  call (issue's fix): Ok(String("pkg.mod"))
+  A expression-first: Ok(String("pkg.mod"))
+  B block-first     : Ok(String("pkg.mod"))
+--- bare table expression: "{ v = 'bare' }"
+  eval (0.1.4)      : Ok(table v=Ok(String("bare")))
+  call (issue's fix): Err(syntax error: m.lua:1: unexpected symbol near '{')
+  A expression-first: Ok(table v=Ok(String("bare")))
+  B block-first     : Ok(table v=Ok(String("bare")))
+--- bare ... expression: "..."
+  eval (0.1.4)      : Ok(Nil)
+  call (issue's fix): Err(syntax error: m.lua:1: unexpected symbol near '...')
+  A expression-first: Ok(String("pkg.mod"))
+  B block-first     : Ok(String("pkg.mod"))
+--- both expression and statement: "tostring(1)"
+  eval (0.1.4)      : Ok(String("1"))
+  call (issue's fix): Ok(Nil)
+  A expression-first: Ok(String("1"))
+  B block-first     : Ok(Nil)
+--- argument count: "return select('#', ...)"
+  eval (0.1.4)      : Ok(Integer(0))
+  call (issue's fix): Ok(Integer(1))
+  A expression-first: Ok(Integer(2))
+  B block-first     : Ok(Integer(2))
+--- syntax error: "local x = \n"
+  eval (0.1.4)      : Err(syntax error: m.lua:2: unexpected symbol near <eof>)
+  call (issue's fix): Err(syntax error: m.lua:2: unexpected symbol near <eof>)
+  A expression-first: Err(syntax error: m.lua:2: unexpected symbol near <eof>)
+  B block-first     : Err(syntax error: m.lua:1: unexpected symbol near 'local')
+--- two return values: "return { v = 1 }, 'extra'"
+  eval (0.1.4)      : Ok(table v=Ok(Integer(1)))
+  call (issue's fix): Ok(table v=Ok(Integer(1)))
+  A expression-first: Ok(table v=Ok(Integer(1)))
+  B block-first     : Ok(table v=Ok(Integer(1)))
+--- bytecode header as UTF-8
+  first 12 bytes: [1b, 4c, 75, 61, 54, 00, 19, 93, 0d, 0a, 1a, 0a]
+  String::from_utf8: Err("invalid utf-8 sequence of 1 bytes from index 7")
+name = "mlua"
+version = "0.12.0"
