@@ -139,6 +139,52 @@ $ airsl run --allow-read . headings.lua notes.md
 contain `..` or a path separator, so a script cannot reach for `require("../../secrets")`. You can
 still organise modules into subfolders: `require("lib.markdown")` loads `lib/markdown.lua`.
 
+## What a module receives
+
+When `require` loads a module, it hands the module two values in `...`: the module's own name and
+the path of its file. The name is the one the caller wrote, such as `lib.toc`. The path always uses
+`/` as its separator.
+
+A module can use its name to require a sibling, without spelling out the folder again. Try it in a
+new folder, separate from the project above. It holds three files: `toc.lua`, `lib/toc.lua` and
+`lib/markdown.lua`, which is a copy of `markdown.lua` from the previous section. Save this as
+`lib/toc.lua`:
+
+```lua
+-- lib/toc.lua
+local name, path = ...
+local base = name:match("^(.-)[^.]*$")
+local markdown = require(base .. "markdown")
+
+local M = {}
+
+function M.print(text)
+  print("-- " .. name .. " (" .. path:match("[^/]*$") .. ")")
+  for _, heading in ipairs(markdown.headings(text)) do
+    print(heading)
+  end
+end
+
+return M
+```
+
+`name` is `lib.toc`. The pattern keeps everything up to the last dot, so `base` is `lib.`, and
+`base .. "markdown"` is `lib.markdown`. The second pattern keeps only the file name from `path`.
+
+Save this as `toc.lua`:
+
+```lua
+-- toc.lua
+require("lib.toc").print("# Shopping\n## Hardware\n")
+```
+
+```console
+$ airsl run toc.lua
+-- lib.toc (toc.lua)
+# Shopping
+## Hardware
+```
+
 ## Testing it
 
 Here is the payoff from the split. `markdown.headings` takes text and returns a list. It reads
