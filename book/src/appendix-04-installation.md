@@ -18,7 +18,7 @@ $ curl -LsSf https://airsstack.github.io/airsl/install.sh | AIRSL_CLI_INSTALL_DI
 On Windows, set the variable in a PowerShell session, then run the installer from that session:
 
 ```powershell
-$env:AIRSL_VERSION = '0.1.4'; irm https://airsstack.github.io/airsl/install.ps1 | iex
+$env:AIRSL_VERSION = '<version>'; irm https://airsstack.github.io/airsl/install.ps1 | iex
 ```
 
 The installer only runs when the session allows scripts. If it refuses, run

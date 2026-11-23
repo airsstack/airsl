@@ -15,7 +15,7 @@ powershell -ExecutionPolicy Bypass -c "irm https://airsstack.github.io/airsl/ins
 ```
 
 The installer puts `airsl` in `~/.local/bin` and adds that folder to your `PATH`. Set
-`AIRSL_VERSION=0.1.4` to install a particular release instead of the latest. The prebuilt binary
+`AIRSL_VERSION=<version>` to install a particular release instead of the latest. The prebuilt binary
 needs no Rust, Lua or C compiler.
 
 To build it yourself instead, with a Rust toolchain and a C compiler:

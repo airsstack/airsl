@@ -3,7 +3,7 @@
 #   powershell -ExecutionPolicy Bypass -c "irm https://airsstack.github.io/airsl/install.ps1 | iex"
 #
 #   # or, inside a PowerShell session, pinned to one release:
-#   $env:AIRSL_VERSION = '0.1.4'; irm https://airsstack.github.io/airsl/install.ps1 | iex
+#   $env:AIRSL_VERSION = '<version>'; irm https://airsstack.github.io/airsl/install.ps1 | iex
 #
 # This is a pointer, not an installer. It fetches the installer dist generated
 # for one release and runs it, so the short URL never goes stale and what it
@@ -31,7 +31,7 @@
         $url = "$repo/releases/download/airsl-cli-v$version/$installer"
         $what = "airsl $version"
     } else {
-        throw "airsl-install: error: AIRSL_VERSION='$env:AIRSL_VERSION' is not a version (expected something like 0.1.4)"
+        throw "airsl-install: error: AIRSL_VERSION='$env:AIRSL_VERSION' is not a version (expected MAJOR.MINOR.PATCH or latest)"
     }
 
     # Windows PowerShell 5.1 can still default to TLS 1.0, which GitHub refuses.

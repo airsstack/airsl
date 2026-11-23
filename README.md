@@ -76,7 +76,7 @@ pipeline mean the same thing.
 ## Releases
 
 [CHANGELOG.md](CHANGELOG.md) covers both crates in one timeline. Each crate is tagged on its own,
-`airsl-v0.1.4` and `airsl-cli-v0.1.4`, because the two are versioned independently.
+`airsl-v<version>` and `airsl-cli-v<version>`, because the two are versioned independently.
 
 For maintainers:
 
