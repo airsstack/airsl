@@ -2,7 +2,7 @@
 # Installs the airsl command-line tool.
 #
 #   curl -LsSf https://airsstack.github.io/airsl/install.sh | sh
-#   curl -LsSf https://airsstack.github.io/airsl/install.sh | AIRSL_VERSION=0.1.4 sh
+#   curl -LsSf https://airsstack.github.io/airsl/install.sh | AIRSL_VERSION=<version> sh
 #   curl -LsSf https://airsstack.github.io/airsl/install.sh | sh -s -- --no-modify-path
 #
 # This is a pointer, not an installer. It fetches the installer dist generated
@@ -51,7 +51,7 @@ main() {
             what="the latest release"
             ;;
         *[!0-9A-Za-z.+-]* | "")
-            fail "AIRSL_VERSION='${AIRSL_VERSION:-}' is not a version (expected something like 0.1.4)"
+            fail "AIRSL_VERSION='${AIRSL_VERSION:-}' is not a version (expected MAJOR.MINOR.PATCH or latest)"
             ;;
         *)
             url="$repo/releases/download/airsl-cli-v$version/$installer"

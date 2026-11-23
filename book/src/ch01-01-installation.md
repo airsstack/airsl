@@ -20,7 +20,7 @@ folder to your `PATH`. Open a new terminal so the change takes effect, then chec
 
 ```console
 $ airsl --version
-airsl 0.1.5
+airsl <version>
 ```
 
 If you would rather the installer left your `PATH` alone, set `AIRSL_CLI_NO_MODIFY_PATH=1` before
@@ -30,7 +30,7 @@ These commands always install the newest release. To install a particular one in
 `AIRSL_VERSION`:
 
 ```console
-$ curl -LsSf https://airsstack.github.io/airsl/install.sh | AIRSL_VERSION=0.1.4 sh
+$ curl -LsSf https://airsstack.github.io/airsl/install.sh | AIRSL_VERSION=<version> sh
 ```
 
 ## Building from source
