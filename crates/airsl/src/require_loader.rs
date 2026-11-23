@@ -10,6 +10,8 @@
 //! - [`RequireDisposition`], which of the three possible `require` globals a script should get.
 //! - [`RequireLoader`], which installs and removes the `require` global for one script root.
 //! - Resolution, containment, caching and cycle detection.
+//! - Running a module: read as an expression first, then called with its name and path, the two
+//!   arguments Lua's own `require` passes.
 //!
 //! Non-responsibilities: applying the disposition. [`crate::Engine`] holds the state and does that.
 #![expect(
@@ -115,6 +117,10 @@ impl RequireLoader {
         let require = lua
             .create_function(move |lua, target: mlua::LuaString| {
                 let target = RequireTarget::new(target.to_str()?.to_owned())?;
+                // Lua's own `require` also returns the module's path as a second value; this one
+                // returns only the module. A second value spills into a multi-value position (the
+                // last field of a table constructor, the last argument of a call) and breaks a
+                // script that relies on one result. A module reads its own path from `...` instead.
                 load(lua, &root, &target).map_err(mlua::Error::from)
             })
             .map_err(fail)?;
@@ -190,17 +196,21 @@ fn load(lua: &mlua::Lua, root: &Path, target: &RequireTarget) -> Result<Value> {
     }
 }
 
-/// Reads and evaluates the module at `path`.
+/// Reads the module at `path` and calls it with `target` and its own path, returning its first
+/// result.
 fn run(lua: &mlua::Lua, path: &Path, target: &RequireTarget) -> Result<Value> {
+    // One string for every use, so the chunk name and the path the module is handed cannot differ.
+    let script_path = to_script_string(path);
+
     let source = std::fs::read_to_string(path).map_err(|source| Error::ScriptRead {
-        path: to_script_string(path),
+        path: script_path.clone(),
         source,
     })?;
 
-    let chunk_name = format!("@{}", to_script_string(path));
+    let chunk_name = format!("@{script_path}");
 
     compile(lua, &source, &chunk_name)
-        .and_then(|module| module.call::<Value>(()))
+        .and_then(|module| module.call::<Value>((target.as_str(), script_path)))
         .map_err(|source| Error::lua(target.as_str(), source))
 }
 
@@ -249,9 +259,9 @@ fn resolve(root: &Path, target: &RequireTarget) -> Result<PathBuf> {
                 root: to_script_string(&root),
             });
         }
-        // Stripped before it crosses back out of this function: this value becomes both the
-        // module-cache key and the chunk name a Lua traceback shows, and nothing verbatim may ever
-        // reach either.
+        // Stripped before it crosses back out of this function: this value becomes the
+        // module-cache key, the chunk name a Lua traceback shows and the path the module is
+        // handed, and nothing verbatim may ever reach any of them.
         return Ok(strip_verbatim(path));
     }
 
@@ -270,6 +280,7 @@ mod tests {
     )]
 
     use super::RequireDisposition;
+    use crate::paths::rules::native::{strip_verbatim, to_script_string};
     use crate::sandbox::LanguageSurface;
     use crate::types::RequireTarget;
     use crate::{Engine, Policy, Script};
@@ -487,6 +498,8 @@ mod tests {
             err.to_string().contains(":2: unexpected symbol near <eof>"),
             "{err}"
         );
+        // The chunk name is set on the statement attempt too, so the error names the module's file.
+        assert!(err.to_string().contains("/abs/m.lua:2:"), "{err}");
     }
 
     #[test]
@@ -509,5 +522,112 @@ mod tests {
         crate::test_support::link_file(&decoy.join("m.lua"), &root.join("m.lua")).unwrap();
         let err = resolve(&root, "m").unwrap_err();
         assert!(err.to_string().contains("outside"), "{err}");
+    }
+
+    /// Runs `entry` under `root` on a fresh engine and returns the string it returns.
+    fn run_entry(root: &Path, entry: &str) -> crate::Result<String> {
+        let engine = Engine::builder()
+            .policy(Policy::confined())
+            .build()
+            .unwrap();
+        let script = Script::from_file(root.join(entry)).unwrap();
+        engine.eval_to::<String>(&script)
+    }
+
+    #[test]
+    fn a_required_module_receives_its_name_and_path_as_its_arguments() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().canonicalize().unwrap();
+        write(
+            &root,
+            "lib/m.lua",
+            "return { n = select('#', ...), name = (...), path = select(2, ...) }",
+        );
+        write(
+            &root,
+            "main.lua",
+            "local m = require('lib.m')\nreturn m.n .. '|' .. m.name .. '|' .. m.path",
+        );
+
+        let expected = to_script_string(&strip_verbatim(
+            root.join("lib/m.lua").canonicalize().unwrap(),
+        ));
+        assert_eq!(
+            run_entry(&root, "main.lua").unwrap(),
+            format!("2|lib.m|{expected}")
+        );
+    }
+
+    #[test]
+    fn a_module_reaches_its_sibling_through_its_own_name_from_either_root() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        write(
+            root,
+            "main.lua",
+            "local f = require(\"core.hooks.enforce\")\nreturn f()\n",
+        );
+        write(
+            root,
+            "core/hooks/enforce.lua",
+            "local base = (...):match(\"^(.-)[^.]*$\")\nlocal lib = require(base .. \"lib.x\")\nreturn function() return \"lib=\" .. lib.v .. \" base=[\" .. base .. \"]\" end\n",
+        );
+        write(root, "core/hooks/lib/x.lua", "return { v = \"ok\" }\n");
+        write(
+            root,
+            "core/hooks/from_hooks.lua",
+            "local f = require(\"enforce\")\nreturn f()\n",
+        );
+
+        // A fresh engine per root: the module cache keeps the name a file was first reached under.
+        assert_eq!(
+            run_entry(root, "main.lua").unwrap(),
+            "lib=ok base=[core.hooks.]"
+        );
+        assert_eq!(
+            run_entry(root, "core/hooks/from_hooks.lua").unwrap(),
+            "lib=ok base=[]"
+        );
+    }
+
+    #[test]
+    fn a_module_written_as_a_bare_expression_still_loads() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "m.lua", "{ v = 'bare' }\n");
+        write(dir.path(), "main.lua", "return require('m').v");
+        assert_eq!(run_entry(dir.path(), "main.lua").unwrap(), "bare");
+    }
+
+    #[test]
+    fn a_module_that_is_both_an_expression_and_a_statement_returns_the_expression() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "m.lua", "tostring(1)\n");
+        write(dir.path(), "main.lua", "return tostring(require('m'))");
+        assert_eq!(run_entry(dir.path(), "main.lua").unwrap(), "1");
+    }
+
+    #[test]
+    fn a_syntax_error_in_a_module_reports_the_statement_parse() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "m.lua", "local x = \n");
+        write(dir.path(), "main.lua", "return require('m')");
+        let err = run_entry(dir.path(), "main.lua").unwrap_err();
+        assert!(matches!(err, crate::Error::Lua { .. }), "{err}");
+        assert!(
+            err.to_string().contains(":2: unexpected symbol near <eof>"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn a_module_returning_several_values_yields_only_the_first() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "m.lua", "return { v = 1 }, 'extra'");
+        write(
+            dir.path(),
+            "main.lua",
+            "local a, b = require('m'); return tostring(b) .. ':' .. a.v",
+        );
+        assert_eq!(run_entry(dir.path(), "main.lua").unwrap(), "nil:1");
     }
 }
