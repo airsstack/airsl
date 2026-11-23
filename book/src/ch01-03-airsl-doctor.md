@@ -5,7 +5,7 @@ is:
 
 ```console
 $ airsl doctor
-airsl 0.1.4
+airsl 0.1.5
   lua:          Lua 5.4
   language:     restricted
   root table:   airsstack
@@ -39,7 +39,7 @@ What `doctor` just showed is the default preset, called `confined`. There are tw
 
 ```console
 $ airsl doctor --policy trusted
-airsl 0.1.4
+airsl 0.1.5
   lua:          Lua 5.4
   language:     full
   root table:   airsstack

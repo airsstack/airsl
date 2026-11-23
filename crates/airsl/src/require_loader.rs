@@ -10,6 +10,8 @@
 //! - [`RequireDisposition`], which of the three possible `require` globals a script should get.
 //! - [`RequireLoader`], which installs and removes the `require` global for one script root.
 //! - Resolution, containment, caching and cycle detection.
+//! - Running a module: read as an expression first, then called with its name and path, the two
+//!   arguments Lua's own `require` passes.
 //!
 //! Non-responsibilities: applying the disposition. [`crate::Engine`] holds the state and does that.
 #![expect(
@@ -115,6 +117,10 @@ impl RequireLoader {
         let require = lua
             .create_function(move |lua, target: mlua::LuaString| {
                 let target = RequireTarget::new(target.to_str()?.to_owned())?;
+                // Lua's own `require` also returns the module's path as a second value; this one
+                // returns only the module. A second value spills into a multi-value position (the
+                // last field of a table constructor, the last argument of a call) and breaks a
+                // script that relies on one result. A module reads its own path from `...` instead.
                 load(lua, &root, &target).map_err(mlua::Error::from)
             })
             .map_err(fail)?;
@@ -141,7 +147,8 @@ impl RequireLoader {
     }
 }
 
-/// Resolves `target` under `root`, loads it once, and returns what it returned.
+/// Resolves `target` under `root`, loads it once, and returns what it returned
+/// (`true` when it returned nothing).
 fn load(lua: &mlua::Lua, root: &Path, target: &RequireTarget) -> Result<Value> {
     let fail = |source: mlua::Error| Error::lua(target.as_str(), source);
 
@@ -174,14 +181,15 @@ fn load(lua: &mlua::Lua, root: &Path, target: &RequireTarget) -> Result<Value> {
     match run(lua, &path, target) {
         Ok(value) => {
             // A module that returns nothing is still loaded; record that, matching Lua's own
-            // convention, so a second require does not run it again.
+            // convention, so a second require does not run it again. The caller receives the
+            // recorded value too, so the first require and every later one agree.
             let recorded = if matches!(value, Value::Nil) {
                 Value::Boolean(true)
             } else {
-                value.clone()
+                value
             };
-            loaded.set(key.as_str(), recorded).map_err(fail)?;
-            Ok(value)
+            loaded.set(key.as_str(), recorded.clone()).map_err(fail)?;
+            Ok(recorded)
         }
         Err(error) => {
             loaded.set(key.as_str(), Value::Nil).map_err(fail)?;
@@ -190,17 +198,41 @@ fn load(lua: &mlua::Lua, root: &Path, target: &RequireTarget) -> Result<Value> {
     }
 }
 
-/// Reads and evaluates the module at `path`.
+/// Reads the module at `path` and calls it with `target` and its own path, returning its first
+/// result.
 fn run(lua: &mlua::Lua, path: &Path, target: &RequireTarget) -> Result<Value> {
+    // One string for every use, so the chunk name and the path the module is handed cannot differ.
+    let script_path = to_script_string(path);
+
     let source = std::fs::read_to_string(path).map_err(|source| Error::ScriptRead {
-        path: to_script_string(path),
+        path: script_path.clone(),
         source,
     })?;
 
-    lua.load(&source)
-        .set_name(format!("@{}", to_script_string(path)))
-        .eval::<Value>()
+    let chunk_name = format!("@{script_path}");
+
+    compile(lua, &source, &chunk_name)
+        .and_then(|module| module.call::<Value>((target.as_str(), script_path)))
         .map_err(|source| Error::lua(target.as_str(), source))
+}
+
+/// Compiles a module's source into a function, reading it as an expression first.
+///
+/// When the source is not an expression, its own compile error is the one returned, never the
+/// expression attempt's, so a syntax error points at what the author wrote.
+fn compile(lua: &mlua::Lua, source: &str, chunk_name: &str) -> mlua::Result<mlua::Function> {
+    // This is the order of `mlua::Chunk::eval`: expression first, statements second. It is
+    // rebuilt here because `eval` calls the chunk with no arguments and the expression step is
+    // private to mlua, so a function that can be given arguments has to be compiled by hand.
+    if let Ok(function) = lua
+        .load(format!("return {source}"))
+        .set_name(chunk_name)
+        .into_function()
+    {
+        return Ok(function);
+    }
+
+    lua.load(source).set_name(chunk_name).into_function()
 }
 
 /// Finds the file `target` names under `root`, refusing anything outside it.
@@ -229,9 +261,9 @@ fn resolve(root: &Path, target: &RequireTarget) -> Result<PathBuf> {
                 root: to_script_string(&root),
             });
         }
-        // Stripped before it crosses back out of this function: this value becomes both the
-        // module-cache key and the chunk name a Lua traceback shows, and nothing verbatim may ever
-        // reach either.
+        // Stripped before it crosses back out of this function: this value becomes the
+        // module-cache key, the chunk name a Lua traceback shows and the path the module is
+        // handed, and nothing verbatim may ever reach any of them.
         return Ok(strip_verbatim(path));
     }
 
@@ -250,9 +282,11 @@ mod tests {
     )]
 
     use super::RequireDisposition;
+    use crate::paths::rules::native::{strip_verbatim, to_script_string};
     use crate::sandbox::LanguageSurface;
     use crate::types::RequireTarget;
     use crate::{Engine, Policy, Script};
+    use mlua::Value;
     use std::io::Write as _;
     use std::path::Path;
 
@@ -408,6 +442,77 @@ mod tests {
         );
     }
 
+    fn compile(lua: &mlua::Lua, source: &str) -> mlua::Result<mlua::Function> {
+        super::compile(lua, source, "@/abs/m.lua")
+    }
+
+    const NAME: &str = "pkg.mod";
+    const PATH: &str = "/abs/m.lua";
+
+    #[test]
+    fn compile_runs_a_block_that_returns_its_first_argument() {
+        let lua = mlua::Lua::new();
+        let f = compile(&lua, "return (...)").unwrap();
+        assert_eq!(f.call::<String>((NAME, PATH)).unwrap(), NAME);
+    }
+
+    #[test]
+    fn compile_passes_both_arguments() {
+        let lua = mlua::Lua::new();
+        let f = compile(&lua, "return select('#', ...)").unwrap();
+        assert_eq!(f.call::<i64>((NAME, PATH)).unwrap(), 2);
+    }
+
+    #[test]
+    fn compile_runs_a_bare_vararg_expression() {
+        let lua = mlua::Lua::new();
+        let f = compile(&lua, "...").unwrap();
+        assert_eq!(f.call::<String>((NAME, PATH)).unwrap(), NAME);
+    }
+
+    #[test]
+    fn compile_runs_a_bare_table_expression() {
+        let lua = mlua::Lua::new();
+        let f = compile(&lua, "{ v = 'bare' }").unwrap();
+        let table = f.call::<mlua::Table>((NAME, PATH)).unwrap();
+        assert_eq!(table.get::<String>("v").unwrap(), "bare");
+    }
+
+    #[test]
+    fn compile_prefers_the_expression_reading() {
+        let lua = mlua::Lua::new();
+        let f = compile(&lua, "tostring(1)").unwrap();
+        assert_eq!(
+            f.call::<Option<String>>((NAME, PATH)).unwrap().unwrap(),
+            "1"
+        );
+    }
+
+    #[test]
+    fn compile_reports_the_statement_parse_error() {
+        let lua = mlua::Lua::new();
+        let err = compile(&lua, "local x = \n").unwrap_err();
+        assert!(
+            matches!(err, mlua::Error::SyntaxError { .. }),
+            "not a syntax error: {err}"
+        );
+        assert!(
+            err.to_string().contains(":2: unexpected symbol near <eof>"),
+            "{err}"
+        );
+        // The chunk name is set on the statement attempt too, so the error names the module's file.
+        assert!(err.to_string().contains("/abs/m.lua:2:"), "{err}");
+    }
+
+    #[test]
+    fn compile_keeps_only_the_first_of_several_return_values() {
+        let lua = mlua::Lua::new();
+        let f = compile(&lua, "return { v = 1 }, 'extra'").unwrap();
+        let value = f.call::<Value>((NAME, PATH)).unwrap();
+        let table = value.as_table().unwrap();
+        assert_eq!(table.get::<i64>("v").unwrap(), 1);
+    }
+
     #[test]
     fn a_sibling_directory_sharing_a_name_prefix_is_not_inside_the_root() {
         let parent = tempfile::tempdir().unwrap();
@@ -419,5 +524,192 @@ mod tests {
         crate::test_support::link_file(&decoy.join("m.lua"), &root.join("m.lua")).unwrap();
         let err = resolve(&root, "m").unwrap_err();
         assert!(err.to_string().contains("outside"), "{err}");
+    }
+
+    /// Runs `entry` under `root` on a fresh engine and returns the string it returns.
+    fn run_entry(root: &Path, entry: &str) -> crate::Result<String> {
+        let engine = Engine::builder()
+            .policy(Policy::confined())
+            .build()
+            .unwrap();
+        let script = Script::from_file(root.join(entry)).unwrap();
+        engine.eval_to::<String>(&script)
+    }
+
+    #[test]
+    fn a_required_module_receives_its_name_and_path_as_its_arguments() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().canonicalize().unwrap();
+        write(
+            &root,
+            "lib/m.lua",
+            "return { n = select('#', ...), name = (...), path = select(2, ...) }",
+        );
+        write(
+            &root,
+            "main.lua",
+            "local m = require('lib.m')\nreturn m.n .. '|' .. m.name .. '|' .. m.path",
+        );
+
+        let expected = to_script_string(&strip_verbatim(
+            root.join("lib/m.lua").canonicalize().unwrap(),
+        ));
+        assert_eq!(
+            run_entry(&root, "main.lua").unwrap(),
+            format!("2|lib.m|{expected}")
+        );
+    }
+
+    #[test]
+    fn a_module_reaches_its_sibling_through_its_own_name_from_either_root() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        write(
+            root,
+            "main.lua",
+            "local f = require(\"core.hooks.enforce\")\nreturn f()\n",
+        );
+        write(
+            root,
+            "core/hooks/enforce.lua",
+            "local base = (...):match(\"^(.-)[^.]*$\")\nlocal lib = require(base .. \"lib.x\")\nreturn function() return \"lib=\" .. lib.v .. \" base=[\" .. base .. \"]\" end\n",
+        );
+        write(root, "core/hooks/lib/x.lua", "return { v = \"ok\" }\n");
+        write(
+            root,
+            "core/hooks/from_hooks.lua",
+            "local f = require(\"enforce\")\nreturn f()\n",
+        );
+
+        // A fresh engine per root: the module cache keeps the name a file was first reached under.
+        assert_eq!(
+            run_entry(root, "main.lua").unwrap(),
+            "lib=ok base=[core.hooks.]"
+        );
+        assert_eq!(
+            run_entry(root, "core/hooks/from_hooks.lua").unwrap(),
+            "lib=ok base=[]"
+        );
+    }
+
+    #[test]
+    fn a_module_written_as_a_bare_expression_still_loads() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "m.lua", "{ v = 'bare' }\n");
+        write(dir.path(), "main.lua", "return require('m').v");
+        assert_eq!(run_entry(dir.path(), "main.lua").unwrap(), "bare");
+    }
+
+    #[test]
+    fn a_module_that_is_both_an_expression_and_a_statement_returns_the_expression() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "m.lua", "tostring(1)\n");
+        write(dir.path(), "main.lua", "return tostring(require('m'))");
+        assert_eq!(run_entry(dir.path(), "main.lua").unwrap(), "1");
+    }
+
+    #[test]
+    fn a_syntax_error_in_a_module_reports_the_statement_parse() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "m.lua", "local x = \n");
+        write(dir.path(), "main.lua", "return require('m')");
+        let err = run_entry(dir.path(), "main.lua").unwrap_err();
+        assert!(matches!(err, crate::Error::Lua { .. }), "{err}");
+        assert!(
+            err.to_string().contains(":2: unexpected symbol near <eof>"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn a_module_returning_several_values_yields_only_the_first() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "m.lua", "return { v = 1 }, 'extra'");
+        write(
+            dir.path(),
+            "main.lua",
+            "local a, b = require('m'); return tostring(b) .. ':' .. a.v",
+        );
+        assert_eq!(run_entry(dir.path(), "main.lua").unwrap(), "nil:1");
+    }
+
+    #[test]
+    fn require_returns_exactly_one_value_on_the_first_load_and_on_a_cache_hit() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "m.lua", "return { v = 1 }");
+        write(
+            dir.path(),
+            "main.lua",
+            "local function pack(...) return select('#', ...), ... end\n\
+             local first_count, first = pack(require('m'))\n\
+             local cached_count, cached = pack(require('m'))\n\
+             return first_count .. '|' .. cached_count .. '|' .. tostring(first == cached)",
+        );
+        assert_eq!(run_entry(dir.path(), "main.lua").unwrap(), "1|1|true");
+    }
+
+    #[test]
+    fn a_require_in_a_multi_value_position_contributes_one_value() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "a.lua", "return { v = 'a' }");
+        write(dir.path(), "b.lua", "return { v = 'b' }");
+        write(
+            dir.path(),
+            "main.lua",
+            "local fields = { require('a'), require('b') }\n\
+             local inserted = pcall(table.insert, {}, require('a'))\n\
+             return #fields .. '|' .. tostring(inserted)",
+        );
+        assert_eq!(run_entry(dir.path(), "main.lua").unwrap(), "2|true");
+    }
+
+    #[test]
+    fn a_module_returning_false_yields_false_and_runs_once() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "m.lua", "runs = (runs or 0) + 1\nreturn false");
+        write(
+            dir.path(),
+            "main.lua",
+            "local first = require('m')\n\
+             local second = require('m')\n\
+             return tostring(first) .. '|' .. tostring(second) .. '|' .. runs",
+        );
+        assert_eq!(run_entry(dir.path(), "main.lua").unwrap(), "false|false|1");
+    }
+
+    #[test]
+    fn a_module_returning_nothing_yields_true_on_its_first_require() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "m.lua", "runs = (runs or 0) + 1");
+        write(
+            dir.path(),
+            "main.lua",
+            "local first = { require('m') }\n\
+             local second = { require('m') }\n\
+             return tostring(first[1]) .. '|' .. #first .. '|' .. tostring(second[1]) .. '|' \
+             .. #second .. '|' .. select('#', require('m')) .. '|' .. runs",
+        );
+        assert_eq!(
+            run_entry(dir.path(), "main.lua").unwrap(),
+            "true|1|true|1|1|1"
+        );
+    }
+
+    #[test]
+    fn a_file_reached_under_two_names_runs_once_and_sees_the_first_name() {
+        let dir = tempfile::tempdir().unwrap();
+        write(
+            dir.path(),
+            "lib/init.lua",
+            "runs = (runs or 0) + 1\nreturn { name = (...) }",
+        );
+        write(
+            dir.path(),
+            "main.lua",
+            "local a = require('lib')\n\
+             local b = require('lib.init')\n\
+             return tostring(a == b) .. '|' .. a.name .. '|' .. runs",
+        );
+        assert_eq!(run_entry(dir.path(), "main.lua").unwrap(), "true|lib|1");
     }
 }

@@ -20,7 +20,7 @@ folder to your `PATH`. Open a new terminal so the change takes effect, then chec
 
 ```console
 $ airsl --version
-airsl 0.1.4
+airsl 0.1.5
 ```
 
 If you would rather the installer left your `PATH` alone, set `AIRSL_CLI_NO_MODIFY_PATH=1` before

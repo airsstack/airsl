@@ -1,0 +1,59 @@
+$ /Users/hiraq/Projects/airsstack/airsl/.claude/worktrees/require-refactor-adjustments/target/debug/airsl --version
+airsl 0.1.4
+
+## P1 issue repro: airsl run --policy confined main.lua
+airsl: lua error in /private/tmp/claude-501/-Users-hiraq-Projects-airsstack-airsl/9fed1617-4aa9-401d-ac51-f3ee6f59efe9/scratchpad/fx/main.lua: lua error in core.hooks.enforce: runtime error: ...d-ac51-f3ee6f59efe9/scratchpad/fx/core/hooks/enforce.lua:1: attempt to index a nil value
+
+## P2 idiom pieces
+core.hooks.enforce -> base=[core.hooks.]
+enforce -> base=[]
+hooks.enforce -> base=[hooks.]
+from R: ok
+from R/core/hooks: ok
+core.hooks.enforce
+
+## P3 module arguments and evaluation (confined)
+count=0
+bare expression module: bare
+expression-and-statement module: 1
+syntax error module:
+airsl: lua error in /private/tmp/claude-501/-Users-hiraq-Projects-airsstack-airsl/9fed1617-4aa9-401d-ac51-f3ee6f59efe9/scratchpad/fx/main_broken.lua: lua error in broken: syntax error: ...617-4aa9-401d-ac51-f3ee6f59efe9/scratchpad/fx/broken.lua:2: unexpected symbol near <eof>
+
+## P4 caching and return values
+same file, two names (confined): runs=1 same=true
+stock Lua 5.4 require (--policy trusted):
+module argc=2 second result=/private/tmp/claude-501/-Users-hiraq-Projects-airsstack-airsl/9fed1617-4aa9-401d-ac51-f3ee6f59efe9/scratchpad/fx/native.lua
+first  n=2
+cached n=1
+nil module: first=true second=true runs=1
+false module: first=false second=false runs=2
+confined require:
+first  n=1
+cached n=1
+nil module: first=nil second=true runs=1
+false module: first=false second=false runs=1
+
+## P5 book example compiles: airsl check book/
+3 file(s) compiled, 0 failed
+## P6 require under each policy
+trusted: function
+confined: function
+pure: nil
+## P7 a module file that is not UTF-8
+airsl: lua error in /private/tmp/claude-501/-Users-hiraq-Projects-airsstack-airsl/9fed1617-4aa9-401d-ac51-f3ee6f59efe9/scratchpad/fx/main_notutf8.lua: cannot read script `/private/tmp/claude-501/-Users-hiraq-Projects-airsstack-airsl/9fed1617-4aa9-401d-ac51-f3ee6f59efe9/scratchpad/fx/notutf8.lua`: stream did not contain valid UTF-8
+## P8 require in a multi-value position, and a module returning two values
+confined:
+constructor { require(ma), require(mb) } parts=2
+table.insert({}, require(ma)) ok=true nil
+module returning two values: n=1 type=table
+stock (--policy trusted):
+constructor { require(ma), require(mb) } parts=3  (mb is a first load)
+table.insert({}, require(ma)) ok=true nil  (ma is a cache hit)
+table.insert({}, require(multi)) ok=false bad argument #2 to 'table.insert' (number expected, got table)  (multi is a first load)
+module returning two values: type=table
+## P9 refusals raised before a target is validated, and the main script's ...
+table: false bad argument #1: error converting Lua table to string (expected string or number)
+nil: false bad argument #1: error converting Lua nil to string (expected string or number)
+number 1: false module `1` not found under `/private/tmp/claude-501/-Users-hiraq-Projects-airsstack-airsl/9fed1617-4aa9-401d-ac51-f3ee6f59efe9/scratchpad/fx`
+non-UTF-8: false error converting Lua string to &str (invalid utf-8 sequence of 1 bytes from index 0)
+main script select('#', ...)=0

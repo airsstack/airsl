@@ -9,7 +9,15 @@ The two crates are versioned independently, and each entry names every crate it 
 release is tagged per crate — `airsl-v0.1.4`, `airsl-cli-v0.1.3` — because one commit has shipped
 two crates under two different numbers, which a single `vX.Y.Z` tag cannot name.
 
-## Unreleased
+## airsl 0.1.5 — airsl-cli 0.1.5 — 2026-11-23
+
+Compatible changes, so both crates take a `z` bump.
+
+### Fixed
+
+- **A module loaded by `require` now receives its name and path in `...`.** A module can read them
+  with `local name, path = ...` and require its siblings by a name relative to its own. A module
+  that returns nothing now yields `true` on its first `require`, as it already did on later ones.
 
 ### Changed
 

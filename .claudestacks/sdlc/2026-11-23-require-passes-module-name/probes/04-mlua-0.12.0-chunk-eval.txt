@@ -1,0 +1,21 @@
+    /// Evaluate the chunk as either an expression or block.
+    ///
+    /// If the chunk can be parsed as an expression, this loads and executes the chunk and returns
+    /// the value that it evaluates to. Otherwise, the chunk is interpreted as a block as normal,
+    /// and this is equivalent to calling `exec`.
+    pub fn eval<R: FromLuaMulti>(self) -> Result<R> {
+        // Bytecode is always interpreted as a statement.
+        // For source code, first try interpreting the lua as an expression by adding
+        // "return", then as a statement. This is the same thing the
+        // actual lua repl does.
+        if self.detect_mode() == ChunkMode::Binary {
+            self.call(())
+        } else if let Ok(function) = self.to_expression() {
+            function.call(())
+        } else {
+            self.call(())
+        }
+    }
+...
+    fn to_expression(&self) -> Result<Function> {
+        // We assume that mode is Text
