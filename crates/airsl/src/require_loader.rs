@@ -197,10 +197,30 @@ fn run(lua: &mlua::Lua, path: &Path, target: &RequireTarget) -> Result<Value> {
         source,
     })?;
 
-    lua.load(&source)
-        .set_name(format!("@{}", to_script_string(path)))
-        .eval::<Value>()
+    let chunk_name = format!("@{}", to_script_string(path));
+
+    compile(lua, &source, &chunk_name)
+        .and_then(|module| module.call::<Value>(()))
         .map_err(|source| Error::lua(target.as_str(), source))
+}
+
+/// Compiles a module's source into a function, reading it as an expression first.
+///
+/// When the source is not an expression, its own compile error is the one returned, never the
+/// expression attempt's, so a syntax error points at what the author wrote.
+fn compile(lua: &mlua::Lua, source: &str, chunk_name: &str) -> mlua::Result<mlua::Function> {
+    // This is the order of `mlua::Chunk::eval`: expression first, statements second. It is
+    // rebuilt here because `eval` calls the chunk with no arguments and the expression step is
+    // private to mlua, so a function that can be given arguments has to be compiled by hand.
+    if let Ok(function) = lua
+        .load(format!("return {source}"))
+        .set_name(chunk_name)
+        .into_function()
+    {
+        return Ok(function);
+    }
+
+    lua.load(source).set_name(chunk_name).into_function()
 }
 
 /// Finds the file `target` names under `root`, refusing anything outside it.
@@ -253,6 +273,7 @@ mod tests {
     use crate::sandbox::LanguageSurface;
     use crate::types::RequireTarget;
     use crate::{Engine, Policy, Script};
+    use mlua::Value;
     use std::io::Write as _;
     use std::path::Path;
 
@@ -406,6 +427,75 @@ mod tests {
             required_frame.trim(),
             "direct: {direct_err}\nrequired: {required_err}"
         );
+    }
+
+    fn compile(lua: &mlua::Lua, source: &str) -> mlua::Result<mlua::Function> {
+        super::compile(lua, source, "@/abs/m.lua")
+    }
+
+    const NAME: &str = "pkg.mod";
+    const PATH: &str = "/abs/m.lua";
+
+    #[test]
+    fn compile_runs_a_block_that_returns_its_first_argument() {
+        let lua = mlua::Lua::new();
+        let f = compile(&lua, "return (...)").unwrap();
+        assert_eq!(f.call::<String>((NAME, PATH)).unwrap(), NAME);
+    }
+
+    #[test]
+    fn compile_passes_both_arguments() {
+        let lua = mlua::Lua::new();
+        let f = compile(&lua, "return select('#', ...)").unwrap();
+        assert_eq!(f.call::<i64>((NAME, PATH)).unwrap(), 2);
+    }
+
+    #[test]
+    fn compile_runs_a_bare_vararg_expression() {
+        let lua = mlua::Lua::new();
+        let f = compile(&lua, "...").unwrap();
+        assert_eq!(f.call::<String>((NAME, PATH)).unwrap(), NAME);
+    }
+
+    #[test]
+    fn compile_runs_a_bare_table_expression() {
+        let lua = mlua::Lua::new();
+        let f = compile(&lua, "{ v = 'bare' }").unwrap();
+        let table = f.call::<mlua::Table>((NAME, PATH)).unwrap();
+        assert_eq!(table.get::<String>("v").unwrap(), "bare");
+    }
+
+    #[test]
+    fn compile_prefers_the_expression_reading() {
+        let lua = mlua::Lua::new();
+        let f = compile(&lua, "tostring(1)").unwrap();
+        assert_eq!(
+            f.call::<Option<String>>((NAME, PATH)).unwrap().unwrap(),
+            "1"
+        );
+    }
+
+    #[test]
+    fn compile_reports_the_statement_parse_error() {
+        let lua = mlua::Lua::new();
+        let err = compile(&lua, "local x = \n").unwrap_err();
+        assert!(
+            matches!(err, mlua::Error::SyntaxError { .. }),
+            "not a syntax error: {err}"
+        );
+        assert!(
+            err.to_string().contains(":2: unexpected symbol near <eof>"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn compile_keeps_only_the_first_of_several_return_values() {
+        let lua = mlua::Lua::new();
+        let f = compile(&lua, "return { v = 1 }, 'extra'").unwrap();
+        let value = f.call::<Value>((NAME, PATH)).unwrap();
+        let table = value.as_table().unwrap();
+        assert_eq!(table.get::<i64>("v").unwrap(), 1);
     }
 
     #[test]
