@@ -147,7 +147,8 @@ impl RequireLoader {
     }
 }
 
-/// Resolves `target` under `root`, loads it once, and returns what it returned.
+/// Resolves `target` under `root`, loads it once, and returns what it returned
+/// (`true` when it returned nothing).
 fn load(lua: &mlua::Lua, root: &Path, target: &RequireTarget) -> Result<Value> {
     let fail = |source: mlua::Error| Error::lua(target.as_str(), source);
 
@@ -180,14 +181,15 @@ fn load(lua: &mlua::Lua, root: &Path, target: &RequireTarget) -> Result<Value> {
     match run(lua, &path, target) {
         Ok(value) => {
             // A module that returns nothing is still loaded; record that, matching Lua's own
-            // convention, so a second require does not run it again.
+            // convention, so a second require does not run it again. The caller receives the
+            // recorded value too, so the first require and every later one agree.
             let recorded = if matches!(value, Value::Nil) {
                 Value::Boolean(true)
             } else {
-                value.clone()
+                value
             };
-            loaded.set(key.as_str(), recorded).map_err(fail)?;
-            Ok(value)
+            loaded.set(key.as_str(), recorded.clone()).map_err(fail)?;
+            Ok(recorded)
         }
         Err(error) => {
             loaded.set(key.as_str(), Value::Nil).map_err(fail)?;
@@ -673,6 +675,24 @@ mod tests {
              return tostring(first) .. '|' .. tostring(second) .. '|' .. runs",
         );
         assert_eq!(run_entry(dir.path(), "main.lua").unwrap(), "false|false|1");
+    }
+
+    #[test]
+    fn a_module_returning_nothing_yields_true_on_its_first_require() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "m.lua", "runs = (runs or 0) + 1");
+        write(
+            dir.path(),
+            "main.lua",
+            "local first = { require('m') }\n\
+             local second = { require('m') }\n\
+             return tostring(first[1]) .. '|' .. #first .. '|' .. tostring(second[1]) .. '|' \
+             .. #second .. '|' .. select('#', require('m')) .. '|' .. runs",
+        );
+        assert_eq!(
+            run_entry(dir.path(), "main.lua").unwrap(),
+            "true|1|true|1|1|1"
+        );
     }
 
     #[test]
