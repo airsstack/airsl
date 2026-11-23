@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-23
 built-on: a4e85e09b81c
 ---
@@ -205,3 +205,25 @@ Written first and seen failing (on the current code the first call returns nil),
 - `cargo make dod` green on the workspace after Task 4.
 - `cargo test -q -p airsl --lib require` shows the 37 pre-existing tests plus this plan's new ones,
   none failing.
+
+## Review findings
+
+- T1 🟡 statement-path `set_name` unguarded — fixed in T2: `compile_reports_the_statement_parse_error` asserts `/abs/m.lua:2:`; removing `set_name` from the statement branch fails only that test. `cargo test -p airsl require_loader` → 23 passed.
+- T1 🔵 comment omits eval's bytecode branch — declined: modules are read with `read_to_string`, so bytecode never reaches `compile`.
+- T1 🔵 `use mlua::Value;` for one test; test helper named `compile`; consts between tests — declined: style only.
+- T1 🔵 `compile_keeps_only_the_first_of_several_return_values` guards mlua's conversion, not airsl code — declined: the plan names this test; the engine-level guard is `a_module_returning_several_values_yields_only_the_first`.
+- T2 🔵 install-closure comment readable two ways — fixed: reworded ("Lua's own `require` also returns … this one returns only the module").
+- T2 🔵 `to_script_string` called twice in `run` — fixed: computed once, reused by the `ScriptRead` error.
+- T2 🔵 "the name a traceback shows" inexact for long chunk ids — fixed: "the chunk name and the path".
+- T2 🔵 `resolve` comment omits the module's second argument — fixed.
+- T2 🔵 several-values guard checked count and value on different calls — fixed: `local a, b = require('m')` checks both on the first call (`nil:1`).
+- T3 🔵 identity check compared two cache hits — fixed: first-load value compared with a cache hit (`1|1|true`).
+- T4: no findings.
+- After fixes: `cargo test -q -p airsl --lib require` → `test result: ok. 55 passed; 0 failed` (37 pre-existing + 18 new); `cargo make dod` green (reviewer re-run, 571 + 86 + 9 tests, 0 warnings).
+
+## Deviations
+
+- 2026-11-23 — No commits made. The execute instruction did not say to commit, so the per-task commits the plan names are left to the author; the working tree holds all four tasks (patches per task: scratchpad `p01-after-t1.patch`, `p01-t2.patch`, `p01-t3.patch`, `p01-t4.patch`).
+- 2026-11-23 — No `task-briefer` spawned: the plan was already in the orchestrator's context; each coder read its own `### Task N` section.
+- 2026-11-23 — Tasks 3 and 4 were reviewed in one reviewer pass (same file, sequential tasks).
+- 2026-11-23 — The T1 review's 🟡 was folded into the Task 2 coder brief rather than a separate fix spawn.

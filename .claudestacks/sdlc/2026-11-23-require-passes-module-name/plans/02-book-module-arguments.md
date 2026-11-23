@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-23
 depends-on: [01]
 built-on: a4e85e09b81c
@@ -86,3 +86,17 @@ book/src/ch02-00-first-project.md   — modify: new section on what a module rec
 
 - `cargo make book-build` green.
 - The transcript in the chapter equals the three lines fixed by spec §7.
+
+## Review findings
+
+- 🔵 No DoD step checks the chapter's example — declined: book examples are run by hand by project convention; plan 01's `a_required_module_receives_its_name_and_path_as_its_arguments` and `a_module_reaches_its_sibling_through_its_own_name_from_either_root` guard the behaviour.
+- 🔵 "The name is the one the caller wrote" inexact for a file reached under two names — declined: the chapter never introduces `init.lua`; the sentence is exact for every case a reader of the chapter meets.
+- 🔵 "The path always uses `/`" not shown by the transcript — declined: the sentence is what the example's `path:match("[^/]*$")` relies on, and the plan's Risks rest on it.
+- 🔵 "from the last section" ambiguous — fixed: "from the previous section".
+- 🔵 copied `lib/markdown.lua` keeps its `-- markdown.lua` header — declined: the plan asks for a copy.
+- Verified: `cargo run -q -p airsl-cli -- run <scratch>/book-toc/toc.lua` → `-- lib.toc (toc.lua)` / `# Shopping` / `## Hardware`; `check <scratch>/book-toc` → `3 file(s) compiled, 0 failed`; `cargo make book-build` exit 0; `cargo make dod` green.
+
+## Deviations
+
+- 2026-11-23 — No commit made (the execute instruction did not say to commit).
+- 2026-11-23 — Run in parallel with plan 01's final review (disjoint files; plan 01's code was complete and its DoD green).

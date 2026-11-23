@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-23
 depends-on: [01, 02]
 built-on: a4e85e09b81c
@@ -103,3 +103,29 @@ CHANGELOG.md                         — modify: Unreleased becomes the 0.1.5 en
   commit.
 - `git grep -n "0\.1\.4" -- ':!.claudestacks' ':!CHANGELOG.md'` matches only the lines spec §7
   keeps.
+
+## Review findings
+
+- 🔵 "A compatible change" singular over three items — fixed: "Compatible changes, so both crates
+  take a `z` bump."
+- 🔵 No gate catches the root `[workspace.dependencies]` airsl version reverting to 0.1.4
+  (`^0.1.4` still matches the 0.1.5 member) — declined: pre-existing gap outside this plan; the
+  plan's version grep covers it.
+- 🔵 No gate compares the book's version transcripts with the binary — declined: pre-existing;
+  book output is pasted by hand by project convention.
+- Verified (reviewer re-run): `cargo run -q -p airsl-cli -- --version` → `airsl 0.1.5`; `doctor`
+  and `doctor --policy trusted` match the book byte for byte; the version grep returns exactly the
+  kept list; `Cargo.lock` lists airsl and airsl-cli at 0.1.5; `cargo make dod` exit 0
+  (571 + 86 + 9 tests, 0 warnings); `cargo make book-build` exit 0.
+
+## Deviations
+
+- 2026-11-23 — No release commit made (the execute instruction did not say to commit). So
+  `cargo make publish-dry-run` exits 101 on the dirty tree ("3 files in the working directory
+  contain changes that were not yet committed into git"). Its three commands were run with
+  `--allow-dirty` instead: `cargo package --list -p airsl` exit 0; `cargo publish --dry-run -p
+  airsl` exit 0 ("aborting upload due to dry run" after verifying airsl v0.1.5);
+  `cargo package --list -p airsl-cli` exit 0. The plain `cargo make publish-dry-run` must be
+  re-run on the release commit.
+- 2026-11-23 — The CHANGELOG date is the execution date; update it if the release commit lands on
+  another day.
