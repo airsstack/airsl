@@ -630,4 +630,66 @@ mod tests {
         );
         assert_eq!(run_entry(dir.path(), "main.lua").unwrap(), "nil:1");
     }
+
+    #[test]
+    fn require_returns_exactly_one_value_on_the_first_load_and_on_a_cache_hit() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "m.lua", "return { v = 1 }");
+        write(
+            dir.path(),
+            "main.lua",
+            "local function pack(...) return select('#', ...), ... end\n\
+             local first_count, first = pack(require('m'))\n\
+             local cached_count, cached = pack(require('m'))\n\
+             return first_count .. '|' .. cached_count .. '|' .. tostring(first == cached)",
+        );
+        assert_eq!(run_entry(dir.path(), "main.lua").unwrap(), "1|1|true");
+    }
+
+    #[test]
+    fn a_require_in_a_multi_value_position_contributes_one_value() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "a.lua", "return { v = 'a' }");
+        write(dir.path(), "b.lua", "return { v = 'b' }");
+        write(
+            dir.path(),
+            "main.lua",
+            "local fields = { require('a'), require('b') }\n\
+             local inserted = pcall(table.insert, {}, require('a'))\n\
+             return #fields .. '|' .. tostring(inserted)",
+        );
+        assert_eq!(run_entry(dir.path(), "main.lua").unwrap(), "2|true");
+    }
+
+    #[test]
+    fn a_module_returning_false_yields_false_and_runs_once() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "m.lua", "runs = (runs or 0) + 1\nreturn false");
+        write(
+            dir.path(),
+            "main.lua",
+            "local first = require('m')\n\
+             local second = require('m')\n\
+             return tostring(first) .. '|' .. tostring(second) .. '|' .. runs",
+        );
+        assert_eq!(run_entry(dir.path(), "main.lua").unwrap(), "false|false|1");
+    }
+
+    #[test]
+    fn a_file_reached_under_two_names_runs_once_and_sees_the_first_name() {
+        let dir = tempfile::tempdir().unwrap();
+        write(
+            dir.path(),
+            "lib/init.lua",
+            "runs = (runs or 0) + 1\nreturn { name = (...) }",
+        );
+        write(
+            dir.path(),
+            "main.lua",
+            "local a = require('lib')\n\
+             local b = require('lib.init')\n\
+             return tostring(a == b) .. '|' .. a.name .. '|' .. runs",
+        );
+        assert_eq!(run_entry(dir.path(), "main.lua").unwrap(), "true|lib|1");
+    }
 }
