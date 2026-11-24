@@ -1,0 +1,25 @@
+# airsl 0.1.5 (checkout 62d2572)
+$ airsl run --policy trusted globals.lua
+base: _VERSION assert collectgarbage dofile error getmetatable ipairs load loadfile next pairs pcall print rawequal rawget rawlen rawset require select setmetatable tonumber tostring type warn xpcall
+coroutine: close create isyieldable resume running status wrap yield
+io: close flush input lines open output popen read stderr stdin stdout tmpfile type write
+math: abs acos asin atan atan2 ceil cos cosh deg exp floor fmod frexp huge ldexp log log10 max maxinteger min mininteger modf pi pow rad random randomseed sin sinh sqrt tan tanh tointeger type ult
+os: clock date difftime execute exit getenv remove rename setlocale time tmpname
+package: config cpath loaded loadlib path preload searchers searchpath
+string: byte char dump find format gmatch gsub len lower match pack packsize rep reverse sub unpack upper
+table: concat insert move pack remove sort unpack
+utf8: char charpattern codepoint codes len offset
+$ airsl run --policy confined globals.lua
+base: _VERSION assert collectgarbage error getmetatable ipairs next pairs pcall print rawequal rawget rawlen rawset require select setmetatable tonumber tostring type warn xpcall
+coroutine: close create isyieldable resume running status wrap yield
+math: abs acos asin atan atan2 ceil cos cosh deg exp floor fmod frexp huge ldexp log log10 max maxinteger min mininteger modf pi pow rad random randomseed sin sinh sqrt tan tanh tointeger type ult
+os: clock date difftime time
+string: byte char dump find format gmatch gsub len lower match pack packsize rep reverse sub unpack upper
+table: concat insert move pack remove sort unpack
+utf8: char charpattern codepoint codes len offset
+$ airsl run --policy pure globals.lua
+base: _VERSION assert collectgarbage error getmetatable ipairs next pairs pcall print rawequal rawget rawlen rawset select setmetatable tonumber tostring type warn xpcall
+math: abs acos asin atan atan2 ceil cos cosh deg exp floor fmod frexp huge ldexp log log10 max maxinteger min mininteger modf pi pow rad random randomseed sin sinh sqrt tan tanh tointeger type ult
+string: byte char dump find format gmatch gsub len lower match pack packsize rep reverse sub unpack upper
+table: concat insert move pack remove sort unpack
+utf8: char charpattern codepoint codes len offset
