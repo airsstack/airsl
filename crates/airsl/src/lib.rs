@@ -46,6 +46,7 @@ mod require_loader;
 mod script;
 #[cfg(test)]
 mod test_support;
+mod version;
 
 pub mod extension;
 pub mod modules;
@@ -75,3 +76,4 @@ pub use script::Script;
 pub use types::{
     ChunkName, EnvName, EventName, ExtensionName, ModuleName, RequireTarget, RootTable,
 };
+pub use version::VERSION;
