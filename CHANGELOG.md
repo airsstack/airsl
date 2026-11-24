@@ -9,6 +9,23 @@ The two crates are versioned independently, and each entry names every crate it 
 release is tagged per crate — `airsl-v0.1.4`, `airsl-cli-v0.1.3` — because one commit has shipped
 two crates under two different numbers, which a single `vX.Y.Z` tag cannot name.
 
+## airsl 0.1.6 — airsl-cli 0.1.6 — 2026-11-24
+
+Compatible changes, so both crates take a `z` bump.
+
+### Added
+
+- **`airsl::VERSION`**, the version of the `airsl` crate a program was built against. An embedder
+  can record which runtime ran a script, or compare it with an installed `airsl` binary, without
+  reading its own `Cargo.lock`.
+
+### Changed
+
+- **Current majors of `sha2`, `sha1` and `toml`.** `sha2` and `sha1` move to 0.11 and `toml` to 1,
+  so a crate that depends on `airsl` and on the current releases of these crates no longer
+  compiles two copies of `sha2`, `digest` and `toml`. Hash output is unchanged. A manifest parse
+  error still carries the parser's message, which now comes from `toml` 1.
+
 ## airsl 0.1.5 — airsl-cli 0.1.5 — 2026-11-23
 
 Compatible changes, so both crates take a `z` bump.
