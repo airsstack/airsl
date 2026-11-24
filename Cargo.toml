@@ -27,11 +27,13 @@ thiserror  = "2.0.18"
 regex      = "1"
 globset    = "0.4"
 walkdir    = "2.5"
-sha2       = "0.10"
+sha2       = "0.11"
 # SHA-1 for compatibility only. Callers that key artifacts off `shasum | cut -c1-8`
 # or `hashlib.sha1(...)[:8]` need it; shipping only SHA-256 would silently re-key
 # every such project and orphan its artifacts.
-sha1       = "0.10"
+# Kept on the same major as `sha2`: both sit on `digest`, and mismatched majors compile two
+# copies of it into every crate that depends on `airsl`.
+sha1       = "0.11"
 # Time formatting. `jiff` over `time` because it never goes through libc `tzset`, which is not
 # thread-safe, so local time resolves correctly in multi-threaded embedders. On unix it reads
 # /etc/localtime directly; on Windows, where there is no /etc/localtime, it carries its own tzdb.
@@ -39,8 +41,10 @@ jiff       = "0.2"
 # Extension manifests (`extension.toml`). `toml` rather than a hand parser because the
 # manifest is the one file a third party writes for this runtime, and the error messages a
 # real parser produces are part of that contract. `airsl` only reads manifests, never writes
-# them back out, so the `display` default feature (TOML serialization) is dropped.
-toml       = { version = "0.8", default-features = false, features = ["parse"] }
+# them back out, so the `display` default feature (TOML serialization) is dropped. `toml` 1
+# split `serde` and `std` out of `parse`: without them `toml::from_str` and `toml::Value` do not
+# exist, so all three are named.
+toml       = { version = "1", default-features = false, features = ["std", "serde", "parse"] }
 # Temp files and dirs. A runtime dependency of `airsl`, which exposes
 # `airsstack.fs.tempdir` to Lua; dev-only for `airsl-cli`.
 tempfile   = "3.23.0"
@@ -49,7 +53,7 @@ clap       = { version = "4", features = ["derive"] }
 # Internal workspace member — path for local builds, version for publish-readiness.
 # `airsl-cli` inherits this with `{ workspace = true }`. Cargo strips the path and
 # keeps the version when packaging, so the published crate depends on crates.io.
-airsl      = { version = "0.1.5", path = "crates/airsl" }
+airsl      = { version = "0.1.6", path = "crates/airsl" }
 
 [workspace.lints.rust]
 unsafe_code        = "forbid"
