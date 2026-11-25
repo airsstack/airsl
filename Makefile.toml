@@ -127,10 +127,13 @@ description = "Run every example end to end, check its README shows the real out
 # loudly wherever it cannot, which is the property this whole scheme protects.
 script_runner = "@duckscript"
 script = '''
-# Fails the task unless `${2}` (what `${1}` printed) appears verbatim in the
-# file `${3}`. An empty output fails too: it would be contained in any file, so
-# it would pass while proving nothing. The actual output is echoed before the
-# error so a failing run shows what to paste, rather than only that it differs.
+# Returns whether `${2}` (what `${1}` printed) appears verbatim in the file
+# `${3}`. An empty output fails at once: it would be contained in any file, so
+# it would pass while proving nothing. A mismatch echoes the actual output, so
+# a failing run shows what to paste rather than only that it differs, and is
+# returned rather than raised: the caller counts mismatches and fails once at
+# the end, so one run names every transcript that drifted — on a platform only
+# CI has, the first mismatch hiding the rest would cost a CI round per example.
 function assert_documented
     shown = readfile ${3}
     shown = replace ${shown} "\r\n" "\n"
@@ -142,9 +145,12 @@ function assert_documented
     if not ${found}
         echo --- actual output of ${1}
         echo ${actual}
-        trigger_error "${1}: its output does not appear verbatim in ${3}"
+        echo --- DRIFT: ${1}: its output does not appear verbatim in ${3}
     end
+    return ${found}
 end
+
+drifted = set 0
 
 dirs = glob_array crates/airsl/examples/*/
 for dir in ${dirs}
@@ -172,7 +178,10 @@ for dir in ${dirs}
                 echo ${ran.stderr}
                 trigger_error "example ${name} exited with status ${ran.code}"
             end
-            assert_documented "example ${name}" ${ran.stdout} ${dir}/README.md
+            documented = assert_documented "example ${name}" ${ran.stdout} ${dir}/README.md
+            if not ${documented}
+                drifted = calc ${drifted} + 1
+            end
         end
     end
 end
@@ -191,21 +200,34 @@ if not eq ${ran.code} 0
     echo ${ran.stderr}
     trigger_error "airsl run --policy trusted ${probe} exited with status ${ran.code}"
 end
-assert_documented "airsl run --policy trusted" ${ran.stdout} ${appendix}
+documented = assert_documented "airsl run --policy trusted" ${ran.stdout} ${appendix}
+if not ${documented}
+    drifted = calc ${drifted} + 1
+end
 echo --- appendix F, confined
 ran = exec cargo run -q -p airsl-cli -- run --policy confined ${probe}
 if not eq ${ran.code} 0
     echo ${ran.stderr}
     trigger_error "airsl run --policy confined ${probe} exited with status ${ran.code}"
 end
-assert_documented "airsl run --policy confined" ${ran.stdout} ${appendix}
+documented = assert_documented "airsl run --policy confined" ${ran.stdout} ${appendix}
+if not ${documented}
+    drifted = calc ${drifted} + 1
+end
 echo --- appendix F, pure
 ran = exec cargo run -q -p airsl-cli -- run --policy pure --allow-access stdout ${probe}
 if not eq ${ran.code} 0
     echo ${ran.stderr}
     trigger_error "airsl run --policy pure --allow-access stdout ${probe} exited with status ${ran.code}"
 end
-assert_documented "airsl run --policy pure --allow-access stdout" ${ran.stdout} ${appendix}
+documented = assert_documented "airsl run --policy pure --allow-access stdout" ${ran.stdout} ${appendix}
+if not ${documented}
+    drifted = calc ${drifted} + 1
+end
+
+if greater_than ${drifted} 0
+    trigger_error "${drifted} transcript(s) differ from what the program printed; each is named above with its actual output"
+end
 
 # Every shipped script still compiles against the current runtime. `check`
 # loads and compiles without running, so this costs a parse and nothing else —
