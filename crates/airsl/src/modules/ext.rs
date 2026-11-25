@@ -154,6 +154,11 @@ impl HostModule for Ext {
                 )
                 .field("proc", LuaType::record("GrantedProc"), "Runnable programs.")
                 .field(
+                    "access",
+                    LuaType::array(LuaType::STRING),
+                    "Granted host-access names, such as `stdin` or `clock`, in declaration order.",
+                )
+                .field(
                     "limits",
                     LuaType::record("GrantedLimits"),
                     "Resource ceilings.",
@@ -535,5 +540,30 @@ mod tests {
     #[test]
     fn its_description_matches_what_it_installs() {
         crate::luals::verify(&super::Ext::new(), &crate::types::RootTable::default()).unwrap();
+    }
+
+    #[test]
+    fn the_granted_record_names_every_key_granted_returns() {
+        // `verify` compares a module's own keys only, so a key added to the returned table would
+        // otherwise drift out of the editor's view unnoticed.
+        use crate::description::Field;
+        use crate::modules::HostModule;
+        let description = Ext::new().describe().unwrap();
+        let record = description
+            .records()
+            .iter()
+            .find(|r| r.name() == "Granted")
+            .unwrap();
+        let mut described: Vec<&str> = record.fields().iter().map(Field::name).collect();
+        described.sort_unstable();
+        let engine = Engine::builder().policy(Policy::trusted()).build().unwrap();
+        let installed = run(
+            &engine,
+            "local keys = {} \
+             for k in pairs(airsstack.ext.granted()) do keys[#keys + 1] = k end \
+             table.sort(keys) return table.concat(keys, ',')",
+        )
+        .unwrap();
+        assert_eq!(described.join(","), installed);
     }
 }
