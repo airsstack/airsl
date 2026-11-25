@@ -22,7 +22,7 @@
     reason = "explicit pub(crate) documents the crate-wide visibility intent at each item"
 )]
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use serde_json::{Map, Value};
 
@@ -229,75 +229,121 @@ fn spelled(keys: &[&str]) -> String {
         .join(" \u{2192} ")
 }
 
-/// The shortest setting path of two or more segments that is reached through two different
-/// spellings, ties broken by byte order of the joined path.
+/// The setting name of two or more segments that two different spellings join to, if any. With
+/// several, the one with the fewest segments, then the first comparing segment by segment.
 ///
 /// A rewrite sorts keys, which can flip which of two spellings of one setting is textually last,
 /// and the language server uses the last. Two spellings can sit under different top-level keys or
 /// inside one, such as `Lua` holding both `workspace` and `workspace.library`.
 fn shared_setting_path(root: &Map<String, Value>) -> Option<String> {
-    let mut reached = BTreeMap::new();
+    let mut names = Names::default();
     for (key, value) in root {
-        Trail::start(key).walk(value, &mut reached);
+        let mut segments = key.split('.').peekable();
+        // The server applies a key or `Lua.` plus it, so a leading `Lua` names nothing of its own.
+        segments.next_if_eq(&"Lua");
+        let node = names.extend(Names::ROOT, segments);
+        names.visit(node, value);
     }
-    reached
-        .into_iter()
-        .filter(|(_, spellings)| spellings.len() >= 2)
-        .map(|(path, _)| (path.len(), path.join(".")))
-        .min()
-        .map(|(_, joined)| joined)
+    names.first_shared()
 }
 
-/// Every setting path reached, with each distinct spelling that reached it. A spelling is the JSON
-/// keys taken until their segments cover the path.
-type Reached = BTreeMap<Vec<String>, BTreeSet<Vec<String>>>;
-
-/// The JSON keys one walk has taken so far and the dot-separated segments they spell.
-#[derive(Clone)]
-struct Trail {
-    /// The keys taken, outermost first.
-    keys: Vec<String>,
-    /// Every key's segments joined in order.
-    segments: Vec<String>,
-    /// For each key, how many segments there are once it is taken.
-    ends: Vec<usize>,
+/// The setting names a luarc's keys spell, held as a tree of segments: a name's last segment is a
+/// node under the node of the segments before it, so names that share a beginning share its nodes.
+///
+/// Storing each name in full would copy every shared beginning once per key below it, which grows
+/// with the square of a long dotted key. The tree grows with the file.
+struct Names<'a> {
+    nodes: Vec<Segment<'a>>,
 }
 
-impl Trail {
-    fn start(key: &str) -> Self {
+/// One node of [`Names`]: a segment, where it hangs, and how many keys name the path ending here.
+struct Segment<'a> {
+    text: &'a str,
+    parent: usize,
+    children: BTreeMap<&'a str, usize>,
+    /// The visited keys whose whole name ends at this node. Each has its own spelling, because a
+    /// parsed object holds a key once, so two or more mean one setting spelled two ways.
+    named_by: usize,
+}
+
+impl Default for Names<'_> {
+    fn default() -> Self {
         Self {
-            keys: Vec::new(),
-            segments: Vec::new(),
-            ends: Vec::new(),
+            nodes: vec![Segment {
+                text: "",
+                parent: Self::ROOT,
+                children: BTreeMap::new(),
+                named_by: 0,
+            }],
         }
-        .then(key)
+    }
+}
+
+impl<'a> Names<'a> {
+    /// The node of the empty name, which every name starts from.
+    const ROOT: usize = 0;
+
+    /// The node reached from `node` by `segments`, adding the nodes that do not exist yet.
+    fn extend(&mut self, mut node: usize, segments: impl Iterator<Item = &'a str>) -> usize {
+        for text in segments {
+            let next = self.nodes.len();
+            let child = *self.nodes[node].children.entry(text).or_insert(next);
+            if child == next {
+                self.nodes.push(Segment {
+                    text,
+                    parent: node,
+                    children: BTreeMap::new(),
+                    named_by: 0,
+                });
+            }
+            node = child;
+        }
+        node
     }
 
-    /// The trail after also taking `key`, whose dots split it into further segments.
-    fn then(mut self, key: &str) -> Self {
-        self.keys.push(key.to_owned());
-        self.segments.extend(key.split('.').map(str::to_owned));
-        self.ends.push(self.segments.len());
-        self
-    }
-
-    /// Records every path of two or more segments this trail reaches, then continues into `value`
-    /// when it is an object. A leading `Lua` segment is not part of any path, but the key that
-    /// carries it stays in the spelling.
-    fn walk(&self, value: &Value, reached: &mut Reached) {
-        let skip = usize::from(self.segments.first().is_some_and(|first| first == "Lua"));
-        for end in skip + 2..=self.segments.len() {
-            let last_key = self.ends.partition_point(|covered| *covered < end);
-            reached
-                .entry(self.segments[skip..end].to_vec())
-                .or_default()
-                .insert(self.keys[..=last_key].to_vec());
-        }
+    /// Counts one key whose name ends at `node`, then visits the keys inside `value` when it is an
+    /// object. Each inner key's segments continue the name, as the server joins them with `.`.
+    fn visit(&mut self, node: usize, value: &'a Value) {
+        self.nodes[node].named_by += 1;
         if let Some(object) = value.as_object() {
             for (key, inner) in object {
-                self.clone().then(key).walk(inner, reached);
+                let child = self.extend(node, key.split('.'));
+                self.visit(child, inner);
             }
         }
+    }
+
+    /// The first name of two or more segments named by more than one key, in breadth-first order.
+    ///
+    /// Each level holds the names of one segment count, and children are kept sorted, so the
+    /// first match has the fewest segments and comes first segment by segment.
+    fn first_shared(&self) -> Option<String> {
+        let mut level = vec![Self::ROOT];
+        let mut depth = 0_usize;
+        while !level.is_empty() {
+            if depth >= 2
+                && let Some(&node) = level.iter().find(|&&node| self.nodes[node].named_by >= 2)
+            {
+                return Some(self.name(node));
+            }
+            level = level
+                .iter()
+                .flat_map(|&node| self.nodes[node].children.values().copied())
+                .collect();
+            depth += 1;
+        }
+        None
+    }
+
+    /// The name ending at `node`, its segments joined with `.`.
+    fn name(&self, mut node: usize) -> String {
+        let mut segments = Vec::new();
+        while node != Self::ROOT {
+            segments.push(self.nodes[node].text);
+            node = self.nodes[node].parent;
+        }
+        segments.reverse();
+        segments.join(".")
     }
 }
 
@@ -567,13 +613,65 @@ mod tests {
     }
 
     #[test]
-    fn the_shortest_shared_path_tie_breaks_by_byte_order() {
+    fn names_of_equal_length_are_compared_segment_by_segment() {
         assert_eq!(
             refusal(
                 r#"{"a-": {"b": {"c": 1}}, "a-.b": {"c": 2}, "a": {"b": {"z": 1}}, "a.b": {"z": 2}}"#
             ),
-            "it sets `a-.b` in two spellings"
+            "it sets `a.b` in two spellings"
         );
+    }
+
+    #[test]
+    fn the_path_with_the_fewest_segments_is_named() {
+        assert_eq!(
+            refusal(r#"{"a": {"b": {"c.d": 1, "c": {"d": 2}}}, "z.y": 1, "z": {"y": 2}}"#),
+            "it sets `z.y` in two spellings"
+        );
+    }
+
+    #[test]
+    fn dotted_map_keys_are_not_two_spellings() {
+        assert_eq!(
+            written_value(
+                r#"{"runtime.builtin": {"io": "disable", "jit.profile": "disable", "jit.util": "disable"}}"#
+            ),
+            json!({
+                "runtime.builtin": {"io": "disable", "jit.profile": "disable", "jit.util": "disable"},
+                "workspace.library": [".airsl/types"]
+            })
+        );
+    }
+
+    #[test]
+    fn dotted_keys_that_share_a_prefix_are_not_two_spellings() {
+        assert_eq!(
+            written_value(r#"{"a.b.c.d": 1, "a.b.c.e": 2}"#),
+            json!({"a.b.c.d": 1, "a.b.c.e": 2, "workspace.library": [".airsl/types"]})
+        );
+    }
+
+    #[test]
+    fn empty_segments_make_a_different_name() {
+        assert_eq!(
+            written_value(r#"{"a..b": 1, "a.b": 2}"#),
+            json!({"a..b": 1, "a.b": 2, "workspace.library": [".airsl/types"]})
+        );
+    }
+
+    #[test]
+    fn map_keys_that_join_to_one_name_are_refused() {
+        assert_eq!(
+            refusal(r#"{"runtime.special": {"x.y": "require", "x": {"y": "require"}}}"#),
+            "it sets `runtime.special.x.y` in two spellings"
+        );
+    }
+
+    #[test]
+    fn a_key_with_many_dots_is_planned() {
+        let long = vec!["k"; 100_000].join(".");
+        let text = format!(r#"{{"{long}": 1, "z.y": 1, "z": {{"y": 2}}}}"#);
+        assert_eq!(refusal(&text), "it sets `z.y` in two spellings");
     }
 
     #[test]
@@ -654,7 +752,7 @@ mod tests {
     fn key_paths_split_nested_dotted_keys() {
         assert_eq!(
             refusal(r#"{"workspace": {"a.b": 1}, "workspace.a": {"b": 2}}"#),
-            "it sets `workspace.a` in two spellings"
+            "it sets `workspace.a.b` in two spellings"
         );
     }
 
