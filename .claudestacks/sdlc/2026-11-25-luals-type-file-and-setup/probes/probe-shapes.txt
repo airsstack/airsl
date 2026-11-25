@@ -1,4 +1,4 @@
-# cwd: the chain directory .claudestacks/sdlc/2026-11-25-luals-type-file-and-setup; <chain> in the output is that directory's absolute path. Binary built from checkout bb95c10, rustc 1.94.1. stdin is the 3 bytes "x" for both runs.
+# cwd: the chain directory .claudestacks/sdlc/2026-11-25-luals-type-file-and-setup; <chain> in the output is that directory's absolute path. Binary built from checkout 0c3d27e (airsl 0.2.0 merged), rustc 1.94.1. stdin is the 3 bytes "x" for both runs.
 $ printf '"x"' | cargo run -q --manifest-path ../../../Cargo.toml -p airsl-cli -- run --policy confined --allow-read . --allow-write . --allow-env HOME --allow-exec echo --memory-limit 100000000 --instruction-limit 100000000 probes/shapes.lua
 proc.run({'echo','hi'}) : table
   [string status] = integer 0
@@ -11,6 +11,14 @@ regex.captures : table
   [integer 2] = string b
   [string n] = string b
 ext.granted() : table
+  [string access] : table
+    [integer 1] = string stdin
+    [integer 2] = string stdout
+    [integer 3] = string stderr
+    [integer 4] = string clock
+    [integer 5] = string cwd
+    [integer 6] = string require
+    [integer 7] = string zones
   [string env] : table
     [string HOME] = boolean true
   [string fs] : table
@@ -27,9 +35,9 @@ ext.granted() : table
   [string unrestricted] = boolean false
 fs.stat('.') : table
   [string kind] = string dir
-  [string modified] = integer 1795590946
+  [string modified] = integer 1795614596
   [string readonly] = boolean false
-  [string size] = integer 192
+  [string size] = integer 320
 json.decode('1') = integer 1
 json.decode('"s"') = string s
 json.decode('null') = userdata userdata: 0x0
@@ -47,6 +55,14 @@ regex.captures : table
   [integer 2] = string b
   [string n] = string b
 ext.granted() : table
+  [string access] : table
+    [integer 1] = string stdin
+    [integer 2] = string stdout
+    [integer 3] = string stderr
+    [integer 4] = string clock
+    [integer 5] = string cwd
+    [integer 6] = string require
+    [integer 7] = string zones
   [string env] : table
   [string fs] : table
     [string read] : table
@@ -57,9 +73,9 @@ ext.granted() : table
   [string unrestricted] = boolean true
 fs.stat('.') : table
   [string kind] = string dir
-  [string modified] = integer 1795590946
+  [string modified] = integer 1795614596
   [string readonly] = boolean false
-  [string size] = integer 192
+  [string size] = integer 320
 json.decode('1') = integer 1
 json.decode('"s"') = string s
 json.decode('null') = userdata userdata: 0x0
