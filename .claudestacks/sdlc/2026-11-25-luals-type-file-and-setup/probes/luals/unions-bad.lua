@@ -1,0 +1,5 @@
+airsstack.u.f({}, nil, "", nil, {})
+airsstack.u.f(1, true, "", nil, {})
+airsstack.u.f(1, nil, "x", nil, {})
+airsstack.u.f(1, nil, "", "b", {})
+airsstack.u.f(1, nil, "", nil, { 1 })

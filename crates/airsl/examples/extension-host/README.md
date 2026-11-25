@@ -50,32 +50,31 @@ word-count: {"longest":"quick","words":9}
 
 - **`load_dir` never short-circuits.** `extensions/broken` asks for `fs.read = ["$OUTSIDE"]`, which
   `main.rs` expands to the filesystem root, and the host is built with
-  `Ceiling::new(Policy::confined())` (`src/extension/ceiling.rs:27`), whose grants start empty — the
+  `Ceiling::new(Policy::confined())` (in `src/extension/ceiling.rs`), whose grants start empty — the
   root is outside every read root the ceiling allows, so negotiation denies the request before
-  `broken/main.lua` is opened for evaluation. `word-count` loads regardless: one
-  directory's manifest error is data in the returned [`LoadReport`]
-  (`src/extension/load_report.rs:20`), never an early return that would have stopped `word-count`
-  from being tried.
-- **Fail-closed, by construction.** The denial happens in [`Extension::approve`]
-  (`src/extension/loaded.rs:175`), a step before [`Approved::start`]
-  (`src/extension/loaded.rs:96`) exists to be called — there is no engine for `broken` to have run
-  code in, which is what "extensions/broken" is standing in for rather than merely a manifest that
-  fails to parse.
+  `broken/main.lua` is opened for evaluation. `word-count` loads regardless: one directory's
+  manifest error is data in the returned [`LoadReport`] (in `src/extension/load_report.rs`), never
+  an early return that would have stopped `word-count` from being tried.
+- **Fail-closed, by construction.** The denial happens in [`Extension::approve`] (in
+  `src/extension/loaded.rs`), a step before [`Approved::start`] (in the same file) exists to be
+  called — there is no engine for `broken` to have run code in, which is what "extensions/broken" is
+  standing in for rather than merely a manifest that fails to parse.
 - **`broadcast` visits every *loaded* extension and returns one [`Dispatch`] per one, in load
-  order** (`src/extension/host.rs:312`). Only `word-count` is in the registry by the time the event
-  fires, so the output has exactly one line — with two extensions loaded it would have two, neither
-  one able to hide the other's answer or its error.
+  order** (`ExtensionHost::broadcast` in `src/extension/host.rs`). Only `word-count` is in the
+  registry by the time the event fires, so the output has exactly one line — with two extensions
+  loaded it would have two, neither one able to hide the other's answer or its error.
 - **The output is byte-stable.** `word-count/main.lua` builds `{ words = ..., longest = ... }` in
   that field order, but this crate's `serde_json` build has the `preserve_order` feature off, so
   `serde_json::Value`'s map is a `BTreeMap` and `to_string` renders `longest` before `words`
   regardless — the same bytes on every run, on every machine, independent of what order the Lua
   table happened to be constructed in.
 - **`regex = true` in the manifest is a presence assertion, not a grant.** `airsstack.regex` needs
-  no authority (`src/modules/regex.rs:8`) — the capability line only tells negotiation "this
-  runtime must install a module named `regex`" (`src/extension/negotiate.rs:236`), which is why
-  `word-count` gets the module with an empty [`GrantSet`] and the manifest still has a reason for
-  the line to exist: `\w+` finds words the way `string.gmatch` cannot state directly, with no
-  alternation and no character-class shorthand of its own.
+  no authority (stated in the module doc of `src/modules/regex.rs`) — the capability line only tells
+  negotiation "this runtime must install a module named `regex`" (`Intersection::apply` in
+  `src/extension/negotiate.rs`), which is why `word-count` gets the module with an empty
+  [`GrantSet`] and the manifest still has a reason for the line to exist: `\w+` finds words the way
+  `string.gmatch` cannot state directly, with no alternation and no character-class shorthand of its
+  own.
 
 ## See also
 

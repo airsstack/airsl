@@ -13,6 +13,7 @@
 use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
 
+use crate::description::{Function, LuaType, ModuleDescription};
 use crate::error::{Error, Result};
 use crate::modules::{HostModule, InstallContext};
 use crate::sandbox::GrantSet;
@@ -269,6 +270,25 @@ impl HostModule for Env {
         table.set("set", set).map_err(fail)?;
 
         Ok(())
+    }
+
+    fn describe(&self) -> Result<ModuleDescription> {
+        ModuleDescription::builder("Environment variables, limited to the names the host granted.")
+            .function(
+                Function::new("get", "Returns the value of a variable, or nil when it is not set.")
+                    .param("name", LuaType::STRING, "The variable name.")
+                    .returns(LuaType::optional(LuaType::STRING)),
+            )
+            .function(
+                Function::new("all", "Returns every readable variable that is set, by name.")
+                    .returns(LuaType::map(LuaType::STRING, LuaType::STRING)),
+            )
+            .function(
+                Function::new("set", "Sets a variable for this process and its children, or clears it when no value is given.")
+                    .param("name", LuaType::STRING, "The variable name.")
+                    .optional("value", LuaType::STRING, "The new value; omit it to clear the variable."),
+            )
+            .build()
     }
 }
 
@@ -544,5 +564,10 @@ mod tests {
             entries,
             vec![(String::from("Path"), Some(String::from("second")))]
         );
+    }
+
+    #[test]
+    fn its_description_matches_what_it_installs() {
+        crate::luals::verify(&super::Env::new(), &crate::types::RootTable::default()).unwrap();
     }
 }

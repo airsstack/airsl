@@ -15,44 +15,22 @@ Rust program collects what they added.
 
 ## The module
 
-A host module is a type that implements the `HostModule` trait. The trait has two methods: `name`,
-which says what the module is called, and `install`, which puts its functions into a Lua table.
+A host module is a type that implements the `HostModule` trait. The trait has three methods: `name`,
+which says what the module is called, `install`, which puts its functions into a Lua table, and
+`describe`, which lists those functions so editors can complete and check them.
 
 ```rust
-use std::sync::{Arc, Mutex};
-
-use airsl::mlua::{Lua, Table};
-use airsl::{HostModule, InstallContext, ModuleName};
-
-struct Notes {
-    name: ModuleName,
-    collected: Arc<Mutex<Vec<String>>>,
-}
-
-impl HostModule for Notes {
-    fn name(&self) -> &ModuleName {
-        &self.name
-    }
-
-    fn install(&self, lua: &Lua, table: &Table, _context: &InstallContext<'_>) -> airsl::Result<()> {
-        let fail = |e| airsl::Error::lua("notes", e);
-
-        let collected = Arc::clone(&self.collected);
-        let add = lua
-            .create_function(move |_, text: String| {
-                collected.lock().expect("notes lock poisoned").push(text);
-                Ok(())
-            })
-            .map_err(fail)?;
-
-        table.set("add", add).map_err(fail)
-    }
-}
+{{#rustdoc_include ../../crates/airsl/examples/notes-module/notes.rs:module}}
 ```
 
 `install` receives the Lua state, the table that will become `myapp.notes`, and a context that this
 module does not need yet. It creates a Rust function and stores it in the table under the name
 `add`. When a script calls `notes.add("...")`, Lua calls that closure with the string.
+
+`describe` says the same thing as data: `notes` has one function, `add`, that takes a string called
+`text`. Nothing runs when it is called. It is the list that [Editor Support](ch01-04-editor-support.md)
+turns into completion in your editor. It is a promise that has to stay true, so
+[the last section](#keeping-the-description-honest) shows how to check it.
 
 `airsl::mlua` is the Lua binding `airsl` itself uses. Always import it from `airsl` rather than
 adding `mlua` to your own `Cargo.toml`. If the two versions ever differ, the compiler reports type
@@ -63,53 +41,7 @@ errors that never mention the real cause.
 Start from the built-in modules, add yours, and give the engine its own root table name:
 
 ```rust
-# use std::sync::{Arc, Mutex};
-# use airsl::mlua::{Lua, Table};
-# use airsl::{HostModule, InstallContext, ModuleName};
-# struct Notes { name: ModuleName, collected: Arc<Mutex<Vec<String>>> }
-# impl HostModule for Notes {
-#     fn name(&self) -> &ModuleName { &self.name }
-#     fn install(&self, lua: &Lua, table: &Table, _context: &InstallContext<'_>) -> airsl::Result<()> {
-#         let fail = |e| airsl::Error::lua("notes", e);
-#         let collected = Arc::clone(&self.collected);
-#         let add = lua.create_function(move |_, text: String| {
-#             collected.lock().expect("notes lock poisoned").push(text);
-#             Ok(())
-#         }).map_err(fail)?;
-#         table.set("add", add).map_err(fail)
-#     }
-# }
-use airsl::{Engine, Policy, RootTable, Script};
-
-fn main() -> Result<(), airsl::Error> {
-    let collected = Arc::new(Mutex::new(Vec::new()));
-
-    let mut modules = airsl::modules::stdlib()?;
-    modules.insert(Box::new(Notes {
-        name: ModuleName::new("notes")?,
-        collected: Arc::clone(&collected),
-    }))?;
-
-    let engine = Engine::builder()
-        .policy(Policy::confined())
-        .root_table(RootTable::new("myapp")?)
-        .stdlib(modules)
-        .build()?;
-
-    let script = Script::from_source(
-        r#"
-          myapp.notes.add("disk is 91% full")
-          myapp.notes.add("backup finished in " .. 42 .. "s")
-        "#,
-        "report",
-    )?;
-    engine.eval(&script)?;
-
-    for note in collected.lock().expect("notes lock poisoned").iter() {
-        println!("note: {note}");
-    }
-    Ok(())
-}
+{{#rustdoc_include ../../crates/airsl/examples/notes-module/main.rs:run}}
 ```
 
 ```console
@@ -155,10 +87,46 @@ And when the module refuses, raise an error that names what was granted, so the 
 knows what to change. The [`custom-module` example](https://github.com/airsstack/airsl/tree/main/crates/airsl/examples/custom-module)
 shows a complete module that does this.
 
+## Keeping the description honest
+
+A description that lists a function `install` never sets, or leaves one out, sends your editor and
+your users the wrong way. `airsl::luals::verify` catches that. It installs the module into a scratch
+Lua state, compares what it finds with what `describe` says, and returns an error that names the
+difference. Call it from your own tests.
+
+`airsl::luals::setup` does for your program what `airsl lua setup` does for the built-ins. Give it a
+project folder, your module set and your root table, and it writes the description file your editor
+reads, then adds it to the language server's settings file. The description file is named after the
+root table, so here it is `.airsl/types/myapp.lua`.
+
+```rust
+{{#rustdoc_include ../../crates/airsl/examples/notes-module/setup.rs:setup}}
+```
+
+`cargo test` runs the check. `cargo run` in your project's folder sets it up:
+
+```console
+$ cargo test --quiet
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+$ cargo run --quiet
+created .airsl/types/myapp.lua
+created .luarc.json
+```
+
+`setup` checks every module with `verify` first, so a description that has drifted stops it before it
+writes anything.
+
 ## Summary
 
-- A host module implements `HostModule`: a `name`, and an `install` that fills a Lua table.
+- A host module implements `HostModule`: a `name`, an `install` that fills a Lua table, and a
+  `describe` that lists what `install` sets.
 - Import `mlua` through `airsl::mlua`.
 - Add your module to `airsl::modules::stdlib()` to keep the built-ins.
 - Name the root table after your program with `RootTable`.
 - A module that reaches outside the script checks its grant in Rust, from the `InstallContext`.
+- Call `airsl::luals::verify` in your tests, and `airsl::luals::setup` to write the editor files for
+  your own root table.

@@ -1,0 +1,55 @@
+# LuaLS 3.19.2 (Mason) libexec/script/config/template.lua: every map-typed (Type.Hash) setting, with the lines that give its key and value types
+$ grep -n -A3 'Type.Hash' template.lua
+200:    ['Lua.runtime.special']                 = Type.Hash(
+201-                                                Type.String,
+202-                                                Type.String >> 'require' << {
+203-                                                    '_G',
+--
+251:    ['Lua.runtime.pluginArgs']              = Type.Or(Type.Array(Type.String), Type.Hash(Type.String, Type.String)),
+252-    ['Lua.runtime.fileEncoding']            = Type.String >> 'utf8' << {
+253-                                                'utf8',
+254-                                                'ansi',
+--
+258:    ['Lua.runtime.builtin']                 = Type.Hash(
+259-                                                Type.String << util.getTableKeys(define.BuiltIn, true),
+260-                                                Type.String >> 'default' << {
+261-                                                    'default',
+--
+271:    ['Lua.diagnostics.severity']            = Type.Hash(
+272-                                                Type.String << util.getTableKeys(define.DiagnosticDefaultNeededFileStatus, true),
+273-                                                Type.String << {
+274-                                                    'Error',
+--
+285:    ['Lua.diagnostics.neededFileStatus']    = Type.Hash(
+286-                                                Type.String << util.getTableKeys(define.DiagnosticDefaultNeededFileStatus, true),
+287-                                                Type.String << {
+288-                                                    'Any',
+--
+297:    ['Lua.diagnostics.groupSeverity']       = Type.Hash(
+298-                                                Type.String << util.getTableKeys(define.DiagnosticDefaultGroupSeverity, true),
+299-                                                Type.String << {
+300-                                                    'Error',
+--
+308:    ['Lua.diagnostics.groupFileStatus']     = Type.Hash(
+309-                                                Type.String << util.getTableKeys(define.DiagnosticDefaultGroupFileStatus, true),
+310-                                                Type.String << {
+311-                                                    'Any',
+--
+413:    ['Lua.format.defaultConfig']            = Type.Hash(Type.String, Type.String)
+414-                                            >> {},
+415:    ['Lua.typeFormat.config']               = Type.Hash(Type.String, Type.String)
+416-                                            >> {
+417-                                                format_line = "true",
+418-                                                auto_complete_end = "true",
+--
+422:    ['Lua.nameStyle.config']                = Type.Hash(Type.String, Type.Or(Type.String, Type.Array(Type.Hash(Type.String, Type.String))))
+423-                                            >> {},
+424-    ['Lua.misc.parameters']                 = Type.Array(Type.String),
+425-    ['Lua.misc.executablePath']             = Type.String,
+--
+449:    ['files.associations']                  = Type.Hash(Type.String, Type.String),
+450-                                            -- copy from VSCode default
+451:    ['files.exclude']                       = Type.Hash(Type.String, Type.Boolean) >> {
+452-                                                ["**/.DS_Store"] = true,
+453-                                                ["**/.git"]      = true,
+454-                                                ["**/.hg"]       = true,

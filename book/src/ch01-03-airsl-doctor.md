@@ -102,5 +102,6 @@ the [command-line reference](appendix-01-cli.md) lists every flag.
 - By default, a script has tools but no permission to reach files, variables or programs, and it has
   limits on memory and running time.
 
-In the next chapter you will write a script that needs a permission, watch it get refused, and then
-grant it.
+In [A First Project](ch02-00-first-project.md) you will write a script that needs a permission,
+watch it get refused, and then grant it. First, [Editor Support](ch01-04-editor-support.md) sets
+up your editor to complete `airsstack` calls.

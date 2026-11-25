@@ -1,0 +1,39 @@
+# Before the fix: airsl built from 889ce3f, LuaLS 3.19.2
+$ sh luals-map-case.sh airsl W builtin_no_setup '{"runtime.builtin": {"io": "disable", "jit.profile": "disable", "jit.util": "disable"}}' no
+## builtin_no_setup  .luarc.json before: {"runtime.builtin": {"io": "disable", "jit.profile": "disable", "jit.util": "disable"}}
+io.lua:1:1 [Warning] Undefined global `io`. (undefined-global)
+nope.lua:1:7 [Warning] Undefined global `airsstack`. (undefined-global)
+Diagnosis complete, 2 problems found
+$ sh luals-map-case.sh airsl W builtin_setup '{"runtime.builtin": {"io": "disable", "jit.profile": "disable", "jit.util": "disable"}}' yes
+## builtin_setup  .luarc.json before: {"runtime.builtin": {"io": "disable", "jit.profile": "disable", "jit.util": "disable"}}
+$ airsl lua setup .
+airsl: will not edit `./.luarc.json`: it sets `runtime.builtin.jit` in two spellings; add ".airsl/types" to `workspace.library` by hand
+exit 1
+--- .luarc.json after:
+{"runtime.builtin": {"io": "disable", "jit.profile": "disable", "jit.util": "disable"}}
+io.lua:1:1 [Warning] Undefined global `io`. (undefined-global)
+nope.lua:1:7 [Warning] Undefined global `airsstack`. (undefined-global)
+Diagnosis complete, 2 problems found
+
+# After the fix: airsl built from the fixed checkout (same script and LuaLS)
+$ sh luals-map-case.sh airsl W builtin_setup '{"runtime.builtin": {"io": "disable", "jit.profile": "disable", "jit.util": "disable"}}' yes
+## builtin_setup  .luarc.json before: {"runtime.builtin": {"io": "disable", "jit.profile": "disable", "jit.util": "disable"}}
+$ airsl lua setup .
+unchanged .airsl/types/airsstack.lua
+updated .luarc.json
+exit 0
+--- .luarc.json after:
+{
+  "runtime.builtin": {
+    "io": "disable",
+    "jit.profile": "disable",
+    "jit.util": "disable"
+  },
+  "workspace.library": [
+    ".airsl/types"
+  ]
+}
+
+io.lua:1:1 [Warning] Undefined global `io`. (undefined-global)
+nope.lua:1:22 [Warning] Undefined field `nope`. (undefined-field)
+Diagnosis complete, 2 problems found

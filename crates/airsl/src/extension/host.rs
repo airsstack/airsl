@@ -359,6 +359,7 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+    use crate::description::ModuleDescription;
     use crate::extension::approver::{ApprovalRequest, Decision};
     use crate::modules::{HostModule, InstallContext, stdlib};
     use crate::sandbox::{GrantSet, Policy};
@@ -694,6 +695,10 @@ mod tests {
             _context: &InstallContext<'_>,
         ) -> Result<()> {
             Ok(())
+        }
+
+        fn describe(&self) -> crate::Result<ModuleDescription> {
+            ModuleDescription::builder("A module that installs nothing.").build()
         }
     }
 

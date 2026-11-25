@@ -1,0 +1,5 @@
+$ grep -l "Variadic\|MultiValue" crates/airsl/src/modules/*.rs
+crates/airsl/src/modules/path.rs
+$ grep -rln "UserData" crates/airsl/src/modules/ (control: grep -rln "create_function" crates/airsl/src/modules/ | wc -l)
+exit=1
+      13

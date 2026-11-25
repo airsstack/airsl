@@ -1,6 +1,6 @@
 [package]
 name        = "airsl-cli"
-description = "Command-line runner for airsl Lua scripts: run, test, check and doctor"
+description = "Command-line runner for airsl Lua scripts: run, test, check, doctor and lua setup"
 version     = "0.2.0"
 
 edition.workspace      = true

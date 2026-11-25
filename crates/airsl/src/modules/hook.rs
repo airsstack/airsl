@@ -37,6 +37,7 @@
 use std::sync::Arc;
 
 use crate::convert;
+use crate::description::{Function, LuaType, ModuleDescription};
 use crate::error::{Error, Result};
 use crate::modules::access::check;
 use crate::modules::stdio::read_stdin;
@@ -133,6 +134,35 @@ impl HostModule for Hook {
         table.set("context", context_fn).map_err(fail)?;
 
         Ok(())
+    }
+
+    fn describe(&self) -> Result<ModuleDescription> {
+        ModuleDescription::builder(
+            "The contract an agent hook script speaks: a JSON payload in, a JSON response out.",
+        )
+        .function(
+            Function::new(
+                "payload",
+                "Reads the JSON payload from standard input, or an empty table when it is blank.",
+            )
+            .returns(LuaType::ANY),
+        )
+        .function(
+            Function::new("emit", "Writes a value to standard output as JSON.").param(
+                "value",
+                LuaType::ANY,
+                "The value to write.",
+            ),
+        )
+        .function(
+            Function::new(
+                "context",
+                "Writes a hook response that adds context for the named hook event.",
+            )
+            .param("event", LuaType::STRING, "The hook event name.")
+            .param("additional", LuaType::STRING, "The context to add."),
+        )
+        .build()
     }
 }
 
@@ -292,5 +322,10 @@ mod tests {
             eval("airsstack.hook.context('SessionStart', 'hello'); return 'done'"),
             "done"
         );
+    }
+
+    #[test]
+    fn its_description_matches_what_it_installs() {
+        crate::luals::verify(&super::Hook::new(), &crate::types::RootTable::default()).unwrap();
     }
 }

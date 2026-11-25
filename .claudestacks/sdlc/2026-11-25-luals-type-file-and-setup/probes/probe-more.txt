@@ -1,0 +1,12 @@
+# toolchain 1.94.1 (29ea6fb6a 2026-03-24), Darwin 25.3.0, src/main.rs = more-main.rs, deps: both
+bom: err -> expected value at line 1 column 1
+bom stripped: ok -> {"a":1}
+not utf-8: err -> invalid unicode code point at line 1 column 8
+comment (from_slice): err -> key must be a string at line 2 column 3
+trailing comma (from_slice): err -> trailing comma at line 1 column 9
+non-object with trailing comma (from_slice): err -> trailing comma at line 1 column 7
+L1 bytes: "{\n  \"workspace.library\": [\n    \".airsl/types\"\n  ]\n}\n"
+Table::pairs keys: ["real"]
+Lua pairs() keys: fake
+Table::get(hidden) = "integer", raw_get(hidden) = "nil"
+table key to_string: "table: 0x8b1010400"

@@ -14,6 +14,7 @@
 //! Non-responsibilities: installation order effects. Modules are installed in insertion order and
 //! must not depend on one another's presence.
 
+use crate::description::ModuleDescription;
 use crate::error::{Error, Result};
 use crate::sandbox::{GrantSet, Policy};
 use crate::types::{ModuleName, RootTable};
@@ -71,6 +72,7 @@ impl<'a> InstallContext<'a> {
 /// # Examples
 ///
 /// ```
+/// use airsl::description::{Function, LuaType, ModuleDescription};
 /// use airsl::{HostModule, InstallContext, ModuleName, Result};
 ///
 /// struct Greeter(ModuleName);
@@ -85,6 +87,16 @@ impl<'a> InstallContext<'a> {
 ///             .create_function(|_, who: String| Ok(format!("hello, {who}")))
 ///             .map_err(|e| airsl::Error::lua("greeter", e))?;
 ///         table.set("hello", hello).map_err(|e| airsl::Error::lua("greeter", e))
+///     }
+///
+///     fn describe(&self) -> Result<ModuleDescription> {
+///         ModuleDescription::builder("Greetings.")
+///             .function(
+///                 Function::new("hello", "Greets someone by name.")
+///                     .param("who", LuaType::STRING, "Who to greet.")
+///                     .returns(LuaType::STRING),
+///             )
+///             .build()
 ///     }
 /// }
 /// ```
@@ -114,6 +126,20 @@ pub trait HostModule: Send + Sync {
         table: &mlua::Table,
         context: &InstallContext<'_>,
     ) -> Result<()>;
+
+    /// Describes the keys [`install`](Self::install) sets, for editors and for the drift check.
+    ///
+    /// The description lists every function and field `install` puts in the table, with the types
+    /// of their parameters and results, and the records those types name. It is data about the
+    /// surface, so it needs no Lua state. [`luals::verify`](crate::luals::verify) installs the
+    /// module into a scratch state and fails when the two disagree, so a host calls it from its own
+    /// tests to keep the description honest.
+    ///
+    /// # Errors
+    ///
+    /// Returns what [`ModuleDescriptionBuilder::build`](crate::description::ModuleDescriptionBuilder::build)
+    /// returns when the description it was given breaks one of its rules.
+    fn describe(&self) -> Result<ModuleDescription>;
 }
 
 /// An ordered set of host modules with unique names.
@@ -217,6 +243,7 @@ mod tests {
     )]
 
     use super::{HostModule, InstallContext, ModuleSet};
+    use crate::description::ModuleDescription;
     use crate::error::Result;
     use crate::types::ModuleName;
 
@@ -240,6 +267,10 @@ mod tests {
             _context: &InstallContext<'_>,
         ) -> Result<()> {
             Ok(())
+        }
+
+        fn describe(&self) -> Result<ModuleDescription> {
+            ModuleDescription::builder("A stub.").build()
         }
     }
 

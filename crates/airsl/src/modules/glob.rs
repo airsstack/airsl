@@ -11,6 +11,7 @@
 
 use std::sync::Arc;
 
+use crate::description::{Function, LuaType, ModuleDescription};
 use crate::error::{Error, Result};
 use crate::modules::guard::PathGuard;
 use crate::modules::{HostModule, InstallContext};
@@ -139,6 +140,26 @@ impl HostModule for Glob {
         table.set("walk", walk).map_err(fail)?;
 
         Ok(())
+    }
+
+    fn describe(&self) -> Result<ModuleDescription> {
+        ModuleDescription::builder("Glob pattern matching and directory walking.")
+            .function(
+                Function::new("match", "Reports whether a path matches a glob pattern.")
+                    .param("pattern", LuaType::STRING, "The glob pattern.")
+                    .param("path", LuaType::STRING, "The path to test.")
+                    .returns(LuaType::BOOLEAN),
+            )
+            .function(
+                Function::new(
+                    "walk",
+                    "Lists the paths under a directory that match a glob pattern, relative to it.",
+                )
+                .param("root", LuaType::STRING, "The directory to walk.")
+                .param("pattern", LuaType::STRING, "The glob pattern.")
+                .returns(LuaType::array(LuaType::STRING)),
+            )
+            .build()
     }
 }
 
@@ -315,5 +336,10 @@ mod tests {
     fn match_needs_no_grant_at_all() {
         // Pure pattern arithmetic: it reaches nothing, so the tightest preset still has it.
         assert_eq!(eval("return type(airsstack.glob.match)"), "function");
+    }
+
+    #[test]
+    fn its_description_matches_what_it_installs() {
+        crate::luals::verify(&super::Glob::new(), &crate::types::RootTable::default()).unwrap();
     }
 }

@@ -1,0 +1,189 @@
+LuaLS: 3.19.2
+== control
+.gitignore: .airsl/ 
+(git repo)
+$ cd control && lua-language-server --check . --checklevel=Information
+main.lua:2:11 [Warning] Undefined global `airsstack`. (undefined-global)
+main.lua:1:11 [Warning] Undefined global `airsstack`. (undefined-global)
+Diagnosis complete, 2 problems found
+== dotted
+.gitignore: .airsl/ 
+.luarc.json: {"workspace.library":[".airsl/types"]}
+(git repo)
+$ cd dotted && lua-language-server --check . --checklevel=Information
+main.lua:2:26 [Warning] Undefined field `nope`. (undefined-field)
+Diagnosis complete, 1 problems found
+== nested
+.gitignore: .airsl/ 
+.luarc.json: {"workspace":{"library":[".airsl/types"]}}
+(git repo)
+$ cd nested && lua-language-server --check . --checklevel=Information
+main.lua:2:26 [Warning] Undefined field `nope`. (undefined-field)
+Diagnosis complete, 1 problems found
+== comments
+.gitignore: .airsl/ 
+.luarc.json: {   // keep me   "workspace.library": [".airsl/types"], } 
+(git repo)
+$ cd comments && lua-language-server --check . --checklevel=Information
+main.lua:2:26 [Warning] Undefined field `nope`. (undefined-field)
+Diagnosis complete, 1 problems found
+== jsonc_only
+.gitignore: .airsl/ 
+.luarc.jsonc: {"workspace.library":[".airsl/types"]}
+(git repo)
+$ cd jsonc_only && lua-language-server --check . --checklevel=Information
+main.lua:2:26 [Warning] Undefined field `nope`. (undefined-field)
+Diagnosis complete, 1 problems found
+== json_wins
+.gitignore: .airsl/ 
+.luarc.json: {"runtime.version":"Lua 5.4"}
+.luarc.jsonc: {"workspace.library":[".airsl/types"]}
+(git repo)
+$ cd json_wins && lua-language-server --check . --checklevel=Information
+main.lua:2:11 [Warning] Undefined global `airsstack`. (undefined-global)
+main.lua:1:11 [Warning] Undefined global `airsstack`. (undefined-global)
+Diagnosis complete, 2 problems found
+== bom
+.gitignore: .airsl/ 
+.luarc.json: ﻿{"workspace.library":[".airsl/types"]}
+(git repo)
+$ cd bom && lua-language-server --check . --checklevel=Information
+main.lua:2:26 [Warning] Undefined field `nope`. (undefined-field)
+Diagnosis complete, 1 problems found
+== lastwins_has
+.gitignore: .airsl/ 
+.luarc.json: {"workspace.library":[], "workspace.library":[".airsl/types"]}
+(git repo)
+$ cd lastwins_has && lua-language-server --check . --checklevel=Information
+main.lua:2:26 [Warning] Undefined field `nope`. (undefined-field)
+Diagnosis complete, 1 problems found
+== firstwins_has
+.gitignore: .airsl/ 
+.luarc.json: {"workspace.library":[".airsl/types"], "workspace.library":[]}
+(git repo)
+$ cd firstwins_has && lua-language-server --check . --checklevel=Information
+main.lua:2:11 [Warning] Undefined global `airsstack`. (undefined-global)
+main.lua:1:11 [Warning] Undefined global `airsstack`. (undefined-global)
+Diagnosis complete, 2 problems found
+== nested_first_has
+.gitignore: .airsl/ 
+.luarc.json: {"workspace":{"library":[".airsl/types"]}, "workspace.library":[]}
+(git repo)
+$ cd nested_first_has && lua-language-server --check . --checklevel=Information
+main.lua:2:11 [Warning] Undefined global `airsstack`. (undefined-global)
+main.lua:1:11 [Warning] Undefined global `airsstack`. (undefined-global)
+Diagnosis complete, 2 problems found
+== dotted_first_has
+.gitignore: .airsl/ 
+.luarc.json: {"workspace.library":[".airsl/types"], "workspace":{"library":[]}}
+(git repo)
+$ cd dotted_first_has && lua-language-server --check . --checklevel=Information
+main.lua:2:11 [Warning] Undefined global `airsstack`. (undefined-global)
+main.lua:1:11 [Warning] Undefined global `airsstack`. (undefined-global)
+Diagnosis complete, 2 problems found
+== disjoint
+.gitignore: .airsl/ 
+.luarc.json: {"workspace.library":[".airsl/types"], "workspace":{"checkThirdParty":false}}
+(git repo)
+$ cd disjoint && lua-language-server --check . --checklevel=Information
+main.lua:2:26 [Warning] Undefined field `nope`. (undefined-field)
+Diagnosis complete, 1 problems found
+== default_state
+.luarc.json: {"workspace.library":[".airsl/types"]}
+(git repo)
+$ cd default_state && lua-language-server --check . --checklevel=Information
+main.lua:2:26 [Warning] Undefined field `nope`. (undefined-field)
+Diagnosis complete, 1 problems found
+== lua_prefix
+.gitignore: .airsl/ 
+.luarc.json: {"Lua.workspace.library":[".airsl/types"]}
+(git repo)
+$ cd lua_prefix && lua-language-server --check . --checklevel=Information
+main.lua:2:26 [Warning] Undefined field `nope`. (undefined-field)
+Diagnosis complete, 1 problems found
+== lua_nested
+.gitignore: .airsl/ 
+.luarc.json: {"Lua":{"workspace":{"library":[".airsl/types"]}}}
+(git repo)
+$ cd lua_nested && lua-language-server --check . --checklevel=Information
+main.lua:2:26 [Warning] Undefined field `nope`. (undefined-field)
+Diagnosis complete, 1 problems found
+== spell
+.luarc.json: {"workspace.library":[".airsl/types"]}
+(git repo)
+$ cd spell && lua-language-server --check . --checklevel=Information
+use.lua:4:57 [Warning] Annotations specify that at most 0 return value(s) are required, found 1 returned here instead. (redundant-return-value)
+use.lua:3:25 [Warning] Cannot assign `string` to parameter `fun(x: string):boolean|string`.
+use.lua:7:1 [Warning] Deprecated. (deprecated)
+Diagnosis complete, 3 problems found
+== order
+.luarc.json: {"workspace.library":[".airsl/types"]}
+(git repo)
+$ cd order && lua-language-server --check . --checklevel=Information
+use.lua:3:20 [Warning] Cannot assign `string` to parameter `integer`.
+Diagnosis complete, 1 problems found
+== layout
+.gitignore: .airsl/ 
+.luarc.json: {"workspace.library":[".airsl/types"]}
+(git repo)
+$ cd layout && lua-language-server --check . --checklevel=Information
+use.lua:3:26 [Warning] Undefined field `nope`. (undefined-field)
+use.lua:4:28 [Warning] Undefined field `nope`. (undefined-field)
+Diagnosis complete, 2 problems found
+== grammar
+.gitignore: .airsl/ 
+.luarc.json: {"workspace.library":[".airsl/types"]}
+(git repo)
+$ cd grammar && lua-language-server --check . --checklevel=Information
+bad.lua:3:41 [Warning] Cannot assign `string` to parameter `("sha1"|"sha256")?`.
+bad.lua:6:29 [Warning] Cannot assign `integer` to parameter `string`.
+bad.lua:2:34 [Warning] Undefined field `nope`. (undefined-field)
+bad.lua:4:26 [Warning] Undefined field `nope`. (undefined-field)
+bad.lua:5:28 [Warning] Undefined field `nope`. (undefined-field)
+Diagnosis complete, 5 problems found
+== compose
+.gitignore: .airsl/ 
+.luarc.json: {"workspace.library":[".airsl/types"]}
+(git repo)
+$ cd compose && lua-language-server --check . --checklevel=Information
+bad.lua:1:27 [Warning] Cannot assign `boolean` to `string|integer`.
+bad.lua:2:29 [Warning] Cannot assign `integer` to parameter `(fun(x: string):boolean)?`.
+bad.lua:4:13 [Warning] Undefined field `upper`. (undefined-field)
+Diagnosis complete, 3 problems found
+== records
+.gitignore: .airsl/ 
+.luarc.json: {"workspace.library":[".airsl/types"]}
+(git repo)
+$ cd records && lua-language-server --check . --checklevel=Information
+bad.lua:6:40 [Warning] Undefined field `nope`. (undefined-field)
+bad.lua:2:11 [Warning] Undefined field `nope`. (undefined-field)
+bad.lua:3:34 [Warning] Undefined field `nope`. (undefined-field)
+bad.lua:4:38 [Warning] Undefined field `nope`. (undefined-field)
+bad.lua:5:36 [Warning] Undefined field `nope`. (undefined-field)
+bad.lua:7:46 [Warning] Undefined field `upper`. (undefined-field)
+Diagnosis complete, 6 problems found
+== unions
+.gitignore: .airsl/ 
+.luarc.json: {"workspace.library":[".airsl/types"]}
+(git repo)
+$ cd unions && lua-language-server --check . --checklevel=Information
+bad.lua:1:15 [Warning] Cannot assign `table` to parameter `boolean|string|integer`.
+bad.lua:2:18 [Warning] Cannot assign `boolean` to parameter `(string|integer)?`.
+bad.lua:3:23 [Warning] Cannot assign `string` to parameter `""`.
+bad.lua:4:27 [Warning] Cannot assign `string` to parameter `"a"?`.
+Diagnosis complete, 4 problems found
+== positions
+.gitignore: .airsl/ 
+.luarc.json: {"workspace.library":[".airsl/types"]}
+(git repo)
+$ cd positions && lua-language-server --check . --checklevel=Information
+bad.lua:3:20 [Warning] Cannot assign `boolean` to `(string|integer)?`.
+bad.lua:1:15 [Warning] Cannot assign `integer` to parameter `string?`.
+bad.lua:2:29 [Warning] Cannot assign `string` to parameter `"x"`.
+bad.lua:4:22 [Warning] Cannot assign `string` to parameter `"a|b"`.
+bad.lua:5:29 [Warning] Cannot assign `string` to parameter `"x?"`.
+bad.lua:8:35 [Warning] Cannot assign `integer` to parameter `string`.
+bad.lua:9:20 [Warning] Cannot assign `integer` to parameter `string|none`.
+bad.lua:6:30 [Warning] Undefined field `nope`. (undefined-field)
+bad.lua:7:21 [Warning] Undefined field `upper`. (undefined-field)
+Diagnosis complete, 9 problems found

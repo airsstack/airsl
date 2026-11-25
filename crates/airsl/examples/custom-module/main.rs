@@ -15,6 +15,7 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
+use airsl::description::{Function, LuaType, ModuleDescription};
 use airsl::{Engine, GrantSet, HostModule, InstallContext, ModuleName, Policy, RootTable, Script};
 
 /// A host module contributed the way a downstream crate would contribute one.
@@ -83,6 +84,20 @@ impl HostModule for Metrics {
         table.set("reset", reset).map_err(fail)?;
 
         Ok(())
+    }
+
+    fn describe(&self) -> Result<ModuleDescription, airsl::Error> {
+        ModuleDescription::builder("Counters a host application exposes to its scripts.")
+            .function(
+                Function::new("record", "Records a named measurement.")
+                    .param("name", LuaType::STRING, "The measurement name.")
+                    .returns(LuaType::STRING),
+            )
+            .function(
+                Function::new("reset", "Clears the recorded measurements.")
+                    .returns(LuaType::STRING),
+            )
+            .build()
     }
 }
 

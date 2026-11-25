@@ -203,6 +203,76 @@ pub enum Error {
         reason: &'static str,
     },
 
+    /// A module description broke a rule `ModuleDescriptionBuilder::build` enforces.
+    ///
+    /// A name that is not a usable Lua identifier is reported as [`Error::InvalidName`] instead.
+    #[error("invalid module description: {reason}")]
+    InvalidDescription {
+        /// Which rule was broken and where, worded as a clause that follows the display prefix.
+        reason: String,
+    },
+
+    /// A host module's `describe` failed, so the module cannot be compared with what it installs.
+    ///
+    /// Wraps the error `describe` returned, usually [`Error::InvalidDescription`] or
+    /// [`Error::InvalidName`], and names the module so a host with many modules knows which one.
+    #[error("cannot describe host module `{module}`: {source}")]
+    DescribeFailed {
+        /// The module whose `describe` failed.
+        module: String,
+        /// What `describe` returned.
+        #[source]
+        source: Box<Self>,
+    },
+
+    /// A host module installs keys that differ from the ones it describes.
+    #[error("host module `{module}` does not match its description: {drift}")]
+    DescriptionDrift {
+        /// The module whose description and installed keys disagree.
+        module: String,
+        /// Every disagreement found.
+        drift: crate::luals::Drift,
+    },
+
+    /// The Lua VM failed while a host module was being compared with its description.
+    ///
+    /// Covers the checker's own calls: creating the table, walking it, reading a described name
+    /// (which a metatable's `__index` may raise from) and converting a key to text. An error from
+    /// the module's own `install` is returned as it is.
+    #[error("cannot verify host module `{module}`: {source}")]
+    VerifyFailed {
+        /// The module being verified.
+        module: String,
+        /// The VM failure.
+        #[source]
+        source: Box<mlua::Error>,
+    },
+
+    /// Setup will not edit a project's luarc file.
+    ///
+    /// Raised when the file cannot be rewritten without losing something or changing what the
+    /// language server reads, or when it is not a regular, writable file. The display tells the
+    /// reader to add the entry by hand.
+    #[error(
+        "will not edit `{path}`: {reason}; add \".airsl/types\" to `workspace.library` by hand"
+    )]
+    LuarcRefused {
+        /// The luarc path, as the caller's project path joined with its name.
+        path: String,
+        /// Why it was refused, worded as a clause that follows the display prefix.
+        reason: String,
+    },
+
+    /// Setup will not write a project's type file because its target is not a regular, writable
+    /// file.
+    #[error("will not write `{path}`: {reason}")]
+    TypeFileRefused {
+        /// The type file path, as the caller's project path joined with its relative path.
+        path: String,
+        /// Why it was refused, worded as a clause that follows the display prefix.
+        reason: String,
+    },
+
     /// A script file could not be read.
     #[error("cannot read script `{path}`: {source}")]
     ScriptRead {
@@ -257,7 +327,7 @@ pub enum Error {
         detail: String,
     },
 
-    /// An operating-system call made on a script's behalf failed.
+    /// An operating-system call failed.
     #[error("{operation} failed on `{path}`: {source}")]
     Io {
         /// What was being attempted, for example `read`.
@@ -397,6 +467,30 @@ mod tests {
     }
 
     #[test]
+    fn a_luarc_refusal_tells_the_reader_to_add_the_entry_by_hand() {
+        let err = Error::LuarcRefused {
+            path: "p/.luarc.json".into(),
+            reason: "it is read-only".into(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "will not edit `p/.luarc.json`: it is read-only; add \".airsl/types\" to `workspace.library` by hand"
+        );
+    }
+
+    #[test]
+    fn a_type_file_refusal_names_the_path_and_reason() {
+        let err = Error::TypeFileRefused {
+            path: "p/.airsl/types/airsstack.lua".into(),
+            reason: "it is not a regular file".into(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "will not write `p/.airsl/types/airsstack.lua`: it is not a regular file"
+        );
+    }
+
+    #[test]
     fn require_escape_names_both_module_and_root() {
         let err = Error::RequireEscape {
             module: "../secrets".into(),
@@ -427,6 +521,17 @@ mod tests {
         let text = err.to_string();
         let lua: mlua::Error = err.into();
         assert!(lua.to_string().contains(&text));
+    }
+
+    #[test]
+    fn an_invalid_description_prefixes_its_reason() {
+        let err = Error::InvalidDescription {
+            reason: "`f` is described twice".into(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "invalid module description: `f` is described twice"
+        );
     }
 
     #[test]

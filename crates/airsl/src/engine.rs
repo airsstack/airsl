@@ -463,6 +463,7 @@ mod tests {
     use serde_json::json;
 
     use super::Engine;
+    use crate::description::{Function, LuaType, ModuleDescription};
     use crate::error::Error;
     use crate::modules::{Ext, HostModule, InstallContext, ModuleSet, stdlib};
     use crate::{
@@ -1104,6 +1105,15 @@ mod tests {
                 .set("back", back)
                 .map_err(|e| crate::Error::lua("boomerang", e))
         }
+
+        fn describe(&self) -> crate::Result<ModuleDescription> {
+            ModuleDescription::builder("A module that dispatches back into its own engine.")
+                .function(
+                    Function::new("back", "Dispatches on the engine it was installed into.")
+                        .returns(LuaType::STRING),
+                )
+                .build()
+        }
     }
 
     #[test]
@@ -1172,6 +1182,15 @@ mod tests {
             table
                 .set("back", back)
                 .map_err(|e| crate::Error::lua("eval_boomerang", e))
+        }
+
+        fn describe(&self) -> crate::Result<ModuleDescription> {
+            ModuleDescription::builder("A module that evaluates back on its own engine.")
+                .function(
+                    Function::new("back", "Evaluates on the engine it was installed into.")
+                        .returns(LuaType::STRING),
+                )
+                .build()
         }
     }
 
@@ -1291,6 +1310,15 @@ mod tests {
             table
                 .set("trigger", trigger)
                 .map_err(|e| crate::Error::lua("poisoner", e))
+        }
+
+        fn describe(&self) -> crate::Result<ModuleDescription> {
+            ModuleDescription::builder("A module that poisons the evaluation lock.")
+                .function(
+                    Function::new("trigger", "Poisons the evaluating thread, then evaluates.")
+                        .returns(LuaType::STRING),
+                )
+                .build()
         }
     }
 

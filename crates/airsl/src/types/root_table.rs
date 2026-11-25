@@ -13,18 +13,10 @@
 
 use crate::error::{Error, Result};
 use crate::types::ModuleName;
+use crate::types::lua_name::RESERVED_WORDS;
 
 /// The root table an engine uses unless told otherwise.
 const DEFAULT: &str = "airsstack";
-
-/// Lua 5.4's reserved words, which cannot appear where a name is expected.
-///
-/// Only the lowercase ones can reach here; [`ModuleName`] already requires a lowercase first
-/// letter, so nothing else in the grammar is reachable.
-const RESERVED_WORDS: [&str; 22] = [
-    "and", "break", "do", "else", "elseif", "end", "false", "for", "function", "goto", "if", "in",
-    "local", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while",
-];
 
 /// Globals a root table would shadow: the standard library tables, and the base functions a script
 /// is entitled to assume are there.

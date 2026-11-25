@@ -18,6 +18,7 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
+use crate::description::{Function, LuaType, ModuleDescription, Record, Signature};
 use crate::error::{Error, Result};
 use crate::modules::{HostModule, InstallContext};
 use crate::paths::rules::native;
@@ -117,6 +118,94 @@ impl HostModule for Ext {
         table.set("granted", granted).map_err(fail)?;
 
         Ok(())
+    }
+
+    fn describe(&self) -> Result<ModuleDescription> {
+        ModuleDescription::builder(
+            "What an extension registers with its host and the authority it was loaded with.",
+        )
+        .function(
+            Function::new("on", "Registers a handler for a host event.")
+                .param("event", LuaType::STRING, "The event name.")
+                .param(
+                    "handler",
+                    LuaType::function(
+                        Signature::new()
+                            .param("payload", LuaType::ANY)
+                            .returns(LuaType::ANY),
+                    ),
+                    "Called with the event payload.",
+                ),
+        )
+        .function(
+            Function::new(
+                "granted",
+                "Returns a copy of the authority this extension was granted.",
+            )
+            .returns(LuaType::record("Granted")),
+        )
+        .record(
+            Record::new("Granted", "The authority an extension was granted.")
+                .field("fs", LuaType::record("GrantedFs"), "Filesystem roots.")
+                .field(
+                    "env",
+                    LuaType::map(LuaType::STRING, LuaType::BOOLEAN),
+                    "Environment variable names, each mapped to true.",
+                )
+                .field("proc", LuaType::record("GrantedProc"), "Runnable programs.")
+                .field(
+                    "access",
+                    LuaType::array(LuaType::STRING),
+                    "Granted host-access names, such as `stdin` or `clock`, in declaration order.",
+                )
+                .field(
+                    "limits",
+                    LuaType::record("GrantedLimits"),
+                    "Resource ceilings.",
+                )
+                .field(
+                    "unrestricted",
+                    LuaType::BOOLEAN,
+                    "Whether the grants are unrestricted.",
+                ),
+        )
+        .record(
+            Record::new("GrantedFs", "The filesystem roots an extension may use.")
+                .field(
+                    "read",
+                    LuaType::array(LuaType::STRING),
+                    "Roots it may read.",
+                )
+                .field(
+                    "write",
+                    LuaType::array(LuaType::STRING),
+                    "Roots it may write.",
+                ),
+        )
+        .record(
+            Record::new("GrantedProc", "The programs an extension may run.").field(
+                "run",
+                LuaType::map(LuaType::STRING, LuaType::BOOLEAN),
+                "Program names, each mapped to true.",
+            ),
+        )
+        .record(
+            Record::new(
+                "GrantedLimits",
+                "The resource ceilings an extension runs under.",
+            )
+            .field(
+                "memory",
+                LuaType::optional(LuaType::INTEGER),
+                "Memory ceiling in bytes, when one is set.",
+            )
+            .field(
+                "instructions",
+                LuaType::optional(LuaType::INTEGER),
+                "Instruction ceiling, when one is set.",
+            ),
+        )
+        .build()
     }
 }
 
@@ -446,5 +535,35 @@ mod tests {
         )
         .unwrap();
         assert_eq!(found, "nil,true");
+    }
+
+    #[test]
+    fn its_description_matches_what_it_installs() {
+        crate::luals::verify(&super::Ext::new(), &crate::types::RootTable::default()).unwrap();
+    }
+
+    #[test]
+    fn the_granted_record_names_every_key_granted_returns() {
+        // `verify` compares a module's own keys only, so a key added to the returned table would
+        // otherwise drift out of the editor's view unnoticed.
+        use crate::description::Field;
+        use crate::modules::HostModule;
+        let description = Ext::new().describe().unwrap();
+        let record = description
+            .records()
+            .iter()
+            .find(|r| r.name() == "Granted")
+            .unwrap();
+        let mut described: Vec<&str> = record.fields().iter().map(Field::name).collect();
+        described.sort_unstable();
+        let engine = Engine::builder().policy(Policy::trusted()).build().unwrap();
+        let installed = run(
+            &engine,
+            "local keys = {} \
+             for k in pairs(airsstack.ext.granted()) do keys[#keys + 1] = k end \
+             table.sort(keys) return table.concat(keys, ',')",
+        )
+        .unwrap();
+        assert_eq!(described.join(","), installed);
     }
 }

@@ -1,0 +1,43 @@
+# toolchain 1.94.1 (29ea6fb6a 2026-03-24), Darwin 25.3.0, src/main.rs = surface-main.rs, deps: airsl
+== trusted
+env (3) all:function get:function set:function
+ext (2) granted:function on:function
+fs (21) append:function atomic_write:function canonicalize:function copy:function create_exclusive:function exists:function is_dir:function is_file:function list:function mkdir:function read:function read_lines:function remove:function remove_dir:function rename:function same_content:function stat:function tempdir:function tempfile:function walk:function write:function
+glob (2) match:function walk:function
+hash (4) hash_file:function hex:function sha1:function sha256:function
+hook (3) context:function emit:function payload:function
+json (3) decode:function encode:function encode_pretty:function
+path (9) absolute:function basename:function dirname:function ext:function is_absolute:function join:function normalize:function relative_to:function stem:function
+proc (2) run:function which:function
+regex (8) captures:function compile:function find:function find_all:function is_match:function replace:function replace_all:function split:function
+stdio (5) error:function isatty:function lines:function read:function write:function
+time (4) format:function monotonic:function now:function parse:function
+root metatable: nil
+== confined
+env (3) all:function get:function set:function
+ext (2) granted:function on:function
+fs (21) append:function atomic_write:function canonicalize:function copy:function create_exclusive:function exists:function is_dir:function is_file:function list:function mkdir:function read:function read_lines:function remove:function remove_dir:function rename:function same_content:function stat:function tempdir:function tempfile:function walk:function write:function
+glob (2) match:function walk:function
+hash (4) hash_file:function hex:function sha1:function sha256:function
+hook (3) context:function emit:function payload:function
+json (3) decode:function encode:function encode_pretty:function
+path (9) absolute:function basename:function dirname:function ext:function is_absolute:function join:function normalize:function relative_to:function stem:function
+proc (2) run:function which:function
+regex (8) captures:function compile:function find:function find_all:function is_match:function replace:function replace_all:function split:function
+stdio (5) error:function isatty:function lines:function read:function write:function
+time (4) format:function monotonic:function now:function parse:function
+root metatable: nil
+== pure
+env (3) all:function get:function set:function
+ext (2) granted:function on:function
+fs (21) append:function atomic_write:function canonicalize:function copy:function create_exclusive:function exists:function is_dir:function is_file:function list:function mkdir:function read:function read_lines:function remove:function remove_dir:function rename:function same_content:function stat:function tempdir:function tempfile:function walk:function write:function
+glob (2) match:function walk:function
+hash (4) hash_file:function hex:function sha1:function sha256:function
+hook (3) context:function emit:function payload:function
+json (3) decode:function encode:function encode_pretty:function
+path (9) absolute:function basename:function dirname:function ext:function is_absolute:function join:function normalize:function relative_to:function stem:function
+proc (2) run:function which:function
+regex (8) captures:function compile:function find:function find_all:function is_match:function replace:function replace_all:function split:function
+stdio (5) error:function isatty:function lines:function read:function write:function
+time (4) format:function monotonic:function now:function parse:function
+root metatable: nil

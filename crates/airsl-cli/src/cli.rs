@@ -235,6 +235,10 @@ pub(crate) enum Command {
     /// Work with extensions: inspect a manifest against a ceiling, or fire one event.
     #[command(subcommand)]
     Ext(ExtCommand),
+
+    /// Work with Lua tooling: set up a project for the Lua language server.
+    #[command(subcommand)]
+    Lua(LuaCommand),
 }
 
 /// Flags every `ext` subcommand shares: the ceiling, declared events, manifest variables.
@@ -277,6 +281,22 @@ pub(crate) enum ExtCommand {
         /// The ceiling to negotiate against.
         #[command(flatten)]
         flags: ExtFlags,
+    },
+}
+
+/// The `lua` subcommands: prepare a project for the Lua language server.
+#[derive(Debug, Subcommand)]
+pub(crate) enum LuaCommand {
+    /// Write a description of the built-in modules and add it to the language server's settings.
+    ///
+    /// Writes the description to `.airsl/types/airsstack.lua` and adds `.airsl/types` to
+    /// `workspace.library` in `.luarc.json` (or `.luarc.jsonc` when only that exists), so the
+    /// language server completes and checks `airsstack.*` calls. Running it again leaves an
+    /// up-to-date project untouched.
+    Setup {
+        /// Project directory to set up. Defaults to the working directory.
+        #[arg(default_value = ".")]
+        dir: PathBuf,
     },
 }
 
@@ -369,7 +389,7 @@ mod tests {
     )]
 
     use super::{
-        Cli, Command, ExtCommand, ExtFlags, Grants, LimitOverride, PolicyName,
+        Cli, Command, ExtCommand, ExtFlags, Grants, LimitOverride, LuaCommand, PolicyName,
         parse_instruction_limit, parse_memory_limit, parse_var, resolve_ceiling, resolve_policy,
     };
     use airsl::{HostAccess, InstructionLimit, LanguageSurface, MemoryLimit, Policy};
@@ -381,6 +401,25 @@ mod tests {
 
     fn run_command(args: &[&str]) -> Command {
         parse(args).command
+    }
+
+    #[test]
+    fn lua_setup_defaults_to_the_working_directory() {
+        let Command::Lua(LuaCommand::Setup { dir }) = run_command(&["airsl", "lua", "setup"])
+        else {
+            panic!("expected the lua setup subcommand");
+        };
+        assert_eq!(dir, std::path::PathBuf::from("."));
+    }
+
+    #[test]
+    fn lua_setup_takes_a_directory() {
+        let Command::Lua(LuaCommand::Setup { dir }) =
+            run_command(&["airsl", "lua", "setup", "proj"])
+        else {
+            panic!("expected the lua setup subcommand");
+        };
+        assert_eq!(dir, std::path::PathBuf::from("proj"));
     }
 
     #[test]

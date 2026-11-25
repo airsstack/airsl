@@ -31,25 +31,25 @@ byte-identical every time and on every platform.
 ## What it demonstrates
 
 - **A resource breach is not a script failure.** `Error::MemoryLimit` and `Error::InstructionLimit`
-  are variants of their own rather than an `Error::Lua` carrying a message
-  (`src/error.rs:49` and `src/error.rs:64`), because a script stopped for consuming the host's
-  memory is an operational event, not a defect in the script.
-- **Classification is structural, never textual.** `Engine::classify` (`src/engine.rs:399`)
-  consults the engine's own instruction counter and walks the VM error chain for
-  `mlua::Error::MemoryError`. It never matches on message text — a script is free to raise a string
-  that reads exactly like either report, and a text match would let it disguise its own failure as
-  a resource breach, or the reverse.
-- **`exhausted_limit()` is the caller's question** (`src/error.rs:335`). It returns
-  `Option<ExhaustedLimit>` (`src/error.rs:313`), which is how the `failure-policy` example decides
-  to surface a breach even while discarding ordinary script errors.
+  are variants of their own rather than an `Error::Lua` carrying a message (in `src/error.rs`),
+  because a script stopped for consuming the host's memory is an operational event, not a defect in
+  the script.
+- **Classification is structural, never textual.** `Engine::classify` (in `src/engine.rs`) consults
+  the engine's own instruction counter and walks the VM error chain for `mlua::Error::MemoryError`.
+  It never matches on message text — a script is free to raise a string that reads exactly like
+  either report, and a text match would let it disguise its own failure as a resource breach, or the
+  reverse.
+- **`exhausted_limit()` is the caller's question** (`Error::exhausted_limit` in `src/error.rs`). It
+  returns `Option<ExhaustedLimit>` (also in `src/error.rs`), which is how the `failure-policy`
+  example decides to surface a breach even while discarding ordinary script errors.
 - **The ceiling is enforced to within a check interval.** The VM hook fires every 10,000
-  instructions (`src/instruction_budget.rs:34`), so a ceiling is approximate by that much. Precision
-  finer than this would be paid for by every script that runs, since the hook sits on the VM's hot
-  path.
+  instructions (`CHECK_INTERVAL` in `src/instruction_budget.rs`), so a ceiling is approximate by
+  that much. Precision finer than this would be paid for by every script that runs, since the hook
+  sits on the VM's hot path.
 - **Order matters when both ceilings could trip.** `classify` tests the instruction budget first, so
   a script that would breach both is reported as an instruction breach. The memory case here arms
   only the memory ceiling, which is what makes its answer unambiguous.
-- **`ResourceLimits::none()` lifts them** (`src/sandbox/resource_limits.rs:101`) — what
+- **`ResourceLimits::none()` lifts them** (in `src/sandbox/resource_limits.rs`) — what
   `Policy::trusted()` carries. Right for first-party code, wrong for anything else: without the
   instruction ceiling nothing defends against a script that never finishes, and the crate offers no
   `sleep` and no timeout to substitute for one.

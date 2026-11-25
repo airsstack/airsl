@@ -1,0 +1,7 @@
+# toolchain 1.94.1 (29ea6fb6a 2026-03-24), Darwin 25.3.0, src/main.rs = io-main.rs, deps: none
+read_dir missing: Some((NotFound, "No such file or directory (os error 2)"))
+read_dir file: Some((NotADirectory, "Not a directory (os error 20)"))
+create_dir_all under file: Some((NotADirectory, "Not a directory (os error 20)"))
+write onto dir: Some((IsADirectory, "Is a directory (os error 21)"))
+read dir as file: Some((IsADirectory, "Is a directory (os error 21)"))
+rename file over dir: Some((IsADirectory, "Is a directory (os error 21)"))

@@ -1,0 +1,13 @@
+# LuaLS 3.19.2 (Mason) libexec/script/config/template.lua: every setting name, its segment count once a leading `Lua` is dropped, and any numeric segment
+$ sed -n -E "s/^[[:space:]]*\['([^']*)'\].*/\1/p" template.lua | wc -l
+95
+$ … | sed 's/^Lua\.//' | awk -F. '{print NF}' | sort | uniq -c
+  94 2
+   1 3
+$ … | grep -E '^Lua\.' -v   (settings without the Lua. prefix)
+files.associations
+files.exclude
+editor.semanticHighlighting.enabled
+editor.acceptSuggestionOnEnter
+$ … | grep -c -E '(^|\.)[0-9]+(\.|$)'   (numeric segments)
+0

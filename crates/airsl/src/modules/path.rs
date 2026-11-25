@@ -22,6 +22,7 @@
 use std::path::{Component, PathBuf};
 use std::sync::Arc;
 
+use crate::description::{Function, LuaType, ModuleDescription};
 use crate::error::{Error, Result};
 use crate::modules::access::{self, Subject};
 use crate::modules::{HostModule, InstallContext};
@@ -152,6 +153,57 @@ impl HostModule for Path {
         table.set("absolute", absolute).map_err(fail)?;
 
         Ok(())
+    }
+
+    fn describe(&self) -> Result<ModuleDescription> {
+        ModuleDescription::builder("Lexical path manipulation that touches no file.")
+            .function(
+                Function::new("join", "Joins path parts with the path separator.")
+                    .variadic(LuaType::STRING, "The parts to join.")
+                    .returns(LuaType::STRING),
+            )
+            .function(
+                Function::new("dirname", "Returns the directory part of a path.")
+                    .param("path", LuaType::STRING, "The path to read.")
+                    .returns(LuaType::STRING),
+            )
+            .function(
+                Function::new("basename", "Returns the last component of a path.")
+                    .param("path", LuaType::STRING, "The path to read.")
+                    .returns(LuaType::STRING),
+            )
+            .function(
+                Function::new("stem", "Returns the last component of a path without its extension.")
+                    .param("path", LuaType::STRING, "The path to read.")
+                    .returns(LuaType::STRING),
+            )
+            .function(
+                Function::new("ext", "Returns the extension of a path, or an empty string when it has none.")
+                    .param("path", LuaType::STRING, "The path to read.")
+                    .returns(LuaType::STRING),
+            )
+            .function(
+                Function::new("normalize", "Collapses redundant separators and dot components in a path.")
+                    .param("path", LuaType::STRING, "The path to read.")
+                    .returns(LuaType::STRING),
+            )
+            .function(
+                Function::new("relative_to", "Expresses a path relative to a base path.")
+                    .param("path", LuaType::STRING, "The path to express.")
+                    .param("base", LuaType::STRING, "The path to measure it from.")
+                    .returns(LuaType::STRING),
+            )
+            .function(
+                Function::new("is_absolute", "Reports whether a path is absolute on this platform.")
+                    .param("path", LuaType::STRING, "The path to read.")
+                    .returns(LuaType::BOOLEAN),
+            )
+            .function(
+                Function::new("absolute", "Resolves a path against the working directory without touching the filesystem.")
+                    .param("path", LuaType::STRING, "The path to read.")
+                    .returns(LuaType::STRING),
+            )
+            .build()
     }
 }
 
@@ -713,5 +765,10 @@ mod tests {
         )
         .unwrap();
         assert_eq!(engine.eval_to::<String>(&script).unwrap(), "all");
+    }
+
+    #[test]
+    fn its_description_matches_what_it_installs() {
+        crate::luals::verify(&super::Path::new(), &crate::types::RootTable::default()).unwrap();
     }
 }

@@ -1,0 +1,79 @@
+# Probes
+
+Rust probes run on rustc 1.94.1, the toolchain `rust-toolchain.toml` pins. Each Rust record's
+first line names its toolchain. The LuaLS and `airsl` records were made on checkout `577e401` and
+re-run on `bb95c10`, which changes no code (macOS, LuaLS 3.19.2).
+
+## LuaLS (`luals/`)
+
+`sh luals/run.sh <empty-dir>` rebuilds every fixture and prints, for each case, the luarc and
+`.gitignore` contents, the exact command, and the diagnostics. `luals/run.out` is its output.
+The `*-typefile.lua`, `*-good.lua` and `*-bad.lua` files are the fixtures it copies.
+`luals/check-typefiles.out` is `cargo run -q -p airsl-cli -- check` on five fixtures, run from the
+checkout. The `records` case and its fixtures (`records-typefile.lua`, `records-good.lua`,
+`records-bad.lua`) were added on checkout `bb95c10`, and the `unions`, `positions`, `lua_prefix` and `lua_nested` cases on `2e2f973`. Each time,
+re-running `run.sh` left every earlier case's output unchanged.
+
+`rewrite-keeps.out` runs `airsl lua setup` (checkout `9b1a837` plus the uncommitted work) on a
+`.luarc.json` of mode 640 with an extended attribute and a hard link, and records each command
+with `stat` and `xattr -l` before and after.
+
+`luals-case.sh` (adopted from the spec review of this revision) sets up one case: a `git init` directory with
+`.airsl/` ignored and `nope.lua`, runs `airsl lua setup`, writes the given luarc (or removes it),
+optionally runs setup again, and prints the LuaLS diagnostics. `run-lua-dotted-library.out` records
+its `control` and `lua_dotted` cases, each command line first. `luals-lua-both.out` records the
+same script on `{"Lua": {"workspace": {"library": []}, "workspace.library": []}}`, first with the
+airsl built before the L9 fix (setup rewrote the file and LuaLS still reported `Undefined global`),
+then after it (setup refuses and leaves the file untouched).
+
+`luals-map-case.sh` is `luals-case.sh` plus `io.lua`, which uses the `io` global, so a luarc that
+disables the `io` builtin shows that LuaLS applied the map-valued `runtime.builtin`.
+`luals-map-keys.out` runs it on `runtime.builtin` with dotted map keys, first with airsl built
+from `889ce3f` (setup refused it), then from the fixed checkout (setup adds the entry).
+`luals-over-refusal.out` runs the same script, on the fixed checkout, on two luarcs L9 refuses
+though LuaLS reads each one way.
+`luals-setting-names.txt` lists every setting name in `template.lua`, with segment counts once a
+leading `Lua` is dropped, the names without a `Lua.` prefix, and the count of numeric segments.
+`long-key-luarc.sh <dots> <dir>` writes a luarc with one key of that many dots plus a `z.y`
+conflict. `long-key-cost.out` runs `/usr/bin/time -l airsl lua setup` on it, with debug builds of
+`889ce3f` (built in a scratch `git worktree` with its own `CARGO_TARGET_DIR`, since deleted) and of
+the fixed checkout.
+`luals-map-settings.txt` lists every map-typed (`Type.Hash`) setting in LuaLS 3.19.2's
+`template.lua`, with its key and value types (`grep -n -A3`).
+
+## Rust
+
+Each `*-main.rs` is `src/main.rs` of a throwaway crate run with `cargo +1.94 run -q`. Each crate
+has its own `[workspace]`. The checkout's `Cargo.lock` is copied in where `airsl` is a dependency.
+`sh rerun.sh <checkout> <empty-scratch-dir>` rebuilds every crate below, rewrites each record
+(header line plus output) and deletes the build. It creates the `w/` directory `io-main.rs`
+writes into.
+
+| Record | Source | `[dependencies]` |
+|---|---|---|
+| `probe-surface.txt` | `surface-main.rs` | `airsl = { path = "<checkout>/crates/airsl" }` |
+| `probe-mlua-typename.txt` | `typename-main.rs` | `airsl = { path = … }` (mlua 0.12.0 via `airsl::mlua`) |
+| `probe-serde.txt` | `serde-main.rs` | `serde_json = "=1.0.151"` |
+| `probe-more.txt` | `more-main.rs` | `airsl = { path = … }`, `serde_json = "=1.0.151"` |
+| `probe-io.txt` | `io-main.rs` | none (std) |
+| `probe-fs-special.txt` | `fs-special-main.rs` | none (std; uses `mkfifo`) |
+| `probe-socket.txt` | `socket-main.rs` | none (std) |
+| `probe-resolve.txt` | `resolve-main.rs` | none (std) |
+| `probe-mode.txt` | `mode-main.rs` | `tempfile = "=3.27.0"` |
+| `probe-chown.txt` | `chown-main.rs` | none (std) |
+
+`surface-greps.txt` records two `grep` runs over `crates/airsl/src/modules/`, each with its command.
+`luals-provider-53-54.lua` is lines 50–58 of LuaLS 3.19.2
+`libexec/script/provider/provider.lua` (Mason install). `luals-config-207-224.lua`,
+`luals-luadoc-559-618.lua` and `luals-luadoc-1768.lua` are excerpts of the same install, each
+headed with its source file and line range.
+
+## Other records
+
+- `probe-shapes.txt`: `shapes.lua` run twice with `airsl run`, from the chain directory, with
+  stdin `"x"`. Line 1 states the working directory and the `<chain>` placeholder, and each command
+  is printed before its output. It shows the key and value types of what `proc.run`,
+  `regex.captures`, `ext.granted`, `fs.stat`, `json.decode` and `hook.payload` return.
+
+- `cargo-tree-serde-json.txt`: `cargo tree -e features -i serde_json` in the checkout.
+- `surface-inventory.md`: per-key arguments and returns of the 12 modules, read from the sources with `file:line`.

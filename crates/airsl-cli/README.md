@@ -64,6 +64,7 @@ airsl: script `forever.lua` exceeded its instruction limit of 100000000
 | `airsl run SCRIPT [ARGS…]` | run a script |
 | `airsl test [PATH]` | run every `*_test.lua` and `test_*.lua` file under `PATH` |
 | `airsl check [PATH]` | compile every `.lua` file under `PATH` without running any of it |
+| `airsl lua setup [DIR]` | write a description of the built-in modules and add it to the language server's settings file, so editors complete airsl scripts |
 | `airsl doctor` | show the version, and what a script would be allowed to do |
 | `airsl ext doctor DIR` | show what an extension asks for, and what it would be given |
 | `airsl ext fire DIR EVENT` | load an extension and send it one event, with the payload on stdin |

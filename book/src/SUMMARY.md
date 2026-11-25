@@ -6,6 +6,7 @@
     - [Installation](ch01-01-installation.md)
     - [Hello, airsl](ch01-02-hello-airsl.md)
     - [What Does a Script Get?](ch01-03-airsl-doctor.md)
+    - [Editor Support](ch01-04-editor-support.md)
 
 - [A First Project: Counting Headings](ch02-00-first-project.md)
 

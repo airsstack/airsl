@@ -1,0 +1,15 @@
+# rewrite-keeps probe: macOS 26.3.1, airsl from checkout 9b1a837 + uncommitted lua setup work
+$ printf "{}
+" > .luarc.json; chmod 640 .luarc.json; ln .luarc.json link.json; xattr -w com.example.probe kept .luarc.json
+$ stat -f "%Sp links=%l inode=%i" .luarc.json; xattr -l .luarc.json
+-rw-r----- links=2 inode=151924558
+com.apple.provenance: 
+com.example.probe: kept
+$ airsl lua setup .
+created .airsl/types/airsstack.lua
+updated .luarc.json
+$ stat -f "%Sp links=%l inode=%i" .luarc.json; xattr -l .luarc.json; echo "(end xattr)"; cat link.json
+-rw-r----- links=1 inode=151924564
+com.apple.provenance: 
+(end xattr)
+{}

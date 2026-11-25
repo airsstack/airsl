@@ -1,0 +1,22 @@
+# Over-refusals of the L9 rule: airsl built from the fixed checkout, LuaLS 3.19.2
+$ sh luals-map-case.sh airsl W files_lua '{"files.associations": {"*.x": "lua"}, "Lua": {"files": {"associations": {"*.y": "lua"}}}}' yes
+## files_lua  .luarc.json before: {"files.associations": {"*.x": "lua"}, "Lua": {"files": {"associations": {"*.y": "lua"}}}}
+$ airsl lua setup .
+airsl: will not edit `./.luarc.json`: it sets `files.associations` in two spellings; add ".airsl/types" to `workspace.library` by hand
+exit 1
+--- .luarc.json after:
+{"files.associations": {"*.x": "lua"}, "Lua": {"files": {"associations": {"*.y": "lua"}}}}
+nope.lua:1:7 [Warning] Undefined global `airsstack`. (undefined-global)
+Diagnosis complete, 1 problems found
+
+$ sh luals-map-case.sh airsl W builtin_extended '{"runtime.builtin": {"io": "disable", "jit.profile": "disable"}, "runtime.builtin.jit": {"profile": "x"}}' yes
+## builtin_extended  .luarc.json before: {"runtime.builtin": {"io": "disable", "jit.profile": "disable"}, "runtime.builtin.jit": {"profile": "x"}}
+$ airsl lua setup .
+airsl: will not edit `./.luarc.json`: it sets `runtime.builtin.jit.profile` in two spellings; add ".airsl/types" to `workspace.library` by hand
+exit 1
+--- .luarc.json after:
+{"runtime.builtin": {"io": "disable", "jit.profile": "disable"}, "runtime.builtin.jit": {"profile": "x"}}
+io.lua:1:1 [Warning] Undefined global `io`. (undefined-global)
+nope.lua:1:7 [Warning] Undefined global `airsstack`. (undefined-global)
+Diagnosis complete, 2 problems found
+
