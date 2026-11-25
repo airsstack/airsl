@@ -1,0 +1,8 @@
+bom: err -> expected value at line 1 column 1
+bom stripped: ok -> {"a":1}
+not utf-8: err -> invalid unicode code point at line 1 column 8
+L1 bytes: "{\n  \"workspace.library\": [\n    \".airsl/types\"\n  ]\n}\n"
+Table::pairs keys: ["real"]
+Lua pairs() keys: fake
+Table::get(hidden) = "integer", raw_get(hidden) = "nil"
+table key to_string: "table: 0xb10c084c0"

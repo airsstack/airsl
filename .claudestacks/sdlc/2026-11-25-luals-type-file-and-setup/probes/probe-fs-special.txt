@@ -1,0 +1,9 @@
+link exists(): true
+link symlink_metadata is_symlink: true
+link canonicalize ends with: "dotfiles/luarc.json"
+link metadata is_file: true
+dangling exists(): false
+dangling symlink_metadata ok: true
+dangling canonicalize: Some((NotFound, "No such file or directory (os error 2)"))
+after write-through: link still symlink: true, read via link: {"x":1}
+fifo is_file: false, is_dir: false

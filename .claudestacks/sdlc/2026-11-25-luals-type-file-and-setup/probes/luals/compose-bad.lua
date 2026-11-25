@@ -1,0 +1,5 @@
+local a = airsstack.t.f({ true })
+local b = airsstack.t.f({}, 42)
+local c, d = airsstack.t.f({})
+local e = d:upper()
+print(a, b, c, e)

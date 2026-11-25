@@ -1,0 +1,6 @@
+$ cargo run -q -p airsl-cli -- check probes/luals/spell-typefile.lua   (checkout 577e401)
+1 file(s) compiled, 0 failed
+exit=0
+$ cargo run -q -p airsl-cli -- check probes/luals/layout-typefile.lua   (checkout 577e401)
+1 file(s) compiled, 0 failed
+exit=0

@@ -1,0 +1,10 @@
+$ cargo tree -e features -i serde_json
+serde_json v1.0.151
+├── serde_json feature "default"
+│   ├── airsl v0.1.6 (/Users/hiraq/.herdr/worktrees/airsl/luarocks-ffi-binding/crates/airsl)
+│   │   └── airsl feature "default" (command-line)
+│   │       └── airsl-cli v0.1.6 (/Users/hiraq/.herdr/worktrees/airsl/luarocks-ffi-binding/crates/airsl-cli)
+│   │           └── airsl-cli feature "default" (command-line)
+│   └── airsl-cli v0.1.6 (/Users/hiraq/.herdr/worktrees/airsl/luarocks-ffi-binding/crates/airsl-cli) (*)
+└── serde_json feature "std"
+    └── serde_json feature "default" (*)

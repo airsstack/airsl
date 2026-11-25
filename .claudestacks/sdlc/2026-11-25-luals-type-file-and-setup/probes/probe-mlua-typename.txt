@@ -1,0 +1,12 @@
+string
+integer
+number
+boolean
+table
+function
+nil
+key "1" type integer
+key "k" type string
+name = "mlua"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"

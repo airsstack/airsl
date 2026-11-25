@@ -1,0 +1,19 @@
+comment: err -> key must be a string at line 2 column 3
+trailing comma: err -> trailing comma at line 1 column 9
+not object: ok -> [
+  1,
+  2
+]
+empty file: err -> EOF while parsing a value at line 1 column 0
+whitespace only: err -> EOF while parsing a value at line 2 column 1
+duplicate key: ok -> {
+  "a": 2
+}
+order: ok -> {
+  "a": {
+    "b": 2,
+    "y": 1
+  },
+  "runtime.version": "Lua 5.4",
+  "z": 1
+}
