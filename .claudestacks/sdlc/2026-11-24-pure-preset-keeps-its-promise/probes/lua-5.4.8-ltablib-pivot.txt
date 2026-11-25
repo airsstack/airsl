@@ -1,0 +1,65 @@
+# lua-src 550.1.1 / lua-5.4.8/ltablib.c (vendored by mlua-sys 0.11.0, locked)
+230:
+231:/*
+232:** Produce a "random" 'unsigned int' to randomize pivot choice. This
+233:** macro is used only when 'sort' detects a big imbalance in the result
+234:** of a partition. (If you don't want/need this "randomness", ~0 is a
+235:** good choice.)
+236:*/
+237:#if !defined(l_randomizePivot)		/* { */
+238:
+239:#include <time.h>
+240:
+241:/* size of 'e' measured in number of 'unsigned int's */
+242:#define sof(e)		(sizeof(e) / sizeof(unsigned int))
+243:
+244:/*
+245:** Use 'time' and 'clock' as sources of "randomness". Because we don't
+246:** know the types 'clock_t' and 'time_t', we cannot cast them to
+247:** anything without risking overflows. A safe way to use their values
+248:** is to copy them to an array of a known type and use the array values.
+249:*/
+250:static unsigned int l_randomizePivot (void) {
+251:#if defined(__wasi__)
+252:  return arc4random();
+253:#else
+254:  clock_t c = clock();
+255:  time_t t = time(NULL);
+256:  unsigned int buff[sof(c) + sof(t)];
+257:  unsigned int i, rnd = 0;
+258:  memcpy(buff, &c, sof(c) * sizeof(unsigned int));
+259:  memcpy(buff + sof(c), &t, sof(t) * sizeof(unsigned int));
+260:  for (i = 0; i < sof(buff); i++)
+261:    rnd += buff[i];
+262:  return rnd;
+263:#endif
+264:}
+265:
+266:#endif					/* } */
+267:
+268:
+269:/* arrays larger than 'RANLIMIT' may use randomized pivots */
+270:#define RANLIMIT	100u
+271:
+272:
+...
+360:    lua_geti(L, 1, up);
+361:    if (sort_comp(L, -1, -2))  /* a[up] < a[lo]? */
+362:      set2(L, lo, up);  /* swap a[lo] - a[up] */
+363:    else
+364:      lua_pop(L, 2);  /* remove both values */
+365:    if (up - lo == 1)  /* only 2 elements? */
+366:      return;  /* already sorted */
+367:    if (up - lo < RANLIMIT || rnd == 0)  /* small interval or no randomize? */
+368:      p = (lo + up)/2;  /* middle element is a good pivot */
+369:    else  /* for larger intervals, it is worth a random pivot */
+370:      p = choosePivot(lo, up, rnd);
+398:      n = up - p;  /* size of smaller interval */
+399:      up = p - 1;  /* tail call for [lo .. p - 1]  (lower interval) */
+400:    }
+401:    if ((up - lo) / 128 > n) /* partition too imbalanced? */
+402:      rnd = l_randomizePivot();  /* try a new randomization */
+403:  }  /* tail call auxsort(L, lo, up, rnd) */
+404:}
+405:
+406:

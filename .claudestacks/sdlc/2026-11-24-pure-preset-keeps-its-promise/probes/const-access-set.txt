@@ -1,0 +1,5 @@
+$ rustc --edition 2024 -D warnings const-access-set.rs && ./const-access-set
+declared allows every member: true
+sealed+stderr allows stderr: true, stdout: false
+bits declared=0b1111111
+exit=0

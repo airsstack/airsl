@@ -1,0 +1,18 @@
+# jiff 0.2.35 / src/tz/db/zoneinfo/enabled.rs
+42:impl Database {
+43:    pub(crate) fn from_env() -> Database {
+44:        if let Some(tzdir) = std::env::var_os("TZDIR") {
+45:            let tzdir = PathBuf::from(tzdir);
+46:            trace!("opening zoneinfo database at TZDIR={}", tzdir.display());
+47:            match Database::from_dir(&tzdir) {
+48:                Ok(db) => return db,
+49:                Err(_err) => {
+50:                    // This is a WARN because it represents a failure to
+51:                    // satisfy a more direct request, which should be louder
+52:                    // than failures related to auto-detection.
+53:                    warn!("failed opening TZDIR={}: {_err}", tzdir.display());
+54:                    // fall through to attempt default directories
+55:                }
+56:            }
+57:        }
+58:        for dir in ZONEINFO_DIRECTORIES {

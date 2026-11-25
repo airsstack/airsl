@@ -1,0 +1,30 @@
+# clap 4.6.6
+$ airsl --allow-access stdout --allow-access stdout
+ok ["stdout", "stdout"]
+$ airsl --allow-access bogus
+error: invalid value 'bogus' for '--allow-access <NAME>'
+  [possible values: stdin, stdout, stderr, clock, cwd, require, zones]
+
+For more information, try '--help'.
+exit=2
+$ airsl --allow-access=
+error: a value is required for '--allow-access <NAME>' but none was supplied
+  [possible values: stdin, stdout, stderr, clock, cwd, require, zones]
+
+For more information, try '--help'.
+exit=2
+$ airsl --allow-access STDOUT
+error: invalid value 'STDOUT' for '--allow-access <NAME>'
+  [possible values: stdin, stdout, stderr, clock, cwd, require, zones]
+
+For more information, try '--help'.
+exit=2
+$ airsl --allow-access
+error: a value is required for '--allow-access <NAME>' but none was supplied
+  [possible values: stdin, stdout, stderr, clock, cwd, require, zones]
+
+For more information, try '--help'.
+exit=2
+$ grep -A1 'name = "clap"$' Cargo.lock   # this probe crate's lockfile
+name = "clap"
+version = "4.6.6"

@@ -1,0 +1,30 @@
+# mlua 0.12.0, lua-src 550.1.1 (Lua 5.4.8), Minimal libraries: STRING|TABLE|MATH|UTF8
+version run 1: Lua 5.4
+version run 2: Lua 5.4
+version run 3: Lua 5.4
+fresh-random run 1: 618821
+fresh-random run 2: 215107
+fresh-random run 3: 804947
+seeded-random run 1: 275394
+seeded-random run 2: 275394
+seeded-random run 3: 275394
+randomseed-noarg run 1: 1795579300 4308691144
+randomseed-noarg run 2: 1795579301 4308953288
+randomseed-noarg run 3: 1795579302 4387072200
+print-removed run 1: nil false
+print-removed run 2: nil false
+print-removed run 3: nil false
+gc-count run 1: 74.4482
+gc-count run 2: 74.4482
+gc-count run 3: 74.4482
+format-p run 1: 0x100e32de0
+format-p run 2: 0x1031a66b0
+format-p run 3: 0x102ed6de0
+$ date +%s → 1795579312
+warn: stdout=returned
+stderr=[]
+$ grep -A1 'name = "mlua"$' Cargo.lock   # this probe crate's lockfile
+name = "mlua"
+version = "0.12.0"
+name = "lua-src"
+version = "550.1.1"

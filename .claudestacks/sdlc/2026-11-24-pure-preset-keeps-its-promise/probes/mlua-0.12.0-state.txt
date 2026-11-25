@@ -1,0 +1,9 @@
+$ state   # mlua 0.12.0, Lua 5.4.8
+-- run 1
+print error: runtime error: printnil.lua:1: attempt to call a nil value (global 'print')
+eval 1: 275394
+eval 2: 909833
+-- run 2
+print error: runtime error: printnil.lua:1: attempt to call a nil value (global 'print')
+eval 1: 275394
+eval 2: 909833
