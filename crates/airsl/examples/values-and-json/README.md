@@ -45,7 +45,7 @@ decoded back: name=widget observed_at=1700000000 tags=2
   order was never anything but an artefact of hashing. The example asserts the two encodings of the
   same table are identical.
 - **An empty Lua table encodes as `{}`.** Lua has no distinct empty-sequence value, so there is
-  nothing to disambiguate an empty object from an empty array with (`sorted` in `src/convert.rs`).
+  nothing to disambiguate an empty object from an empty array with (`to_json` in `src/convert.rs`).
 - **Lua 5.4's integers survive the round trip.** `observed_at` stays `1700000000` rather than
   becoming `1.7e9`. Only Lua 5.3+ distinguishes integers from floats, which is why the crate pins
   5.4 rather than the more commonly embedded 5.1 or LuaJIT.

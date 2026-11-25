@@ -139,7 +139,7 @@ Rust would be the one line in the block that had not been through it.
 Not in the output above, deliberately: showing it would mean committing a symlink into the
 repository. A target cannot spell a parent, but a symlink *inside* the root can point out of it, and
 no amount of name validation sees that. So `resolve` canonicalises both the root and the candidate
-and compares them as paths (in `src/require_loader.rs`), raising `Error::RequireEscape`
+and compares them as paths (`is_within` in `src/paths/containment.rs`), raising `Error::RequireEscape`
 when the candidate is not underneath. `Path::starts_with` matches whole components rather than
 characters, so a sibling directory whose name merely begins with the root's — `app-extra` beside
 `app` — is not a match. The crate's own tests cover both

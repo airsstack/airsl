@@ -63,7 +63,7 @@ Windows build shows the drive root `main.rs`'s `OUTSIDE_ROOT` supplies instead.
   table happened to be constructed in.
 - **`regex = true` in the manifest is a presence assertion, not a grant.** `airsstack.regex` needs
   no authority (stated in the module doc of `src/modules/regex.rs`) — the capability line only tells
-  negotiation "this runtime must install a module named `regex`" (`Intersection` in
+  negotiation "this runtime must install a module named `regex`" (`Intersection::apply` in
   `src/extension/negotiate.rs`), which is why `word-count` gets the module with an empty
   [`GrantSet`] and the manifest still has a reason for the line to exist: `\w+` finds words the way
   `string.gmatch` cannot state directly, with no alternation and no character-class shorthand of its
