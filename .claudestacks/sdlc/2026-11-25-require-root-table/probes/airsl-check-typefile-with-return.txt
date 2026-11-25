@@ -1,0 +1,10 @@
+$ airsl check .airsl/types/airsstack.lua   (airsl debug build of 4620389; type file from `airsl lua setup` with "
+return airsstack
+" appended)
+1 file(s) compiled, 0 failed
+exit 0
+$ tail -c 40 .airsl/types/airsstack.lua | od -c
+0000000    a   c   k   .   e   x   t   .   g   r   a   n   t   e   d   (
+0000020    )       e   n   d  \n  \n   r   e   t   u   r   n       a   i
+0000040    r   s   s   t   a   c   k  \n                                
+0000050

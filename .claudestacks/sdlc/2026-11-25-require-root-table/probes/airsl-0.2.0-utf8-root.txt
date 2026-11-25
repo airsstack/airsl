@@ -1,0 +1,4 @@
+rustc 1.94.1 (e408947bf 2026-03-25), airsl path dependency at checkout 4620389, macOS
+airsl 0.2.0 (path dependency, checkout 4620389)
+RootTable::new("utf8") -> Ok("utf8")
+global utf8 has json: true; package.loaded.utf8 has charpattern: true; require("utf8") is the global: false
