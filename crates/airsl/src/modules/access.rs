@@ -21,12 +21,13 @@ use crate::sandbox::{GrantSet, HostAccess};
 
 /// What the grant set does hold, as the tail every refusal ends with.
 ///
-/// Either "the granted access is" and the members in [`HostAccess::ALL`] order, or "no access is"
-/// when it holds none. The empty tail mirrors what `env` and `proc` say when they hold no entries.
+/// Either "the granted access is" and the members in [`HostAccess::ALL`] order, or "no access is
+/// granted" when it holds none. The empty tail reads like the "none are granted" that `env`, `proc`
+/// and the filesystem roots say when they hold no entries.
 fn granted(grants: &GrantSet) -> String {
     let members: Vec<&str> = grants.access().map(HostAccess::as_str).collect();
     if members.is_empty() {
-        String::from("no access is")
+        String::from("no access is granted")
     } else {
         format!("the granted access is {}", members.join(", "))
     }
@@ -123,10 +124,10 @@ mod tests {
     use crate::sandbox::{GrantSet, HostAccess};
 
     #[test]
-    fn shape_a_with_nothing_granted_says_no_access_is() {
+    fn shape_a_with_nothing_granted_says_no_access_is_granted() {
         assert_eq!(
             detail(&GrantSet::sealed(), HostAccess::Stdout),
-            "`stdout` is not granted — no access is"
+            "`stdout` is not granted — no access is granted"
         );
     }
 
@@ -170,7 +171,7 @@ mod tests {
         let err = check(&GrantSet::sealed(), "stdio", "read", HostAccess::Stdin).unwrap_err();
         assert_eq!(
             err.to_string(),
-            "stdio.read denied: `stdin` is not granted — no access is"
+            "stdio.read denied: `stdin` is not granted — no access is granted"
         );
     }
 
@@ -187,7 +188,7 @@ mod tests {
         assert_eq!(
             err.to_string(),
             "time.parse denied: the named time zone `America/New_York` needs `zones`, which is \
-             not granted — no access is"
+             not granted — no access is granted"
         );
     }
 

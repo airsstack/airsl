@@ -5,12 +5,13 @@
 //! searches `package.path` — the process's working directory and its installation prefixes — and
 //! can open anything on the machine. On `confined` it gets a Rust function that resolves under the
 //! directory the script was read from, has no `package` table to widen, and refuses a name that
-//! could describe a parent. Two functions behind one name is not something a single-file example
-//! can show.
+//! could describe a parent. On `pure` the global is a function that refuses every call until the
+//! `require` host access is granted, and then it is the confined one. Several functions behind one
+//! name is not something a single-file example can show.
 //!
 //! Responsibilities: the confined `require` — resolution through `<stem>.lua` and
 //! `<stem>/init.lua`, the module cache and how long it lives, the three ways a target is refused,
-//! and the three-way answer to which `require` a script gets at all.
+//! and the four-way answer to which `require` a script gets at all.
 //!
 //! Non-responsibilities: the rest of the policy. A preset decides grants and ceilings too, and
 //! [`policy-presets`](../policy-presets/) is where those are read.
@@ -18,7 +19,7 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
-use airsl::{Engine, Policy, Script};
+use airsl::{Engine, GrantSet, HostAccess, Policy, Script};
 
 /// A confined script the engine has no directory for, because it never came from one.
 ///
@@ -27,7 +28,7 @@ use airsl::{Engine, Policy, Script};
 /// back to the working directory would resolve differently depending on where the host was
 /// started. Inline because the point is precisely that this script is not a file.
 const FROM_MEMORY: &str = r#"print(string.format(
-  "%-8s require=%-8s and no directory that could give it one",
+  "%-12s require=%-8s and no directory that could give it one",
   "memory",
   require == nil and "absent" or "present"
 ))"#;
@@ -48,9 +49,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     let second = Engine::builder().policy(Policy::confined()).build()?;
     second.eval(&run(&app, &root, "\n-- a second engine"))?;
 
-    // One script under three presets, the way `policy-presets` compares them — narrowed here to
-    // the single global whose meaning the surface changes rather than merely withholding.
+    // One script under four rows, the way `policy-presets` compares presets — narrowed here to the
+    // single global whose meaning the surface and the grants change rather than merely withhold.
+    // `pure` is given `stdout` and nothing else, because the script writes its row through `stdio`;
+    // the last row adds `require` to that, which is the whole difference between a `require` that
+    // refuses every call and the confined loader.
     let which = Script::from_file(dir.join("which_require.lua"))?.with_name("which_require.lua")?;
+    let stdout_only = || GrantSet::sealed().with_access(HostAccess::Stdout);
     for (heading, label, policy) in [
         (
             "\n-- one name, three functions",
@@ -58,7 +63,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             Policy::trusted(),
         ),
         ("", "confined", Policy::confined()),
-        ("", "pure", Policy::pure()),
+        ("", "pure", Policy::pure().with_grants(stdout_only())),
+        (
+            "",
+            "pure+require",
+            Policy::pure().with_grants(stdout_only().with_access(HostAccess::Require)),
+        ),
     ] {
         let probe = Engine::builder().policy(policy).build()?;
         probe.eval(&which.clone().with_args([label, heading]))?;

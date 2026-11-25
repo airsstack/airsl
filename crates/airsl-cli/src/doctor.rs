@@ -5,11 +5,13 @@
 //! diagnostics. `doctor` is the one command that answers "is it installed, and what would a script
 //! actually get" without needing a script to run.
 //!
-//! Responsibilities: [`report`], which renders a resolved policy and the modules installed under
-//! it.
+//! Responsibilities: [`run`], which resolves the policy the command line asks for exactly as
+//! `airsl run` would, and [`report`], which renders a resolved policy and the modules installed
+//! under it.
 //!
-//! Non-responsibilities: fixing anything, and deciding the policy. The report is read-only and
-//! describes whatever policy it is handed.
+//! Non-responsibilities: fixing anything, and deciding what a preset or flag means — that is
+//! [`crate::cli::resolve_policy`]'s. The report is read-only and describes whatever policy it is
+//! handed.
 #![expect(
     clippy::redundant_pub_crate,
     reason = "explicit pub(crate) documents the crate-wide visibility intent at each item"
@@ -18,6 +20,15 @@
 use core::fmt::Write as _;
 
 use airsl::{Engine, Policy};
+
+use crate::cli::{Grants, PolicyName, resolve_policy};
+
+/// The report for `policy` with `grants` added, built by the same resolution `airsl run` uses,
+/// so `doctor` never describes a policy a script would not get.
+#[must_use]
+pub(crate) fn run(policy: PolicyName, grants: Grants) -> String {
+    report(&resolve_policy(policy, None, None, grants))
+}
 
 /// Renders the runtime summary for `policy`.
 ///
@@ -61,8 +72,45 @@ pub(crate) fn describe<T: core::fmt::Display>(limit: Option<T>) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{describe, report};
-    use airsl::{MemoryLimit, Policy};
+    use super::{describe, report, run};
+    use crate::cli::{Cli, Command, Grants, PolicyName, resolve_policy};
+    use airsl::{HostAccess, MemoryLimit, Policy};
+    use clap::Parser as _;
+
+    #[test]
+    fn doctor_reports_pure_with_stderr_as_access_stderr() {
+        let grants = Grants {
+            access: vec![HostAccess::Stderr],
+            ..Grants::default()
+        };
+        let policy = resolve_policy(PolicyName::Pure, None, None, grants);
+        assert!(report(&policy).contains("grants:       access stderr\n"));
+    }
+
+    #[test]
+    fn doctor_reports_the_policy_its_own_command_line_asks_for() {
+        let Ok(Cli {
+            command: Command::Doctor { policy, grants },
+            ..
+        }) = Cli::try_parse_from([
+            "airsl",
+            "doctor",
+            "--policy",
+            "pure",
+            "--allow-access",
+            "stderr",
+        ])
+        else {
+            unreachable!("`doctor` parses into `Command::Doctor`");
+        };
+        assert!(run(policy, grants).contains("grants:       access stderr\n"));
+    }
+
+    #[test]
+    fn doctor_reports_pure_with_no_flags_as_none() {
+        let policy = resolve_policy(PolicyName::Pure, None, None, Grants::default());
+        assert!(report(&policy).contains("grants:       none\n"));
+    }
 
     #[test]
     fn the_report_names_the_binary_and_its_version() {

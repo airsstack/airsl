@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [02, 03, 04, 05, 07]
 built-on: d8c7bb7f05b4
@@ -87,3 +87,18 @@ crates/airsl/src/sandbox/policy.rs   — modify: two end-to-end tests
     (the confined result in E1).
   - `--policy pure --allow-access stdout`, on a script writing `math.random(1, 1000000)`, run three
     times: prints `275394` each time.
+
+## Review findings
+
+`0🔴 1🟡 4🔵`, blocking none. `cargo test -p airsl sandbox::policy` → 8 passed after the fixes below.
+
+- 🟡 `policy.rs` comment used the spec's "shape B" vocabulary — fixed: "only the refusal's own words tell it apart".
+- 🔵 `TRY` doc called a multi-statement prelude "one-line helper" — fixed: it names `try`, `s` and `out`.
+- 🔵 the plan lists `stdio.isatty()` with no argument; the test passed `'stdout'` — fixed: called with no argument.
+- 🔵 refusals asserted with `starts_with`, which would accept trailing text — fixed: the first line of `tostring(e)` must equal the expected text.
+- 🔵 if the stdin refusals were reverted, `stdio.read`/`lines`/`hook.payload` would block on a terminal instead of failing — fixed 2026-11-25: the evaluation runs on a thread awaited with `recv_timeout` (10 s); proved with a scratch test granting stdin under `sleep 30 | cargo test`: failed at 10.01 s, "a stdin-reading call was not refused: the evaluation was still running after 10s".
+
+## Deviations
+
+- 2026-11-25 — Started while plan 07 Task 2 was in flight; the files are disjoint and it uses only Task 1's `--allow-access` for the CLI proof.
+- 2026-11-25 — CLI Proof, real output (built binary, scripts in scratch): `run --policy pure w.lua` → exit 1, ``stdio.write denied: `stdout` is not granted — no access is``; `run --policy pure --allow-access stdout r.lua` → `function`, then ``false require denied: `require` is not granted — the granted access is stdout``; `run --allow-access stdout --allow-access require r.lua` → `function`, `true 42`; `run --policy pure --allow-access stdout m.lua` ×3 → `275394` each time.

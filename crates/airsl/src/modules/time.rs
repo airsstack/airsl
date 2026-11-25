@@ -343,7 +343,7 @@ mod tests {
     fn now_is_refused_without_the_clock() {
         let text = refusal_under_pure("airsstack.time.now()");
         assert!(
-            text.contains("time.now denied: `clock` is not granted — no access is"),
+            text.contains("time.now denied: `clock` is not granted — no access is granted"),
             "{text}"
         );
     }
@@ -352,7 +352,7 @@ mod tests {
     fn monotonic_is_refused_without_the_clock() {
         let text = refusal_under_pure("airsstack.time.monotonic()");
         assert!(
-            text.contains("time.monotonic denied: `clock` is not granted — no access is"),
+            text.contains("time.monotonic denied: `clock` is not granted — no access is granted"),
             "{text}"
         );
     }
@@ -365,7 +365,7 @@ mod tests {
         assert!(
             text.contains(
                 "time.parse denied: the named time zone `America/New_York` needs `zones`, \
-                 which is not granted — no access is"
+                 which is not granted — no access is granted"
             ),
             "{text}"
         );

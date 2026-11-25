@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [01, 02, 03, 04, 05, 06, 07, 08, 09, 10]
 built-on: d8c7bb7f05b4
@@ -80,3 +80,26 @@ CHANGELOG.md                  — modify: the airsl 0.2.0 — airsl-cli 0.2.0 en
 - `cargo make dod`, `cargo make examples`, `cargo make book-build` and `cargo make publish-dry-run`
   are green.
 - `cargo run -p airsl-cli -- --version` prints `airsl 0.2.0`.
+
+## Review findings
+
+One reviewer: `1🔴 3🟡 5🔵` (code), `1🟡` (plan). Blocking: the two first rows. One fix coder took all of them; after it `cargo make dod` → "Build Done in 4.46 seconds"; `cargo make examples` → `19 passed, 0 failed`; `cargo make book-build` green; `airsl --version` → `airsl 0.2.0`; `cargo test -p airsl --doc version` → 1 passed.
+
+- 🔴 Breaking list omitted that under `pure` a relative path to `fs`, `hash.hash_file` or `glob.walk` needs `cwd`, even with roots granted — fixed: a Breaking bullet; probed all three refused, and all three pass with `--allow-access cwd`.
+- 🟡 `time.parse` bullet said the pattern decides; the parsed text naming an IANA zone does (`%Q` + `+0400` → 1704052800; `UTC` refused) — fixed.
+- 🟡 `grants:` bullet covered only `none` lines; lines with allowlist entries gain the `access …; ` prefix too — fixed with a real line: `grants:       access stdin,stdout,stderr,clock,cwd,require,zones; exec git`.
+- 🟡 "`confined` and `trusted` scripts run as on 0.1.6" too broad — fixed: narrowed to `print`, `require` and random seeding.
+- 🔵 reused-engine reason "carries its globals" — fixed: "keeps its Lua state".
+- 🔵 `GrantSet::declared().to_string()` change (`none` → `access …`) unnamed — fixed.
+- 🔵 link texts did not match page titles — fixed.
+- 🔵 `/private/etc/hosts` macOS-only — fixed: named as macOS.
+- 🔵 "empty when none is" — fixed: "empty when none is granted".
+- 🔵 `crates/airsl/src/version.rs` doc example said `"0.1.6"` — fixed: `"0.2.0"` (outside the plan's file list).
+- 🟡 (plan) the plan's own Breaking list missed the relative-path rule — fixed by the 🔴 above.
+
+## Deviations
+
+- 2026-11-25 — `cargo make publish-dry-run` refuses an uncommitted tree: `cargo package --list -p airsl` → exit 101, "20 files in the working directory contain changes that were not yet committed into git". Its three steps run with `--allow-dirty` all exit 0: `cargo publish --dry-run -p airsl --allow-dirty` packaged 118 files (941.5KiB, 242.1KiB compressed), verified `airsl v0.2.0`, "aborting upload due to dry run". Re-run `cargo make publish-dry-run` after the release commit.
+- 2026-11-25 — Run while plan 10's fix coder was finishing; file sets disjoint.
+- 2026-11-25 — The CHANGELOG header's SemVer note now says `0.y.z` instead of `0.1.z`, which no longer held at 0.2. Issues are linked as `[#11](https://github.com/airsstack/airsl/issues/11)`; no earlier entry named issues.
+- 2026-11-25 — `crates/airsl/src/version.rs` changed (its doc example's version string), outside the plan's file list.

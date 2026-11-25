@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [01, 02, 03, 04, 05, 06, 07, 09]
 built-on: d8c7bb7f05b4
@@ -188,3 +188,31 @@ READMEs are not doctested (`CLAUDE.md`).
 - `grep -rn "No grant needed" book/src/appendix-02-modules.md` shows only the `json`, `regex` and
   `ext` lines (`:9`, `:19`, `:142`).
 - In `book/src/ch05-00-the-toolbox.md`, the `never` row lists only `json`, `regex` and `ext`.
+
+## Review findings
+
+One reviewer over Tasks 1–4: `3🟡 11🔵 1❓` (code), `1🟡 2🔵` (plan). It re-ran `cargo make dod` (exit 0) and `cargo make book-build`, spot-ran every refusal in ch05-02/03/04 and ch03-01, the doctor and ext doctor transcripts, appendix F (byte-identical to the probe's three runs), and compiled ch06-03's and `crates/airsl/README.md`'s Rust examples. Plan Proof greps: "No grant needed" only at json, regex, ext; ch05-00's `never` row lists only json, regex, ext. One fix coder took every finding but the three open ones; after it `cargo make book-build` → "Build Done in 0.71 seconds", and `grep -rn 'claude-501\|scratchpad' book/src` → nothing.
+
+- 🟡 ch09-03 transcript showed a scratch-tool path — fixed: re-run under a demo folder, pasted in the book's `/home/you` convention.
+- 🟡 ch03-00 "There are four … covers every kind of permission" — fixed: names host access and `--allow-access`, links ch03-01#host-access.
+- 🟡 ch02-00 said every refusal shows the path as written (only no-roots refusals do) — fixed, rewrapped.
+- 🔵 ch01-03 annotation "no files", "may use the terminal" — fixed.
+- 🔵 ch03-01 repeated ch01-03's doctor transcript — fixed: a link.
+- 🔵 ch03-01 "What host access does not cover" repeated ch06-03 — fixed: one sentence and a link.
+- 🔵 ch05-02 "a path" → "a relative path"; "in in front of" — fixed.
+- 🔵 ch05-04 isatty refusal cut short — fixed: the full first line.
+- 🔵 ch09-01 grants row omitted host access; "no grants either" ambiguous — fixed.
+- 🔵 appendix F said "function" for non-functions — fixed: "name"/"Names"; tables untouched.
+- 🔵 `crates/airsl/README.md` link text did not match the chapter title — fixed.
+- 🔵 appendix F's verbatim probe carries a no-op `io_write = nil` — fixed 2026-11-25: the probe ships as `book/src/surfaces.lua` without the line (output identical under all three presets, `cmp`), shown with `{{#include surfaces.lua}}`.
+- 🔵 nothing re-runs book transcripts or regenerates appendix F in a gate — fixed 2026-11-25 for appendix F: its listings are the raw output blocks and `cargo make examples` requires each preset's output verbatim in the appendix (a one-character edit → exit 1). Other book transcripts are still checked by hand.
+- ❓ the empty-set refusal tail "— no access is" reads unfinished — fixed 2026-11-25 on the author's word (departs from spec §9): the empty tail is "no access is granted", matching the "none are granted" tail of env, proc and fs; code, tests and book updated.
+- 🟡 (plan) ch03-00 and ch09-01 held stale claims but were in no task's file list — fixed under the findings above.
+- 🔵 (plan) cwd notes on fs/glob.walk/hash.hash_file in appendix-02 and ch05-00 beyond the listed lines — accepted: verified true for both guard rules.
+- 🔵 (plan) ch02-00's no-roots transcript re-pasted, not listed — accepted: real output had changed.
+
+## Deviations
+
+- 2026-11-25 — The four tasks' file sets are disjoint, so they ran as four parallel coders with one review over all four.
+- 2026-11-25 — Files beyond the plan's list: `ch03-00-asking-permission.md`, `ch09-01-three-layers.md` (stale claims the review found). `README.md` (root) did not change: it shows no doctor output and makes no claim about `pure` or `declared()`.
+- 2026-11-25 — Task coders did not run `cargo make dod` (text-only, coders in parallel); the reviewer ran it over the whole tree: exit 0.

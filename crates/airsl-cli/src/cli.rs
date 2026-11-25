@@ -17,7 +17,8 @@
 
 use std::path::PathBuf;
 
-use airsl::{GrantSet, InstructionLimit, MemoryLimit, Policy};
+use airsl::{GrantSet, HostAccess, InstructionLimit, MemoryLimit, Policy};
+use clap::builder::{PossibleValuesParser, TypedValueParser as _};
 use clap::{Parser, Subcommand, ValueEnum};
 
 /// The argument that switches a ceiling off entirely.
@@ -83,9 +84,11 @@ impl From<PolicyName> for Policy {
 
 /// The authority a caller grants on the command line.
 ///
-/// Nothing is granted by default, on any preset below `trusted`. That is deliberate: a hook
-/// launcher states what its script may reach, in the same place it states the script, so the
-/// authority is visible to whoever reads the command rather than buried in a policy file.
+/// The allowlists (`--allow-read`, `--allow-write`, `--allow-env`, `--allow-exec`) start empty on
+/// every preset below `trusted`. Host access (`--allow-access`) is held by `confined` and not by
+/// `pure`, so `--allow-access` adds only to `pure`. That is deliberate: a hook launcher states what
+/// its script may reach, in the same place it states the script, so the authority is visible to
+/// whoever reads the command rather than buried in a policy file.
 #[derive(Debug, Default, clap::Args)]
 pub(crate) struct Grants {
     /// Directory the sandbox may read under. Repeat for several.
@@ -105,18 +108,35 @@ pub(crate) struct Grants {
     /// Executable the sandbox may run. Repeat for several.
     #[arg(long = "allow-exec", value_name = "PROGRAM")]
     pub exec: Vec<String>,
+
+    /// Host access the sandbox may use. Repeat for several. Only `pure` starts without them.
+    #[arg(long = "allow-access", value_name = "NAME", value_parser = access_names())]
+    pub access: Vec<HostAccess>,
+}
+
+/// Parses `--allow-access` straight into a [`HostAccess`].
+///
+/// The possible values come from `HostAccess::ALL` so the CLI keeps no copy of the list, and
+/// clap's own error and `--help` name them. `HostAccess`'s `FromStr` stays the one place a name
+/// becomes a member.
+fn access_names() -> impl clap::builder::TypedValueParser<Value = HostAccess> {
+    PossibleValuesParser::new(HostAccess::ALL.map(HostAccess::as_str))
+        .try_map(|name| name.parse::<HostAccess>())
 }
 
 impl Grants {
-    /// The grant set these flags describe.
-    fn into_grant_set(self) -> GrantSet {
-        GrantSet::declared()
-            .with_fs(|fs| {
-                let fs = self.read.into_iter().fold(fs, airsl::FsGrant::read);
-                self.write.into_iter().fold(fs, airsl::FsGrant::write)
-            })
-            .with_env(|env| env.read(self.env))
-            .with_proc(|proc| proc.allow(self.exec))
+    /// The grant set these flags describe, added to `base`, the grants the preset already holds.
+    ///
+    /// The base is the preset's own and not `GrantSet::declared()`: starting from `declared()`
+    /// would hand `pure` every host access member the moment any flag was given.
+    fn into_grant_set(self, base: GrantSet) -> GrantSet {
+        let base = self.access.into_iter().fold(base, GrantSet::with_access);
+        base.with_fs(|fs| {
+            let fs = self.read.into_iter().fold(fs, airsl::FsGrant::read);
+            self.write.into_iter().fold(fs, airsl::FsGrant::write)
+        })
+        .with_env(|env| env.read(self.env))
+        .with_proc(|proc| proc.allow(self.exec))
     }
 }
 
@@ -199,10 +219,17 @@ pub(crate) enum Command {
     },
 
     /// Report the runtime version and the policy a script would run under.
+    ///
+    /// Takes the same preset and grant flags as `run`, so it describes exactly the policy `run`
+    /// would build from them. It takes no ceiling flags: the preset's ceilings are the ones shown.
     Doctor {
         /// Which policy preset to describe.
         #[arg(long, value_enum, default_value_t = PolicyName::Confined)]
         policy: PolicyName,
+
+        /// What the described policy grants beyond the preset.
+        #[command(flatten)]
+        grants: Grants,
     },
 
     /// Work with extensions: inspect a manifest against a ceiling, or fire one event.
@@ -286,7 +313,8 @@ pub(crate) fn resolve_policy(
     if policy.grants().is_unrestricted() {
         policy
     } else {
-        policy.with_grants(grants.into_grant_set())
+        let base = policy.grants().clone();
+        policy.with_grants(grants.into_grant_set(base))
     }
 }
 
@@ -344,7 +372,7 @@ mod tests {
         Cli, Command, ExtCommand, ExtFlags, Grants, LimitOverride, PolicyName,
         parse_instruction_limit, parse_memory_limit, parse_var, resolve_ceiling, resolve_policy,
     };
-    use airsl::{InstructionLimit, LanguageSurface, MemoryLimit, Policy};
+    use airsl::{HostAccess, InstructionLimit, LanguageSurface, MemoryLimit, Policy};
     use clap::Parser as _;
 
     fn parse(args: &[&str]) -> Cli {
@@ -475,7 +503,7 @@ mod tests {
 
     #[test]
     fn doctor_describes_the_confined_preset_by_default() {
-        let Command::Doctor { policy } = run_command(&["airsl", "doctor"]) else {
+        let Command::Doctor { policy, .. } = run_command(&["airsl", "doctor"]) else {
             panic!("expected the doctor subcommand");
         };
         assert_eq!(policy, PolicyName::Confined);
@@ -483,11 +511,30 @@ mod tests {
 
     #[test]
     fn doctor_can_describe_another_preset() {
-        let Command::Doctor { policy } = run_command(&["airsl", "doctor", "--policy", "pure"])
+        let Command::Doctor { policy, .. } = run_command(&["airsl", "doctor", "--policy", "pure"])
         else {
             panic!("expected the doctor subcommand");
         };
         assert_eq!(policy, PolicyName::Pure);
+    }
+
+    #[test]
+    fn doctor_accepts_the_grant_flags() {
+        let Command::Doctor { policy, grants } = run_command(&[
+            "airsl",
+            "doctor",
+            "--policy",
+            "pure",
+            "--allow-access",
+            "stderr",
+            "--allow-read",
+            ".",
+        ]) else {
+            panic!("expected the doctor subcommand");
+        };
+        assert_eq!(policy, PolicyName::Pure);
+        assert_eq!(grants.access, [HostAccess::Stderr]);
+        assert_eq!(grants.read, [std::path::PathBuf::from(".")]);
     }
 
     #[test]
@@ -621,5 +668,109 @@ mod tests {
                 .fs()
                 .allows_read(std::path::Path::new(&format!("{root}/f")))
         );
+    }
+
+    fn parsed_access(args: &[&str]) -> Vec<HostAccess> {
+        match run_command(args) {
+            Command::Run { grants, .. } => grants.access,
+            other => panic!("expected the run subcommand, got {other:?}"),
+        }
+    }
+
+    fn access_grants(members: &[HostAccess]) -> Grants {
+        Grants {
+            access: members.to_vec(),
+            ..Grants::default()
+        }
+    }
+
+    #[test]
+    fn allow_access_parses_each_member_and_repeats() {
+        assert_eq!(
+            parsed_access(&[
+                "airsl",
+                "run",
+                "--allow-access",
+                "stdout",
+                "--allow-access",
+                "require",
+                "x.lua",
+            ]),
+            [HostAccess::Stdout, HostAccess::Require]
+        );
+        for member in HostAccess::ALL {
+            let name = member.as_str();
+            assert_eq!(
+                parsed_access(&["airsl", "run", "--allow-access", name, "x.lua"]),
+                [member]
+            );
+        }
+        assert_eq!(
+            parsed_access(&[
+                "airsl",
+                "run",
+                "--allow-access",
+                "stdout",
+                "--allow-access",
+                "stdout",
+                "x.lua",
+            ]),
+            [HostAccess::Stdout, HostAccess::Stdout]
+        );
+    }
+
+    #[test]
+    fn allow_access_rejects_an_unknown_name() {
+        let rendered = Cli::try_parse_from(["airsl", "run", "--allow-access", "bogus", "x.lua"])
+            .unwrap_err()
+            .render()
+            .to_string();
+        assert!(
+            rendered.contains("invalid value 'bogus' for '--allow-access <NAME>'"),
+            "{rendered}"
+        );
+        assert!(
+            rendered
+                .contains("[possible values: stdin, stdout, stderr, clock, cwd, require, zones]"),
+            "{rendered}"
+        );
+    }
+
+    #[test]
+    fn pure_flags_fold_onto_sealed_not_declared() {
+        let policy = resolve_policy(
+            PolicyName::Pure,
+            None,
+            None,
+            access_grants(&[HostAccess::Stderr]),
+        );
+        let held: Vec<_> = policy.grants().access().collect();
+        assert_eq!(held, [HostAccess::Stderr]);
+
+        let policy = resolve_policy(PolicyName::Pure, None, None, Grants::default());
+        assert!(policy.grants().is_empty());
+    }
+
+    #[test]
+    fn confined_allow_access_changes_nothing() {
+        let bare = resolve_policy(PolicyName::Confined, None, None, Grants::default());
+        let flagged = resolve_policy(
+            PolicyName::Confined,
+            None,
+            None,
+            access_grants(&[HostAccess::Stdout]),
+        );
+        assert_eq!(flagged.grants(), bare.grants());
+    }
+
+    #[test]
+    fn trusted_ignores_allow_access() {
+        let policy = resolve_policy(
+            PolicyName::Trusted,
+            None,
+            None,
+            access_grants(&[HostAccess::Stdout]),
+        );
+        assert!(policy.grants().is_unrestricted());
     }
 }

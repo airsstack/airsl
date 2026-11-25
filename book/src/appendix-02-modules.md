@@ -31,7 +31,8 @@ No grant needed. Syntax is that of Rust's [`regex`](https://docs.rs/regex) crate
 
 ## `path`
 
-No grant needed. Works on strings only, and always writes `/`.
+Works on strings only, and always writes `/`. Needs no grant, except that `absolute(p)` of a relative
+path needs the `cwd` member of host access.
 
 | Function | Returns |
 |---|---|
@@ -45,7 +46,8 @@ No grant needed. Works on strings only, and always writes `/`.
 
 ## `fs`
 
-Needs a read or write grant for the path, as listed.
+Needs a read or write grant for the path, as listed. A relative path also needs the `cwd` member of
+host access.
 
 | Function | Grant | Returns |
 |---|---|---|
@@ -68,6 +70,8 @@ Needs a read or write grant for the path, as listed.
 | `tempfile()`, `tempdir()` | write, on the system temp folder | the new path |
 
 ## `glob`
+
+A relative `root` for `walk` also needs the `cwd` member of host access.
 
 | Function | Grant | Returns |
 |---|---|---|
@@ -97,7 +101,8 @@ Needs each program's name to be granted.
 
 ## `time`
 
-No grant needed.
+`now()` and `monotonic()` need the `clock` member of host access. `parse` needs the `zones` member
+when its pattern names a time zone, and nothing otherwise. `format` needs nothing.
 
 | Function | Returns |
 |---|---|
@@ -108,6 +113,8 @@ No grant needed.
 
 ## `hash`
 
+A relative path for `hash_file` also needs the `cwd` member of host access.
+
 | Function | Grant | Returns |
 |---|---|---|
 | `sha256(text)` | none | hex |
@@ -117,7 +124,8 @@ No grant needed.
 
 ## `stdio`
 
-No grant needed.
+`read` and `lines` need the `stdin` member of host access, `write` needs `stdout`, and `error` needs
+`stderr`. `isatty` needs the member for the stream it names.
 
 | Function | Returns |
 |---|---|
@@ -129,7 +137,7 @@ No grant needed.
 
 ## `hook`
 
-No grant needed.
+`payload()` needs the `stdin` member of host access. `context` and `emit` need `stdout`.
 
 | Function | Returns |
 |---|---|

@@ -169,7 +169,7 @@ crates/airsl-cli/src/ext_doctor.rs        — modify: four whole-output expectat
 - 🔵 sealed tests overlap — fixed: `_is_empty` checks emptiness and no member, `_waives_nothing` checks not unrestricted and no fs/env/proc reach.
 - 🔵 `unrestricted().with_access(x) != unrestricted()` — fixed: `unrestricted()` holds every access bit; `adding_a_member_to_an_unrestricted_set_changes_nothing`.
 - 🔵 negotiate.rs:600 joined `&&` assert — fixed: three asserts, each naming its axis.
-- 🔵 host_access doc names CLI users ahead of plan 07 — open; true once plan 07 lands.
+- 🔵 host_access doc names CLI users ahead of plan 07 — resolved: plan 07 landed; `crates/airsl-cli/src/cli.rs` builds `--allow-access` from `HostAccess::ALL`.
 - 🔵 unplanned `HostAccess::ALL_BITS` and three extra tests — accepted (coverage only).
 - Plan proof: `airsl doctor --policy pure` → `  grants:       none`; `--policy confined` → `  grants:       access stdin,stdout,stderr,clock,cwd,require,zones`.
 

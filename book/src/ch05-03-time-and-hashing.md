@@ -60,6 +60,45 @@ print(("took %.3f seconds"):format(a.time.monotonic() - start))
 There is no `sleep`. A script that could pause for as long as it liked would get around the
 instruction limit from [chapter 4](ch04-01-limits.md).
 
+### Reading the clock needs `clock`
+
+`now` and `monotonic` read the host's clock, so each needs the `clock` member of host access.
+`format` needs nothing: it renders a number it is given and never looks at the clock. `confined`
+holds `clock`. Under `pure`, a script that calls `airsstack.time.now()` is refused:
+
+```console
+$ airsl run --policy pure now.lua
+airsl: lua error in now.lua: time.now denied: `clock` is not granted — no access is granted
+```
+
+`monotonic` gives the same refusal with `time.monotonic` in front. `--allow-access clock` gives
+both back.
+
+### Named zones need `zones`
+
+`time.parse` with no pattern, or with a pattern that reads only a numeric offset such as `%z`, needs
+nothing. A pattern that names a time zone, such as `%Q` for `America/New_York`, makes `time.parse`
+read the host's time zone database. That is a second thing a script could learn about the machine, so
+it needs the `zones` member:
+
+```lua
+-- zone.lua
+local t = airsstack.time.parse("2024-07-01 12:00 America/New_York", "%Y-%m-%d %H:%M %Q")
+airsstack.stdio.write(t .. "\n")
+```
+
+```console
+$ airsl run zone.lua
+1719849600
+
+$ airsl run --policy pure zone.lua
+airsl: lua error in zone.lua: time.parse denied: the named time zone `America/New_York` needs `zones`, which is not granted — no access is granted
+```
+
+Text that does not match the pattern fails with the usual parse error, before `zones` is consulted.
+Because the script writes its answer with `stdio.write`, the second run also needs `stdout`.
+`--allow-access zones --allow-access stdout` makes it print the same number as the first.
+
 ## `hash`
 
 | Function | Returns |

@@ -414,7 +414,7 @@ mod tests {
             );
             assert!(
                 err.to_string()
-                    .contains("require denied: `require` is not granted — no access is"),
+                    .contains("require denied: `require` is not granted — no access is granted"),
                 "{call}: {err}"
             );
         }

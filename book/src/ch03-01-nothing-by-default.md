@@ -1,7 +1,8 @@
 # Nothing Is Allowed by Default
 
-Under the default preset, a script starts with no grants. This page explains the three rules that
-follow from that.
+Under the default preset, a script starts with no permission to touch files, environment variables
+or programs. This page explains the three rules that follow from that. It then introduces a second,
+smaller kind of permission, called host access.
 
 ## The tools are always there
 
@@ -54,3 +55,58 @@ includes a stack traceback after the first line, and `match("^[^\n]*")` keeps on
 
 A script can use this to fall back gracefully. But usually it is better to let the error stop the
 script, so that whoever runs it sees exactly what was missing.
+
+## Host access
+
+A folder, a variable and a program are permissions you name. Some things a script does have nothing
+to name: writing its output, reading the clock, resolving a relative path. These are called **host
+access**, and there are seven members:
+
+| Member | What it lets a script do |
+|---|---|
+| `stdin` | read standard input |
+| `stdout` | write standard output |
+| `stderr` | write standard error |
+| `clock` | read the clock |
+| `cwd` | use a relative path, which resolves against the working folder |
+| `require` | load other files from the script's own folder with `require` |
+| `zones` | parse a time that names a time zone, such as `America/New_York` |
+
+[Chapter 5](ch05-00-the-toolbox.md) says which member each function needs.
+
+`trusted` and `confined` hold all seven, so nothing in this book so far has been refused for want of
+one. `pure` holds none. A `pure` script that calls `airsstack.time.now` is refused, and the message
+names the member it lacks. `--allow-access` gives members back, one at a time. Repeat the flag for
+more than one. Here is a script that tries the clock and writes what happened:
+
+```lua
+-- clock.lua
+local ok, err = pcall(airsstack.time.now)
+local out = airsstack.stdio
+out.write((ok and "the clock works" or tostring(err):match("^[^\n]*")) .. "\n")
+```
+
+```console
+$ airsl run --policy pure clock.lua
+airsl: lua error in clock.lua: stdio.write denied: `stdout` is not granted — no access is granted
+stack traceback:
+	[C]: in field 'write'
+	clock.lua:4: in main chunk
+
+$ airsl run --policy pure --allow-access stdout clock.lua
+time.now denied: `clock` is not granted — the granted access is stdout
+$ airsl run --policy pure --allow-access stdout --allow-access clock clock.lua
+the clock works
+```
+
+The first run is refused before it can say anything, because the script cannot write without
+`stdout`. The message ends with what the script does hold, which here is nothing.
+
+`airsl doctor` shows the members a policy holds on its `grants:` line. See
+[Grants on the command line](ch01-03-airsl-doctor.md#grants-on-the-command-line).
+
+`--allow-access` changes nothing under `confined`, which already holds every member, and it is
+ignored under `trusted`, like every other grant flag.
+
+Host access does not remove parts of Lua itself; those belong to the preset. See
+[Host access does not reach Lua's own functions](ch06-03-granting.md#host-access-does-not-reach-luas-own-functions).

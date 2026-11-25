@@ -258,7 +258,7 @@ mod tests {
     fn hook_payload_is_refused_without_stdin() {
         assert!(
             refusal("return airsstack.hook.payload()")
-                .contains("hook.payload denied: `stdin` is not granted — no access is")
+                .contains("hook.payload denied: `stdin` is not granted — no access is granted")
         );
     }
 
@@ -266,7 +266,7 @@ mod tests {
     fn hook_emit_is_refused_without_stdout() {
         assert!(
             refusal("airsstack.hook.emit({ok = true})")
-                .contains("hook.emit denied: `stdout` is not granted — no access is")
+                .contains("hook.emit denied: `stdout` is not granted — no access is granted")
         );
     }
 
@@ -274,7 +274,7 @@ mod tests {
     fn hook_context_is_refused_without_stdout() {
         assert!(
             refusal("airsstack.hook.context('SessionStart', 'hello')")
-                .contains("hook.context denied: `stdout` is not granted — no access is")
+                .contains("hook.context denied: `stdout` is not granted — no access is granted")
         );
     }
 

@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [01]
 built-on: d8c7bb7f05b4
@@ -117,3 +117,22 @@ flags. It gets no ceiling flags (spec §16).
   `grants:       access stderr`.
 - `cargo run -p airsl-cli -- run --policy pure --allow-access bogus x.lua` exits 2 with clap's
   message (E11).
+
+## Review findings
+
+One reviewer over both tasks: `0🔴 1🟡 5🔵`, blocking none. `cargo make dod-crate airsl-cli` → 95 passed after the fixes below.
+
+- 🟡 `main.rs` doctor arm unguarded (a revert to `Policy::from(policy)` compiled and passed) — fixed: the arm calls the new `doctor::run(policy, grants)`, pinned by `doctor_reports_the_policy_its_own_command_line_asks_for`, which parses `doctor --policy pure --allow-access stderr` and asserts `grants:       access stderr`.
+- 🔵 `use std::str::FromStr as _` only for one call — fixed: `name.parse::<HostAccess>()`.
+- 🔵 `Grants` doc "it is `pure` that these flags add to" ambiguous — fixed: "`--allow-access` adds only to `pure`".
+- 🔵 test helper `access_names` shadowed the production parser factory's name — fixed: renamed `parsed_access`.
+- 🔵 help text lists the seven names by hand beside clap's possible-values line — fixed 2026-11-25 on the author's word (departs from spec §8's text): the help reads "Host access the sandbox may use. Repeat for several. Only `pure` starts without them." and clap's `[possible values: …]` line lists the names.
+- 🔵 `.map(|name| name)` identity map — fixed 2026-11-25: gone with the typed parser below.
+- 🔵 `Vec<String>` + `filter_map(.. .ok())` dropped a bad name silently when `Grants` was built by hand — fixed 2026-11-25: `Grants.access` is `Vec<HostAccess>`, parsed by `PossibleValuesParser(..).try_map(str::parse::<HostAccess>)`; `cargo make dod-crate airsl-cli` → 95 passed.
+
+## Deviations
+
+- 2026-11-25 — Task 1 and Task 2 share `cli.rs`, so they ran as two sequential batches with one review over both instead of a review per batch.
+- 2026-11-25 — Ledger taken with `grep -n '^### Task'` instead of a task-briefer ledger spawn (two tasks).
+- 2026-11-25 — Task 2's coder wrote the tests and implementation in one pass, so it did not see them fail first. The two `doctor.rs` tests exercise Task 1's `resolve_policy` and pass on it alone.
+- 2026-11-25 — Plan Proof, real output: `airsl doctor --policy pure --allow-access stderr` → `  grants:       access stderr`; `airsl run --policy pure --allow-access bogus x.lua` → exit 2, `error: invalid value 'bogus' for '--allow-access <NAME>'` / `  [possible values: stdin, stdout, stderr, clock, cwd, require, zones]`.

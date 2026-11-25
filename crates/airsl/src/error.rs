@@ -411,11 +411,11 @@ mod tests {
     #[test]
     fn require_denied_names_require_and_the_detail() {
         let err = Error::RequireDenied {
-            detail: "`require` is not granted — no access is".into(),
+            detail: "`require` is not granted — no access is granted".into(),
         };
         assert_eq!(
             err.to_string(),
-            "require denied: `require` is not granted — no access is"
+            "require denied: `require` is not granted — no access is granted"
         );
     }
 

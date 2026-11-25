@@ -33,8 +33,8 @@ $ airsl run greet.lua airsl
 hello, airsl
 ```
 
-Nothing outside the script is reachable until you grant it. Each grant is a flag, so whoever reads
-the command can see what the script may touch:
+No file, environment variable or program is reachable until you grant it. Each grant is a flag, so
+whoever reads the command can see what the script may touch:
 
 ```console
 $ airsl run --allow-read config --allow-write backups backup.lua config/app.toml backups/app.toml
@@ -47,6 +47,7 @@ copied 12 bytes
 | `--allow-write DIR` | write files under `DIR` |
 | `--allow-env NAME` | read and set the environment variable `NAME` |
 | `--allow-exec PROGRAM` | run `PROGRAM` |
+| `--allow-access NAME` | use one kind of host access: `stdin`, `stdout`, `stderr`, `clock`, `cwd`, `require` or `zones` |
 
 Every script also runs under a memory limit and an instruction limit, so one that loops forever is
 stopped instead of hanging:
@@ -68,8 +69,9 @@ airsl: script `forever.lua` exceeded its instruction limit of 100000000
 | `airsl ext fire DIR EVENT` | load an extension and send it one event, with the payload on stdin |
 
 `--policy trusted|confined|pure` picks a preset, `--memory-limit` and `--instruction-limit` change
-the limits, and `--fail-open` keeps a failing script from failing whatever ran it, which is what an
-editor or agent hook needs.
+the limits, `--allow-access` gives a `pure` script back the host access it starts without (the other
+presets already hold all of it), and `--fail-open` keeps a failing script from failing whatever ran
+it, which is what an editor or agent hook needs.
 
 ## Learn more
 

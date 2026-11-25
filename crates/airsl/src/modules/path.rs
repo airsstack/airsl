@@ -659,7 +659,7 @@ mod tests {
             .next()
             .unwrap(),
             "path.absolute denied: the relative path `x` needs `cwd`, which is not granted — no \
-             access is"
+             access is granted"
         );
     }
 
@@ -672,7 +672,7 @@ mod tests {
         assert!(
             text.contains(
                 "path.absolute denied: the relative path `` needs `cwd`, which is not granted — \
-                 no access is"
+                 no access is granted"
             ),
             "{text}"
         );

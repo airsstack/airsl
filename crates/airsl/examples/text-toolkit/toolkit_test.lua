@@ -4,9 +4,11 @@
 -- are the tests, and reports by control flow: a test passes by returning and fails by raising. So
 -- `assert` is the entire assertion surface, and there is no framework to learn.
 --
--- Every module used below needs no grant, which is what lets `airsl test` run this directory with
--- no `--allow-*` flag at all. A test that needed one would be testing the policy as much as the
--- code, and would fail for whoever ran the obvious command.
+-- Nothing below needs an fs, env or exec grant, which is what lets `airsl test` run this directory
+-- with no `--allow-*` flag at all. The two host-access members it uses, `clock` for
+-- `time.monotonic` and `cwd` for `path.absolute`, are already held by the `confined` policy the
+-- command runs under. A test that needed more would be testing the policy as much as the code, and
+-- would fail for whoever ran the obvious command.
 
 local regex = airsstack.regex
 local path = airsstack.path
@@ -77,7 +79,8 @@ return {
   end,
 
   normalize_resolves_dots_without_consulting_the_filesystem = function()
-    -- None of these paths exists. That is the point: `path` needs no grant because it never asks.
+    -- None of these paths exists. That is the point: `normalize` needs no grant because it never
+    -- asks.
     assert(path.normalize("a/b/../c/./d") == "a/c/d")
     assert(path.normalize("../a") == "../a")
   end,

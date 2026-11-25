@@ -23,8 +23,10 @@ fn main() -> Result<(), airsl::Error> {
 
 ## Granting access
 
-Nothing is granted unless you say so. Here a script may read the project, write only its `build`
-folder, read `HOME`, and run `git`:
+No folder, environment variable or program is reachable unless you grant it. `Policy::confined()`
+does hold the host access an ordinary script needs, which is stdin, stdout, stderr, the clock, the
+working directory, `require` and named time zones. `Policy::pure()` holds none of it. Here a script
+may read the project, write only its `build` folder, read `HOME`, and run `git`:
 
 ```rust
 use airsl::{Engine, GrantSet, Policy};
@@ -43,6 +45,11 @@ fn main() -> Result<(), airsl::Error> {
 
 Anything else is refused with an error that names what was granted, so a script that asks for the
 wrong folder tells you which folder it was allowed.
+
+To widen `Policy::pure()` instead, start from `GrantSet::sealed()`. `GrantSet::declared()` holds all
+the host access, so building on it reopens what `pure` closes. The book's
+[What airsl Can and Cannot Promise](https://airsstack.github.io/airsl/ch09-03-what-it-promises.html) chapter lists
+what `pure` refuses.
 
 ## Telling a stopped script from a failed one
 

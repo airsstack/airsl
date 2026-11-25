@@ -9,7 +9,7 @@
 //! [`Engine::eval`] and [`Engine::eval_to`].
 //!
 //! Non-responsibilities: granting authority. Nothing here touches the filesystem, the environment
-//! or a subprocess, so the confined preset's empty grant set is never consulted.
+//! or exec, so no grant of the confined preset is exercised.
 
 use airsl::{Engine, Policy, Script};
 

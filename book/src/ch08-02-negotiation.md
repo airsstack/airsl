@@ -57,12 +57,12 @@ extension:    word-count 0.1.0 (api 1, entry main.lua)
 events:       none
 ceiling:
   language:     restricted
-  grants:       none
+  grants:       access stdin,stdout,stderr,clock,cwd,require,zones
   memory:       67108864 bytes
   instructions: 100000000 instructions
 negotiated:
   language:     restricted
-  grants:       none
+  grants:       access stdin,stdout,stderr,clock,cwd,require,zones
   memory:       8388608 bytes
   instructions: 1000000 instructions
 requested:
@@ -72,6 +72,13 @@ decision:     approve
 
 `ceiling` is what the host offered, here the `confined` defaults. `negotiated` is what the extension
 will actually run under: the same grants, and the smaller limits its manifest asked for.
+
+The `grants:` line starts with `access`, the host access the extension may use. The ceiling decides
+it: the extension gets exactly the members the ceiling holds, no more and no fewer, and its manifest
+cannot ask for one. A `confined` ceiling holds all seven, as shown. A `pure` ceiling holds none, so a
+host that wants its extensions to read the clock or to `require` their own files has to put those
+members in the ceiling. The members are described in
+[chapter 3](ch03-01-nothing-by-default.md).
 
 When a request is outside the ceiling, the report says which item and why:
 
@@ -83,8 +90,9 @@ requested:
 decision:     deny — fs.read `/`: outside the granted read roots: none
 ```
 
-To widen the ceiling, pass the same grant flags `airsl run` takes. `--var NAME=VALUE` supplies a
-manifest variable.
+To widen the ceiling, pass the same grant flags `airsl run` takes. `--allow-access` is accepted too,
+but this command's ceiling is `confined`, which already holds every member, so it changes nothing.
+`--var NAME=VALUE` supplies a manifest variable.
 
 ## Firing an event
 

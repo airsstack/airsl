@@ -258,7 +258,7 @@ mod tests {
     fn stdio_read_is_refused_without_stdin() {
         assert!(
             refusal("return airsstack.stdio.read()")
-                .contains("stdio.read denied: `stdin` is not granted — no access is")
+                .contains("stdio.read denied: `stdin` is not granted — no access is granted")
         );
     }
 
@@ -266,7 +266,7 @@ mod tests {
     fn stdio_lines_is_refused_without_stdin() {
         assert!(
             refusal("return airsstack.stdio.lines()")
-                .contains("stdio.lines denied: `stdin` is not granted — no access is")
+                .contains("stdio.lines denied: `stdin` is not granted — no access is granted")
         );
     }
 
@@ -274,7 +274,7 @@ mod tests {
     fn stdio_write_is_refused_without_stdout() {
         assert!(
             refusal("airsstack.stdio.write('x')")
-                .contains("stdio.write denied: `stdout` is not granted — no access is")
+                .contains("stdio.write denied: `stdout` is not granted — no access is granted")
         );
     }
 
@@ -291,7 +291,7 @@ mod tests {
     fn stdio_error_is_refused_without_stderr() {
         assert!(
             refusal("airsstack.stdio.error('x')")
-                .contains("stdio.error denied: `stderr` is not granted — no access is")
+                .contains("stdio.error denied: `stderr` is not granted — no access is granted")
         );
     }
 
@@ -307,7 +307,7 @@ mod tests {
             let text = refusal(&format!("return airsstack.stdio.{call}"));
             assert!(
                 text.contains(&format!(
-                    "stdio.isatty denied: `{member}` is not granted — no access is"
+                    "stdio.isatty denied: `{member}` is not granted — no access is granted"
                 )),
                 "{call}: {text}"
             );
