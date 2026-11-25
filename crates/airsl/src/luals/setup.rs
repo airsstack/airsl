@@ -387,6 +387,11 @@ fn set_created_mode(file: &fs::File) -> io::Result<()> {
 
 /// Leaves a created file with the temporary file's own permissions.
 #[cfg(not(unix))]
+#[expect(
+    clippy::missing_const_for_fn,
+    clippy::unnecessary_wraps,
+    reason = "matches the unix signature, which the caller passes to `map_or_else`"
+)]
 fn set_created_mode(_file: &fs::File) -> io::Result<()> {
     Ok(())
 }
