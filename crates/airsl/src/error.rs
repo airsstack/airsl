@@ -248,6 +248,31 @@ pub enum Error {
         source: Box<mlua::Error>,
     },
 
+    /// Setup will not edit a project's luarc file.
+    ///
+    /// Raised when the file cannot be rewritten without losing something or changing what the
+    /// language server reads, or when it is not a regular, writable file. The display tells the
+    /// reader to add the entry by hand.
+    #[error(
+        "will not edit `{path}`: {reason}; add \".airsl/types\" to `workspace.library` by hand"
+    )]
+    LuarcRefused {
+        /// The luarc path, as the caller's project path joined with its name.
+        path: String,
+        /// Why it was refused, worded as a clause that follows the display prefix.
+        reason: String,
+    },
+
+    /// Setup will not write a project's type file because its target is not a regular, writable
+    /// file.
+    #[error("will not write `{path}`: {reason}")]
+    TypeFileRefused {
+        /// The type file path, as the caller's project path joined with its relative path.
+        path: String,
+        /// Why it was refused, worded as a clause that follows the display prefix.
+        reason: String,
+    },
+
     /// A script file could not be read.
     #[error("cannot read script `{path}`: {source}")]
     ScriptRead {
@@ -291,7 +316,7 @@ pub enum Error {
         detail: String,
     },
 
-    /// An operating-system call made on a script's behalf failed.
+    /// An operating-system call failed.
     #[error("{operation} failed on `{path}`: {source}")]
     Io {
         /// What was being attempted, for example `read`.
@@ -428,6 +453,30 @@ mod tests {
     fn lua_wraps_chunk_name_into_the_message() {
         let err = Error::lua("enforce.lua", mlua::Error::RuntimeError("boom".into()));
         assert!(err.to_string().starts_with("lua error in enforce.lua: "));
+    }
+
+    #[test]
+    fn a_luarc_refusal_tells_the_reader_to_add_the_entry_by_hand() {
+        let err = Error::LuarcRefused {
+            path: "p/.luarc.json".into(),
+            reason: "it is read-only".into(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "will not edit `p/.luarc.json`: it is read-only; add \".airsl/types\" to `workspace.library` by hand"
+        );
+    }
+
+    #[test]
+    fn a_type_file_refusal_names_the_path_and_reason() {
+        let err = Error::TypeFileRefused {
+            path: "p/.airsl/types/airsstack.lua".into(),
+            reason: "it is not a regular file".into(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "will not write `p/.airsl/types/airsstack.lua`: it is not a regular file"
+        );
     }
 
     #[test]
