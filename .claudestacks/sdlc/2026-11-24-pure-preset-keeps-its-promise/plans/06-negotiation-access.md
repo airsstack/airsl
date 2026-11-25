@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [01]
 built-on: d8c7bb7f05b4
@@ -66,3 +66,16 @@ changes.
 ## Proof
 
 - `cargo make dod` is green.
+
+## Review findings
+
+- 🔵 negotiate.rs:274 — doc listed the HostAccess members by hand. Fixed: links [`HostAccess`]. `cargo make dod` exit 0 (2026-11-25, after all fixes): airsl 643 lib tests + 16 doctests, airsl-cli 86 tests; fmt, clippy -D warnings, rustdoc -D warnings green.
+- 🔵 negotiate.rs:278 — local `access` held a GrantSet. Fixed: renamed `base`.
+- Reviewer guard check: reverting to `declared()` fails the pure and stderr+require tests; bare `sealed()` fails the confined test. A trusted (unrestricted) ceiling cannot reach `negotiate` (`Ceiling::new` refuses it with `Error::CeilingUnbounded`).
+
+## Deviations
+
+- 2026-11-25 — Ledger taken with `grep -n '^### Task'` instead of a `task-briefer` ledger spawn; briefs were spawned per task as specified.
+- 2026-11-25 — Plans 01–06 ran in one execute run on one working tree, with file-disjoint tasks from different plans coded concurrently; each plan was reviewed from a frozen patch snapshot of its own files.
+- 2026-11-25 — Not committed: the execute instruction did not ask for commits, so the per-task commit messages the plan names were not created. All changes sit in the working tree.
+- 2026-11-25 — Disk at 100% (242 MB free) mid-run; regenerable probe `target/` dirs in the session scratchpad were deleted to continue (614 MB free).

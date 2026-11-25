@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [02]
 built-on: d8c7bb7f05b4
@@ -131,3 +131,19 @@ module cache in the registry is not touched (spec §6).
 - `cargo make dod` is green.
 - The CLI run of the same check is in plan 08, because until plan 07 the CLI folds its flags onto
   `declared()`, and `probes/require.lua` uses `print`, which plan 04 withholds.
+
+## Review findings
+
+- 🟡 require_loader.rs:43-48 — `RequireDisposition` doc stale ("Minimal is entitled to none"). Fixed: documents Full→Native; below Full: ungranted→Refused, granted+root→Confined, granted+no root→Absent. `cargo make dod` exit 0 (2026-11-25, after all fixes): airsl 643 lib tests + 16 doctests, airsl-cli 86 tests; fmt, clippy -D warnings, rustdoc -D warnings green.
+- 🟡 require_loader.rs:369-371 — stale test comment. Fixed.
+- 🔵 engine.rs:277 wording — fixed; duplicated `raised()` test helper — fixed (moved to `test_support`).
+- CLI check under `--policy pure` deferred to plan 08 as the plan states: until plan 07 the CLI folds flags onto `declared()`, so `airsl run --policy pure` still gets a confined `require` (observed: "module `x` not found under `<dir>`").
+
+## Deviations
+
+- 2026-11-25 — Ledger taken with `grep -n '^### Task'` instead of a `task-briefer` ledger spawn; briefs were spawned per task as specified.
+- 2026-11-25 — Plans 01–06 ran in one execute run on one working tree, with file-disjoint tasks from different plans coded concurrently; each plan was reviewed from a frozen patch snapshot of its own files.
+- 2026-11-25 — Not committed: the execute instruction did not ask for commits, so the per-task commit messages the plan names were not created. All changes sit in the working tree.
+- 2026-11-25 — Disk at 100% (242 MB free) mid-run; regenerable probe `target/` dirs in the session scratchpad were deleted to continue (614 MB free).
+- 2026-11-25 — A refusal reaches the caller as `Error::Lua` wrapping `Error::RequireDenied` / `Error::RequireEscape` (as every host refusal does); tests assert by downcasting the source.
+- 2026-11-25 — `crates/airsl/examples/multi-file-project/which_require.lua:13` comment ("three possible globals") may be stale now `pure` has a refusing `require`; left for plan 09.

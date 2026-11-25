@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 built-on: d8c7bb7f05b4
 ---
@@ -159,3 +159,22 @@ crates/airsl-cli/src/ext_doctor.rs        — modify: four whole-output expectat
 - `cargo make dod` is green.
 - `cargo run -p airsl-cli -- doctor --policy pure` prints `grants:       none`.
 - `cargo run -p airsl-cli -- doctor --policy confined` prints the seven members.
+
+## Review findings
+
+- 🟡 grant_set.rs:38 — struct doc said "starts from `sealed()`" but the example built on `declared()`. Fixed: example builds on `sealed().with_access(..)`. `cargo make dod` exit 0 (2026-11-25, after all fixes): airsl 643 lib tests + 16 doctests, airsl-cli 86 tests; fmt, clippy -D warnings, rustdoc -D warnings green.
+- 🟡 grant_set.rs:426 — `allows` proven const only at runtime. Fixed: `const _: () = { … core::mem::forget(g); }` block; removing `const` from `allows` fails with E0015 at grant_set.rs:444 (coder mutation run).
+- 🟡 policy.rs:91 — reverting `pure()` to `declared()` failed no test. Fixed: `pure_is_tighter_than_confined_on_every_axis_that_can_be` asserts `pure.grants().is_empty()` and no member allowed.
+- 🔵 host_access.rs:9 — `Responsibilities:` not a list; doctests not under `# Examples`. Fixed.
+- 🔵 sealed tests overlap (plan-named); `unrestricted().with_access(x) != unrestricted()`; host_access doc names CLI/refusal users ahead of plans 02–07; negotiate.rs:600 joined `&&` assert — open, accepted.
+- 🔵 unplanned `HostAccess::ALL_BITS` and three extra tests — accepted (coverage only).
+- Plan proof: `airsl doctor --policy pure` → `  grants:       none`; `--policy confined` → `  grants:       access stdin,stdout,stderr,clock,cwd,require,zones`.
+
+## Deviations
+
+- 2026-11-25 — Ledger taken with `grep -n '^### Task'` instead of a `task-briefer` ledger spawn; briefs were spawned per task as specified.
+- 2026-11-25 — Plans 01–06 ran in one execute run on one working tree, with file-disjoint tasks from different plans coded concurrently; each plan was reviewed from a frozen patch snapshot of its own files.
+- 2026-11-25 — Not committed: the execute instruction did not ask for commits, so the per-task commit messages the plan names were not created. All changes sit in the working tree.
+- 2026-11-25 — Disk at 100% (242 MB free) mid-run; regenerable probe `target/` dirs in the session scratchpad were deleted to continue (614 MB free).
+- 2026-11-25 — `the_constructors_can_build_constants`: a `const` item calling `.allows` on a temporary fails E0493 (GrantSet has a destructor). Built: const GrantSet items with runtime `allows` asserts, plus a const block that `forget`s the set to prove `allows` is `const fn`.
+- 2026-11-25 — Added crate-private `HostAccess::ALL_BITS` beside `bit` so `declared()` stays `const` without a loop.

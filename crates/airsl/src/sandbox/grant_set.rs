@@ -5,13 +5,15 @@
 //! draw is not "may this script touch files" but "may it touch *these* files", and a boolean
 //! cannot express that.
 //!
-//! Responsibilities: [`GrantSet`] and the two reaches it can describe.
+//! Responsibilities: [`GrantSet`], the two reaches it can describe, and the set of
+//! [`HostAccess`] members it holds.
 //!
 //! Non-responsibilities: enforcement. A grant is a promise the host module keeps, checked inside
 //! the Rust function before the operation it guards. Nothing here reaches the VM.
 
 use crate::paths::rules::native::to_script_string;
 use crate::sandbox::grants::{EnvGrant, FsGrant, ProcGrant};
+use crate::sandbox::host_access::HostAccess;
 
 /// How far the grants in a [`GrantSet`] reach.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -30,10 +32,13 @@ enum GrantReach {
 /// declared side exists to draw is never "may this script touch files" but "may it touch *these*
 /// files", which is why each axis carries its own allowlist rather than a boolean.
 ///
-/// Nothing is granted by default. A host that wants a script to reach something says so:
+/// Alongside the three allowlists the set holds [`HostAccess`] members, the unparameterised
+/// capabilities (standard streams, clocks, the working directory, `require`, time zones). The
+/// default, [`GrantSet::declared`], holds all of them and no allowlist entries. A host that wants a
+/// script held to less starts from [`GrantSet::sealed`] and names what it adds:
 ///
 /// ```
-/// use airsl::{GrantSet, Policy};
+/// use airsl::{GrantSet, HostAccess, Policy};
 ///
 /// // Built from the working directory, not a hardcoded literal: a unix-spelled absolute path has
 /// // no drive on Windows, so it would resolve against whichever drive this doctest happens to run
@@ -41,29 +46,65 @@ enum GrantReach {
 /// let repo = std::env::current_dir().unwrap().join("repo");
 /// let index = repo.join(".index");
 /// let policy = Policy::confined().with_grants(
-///     GrantSet::declared()
+///     GrantSet::sealed()
+///         .with_access(HostAccess::Stdout)
+///         .with_access(HostAccess::Require)
 ///         .with_fs(|fs| fs.read(&repo).write(&index))
 ///         .with_env(|env| env.read(["HOME"]))
 ///         .with_proc(|proc| proc.allow(["git"])),
 /// );
+/// assert!(policy.grants().allows(HostAccess::Stdout));
+/// assert!(!policy.grants().allows(HostAccess::Clock));
 /// assert!(policy.grants().fs().allows_read(&repo.join("src")));
 /// assert!(!policy.grants().fs().allows_write(&repo.join("src")));
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct GrantSet {
     reach: GrantReach,
+    /// One bit per [`HostAccess`] member, so every constructor stays `const`.
+    access: u8,
     fs: FsGrant,
     env: EnvGrant,
     proc: ProcGrant,
 }
 
 impl GrantSet {
-    /// Only the grants the host declared, which starts as none at all.
+    /// The baseline a confined script gets: every [`HostAccess`] member and no allowlist entries.
+    ///
+    /// Building a restricted set on this reopens every member; start from [`GrantSet::sealed`]
+    /// instead when the set must hold only what the host names.
     #[must_use]
     pub const fn declared() -> Self {
         Self {
             reach: GrantReach::Declared,
+            access: HostAccess::ALL_BITS,
+            fs: FsGrant::none(),
+            env: EnvGrant::none(),
+            proc: ProcGrant::none(),
+        }
+    }
+
+    /// Nothing on any axis: no [`HostAccess`] member and no allowlist entries.
+    ///
+    /// The base to build a `pure`-based grant set on, because [`GrantSet::declared`] holds every
+    /// member and adding to it can only widen.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use airsl::{GrantSet, HostAccess};
+    ///
+    /// let grants = GrantSet::sealed().with_access(HostAccess::Clock);
+    /// assert!(grants.allows(HostAccess::Clock));
+    /// assert!(!grants.allows(HostAccess::Stdout));
+    /// assert!(GrantSet::sealed().is_empty());
+    /// ```
+    #[must_use]
+    pub const fn sealed() -> Self {
+        Self {
+            reach: GrantReach::Declared,
+            access: 0,
             fs: FsGrant::none(),
             env: EnvGrant::none(),
             proc: ProcGrant::none(),
@@ -79,10 +120,64 @@ impl GrantSet {
     pub const fn unrestricted() -> Self {
         Self {
             reach: GrantReach::Unrestricted,
+            access: 0,
             fs: FsGrant::none(),
             env: EnvGrant::none(),
             proc: ProcGrant::none(),
         }
+    }
+
+    /// Adds one [`HostAccess`] member; a member already present stays as it is.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use airsl::{GrantSet, HostAccess};
+    ///
+    /// let once = GrantSet::sealed().with_access(HostAccess::Stdout);
+    /// let twice = once.clone().with_access(HostAccess::Stdout);
+    /// assert_eq!(once, twice);
+    /// assert!(once.allows(HostAccess::Stdout));
+    /// ```
+    #[must_use]
+    pub const fn with_access(mut self, member: HostAccess) -> Self {
+        self.access |= member.bit();
+        self
+    }
+
+    /// Whether `member` is permitted: always for an unrestricted set, otherwise only if held.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use airsl::{GrantSet, HostAccess};
+    ///
+    /// assert!(GrantSet::declared().allows(HostAccess::Cwd));
+    /// assert!(!GrantSet::sealed().allows(HostAccess::Cwd));
+    /// assert!(GrantSet::unrestricted().allows(HostAccess::Cwd));
+    /// ```
+    #[must_use]
+    pub const fn allows(&self, member: HostAccess) -> bool {
+        self.is_unrestricted() || self.access & member.bit() != 0
+    }
+
+    /// The members this set permits, in [`HostAccess::ALL`] order; all seven when unrestricted.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use airsl::{GrantSet, HostAccess};
+    ///
+    /// let grants = GrantSet::sealed()
+    ///     .with_access(HostAccess::Zones)
+    ///     .with_access(HostAccess::Stdin);
+    /// let names: Vec<_> = grants.access().map(HostAccess::as_str).collect();
+    /// assert_eq!(names, ["stdin", "zones"]);
+    /// ```
+    pub fn access(&self) -> impl Iterator<Item = HostAccess> {
+        HostAccess::ALL
+            .into_iter()
+            .filter(|member| self.allows(*member))
     }
 
     /// Replaces the filesystem authority, built by the closure from what is already there.
@@ -135,14 +230,23 @@ impl GrantSet {
 
     /// Whether this set grants nothing at all.
     ///
-    /// True for a freshly declared set, and false once any axis carries something — which is what
-    /// makes `airsl doctor` able to say "none" honestly rather than by assumption.
+    /// True for [`GrantSet::sealed`], and false once any axis carries something, including a
+    /// [`HostAccess`] member — which is what makes `airsl doctor` able to say "none" honestly rather
+    /// than by assumption.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         matches!(self.reach, GrantReach::Declared)
+            && self.access == 0
             && self.fs.is_empty()
             && self.env.is_empty()
             && self.proc.is_empty()
+    }
+}
+
+impl Default for GrantSet {
+    /// The same as [`GrantSet::declared`].
+    fn default() -> Self {
+        Self::declared()
     }
 }
 
@@ -162,6 +266,10 @@ impl core::fmt::Display for GrantSet {
         // which message a reader happened to hit. One vocabulary, uniformly, beats matching shell
         // convention in one of three places.
         let mut parts = Vec::new();
+        if self.access != 0 {
+            let names: Vec<_> = self.access().map(HostAccess::as_str).collect();
+            parts.push(format!("access {}", names.join(",")));
+        }
         for root in self.fs.read_roots() {
             parts.push(format!("read {}", to_script_string(root)));
         }
@@ -187,6 +295,9 @@ impl core::fmt::Display for GrantSet {
 #[cfg(test)]
 mod tests {
     use super::GrantSet;
+    use crate::sandbox::host_access::HostAccess;
+
+    const ALL_SEVEN: &str = "access stdin,stdout,stderr,clock,cwd,require,zones";
 
     #[test]
     fn declared_is_the_default_reach() {
@@ -194,10 +305,31 @@ mod tests {
     }
 
     #[test]
-    fn declared_grants_nothing_and_waives_nothing() {
+    fn declared_holds_every_host_access_member() {
         let grants = GrantSet::declared();
+        for member in HostAccess::ALL {
+            assert!(grants.allows(member), "{member}");
+        }
+        assert!(!grants.is_empty());
+        assert!(!grants.is_unrestricted());
+    }
+
+    #[test]
+    fn sealed_grants_nothing_and_is_empty() {
+        let grants = GrantSet::sealed();
+        for member in HostAccess::ALL {
+            assert!(!grants.allows(member), "{member}");
+        }
+        assert!(grants.is_empty());
+        assert_eq!(grants.to_string(), "none");
+    }
+
+    #[test]
+    fn sealed_grants_nothing_and_waives_nothing() {
+        let grants = GrantSet::sealed();
         assert!(grants.is_empty());
         assert!(!grants.is_unrestricted());
+        assert_eq!(grants.access().count(), 0);
     }
 
     #[test]
@@ -208,14 +340,71 @@ mod tests {
     }
 
     #[test]
+    fn unrestricted_allows_every_member() {
+        let grants = GrantSet::unrestricted();
+        for member in HostAccess::ALL {
+            assert!(grants.allows(member), "{member}");
+        }
+        assert_eq!(grants.access().collect::<Vec<_>>(), HostAccess::ALL);
+    }
+
+    #[test]
     fn the_two_reaches_are_distinguishable() {
         assert_ne!(GrantSet::declared(), GrantSet::unrestricted());
     }
 
     #[test]
+    fn declared_and_sealed_are_distinguishable() {
+        assert_ne!(GrantSet::declared(), GrantSet::sealed());
+    }
+
+    #[test]
+    fn with_access_adds_exactly_the_named_member() {
+        let grants = GrantSet::sealed().with_access(HostAccess::Clock);
+        for member in HostAccess::ALL {
+            assert_eq!(
+                grants.allows(member),
+                member == HostAccess::Clock,
+                "{member}"
+            );
+        }
+        assert!(!grants.is_empty());
+    }
+
+    #[test]
+    fn with_access_is_idempotent() {
+        let once = GrantSet::sealed().with_access(HostAccess::Stdout);
+        let twice = once.clone().with_access(HostAccess::Stdout);
+        assert_eq!(once, twice);
+        assert_eq!(twice.access().collect::<Vec<_>>(), [HostAccess::Stdout]);
+    }
+
+    #[test]
+    fn access_lists_members_in_declaration_order_whatever_order_they_were_added() {
+        let grants = GrantSet::sealed()
+            .with_access(HostAccess::Zones)
+            .with_access(HostAccess::Stdin)
+            .with_access(HostAccess::Cwd);
+        assert_eq!(
+            grants.access().collect::<Vec<_>>(),
+            [HostAccess::Stdin, HostAccess::Cwd, HostAccess::Zones]
+        );
+    }
+
+    #[test]
     fn each_reach_renders_for_a_report() {
-        assert_eq!(GrantSet::declared().to_string(), "none");
+        assert_eq!(GrantSet::sealed().to_string(), "none");
+        assert_eq!(GrantSet::declared().to_string(), ALL_SEVEN);
         assert_eq!(GrantSet::unrestricted().to_string(), "unrestricted");
+    }
+
+    #[test]
+    fn display_lists_access_first_then_the_allowlists() {
+        let a = crate::test_support::abs("/a");
+        let grants = GrantSet::sealed()
+            .with_access(HostAccess::Stderr)
+            .with_fs(|fs| fs.read(a.as_str()));
+        assert_eq!(grants.to_string(), format!("access stderr; read {a}"));
     }
 
     #[test]
@@ -231,6 +420,28 @@ mod tests {
         let a = crate::test_support::abs("/a");
         let b = crate::test_support::abs("/b");
         let grants = GrantSet::declared().with_fs(|fs| fs.read(a.as_str()).write(b.as_str()));
-        assert_eq!(grants.to_string(), format!("read {a}; write {b}"));
+        assert_eq!(
+            grants.to_string(),
+            format!("{ALL_SEVEN}; read {a}; write {b}")
+        );
     }
+
+    #[test]
+    fn the_constructors_can_build_constants() {
+        const EVERYTHING: GrantSet = GrantSet::declared();
+        const ONLY_REQUIRE: GrantSet = GrantSet::sealed().with_access(HostAccess::Require);
+
+        assert!(EVERYTHING.allows(HostAccess::Zones));
+        assert!(ONLY_REQUIRE.allows(HostAccess::Require));
+        assert!(!ONLY_REQUIRE.allows(HostAccess::Clock));
+    }
+
+    // Evaluated at compile time, so dropping `const` from `GrantSet::allows` (or from a
+    // constructor) fails the build rather than slipping past the runtime asserts above. `forget`
+    // because `GrantSet` has a destructor, which a const context may not run (E0493).
+    const _: () = {
+        let grants = GrantSet::sealed().with_access(HostAccess::Require);
+        assert!(grants.allows(HostAccess::Require) && !grants.allows(HostAccess::Clock));
+        core::mem::forget(grants);
+    };
 }

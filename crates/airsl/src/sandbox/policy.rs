@@ -78,16 +78,20 @@ impl Policy {
         }
     }
 
-    /// A minimal language surface, no grants, and tight ceilings.
+    /// A minimal language surface, a sealed grant set, and tight ceilings.
     ///
     /// For evaluating configuration, expressions and generated snippets. This is the configuration
     /// whose guarantees are strongest and easiest to state, which makes it the right target for
     /// adversarial testing.
+    ///
+    /// The grants are [`GrantSet::sealed`]: no [`HostAccess`](crate::HostAccess) member and no
+    /// allowlist entry. A host widening this policy builds on `GrantSet::sealed()`, not on
+    /// `GrantSet::declared()`, which holds every member and so reopens what `pure` closes.
     #[must_use]
     pub const fn pure() -> Self {
         Self {
             language: LanguageSurface::Minimal,
-            grants: GrantSet::declared(),
+            grants: GrantSet::sealed(),
             limits: ResourceLimits::new(Some(PURE_MEMORY), Some(PURE_INSTRUCTIONS)),
         }
     }
@@ -145,6 +149,7 @@ impl Default for Policy {
 mod tests {
     use super::Policy;
     use crate::sandbox::grant_set::GrantSet;
+    use crate::sandbox::host_access::HostAccess;
     use crate::sandbox::language_surface::LanguageSurface;
     use crate::sandbox::resource_limits::{MemoryLimit, ResourceLimits};
 
@@ -165,7 +170,10 @@ mod tests {
     fn confined_restricts_the_surface_and_imposes_both_ceilings() {
         let policy = Policy::confined();
         assert_eq!(policy.language(), LanguageSurface::Restricted);
-        assert!(policy.grants().is_empty());
+        assert_eq!(
+            policy.grants().access().collect::<Vec<_>>(),
+            HostAccess::ALL
+        );
         assert!(policy.limits().memory().is_some());
         assert!(policy.limits().instructions().is_some());
     }
@@ -175,6 +183,10 @@ mod tests {
         let pure = Policy::pure();
         let confined = Policy::confined();
         assert_eq!(pure.language(), LanguageSurface::Minimal);
+        assert!(pure.grants().is_empty());
+        for member in HostAccess::ALL {
+            assert!(!pure.grants().allows(member), "{member}");
+        }
         assert!(pure.limits().memory() < confined.limits().memory());
         assert!(pure.limits().instructions() < confined.limits().instructions());
     }

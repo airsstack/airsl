@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [02]
 built-on: d8c7bb7f05b4
@@ -116,3 +116,19 @@ refusal before `resolve`. With `cwd` granted, a relative path resolves as today.
 - Under `cargo run -p airsl-cli -- run --policy pure`, `fs.read("/etc/hosts")` gives
   `` `/etc/hosts` is outside the granted read roots: none are granted ``, where 0.1.6 printed
   `/private/etc/hosts` (E5).
+
+## Review findings
+
+- 🔴 guard.rs:661-668 — `a_relative_path_with_cwd_resolves_as_before` compared a verbatim `\\?\` canonical cwd with `resolve`'s stripped path, failing on windows-latest. Fixed: uses `test_support::canonical`. Not run on Windows here. `cargo make dod` exit 0 (2026-11-25, after all fixes): airsl 643 lib tests + 16 doctests, airsl-cli 86 tests; fmt, clippy -D warnings, rustdoc -D warnings green.
+- 🟡 guard.rs:570 — lexical-before-rule-1 unguarded when roots are granted. Fixed: `a_nul_relative_path_is_uncheckable_even_with_roots_and_no_cwd`; fails when `reject_lexically` runs after the cwd refusal (coder mutation run).
+- 🔵 order hidden in `refuse_if_no_roots` — fixed: `refuse_before_resolving` runs lexical → rule 2 → rule 1, then `resolve`.
+- 🔵 doc lines >100 cols, ambiguous `read` lead, history wording in `resolve` doc — fixed; six pre-existing >100-col lines left as they were at HEAD.
+- Plan proof: `airsl run --policy pure` with `airsstack.fs.read("/etc/hosts")` → "fs.read denied: `/etc/hosts` is outside the granted read roots: none are granted" (rc=1).
+
+## Deviations
+
+- 2026-11-25 — Ledger taken with `grep -n '^### Task'` instead of a `task-briefer` ledger spawn; briefs were spawned per task as specified.
+- 2026-11-25 — Plans 01–06 ran in one execute run on one working tree, with file-disjoint tasks from different plans coded concurrently; each plan was reviewed from a frozen patch snapshot of its own files.
+- 2026-11-25 — Not committed: the execute instruction did not ask for commits, so the per-task commit messages the plan names were not created. All changes sit in the working tree.
+- 2026-11-25 — Disk at 100% (242 MB free) mid-run; regenerable probe `target/` dirs in the session scratchpad were deleted to continue (614 MB free).
+- 2026-11-25 — `a_relative_path_with_cwd_resolves_as_before` uses the canonical process cwd as the read root, not a temp dir: the process cwd is shared by all tests and cannot be changed safely. The temp-dir case is covered by `a_relative_path_with_cwd_is_still_checked_against_the_roots`.

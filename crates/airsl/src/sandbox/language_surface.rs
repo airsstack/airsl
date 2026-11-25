@@ -35,6 +35,20 @@ pub(crate) const UNSAFE_OS_FUNCTIONS: [&str; 7] = [
     "setlocale",
 ];
 
+/// Base-library globals withheld on [`LanguageSurface::Minimal`] only.
+///
+/// `print` writes to the host process's stdout, a channel the surface's guarantees say a script
+/// cannot reach. A script that needs to report something returns it instead.
+pub(crate) const MINIMAL_WITHHELD_GLOBALS: [&str; 1] = ["print"];
+
+/// The seed [`LanguageSurface::Minimal`] gives `math.random` before a script runs.
+///
+/// Lua 5.4 seeds `math.random` from the clock and an address when the state is created, so two
+/// runs of one script draw different numbers. `0` is arbitrary; what matters is that it is fixed,
+/// so a script's draws are the same on every engine, and that it is `0` rather than a value a
+/// reader might take to mean something.
+pub(crate) const MINIMAL_RANDOM_SEED: i64 = 0;
+
 /// Which Lua standard libraries a script can reach.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[non_exhaustive]
@@ -58,10 +72,13 @@ pub enum LanguageSurface {
     /// `string`, `table`, `math` and `utf8`, and nothing else — no `os`, no `coroutine`.
     ///
     /// For evaluating configuration, expressions and generated snippets, where the guarantees
-    /// should be as strong and as easy to state as possible. Dropping `os` removes the last source
-    /// of nondeterminism a script could reach without a host module: `os.time` and `os.clock`
-    /// return something different on every run. `utf8` stays because the criterion is
-    /// nondeterminism and authority, not size: it reads a string and returns a number.
+    /// should be as strong and as easy to state as possible. Dropping `os` removes the clock
+    /// sources a script could reach without a host module: `os.time` and `os.clock` return
+    /// something different on every run. Withholding the `print` global closes the last route to
+    /// the host's stdout that needs no host module. `math.random` starts from a fixed seed, and
+    /// `math.randomseed` refuses the no-argument form that seeds from the clock. `utf8` stays
+    /// because the criterion is nondeterminism and authority, not size: it reads a string and
+    /// returns a number.
     Minimal,
 }
 
@@ -93,6 +110,15 @@ impl LanguageSurface {
         !matches!(self, Self::Full)
     }
 
+    /// Whether this surface closes the language's own routes to the host's stdout and clock — the
+    /// ones that need no host module: the globals in
+    /// [`MINIMAL_WITHHELD_GLOBALS`] are removed, `math.random` is seeded with
+    /// [`MINIMAL_RANDOM_SEED`], and `math.randomseed` refuses its no-argument form.
+    #[must_use]
+    pub(crate) const fn closes_ambient_channels(self) -> bool {
+        matches!(self, Self::Minimal)
+    }
+
     /// The name this surface reports itself under.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
@@ -112,7 +138,10 @@ impl core::fmt::Display for LanguageSurface {
 
 #[cfg(test)]
 mod tests {
-    use super::{CHUNK_LOADERS, LanguageSurface, UNSAFE_OS_FUNCTIONS};
+    use super::{
+        CHUNK_LOADERS, LanguageSurface, MINIMAL_RANDOM_SEED, MINIMAL_WITHHELD_GLOBALS,
+        UNSAFE_OS_FUNCTIONS,
+    };
     use mlua::StdLib;
 
     #[test]
@@ -165,6 +194,15 @@ mod tests {
         assert!(!LanguageSurface::Full.withholds_unsafe_globals());
         assert!(LanguageSurface::Restricted.withholds_unsafe_globals());
         assert!(LanguageSurface::Minimal.withholds_unsafe_globals());
+    }
+
+    #[test]
+    fn only_minimal_withholds_print_and_seeds_random() {
+        assert!(LanguageSurface::Minimal.closes_ambient_channels());
+        assert!(!LanguageSurface::Restricted.closes_ambient_channels());
+        assert!(!LanguageSurface::Full.closes_ambient_channels());
+        assert_eq!(MINIMAL_WITHHELD_GLOBALS, ["print"]);
+        assert_eq!(MINIMAL_RANDOM_SEED, 0);
     }
 
     #[test]

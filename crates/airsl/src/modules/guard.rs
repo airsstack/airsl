@@ -6,8 +6,10 @@
 //! also means it can be tested against paths that do not exist, which is most of the interesting
 //! cases.
 //!
-//! Responsibilities: [`PathGuard`], which resolves a path and answers whether the policy permits
-//! reading or writing it.
+//! Responsibilities: [`PathGuard`], which answers whether the policy permits reading or writing a
+//! path. It refuses an unrepresentable spelling first, then an access direction with no roots
+//! granted and a relative path without the `cwd` member (both naming the path as the script wrote
+//! it), and only then resolves the path against the filesystem and compares it with the roots.
 //!
 //! Non-responsibilities: performing the operation, and deciding which of read or write an
 //! operation needs. Only the calling function knows that.
@@ -20,10 +22,11 @@ use std::path::Component;
 use std::sync::Arc;
 
 use crate::error::{Error, Result};
+use crate::modules::access::{self, Subject};
 use crate::paths::ResolvedPath;
 use crate::paths::rules::Unrepresentable;
 use crate::paths::rules::native;
-use crate::sandbox::GrantSet;
+use crate::sandbox::{GrantSet, HostAccess};
 
 /// Which set of roots a refusal was measured against.
 ///
@@ -70,11 +73,19 @@ impl PathGuard {
 
     /// Resolves `raw` and returns it if the policy permits reading it.
     ///
+    /// Refuses in this order, and only the last step touches the filesystem: a spelling this
+    /// runtime will not reason about, then a read axis with no roots at all, then a relative path
+    /// when `cwd` is not granted, then resolution and the root comparison. In the two middle cases
+    /// nothing could be allowed, so the refusal names `raw` as the script wrote it rather than a
+    /// resolved path the script never asked about.
+    ///
     /// # Errors
     ///
-    /// [`Error::Denied`] when no read grant covers the resolved path, or [`Error::UncheckablePath`]
-    /// when it cannot be resolved to something checkable.
+    /// [`Error::Denied`] when no read grant covers the path, including when none are granted at
+    /// all or when the path is relative and `cwd` is not granted, or [`Error::UncheckablePath`]
+    /// when it is an unrepresentable spelling or cannot be resolved to something checkable.
     pub(crate) fn read(&self, operation: &'static str, raw: &str) -> Result<ResolvedPath> {
+        self.refuse_before_resolving(operation, Access::Read, raw)?;
         let resolved = Self::resolve(raw)?;
         if self.grants.is_unrestricted() || self.grants.fs().allows_read(resolved.as_path()) {
             return Ok(resolved);
@@ -88,6 +99,7 @@ impl PathGuard {
     ///
     /// As [`PathGuard::read`], against the write roots.
     pub(crate) fn write(&self, operation: &'static str, raw: &str) -> Result<ResolvedPath> {
+        self.refuse_before_resolving(operation, Access::Write, raw)?;
         let resolved = Self::resolve(raw)?;
         if self.grants.is_unrestricted() || self.grants.fs().allows_write(resolved.as_path()) {
             return Ok(resolved);
@@ -95,21 +107,85 @@ impl PathGuard {
         Err(self.deny(operation, Access::Write, &resolved))
     }
 
-    /// Builds the refusal, naming the roots that *were* granted.
+    /// Runs every refusal that can be decided from the spelling of `raw` alone.
+    ///
+    /// The order is the contract: the spelling check comes first, so a nul byte or device name is
+    /// reported as uncheckable whichever grants are held rather than as merely outside them; then
+    /// the no-roots refusal; then the `cwd` refusal. An unrestricted set skips all three, as it is
+    /// never refused by the root comparison either; [`PathGuard::resolve`] still starts with the
+    /// spelling check for it.
+    fn refuse_before_resolving(
+        &self,
+        operation: &'static str,
+        access: Access,
+        raw: &str,
+    ) -> Result<()> {
+        if self.grants.is_unrestricted() {
+            return Ok(());
+        }
+        reject_lexically(raw)?;
+        self.refuse_if_no_roots(operation, access, raw)?;
+        self.refuse_relative_without_cwd(operation, raw)
+    }
+
+    /// Refuses `raw` outright when the policy grants no root for `access` at all.
+    ///
+    /// Refuses by the raw spelling before any resolution touches the filesystem. Resolving first
+    /// would only let a refusal name a path the script did not write, and would let the existence
+    /// of files outside every root show through the failure it chose.
+    fn refuse_if_no_roots(&self, operation: &'static str, access: Access, raw: &str) -> Result<()> {
+        if self.roots(access).is_empty() {
+            return Err(self.refusal(operation, access, raw));
+        }
+        Ok(())
+    }
+
+    /// Refuses a relative `raw` when the policy does not grant `cwd`.
+    ///
+    /// A relative path means "relative to the working directory", so using one is reading the
+    /// working directory. The refusal is on the spelling, before resolution consults the process
+    /// directory, so what it says does not depend on where the host happens to run. An absolute
+    /// path never needs the member, and an unrestricted set holds every member.
+    fn refuse_relative_without_cwd(&self, operation: &'static str, raw: &str) -> Result<()> {
+        if std::path::Path::new(raw).is_absolute() {
+            return Ok(());
+        }
+        access::check_subject(
+            &self.grants,
+            self.module,
+            operation,
+            HostAccess::Cwd,
+            Subject::RelativePath(raw),
+        )
+    }
+
+    /// The granted roots for one direction of access.
+    fn roots(&self, access: Access) -> &[std::path::PathBuf] {
+        match access {
+            Access::Read => self.grants.fs().read_roots(),
+            Access::Write => self.grants.fs().write_roots(),
+        }
+    }
+
+    /// Builds the refusal for a resolved path, naming the roots that *were* granted.
+    fn deny(&self, operation: &'static str, access: Access, resolved: &ResolvedPath) -> Error {
+        self.refusal(operation, access, &resolved.to_script_string())
+    }
+
+    /// Builds the refusal sentence for `shown`, naming the roots that *were* granted.
     ///
     /// Listing them turns "denied" into something actionable — the usual cause is a grant one
-    /// directory too deep, and without the list that is invisible from the message.
+    /// directory too deep, and without the list that is invisible from the message. `shown` is the
+    /// resolved path when a root comparison failed and the raw spelling when there was nothing to
+    /// compare against; both go through here so the two sentences cannot drift.
     ///
-    /// Both branches share the phrase "is outside the granted read roots", so the sentence names
+    /// Both cases share the phrase "is outside the granted read roots", so the sentence names
     /// what it is comparing against before it says anything about the comparison. An earlier
     /// wording opened with "is outside them", which reads as a continuation of a clause that is
     /// not there: the roots were introduced *after* the pronoun that referred to them, and when
     /// none were granted they were never introduced at all.
-    fn deny(&self, operation: &'static str, access: Access, resolved: &ResolvedPath) -> Error {
-        let roots = match access {
-            Access::Read => self.grants.fs().read_roots(),
-            Access::Write => self.grants.fs().write_roots(),
-        };
+    fn refusal(&self, operation: &'static str, access: Access, shown: &str) -> Error {
+        let roots = self.roots(access);
 
         let granted = if roots.is_empty() {
             String::from("none are granted")
@@ -121,10 +197,7 @@ impl PathGuard {
         Error::Denied {
             module: self.module,
             operation,
-            detail: format!(
-                "`{}` is outside the granted {access} roots: {granted}",
-                resolved.to_script_string()
-            ),
+            detail: format!("`{shown}` is outside the granted {access} roots: {granted}"),
         }
     }
 
@@ -151,10 +224,14 @@ impl PathGuard {
     /// agree. Soundness holds on both platforms, by different arguments — this is documented and
     /// pinned by tests rather than left to be rediscovered.
     ///
-    /// Two more checks happen before any of this: [`native::reject_unrepresentable`] refuses a
-    /// spelling this runtime will not reason about at all — a verbatim (`\\?\`) prefix, a device
-    /// namespace, a reserved device name — and the verbatim prefix `canonicalize()` adds on Windows
-    /// is stripped from its result before the suffix is re-appended, so nothing verbatim is ever
+    /// [`PathGuard::read`] and [`PathGuard::write`] call this only after the spelling, no-roots and
+    /// relative-path refusals, so a path no root could allow never reaches the filesystem. It
+    /// still starts with the spelling check itself, which is what covers an unrestricted set.
+    ///
+    /// That check, [`reject_lexically`] (which runs [`native::reject_unrepresentable`]), refuses a
+    /// spelling this runtime will not reason about at all: a verbatim (`\\?\`) prefix, a device
+    /// namespace or a reserved device name. The verbatim prefix `canonicalize()` adds on Windows is
+    /// stripped from its result before the suffix is re-appended, so nothing verbatim is ever
     /// stored in the [`ResolvedPath`] this function returns.
     ///
     /// # Errors
@@ -162,18 +239,7 @@ impl PathGuard {
     /// [`Error::UncheckablePath`] when the path is a spelling this runtime cannot reason about, when
     /// it cannot be made absolute, or when it ends in an unresolvable `..`.
     fn resolve(raw: &str) -> Result<ResolvedPath> {
-        native::reject_unrepresentable(raw).map_err(|unrepresentable| Error::UncheckablePath {
-            path: raw.to_owned(),
-            reason: match unrepresentable {
-                Unrepresentable::Verbatim => {
-                    r"it is a verbatim \\?\ path, which this runtime refuses as input"
-                }
-                Unrepresentable::DeviceNamespace => {
-                    "it names a reserved device rather than an ordinary file"
-                }
-                Unrepresentable::InteriorNul => "it contains a nul byte",
-            },
-        })?;
+        reject_lexically(raw)?;
 
         let absolute = std::path::absolute(raw).map_err(|_| Error::UncheckablePath {
             path: raw.to_owned(),
@@ -224,6 +290,30 @@ impl PathGuard {
     }
 }
 
+/// Refuses a spelling this runtime will not reason about, before any path is built from it.
+///
+/// A free function rather than a step buried in [`PathGuard::resolve`] because the guard runs it
+/// ahead of the no-roots refusal too: a nul byte or device name is uncheckable whichever grants
+/// are held, and must not be reported as merely outside them.
+///
+/// # Errors
+///
+/// [`Error::UncheckablePath`] naming which unrepresentable spelling `raw` is.
+fn reject_lexically(raw: &str) -> Result<()> {
+    native::reject_unrepresentable(raw).map_err(|unrepresentable| Error::UncheckablePath {
+        path: raw.to_owned(),
+        reason: match unrepresentable {
+            Unrepresentable::Verbatim => {
+                r"it is a verbatim \\?\ path, which this runtime refuses as input"
+            }
+            Unrepresentable::DeviceNamespace => {
+                "it names a reserved device rather than an ordinary file"
+            }
+            Unrepresentable::InteriorNul => "it contains a nul byte",
+        },
+    })
+}
+
 #[cfg(test)]
 mod tests {
     #![expect(
@@ -237,7 +327,7 @@ mod tests {
 
     use super::PathGuard;
     use crate::paths::rules::native;
-    use crate::sandbox::GrantSet;
+    use crate::sandbox::{GrantSet, HostAccess};
     use crate::test_support::script_path;
     use std::sync::Arc;
 
@@ -436,6 +526,209 @@ mod tests {
                 .contains("outside the granted read roots: none are granted"),
             "{err}"
         );
+    }
+
+    #[test]
+    fn no_roots_refuses_before_touching_the_filesystem() {
+        let target = tempfile::tempdir().unwrap();
+        let links = tempfile::tempdir().unwrap();
+        let link = links.path().join("link");
+        crate::test_support::link_dir(target.path(), &link).unwrap();
+
+        let guard = guard(|g| g);
+        // Spelled as the script would, so the expectation is the raw string and not a resolved one.
+        let raw = script_path(&link);
+        let err = guard.read("read", &raw).unwrap_err();
+        assert!(
+            matches!(err, crate::error::Error::Denied { .. }),
+            "expected Denied, got {err:?}"
+        );
+        assert!(
+            err.to_string().contains(&format!(
+                "`{raw}` is outside the granted read roots: none are granted"
+            )),
+            "{err}"
+        );
+        let target = script_path(&target.path().canonicalize().unwrap());
+        assert!(
+            !err.to_string().contains(&target),
+            "the refusal must name the path as written, not the symlink target: {err}"
+        );
+
+        let err = guard.read("read", "/nonexistent/x").unwrap_err();
+        assert!(
+            matches!(err, crate::error::Error::Denied { .. }),
+            "expected Denied, got {err:?}"
+        );
+        assert!(err.to_string().contains("`/nonexistent/x`"), "{err}");
+    }
+
+    #[test]
+    fn no_roots_refuses_writes_with_the_write_wording() {
+        let guard = guard(|g| g);
+        let err = guard.write("write", "/some/where/x").unwrap_err();
+        assert!(
+            matches!(err, crate::error::Error::Denied { .. }),
+            "expected Denied, got {err:?}"
+        );
+        assert!(
+            err.to_string()
+                .contains("`/some/where/x` is outside the granted write roots: none are granted"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn a_nul_path_is_still_uncheckable_before_either_rule() {
+        let guard = guard(|g| g);
+        for err in [
+            guard.read("read", "a\0b").unwrap_err(),
+            guard.write("write", "a\0b").unwrap_err(),
+        ] {
+            match err {
+                crate::error::Error::UncheckablePath { reason, .. } => {
+                    assert_eq!(reason, "it contains a nul byte");
+                }
+                other => panic!("expected UncheckablePath, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn a_nul_relative_path_is_uncheckable_even_with_roots_and_no_cwd() {
+        // Roots are granted and `cwd` is withheld, so a relative spelling would otherwise be
+        // refused as needing `cwd`; the nul byte must be reported first.
+        let dir = tempfile::tempdir().unwrap();
+        let root = crate::test_support::canonical(dir.path());
+
+        let guard = sealed_guard(&root, false);
+        for err in [
+            guard.read("read", "a\0b").unwrap_err(),
+            guard.write("write", "a\0b").unwrap_err(),
+        ] {
+            match err {
+                crate::error::Error::UncheckablePath { reason, .. } => {
+                    assert_eq!(reason, "it contains a nul byte");
+                }
+                other => panic!("expected UncheckablePath, got {other:?}"),
+            }
+        }
+    }
+
+    /// A guard over a sealed set that holds `stderr` (so a refusal has something to list), one read
+    /// root and, when `with_cwd`, the `cwd` member.
+    fn sealed_guard(root: &std::path::Path, with_cwd: bool) -> PathGuard {
+        let mut grants = GrantSet::sealed()
+            .with_access(HostAccess::Stderr)
+            .with_fs(|fs| fs.read(root).write(root));
+        if with_cwd {
+            grants = grants.with_access(HostAccess::Cwd);
+        }
+        PathGuard::new(Arc::new(grants), "fs")
+    }
+
+    #[test]
+    fn a_relative_path_without_cwd_is_refused_before_resolution() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().canonicalize().unwrap();
+
+        let guard = sealed_guard(&root, false);
+        assert_eq!(
+            guard.read("read", "p.lua").unwrap_err().to_string(),
+            "fs.read denied: the relative path `p.lua` needs `cwd`, which is not granted — the \
+             granted access is stderr"
+        );
+        assert_eq!(
+            guard.write("write", "p.lua").unwrap_err().to_string(),
+            "fs.write denied: the relative path `p.lua` needs `cwd`, which is not granted — the \
+             granted access is stderr"
+        );
+    }
+
+    #[test]
+    fn a_dot_slash_path_without_cwd_is_refused_by_its_spelling() {
+        // The refusal is on the spelling, not on where it would land, so it must not depend on
+        // the process working directory at all.
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().canonicalize().unwrap();
+
+        let guard = sealed_guard(&root, false);
+        let err = guard.read("read", "./a.txt").unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("the relative path `./a.txt` needs `cwd`"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn no_roots_wins_over_the_relative_rule() {
+        let guard = PathGuard::new(
+            Arc::new(GrantSet::sealed().with_access(HostAccess::Stderr)),
+            "fs",
+        );
+        assert_eq!(
+            guard.read("read", "p.lua").unwrap_err().to_string(),
+            "fs.read denied: `p.lua` is outside the granted read roots: none are granted"
+        );
+        assert_eq!(
+            guard.write("write", "p.lua").unwrap_err().to_string(),
+            "fs.write denied: `p.lua` is outside the granted write roots: none are granted"
+        );
+    }
+
+    #[test]
+    fn an_absolute_path_does_not_need_cwd() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().canonicalize().unwrap();
+
+        let guard = sealed_guard(&root, false);
+        assert!(
+            guard
+                .read("read", &format!("{}/a.txt", script_path(&root)))
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn a_relative_path_with_cwd_resolves_as_before() {
+        // The process working directory is shared by every test, so it is not changed; the
+        // current directory itself is the root, and a relative name resolves inside it.
+        // `canonical`, not `canonicalize()`: on Windows the latter is `\\?\`-prefixed while
+        // `resolve` strips that prefix, so the two would never compare equal.
+        let cwd = crate::test_support::canonical(&std::env::current_dir().unwrap());
+
+        let guard = sealed_guard(&cwd, true);
+        let resolved = guard.read("read", "not-there.lua").unwrap();
+        assert_eq!(resolved.as_path(), cwd.join("not-there.lua"));
+        assert!(guard.write("write", "not-there.lua").is_ok());
+    }
+
+    #[test]
+    fn a_relative_path_with_cwd_is_still_checked_against_the_roots() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().canonicalize().unwrap();
+
+        let guard = sealed_guard(&root, true);
+        let err = guard.read("read", "not-there.lua").unwrap_err();
+        assert!(
+            err.to_string().contains("outside the granted read roots"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn an_unrestricted_set_skips_both_rules() {
+        let guard = PathGuard::new(Arc::new(GrantSet::unrestricted()), "fs");
+        // Cargo runs a crate's tests from the crate directory, so this relative path exists.
+        assert!(guard.read("read", "Cargo.toml").is_ok());
+        assert!(guard.write("write", "p.lua").is_ok());
+    }
+
+    #[test]
+    fn an_unrestricted_policy_with_no_roots_still_permits() {
+        let guard = PathGuard::new(Arc::new(GrantSet::unrestricted()), "fs");
+        assert!(guard.write("write", "/etc/hostname").is_ok());
     }
 
     #[test]

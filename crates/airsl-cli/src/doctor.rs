@@ -97,7 +97,10 @@ mod tests {
 
     #[test]
     fn the_report_states_the_grants_the_policy_extends() {
-        assert!(report(&Policy::confined()).contains("grants:       none"));
+        assert!(
+            report(&Policy::confined())
+                .contains("grants:       access stdin,stdout,stderr,clock,cwd,require,zones")
+        );
         assert!(report(&Policy::trusted()).contains("grants:       unrestricted"));
     }
 

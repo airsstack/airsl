@@ -11,6 +11,7 @@
 //! - [`language_surface`] — which of Lua's own libraries a script sees.
 //! - [`grant_set`] — what the host modules it reaches may touch.
 //! - [`grants`] — the parameterised authorities a grant set is built from.
+//! - [`host_access`] — the unparameterised host capabilities a grant set can hold.
 //! - [`resource_limits`] — how much memory and execution it may consume.
 //!
 //! Non-responsibilities: what a caller does about a script that failed. That is
@@ -18,6 +19,7 @@
 
 pub mod grant_set;
 pub mod grants;
+pub mod host_access;
 pub mod language_surface;
 pub mod policy;
 pub mod resource_limits;
@@ -26,6 +28,8 @@ pub mod resource_limits;
 pub use grant_set::GrantSet;
 #[doc(inline)]
 pub use grants::{EnvGrant, FsGrant, ProcGrant};
+#[doc(inline)]
+pub use host_access::HostAccess;
 #[doc(inline)]
 pub use language_surface::LanguageSurface;
 #[doc(inline)]

@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [01]
 built-on: d8c7bb7f05b4
@@ -240,3 +240,20 @@ first, so no test reads stdin or writes stdout.
 - `cargo make dod` is green.
 - The CLI check under `airsl run --policy pure` lives in plan 08, because until plan 07 the CLI
   folds its flags onto `declared()`.
+
+## Review findings
+
+- 🟡 registry.rs:104 — `HostModule::install` doc named `path` as needing no authority. Fixed: names `json`. `cargo make dod` exit 0 (2026-11-25, after all fixes): airsl 643 lib tests + 16 doctests, airsl-cli 86 tests; fmt, clippy -D warnings, rustdoc -D warnings green.
+- 🟡 no test pinned "argument error wins over a refusal". Fixed: `an_argument_error_wins_over_a_refusal` (stdio.rs).
+- 🔵 access.rs:10 "first shape" spec vocabulary — fixed; hook.rs `context` shadowing — fixed (`context_fn`); stdio.rs module doc logic + no-arg `isatty` — fixed; time.rs doc "pattern names a zone" → "text names a zone" — fixed; path.rs grants now in `Arc` — fixed.
+- 🔵 duplicated `refusal` test helper (hook.rs, stdio.rs) — open, left duplicated (differing docs, no natural shared spot).
+- 🔵 mod.rs stdio/hook bullets rewritten beyond the plan's list — accepted.
+- Reviewer mutation runs: removing the `path.absolute` check, making it unconditional, removing the `time.parse` zone check, and mapping every `isatty` to stdout each fail a named test.
+
+## Deviations
+
+- 2026-11-25 — Ledger taken with `grep -n '^### Task'` instead of a `task-briefer` ledger spawn; briefs were spawned per task as specified.
+- 2026-11-25 — Plans 01–06 ran in one execute run on one working tree, with file-disjoint tasks from different plans coded concurrently; each plan was reviewed from a frozen patch snapshot of its own files.
+- 2026-11-25 — Not committed: the execute instruction did not ask for commits, so the per-task commit messages the plan names were not created. All changes sit in the working tree.
+- 2026-11-25 — Disk at 100% (242 MB free) mid-run; regenerable probe `target/` dirs in the session scratchpad were deleted to continue (614 MB free).
+- 2026-11-25 — Task 3 coder wrote tests and implementation before the first run (no observed red); the reviewer's mutation runs confirmed each new test fails with the check removed.

@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 built-on: d8c7bb7f05b4
 ---
@@ -109,3 +109,19 @@ table. Failure maps to `Error::EngineSetup` with a stage name, as `withhold_unsa
 - `cargo make dod` is green.
 - `minimal_random_is_the_same_sequence_on_every_fresh_engine` is the plan-wide proof. The CLI run of
   the same check is in plan 08.
+
+## Review findings
+
+- 🔵 language_surface.rs:77-79, :112 — doc overstated "last route to stdout" and a 120-col line. Fixed (route that needs no host module; rewrapped). `cargo make dod` exit 0 (2026-11-25, after all fixes): airsl 643 lib tests + 16 doctests, airsl-cli 86 tests; fmt, clippy -D warnings, rustdoc -D warnings green.
+- 🔵 test renamed `only_minimal_withholds_print` → `only_minimal_withholds_print_and_seeds_random` (Task 2 extends the predicate) — accepted.
+- 🔵 asserts restating constants; seeding-before-limits order unguarded; helper placement in builder.rs tests — open, accepted.
+- Reviewer reproduced 275394 / 909833, `42,0,true`, the randomseed refusal text and `bad argument #1 to '?' (number expected, got nil)`.
+- CLI: `airsl run --policy pure` → `math.random(1,1000000)` = 275394; `math.randomseed()` → "math.randomseed denied: a seed is required — the no-argument form reads the clock"; `type(print)` = nil.
+
+## Deviations
+
+- 2026-11-25 — Ledger taken with `grep -n '^### Task'` instead of a `task-briefer` ledger spawn; briefs were spawned per task as specified.
+- 2026-11-25 — Plans 01–06 ran in one execute run on one working tree, with file-disjoint tasks from different plans coded concurrently; each plan was reviewed from a frozen patch snapshot of its own files.
+- 2026-11-25 — Not committed: the execute instruction did not ask for commits, so the per-task commit messages the plan names were not created. All changes sit in the working tree.
+- 2026-11-25 — Disk at 100% (242 MB free) mid-run; regenerable probe `target/` dirs in the session scratchpad were deleted to continue (614 MB free).
+- 2026-11-25 — Predicate named `closes_ambient_channels` (covers print, seeding and the randomseed wrapper); Task 1's test renamed `only_minimal_withholds_print_and_seeds_random`.

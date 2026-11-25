@@ -1,9 +1,10 @@
 //! The `airsstack.path` host module.
 //!
-//! Its own module, and separate from `fs`, because path manipulation needs no authority at all —
-//! it is string arithmetic over separators. Splitting it from the module that opens files is what
-//! lets an extension that only builds paths be granted nothing, and it is the clearest instance of
-//! the rule that every module is a capability.
+//! Its own module, and separate from `fs`, because path manipulation needs no authority —
+//! it is string arithmetic over separators — except where `absolute` reads the working directory.
+//! Splitting it from the module that opens files is what lets an extension that only builds paths
+//! be granted nothing, and it is the clearest instance of the rule that every module is a
+//! capability.
 //!
 //! Nothing here touches the filesystem. `normalize` resolves `.` and `..` lexically rather than by
 //! asking the operating system, so it neither follows symlinks nor requires the path to exist —
@@ -14,13 +15,18 @@
 //! `normalize`, `relative_to`, `is_absolute` and `absolute`.
 //!
 //! Non-responsibilities: reading anything. The single exception is `absolute`, which reads the
-//! process working directory to resolve a relative path, and reads nothing else.
+//! process working directory to resolve a relative path, and reads nothing else. That read needs
+//! the `cwd` host access, so `absolute` of a relative path is refused when the policy does not
+//! grant it; an absolute argument needs nothing.
 
 use std::path::{Component, PathBuf};
+use std::sync::Arc;
 
 use crate::error::{Error, Result};
+use crate::modules::access::{self, Subject};
 use crate::modules::{HostModule, InstallContext};
 use crate::paths::rules::native::to_script_string;
+use crate::sandbox::HostAccess;
 use crate::types::ModuleName;
 
 /// Installs `airsstack.path`.
@@ -60,7 +66,7 @@ impl HostModule for Path {
         &self,
         lua: &mlua::Lua,
         table: &mlua::Table,
-        _context: &InstallContext<'_>,
+        context: &InstallContext<'_>,
     ) -> Result<()> {
         let fail = |e: mlua::Error| Error::ModuleInstall {
             module: String::from("path"),
@@ -125,9 +131,22 @@ impl HostModule for Path {
             .map_err(fail)?;
         table.set("is_absolute", is_absolute).map_err(fail)?;
 
+        let grants = Arc::new(context.grants().clone());
         let absolute = lua
-            .create_function(|_, path: mlua::LuaString| {
-                absolute(&path.to_str()?).map_err(mlua::Error::from)
+            .create_function(move |_, path: mlua::LuaString| {
+                let raw = path.to_str()?;
+                // Only a relative argument reads the working directory; an absolute one is
+                // resolved from its own text and needs no access.
+                if !std::path::Path::new(raw.as_ref()).is_absolute() {
+                    access::check_subject(
+                        &grants,
+                        "path",
+                        "absolute",
+                        HostAccess::Cwd,
+                        Subject::RelativePath(&raw),
+                    )?;
+                }
+                absolute(&raw).map_err(mlua::Error::from)
             })
             .map_err(fail)?;
         table.set("absolute", absolute).map_err(fail)?;
@@ -624,9 +643,64 @@ mod tests {
         );
     }
 
+    fn eval_under_pure(source: &str) -> String {
+        let engine = Engine::builder().policy(Policy::pure()).build().unwrap();
+        let script = Script::from_source(source, "test").unwrap();
+        engine.eval_to::<String>(&script).unwrap()
+    }
+
+    #[test]
+    fn absolute_of_a_relative_path_is_refused_without_cwd() {
+        assert_eq!(
+            eval_under_pure(
+                "local ok, err = pcall(airsstack.path.absolute, 'x'); return tostring(err)"
+            )
+            .lines()
+            .next()
+            .unwrap(),
+            "path.absolute denied: the relative path `x` needs `cwd`, which is not granted — no \
+             access is"
+        );
+    }
+
+    #[test]
+    fn absolute_of_an_empty_path_is_refused_without_cwd() {
+        // `Path::is_absolute("")` is false, so the empty string takes the relative branch.
+        let text = eval_under_pure(
+            "local ok, err = pcall(airsstack.path.absolute, ''); return tostring(err)",
+        );
+        assert!(
+            text.contains(
+                "path.absolute denied: the relative path `` needs `cwd`, which is not granted — \
+                 no access is"
+            ),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn absolute_of_an_absolute_path_needs_no_cwd() {
+        let given = crate::test_support::abs("/nonexistent/deep/file.lua");
+        let resolved = eval_under_pure(&format!("return airsstack.path.absolute('{given}')"));
+        assert!(
+            resolved.ends_with("/nonexistent/deep/file.lua"),
+            "{resolved}"
+        );
+    }
+
+    #[test]
+    fn absolute_of_a_relative_path_works_with_cwd() {
+        let resolved = eval("return airsstack.path.absolute('x')");
+        assert!(
+            std::path::Path::new(&resolved).is_absolute() && resolved.ends_with("/x"),
+            "{resolved}"
+        );
+    }
+
     #[test]
     fn every_function_is_reachable_under_a_pure_policy_too() {
-        // `path` needs no authority, so the tightest preset must still get all of it.
+        // Every function stays present under the tightest preset; `absolute` of a relative path
+        // is refused when called, but the function itself is not withheld.
         let engine = Engine::builder().policy(Policy::pure()).build().unwrap();
         let script = Script::from_source(
             "local names = {'join','dirname','basename','stem','ext','normalize',

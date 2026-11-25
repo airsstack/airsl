@@ -19,6 +19,8 @@
 //!   `canonicalize()` result.
 //! - [`abs`], the absolute path a test needs when the fixture only cares that the path is
 //!   absolute, not what it is.
+//! - [`raised`], the host error a Lua call carried out inside its `Lua` failure, so a test can
+//!   assert on the refusal's variant rather than on its text.
 //!
 //! Non-responsibilities: deciding whether a path is inside a grant, and choosing which of read or
 //! write an operation needs. Both stay with [`crate::modules::guard`], the module most of these
@@ -169,6 +171,18 @@ pub(crate) fn abs(path: &str) -> String {
     #[cfg(windows)]
     {
         format!("C:{path}")
+    }
+}
+
+/// The error a host function raised, found inside the `Lua` failure that carried it out.
+///
+/// A refusal raised from a function a script called reaches the Rust caller wrapped in
+/// [`crate::Error::Lua`]; this unwraps it. `None` when `err` is not that wrapper or carries
+/// something other than a [`crate::Error`].
+pub(crate) fn raised(err: &crate::Error) -> Option<&crate::Error> {
+    match err {
+        crate::Error::Lua { source, .. } => source.downcast_ref::<crate::Error>(),
+        _ => None,
     }
 }
 
