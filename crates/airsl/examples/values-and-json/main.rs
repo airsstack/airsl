@@ -9,8 +9,9 @@
 //! host, and `airsstack.json`'s `encode` / `encode_pretty` / `decode`.
 //!
 //! Non-responsibilities: writing any of it to disk. Encoding needs no authority, so this runs on
-//! the confined preset's empty grant set; [`filesystem-grants`](../filesystem-grants/) is where a
-//! script earns the right to persist what it built.
+//! the confined preset, which holds no filesystem grant;
+//! [`filesystem-grants`](../filesystem-grants/) is where a script earns the right to persist what
+//! it built.
 
 use std::path::Path;
 

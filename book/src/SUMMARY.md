@@ -55,3 +55,4 @@
     - [C. Presets at a Glance](appendix-03-presets.md)
     - [D. Installation Details](appendix-04-installation.md)
     - [E. Performance](appendix-05-performance.md)
+    - [F. Lua Functions by Surface](appendix-06-surfaces.md)

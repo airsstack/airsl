@@ -36,8 +36,15 @@ failed: broken — extension `broken` was not loaded: fs.read `/`: outside the g
 word-count: {"longest":"quick","words":9}
 ```
 
-The `fs.read` value above is this platform's filesystem root — unix shows `/`; an equivalent
-Windows build shows the drive root `main.rs`'s `OUTSIDE_ROOT` supplies instead.
+The `fs.read` value is the filesystem root, which `main.rs`'s `OUTSIDE_ROOT` spells for each
+platform. Above is unix. On Windows it is the drive root:
+
+```
+loaded: word-count
+failed: broken — extension `broken` was not loaded: fs.read `C:/`: outside the granted read roots: none
+
+word-count: {"longest":"quick","words":9}
+```
 
 ## What it demonstrates
 

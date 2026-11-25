@@ -26,17 +26,23 @@
 //!
 //! Responsibilities: [`Hook`], installing `payload`, `emit` and `context`. `emit` writes an
 //! arbitrary Lua value to stdout as JSON with no envelope shape imposed — the unmodelled escape
-//! hatch for anything `context` doesn't cover.
+//! hatch for anything `context` doesn't cover. `payload` needs the `stdin` host access, and `emit`
+//! and `context` need `stdout`; each refuses before it reads or writes when its member is not
+//! granted.
 //!
 //! Non-responsibilities: deciding whether the hook should have fired, and exiting. A hook that
 //! fails must not turn its failure into a non-zero exit — that is [`crate::FailurePolicy`]'s job,
 //! and the CLI's `--fail-open`.
 
+use std::sync::Arc;
+
 use crate::convert;
 use crate::description::{Function, LuaType, ModuleDescription};
 use crate::error::{Error, Result};
+use crate::modules::access::check;
 use crate::modules::stdio::read_stdin;
 use crate::modules::{HostModule, InstallContext};
+use crate::sandbox::HostAccess;
 use crate::types::ModuleName;
 
 /// Installs `airsstack.hook`.
@@ -75,17 +81,21 @@ impl HostModule for Hook {
         &self,
         lua: &mlua::Lua,
         table: &mlua::Table,
-        _context: &InstallContext<'_>,
+        context: &InstallContext<'_>,
     ) -> Result<()> {
         let fail = |e: mlua::Error| Error::ModuleInstall {
             module: String::from("hook"),
             reason: e.to_string(),
         };
+        let grants = Arc::new(context.grants().clone());
 
         // Reads and decodes in one call, because every hook's first two lines were the same pair
         // and the failure mode of getting them wrong is a hook that silently does nothing.
+        let g = Arc::clone(&grants);
         let payload = lua
-            .create_function(|lua, ()| {
+            .create_function(move |lua, ()| {
+                // Before the read, so a policy without `stdin` is refused even when stdin is empty.
+                check(&g, "hook", "payload", HostAccess::Stdin)?;
                 let text = read_stdin()?;
                 if text.trim().is_empty() {
                     // No payload is not a parse failure. A hook invoked by hand, or one whose event
@@ -98,8 +108,10 @@ impl HostModule for Hook {
             .map_err(fail)?;
         table.set("payload", payload).map_err(fail)?;
 
+        let g = Arc::clone(&grants);
         let emit = lua
-            .create_function(|_, value: mlua::Value| {
+            .create_function(move |_, value: mlua::Value| {
+                check(&g, "hook", "emit", HostAccess::Stdout)?;
                 let text = convert::to_json(&value)?;
                 write_stdout(&text).map_err(mlua::Error::from)
             })
@@ -109,15 +121,17 @@ impl HostModule for Hook {
         // The nesting exists once here so that no script has to remember it. `hookEventName` is
         // required by the contract and has no sensible default, so it is an argument rather than
         // something this module guesses.
-        let context = lua
+        let g = grants;
+        let context_fn = lua
             .create_function(
-                |lua, (event, additional): (mlua::LuaString, mlua::LuaString)| {
+                move |lua, (event, additional): (mlua::LuaString, mlua::LuaString)| {
+                    check(&g, "hook", "context", HostAccess::Stdout)?;
                     let text = context_envelope(lua, event, additional)?;
                     write_stdout(&text).map_err(mlua::Error::from)
                 },
             )
             .map_err(fail)?;
-        table.set("context", context).map_err(fail)?;
+        table.set("context", context_fn).map_err(fail)?;
 
         Ok(())
     }
@@ -195,6 +209,7 @@ mod tests {
     )]
 
     use super::Hook;
+    use crate::test_support::refusal;
     use crate::{Engine, HostModule as _, Policy, Script};
 
     fn eval(source: &str) -> String {
@@ -226,7 +241,7 @@ mod tests {
     #[test]
     fn the_module_is_available_under_a_confined_policy() {
         // Hooks are the reason `confined` is the CLI default, so the contract has to be reachable
-        // from it without a grant.
+        // from it: `confined` holds the stream members the hook functions need.
         assert_eq!(eval("return type(airsstack.hook)"), "table");
     }
 
@@ -266,6 +281,30 @@ mod tests {
         assert!(
             !specific.contains_key("permissionDecision"),
             "envelope must not carry a permissionDecision field: {specific:?}"
+        );
+    }
+
+    #[test]
+    fn hook_payload_is_refused_without_stdin() {
+        assert!(
+            refusal("return airsstack.hook.payload()")
+                .contains("hook.payload denied: `stdin` is not granted — no access is granted")
+        );
+    }
+
+    #[test]
+    fn hook_emit_is_refused_without_stdout() {
+        assert!(
+            refusal("airsstack.hook.emit({ok = true})")
+                .contains("hook.emit denied: `stdout` is not granted — no access is granted")
+        );
+    }
+
+    #[test]
+    fn hook_context_is_refused_without_stdout() {
+        assert!(
+            refusal("airsstack.hook.context('SessionStart', 'hello')")
+                .contains("hook.context denied: `stdout` is not granted — no access is granted")
         );
     }
 

@@ -3,20 +3,27 @@
 //! Below `Full` there is no `io` table at all, and a hook receives its payload on stdin — so
 //! without this such a script cannot run under any policy worth running it under.
 //!
-//! Needs no grant. The three standard streams are the ones the host handed this process when it
-//! started it, so reading and writing them is not authority over anything the host did not
-//! already choose to give. That is a narrower claim than "I/O needs no grant", and it is why
-//! opening a *file* is `fs`'s business rather than this module's.
+//! Each function needs the host-access member of the stream it touches: `read` and `lines` need
+//! `stdin`, `write` needs `stdout`, `error` needs `stderr`, and `isatty` needs the member of the
+//! stream it names (`stdout` for any other name, and for the call with no argument). The three
+//! standard streams are the ones the host handed this process when it started it, but a policy
+//! that names none of them, such as `pure`, must be able to keep a script from reading or writing
+//! them, so each function checks its member before it touches a stream. Opening a *file* is a
+//! different capability and stays `fs`'s business rather than this module's.
 //!
-//! Responsibilities: [`Stdio`], installing `read`, `lines`, `write`, `error` and `isatty`.
+//! Responsibilities: [`Stdio`], installing `read`, `lines`, `write`, `error` and `isatty`, each
+//! refusing its call before it touches a stream when its member is not granted.
 //!
 //! Non-responsibilities: interpreting what arrives. `hook` does that.
 
 use std::io::{IsTerminal as _, Read as _, Write as _};
+use std::sync::Arc;
 
 use crate::description::{Function, LuaType, ModuleDescription};
 use crate::error::{Error, Result};
+use crate::modules::access::check;
 use crate::modules::{HostModule, InstallContext};
+use crate::sandbox::HostAccess;
 use crate::types::ModuleName;
 
 /// Installs `airsstack.stdio`.
@@ -68,20 +75,27 @@ impl HostModule for Stdio {
         &self,
         lua: &mlua::Lua,
         table: &mlua::Table,
-        _context: &InstallContext<'_>,
+        context: &InstallContext<'_>,
     ) -> Result<()> {
         let fail = |e: mlua::Error| Error::ModuleInstall {
             module: String::from("stdio"),
             reason: e.to_string(),
         };
+        let grants = Arc::new(context.grants().clone());
 
+        let g = Arc::clone(&grants);
         let read = lua
-            .create_function(|_, ()| read_stdin().map_err(mlua::Error::from))
+            .create_function(move |_, ()| {
+                check(&g, "stdio", "read", HostAccess::Stdin)?;
+                read_stdin().map_err(mlua::Error::from)
+            })
             .map_err(fail)?;
         table.set("read", read).map_err(fail)?;
 
+        let g = Arc::clone(&grants);
         let lines = lua
-            .create_function(|lua, ()| {
+            .create_function(move |lua, ()| {
+                check(&g, "stdio", "lines", HostAccess::Stdin)?;
                 let text = read_stdin()?;
                 let body = text.strip_suffix('\n').unwrap_or(&text);
                 let lines: Vec<&str> = if body.is_empty() {
@@ -98,8 +112,10 @@ impl HostModule for Stdio {
 
         // No trailing newline is added. A hook's output is a single JSON document read by a parser
         // that cares what the bytes are, so this module writes exactly what it is given.
+        let g = Arc::clone(&grants);
         let write = lua
-            .create_function(|_, body: mlua::LuaString| {
+            .create_function(move |_, body: mlua::LuaString| {
+                check(&g, "stdio", "write", HostAccess::Stdout)?;
                 let mut out = std::io::stdout().lock();
                 out.write_all(&body.as_bytes())
                     .map_err(|source| Error::Io {
@@ -117,8 +133,10 @@ impl HostModule for Stdio {
             .map_err(fail)?;
         table.set("write", write).map_err(fail)?;
 
+        let g = Arc::clone(&grants);
         let error = lua
-            .create_function(|_, body: mlua::LuaString| {
+            .create_function(move |_, body: mlua::LuaString| {
+                check(&g, "stdio", "error", HostAccess::Stderr)?;
                 let mut out = std::io::stderr().lock();
                 out.write_all(&body.as_bytes())
                     .map_err(|source| Error::Io {
@@ -138,16 +156,28 @@ impl HostModule for Stdio {
 
         // Lets a script tell "a person is watching" from "my output is being parsed", which is the
         // difference between printing a progress line and corrupting a JSON document.
+        let g = grants;
         let isatty = lua
-            .create_function(|_, stream: Option<mlua::LuaString>| {
+            .create_function(move |_, stream: Option<mlua::LuaString>| {
                 let name = match stream.as_ref() {
                     Some(text) => text.to_str()?.to_owned(),
                     None => String::from("stdout"),
                 };
+                // The member is the stream's own, with every unknown name falling to stdout as the
+                // answer already does, so the check and the stream consulted cannot disagree.
                 Ok(match name.as_str() {
-                    "stdin" => std::io::stdin().is_terminal(),
-                    "stderr" => std::io::stderr().is_terminal(),
-                    _ => std::io::stdout().is_terminal(),
+                    "stdin" => {
+                        check(&g, "stdio", "isatty", HostAccess::Stdin)?;
+                        std::io::stdin().is_terminal()
+                    }
+                    "stderr" => {
+                        check(&g, "stdio", "isatty", HostAccess::Stderr)?;
+                        std::io::stderr().is_terminal()
+                    }
+                    _ => {
+                        check(&g, "stdio", "isatty", HostAccess::Stdout)?;
+                        std::io::stdout().is_terminal()
+                    }
                 })
             })
             .map_err(fail)?;
@@ -191,7 +221,8 @@ mod tests {
     )]
 
     use super::Stdio;
-    use crate::{Engine, HostModule as _, Policy, Script};
+    use crate::test_support::refusal;
+    use crate::{Engine, GrantSet, HostAccess, HostModule as _, Policy, Script};
 
     fn eval(source: &str) -> String {
         let engine = Engine::builder()
@@ -248,6 +279,77 @@ mod tests {
     #[test]
     fn isatty_defaults_to_stdout() {
         assert_eq!(eval("return type(airsstack.stdio.isatty())"), "boolean");
+    }
+
+    #[test]
+    fn stdio_read_is_refused_without_stdin() {
+        assert!(
+            refusal("return airsstack.stdio.read()")
+                .contains("stdio.read denied: `stdin` is not granted — no access is granted")
+        );
+    }
+
+    #[test]
+    fn stdio_lines_is_refused_without_stdin() {
+        assert!(
+            refusal("return airsstack.stdio.lines()")
+                .contains("stdio.lines denied: `stdin` is not granted — no access is granted")
+        );
+    }
+
+    #[test]
+    fn stdio_write_is_refused_without_stdout() {
+        assert!(
+            refusal("airsstack.stdio.write('x')")
+                .contains("stdio.write denied: `stdout` is not granted — no access is granted")
+        );
+    }
+
+    #[test]
+    fn an_argument_error_wins_over_a_refusal() {
+        // Lua converts the arguments before the host function body runs, so a malformed call
+        // reports the malformed argument even when the member it would have needed is withheld.
+        let text = refusal("airsstack.stdio.write()");
+        assert!(text.contains("bad argument"), "{text}");
+        assert!(!text.contains("denied"), "{text}");
+    }
+
+    #[test]
+    fn stdio_error_is_refused_without_stderr() {
+        assert!(
+            refusal("airsstack.stdio.error('x')")
+                .contains("stdio.error denied: `stderr` is not granted — no access is granted")
+        );
+    }
+
+    #[test]
+    fn stdio_isatty_needs_the_member_of_the_stream_it_names() {
+        for (call, member) in [
+            ("isatty('stdin')", "stdin"),
+            ("isatty('stderr')", "stderr"),
+            ("isatty('stdout')", "stdout"),
+            ("isatty()", "stdout"),
+            ("isatty('bogus')", "stdout"),
+        ] {
+            let text = refusal(&format!("return airsstack.stdio.{call}"));
+            assert!(
+                text.contains(&format!(
+                    "stdio.isatty denied: `{member}` is not granted — no access is granted"
+                )),
+                "{call}: {text}"
+            );
+        }
+
+        let engine = Engine::builder()
+            .policy(Policy::pure().with_grants(GrantSet::sealed().with_access(HostAccess::Stderr)))
+            .build()
+            .unwrap();
+        let kind = engine
+            .eval_to::<String>(
+                &Script::from_source("return type(airsstack.stdio.isatty('stderr'))", "t").unwrap(),
+            )
+            .unwrap();
+        assert_eq!(kind, "boolean");
     }
 
     #[test]

@@ -71,8 +71,8 @@ pub use extension::{Extension, ExtensionHost};
 pub use failure_policy::FailurePolicy;
 pub use modules::{HostModule, InstallContext, ModuleSet};
 pub use sandbox::{
-    EnvGrant, FsGrant, GrantSet, InstructionLimit, LanguageSurface, MemoryLimit, Policy, ProcGrant,
-    ResourceLimits,
+    EnvGrant, FsGrant, GrantSet, HostAccess, InstructionLimit, LanguageSurface, MemoryLimit,
+    Policy, ProcGrant, ResourceLimits,
 };
 pub use script::Script;
 pub use types::{

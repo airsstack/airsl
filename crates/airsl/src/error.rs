@@ -301,6 +301,17 @@ pub enum Error {
         root: String,
     },
 
+    /// A script called `require` while the policy does not grant it.
+    ///
+    /// Distinct from [`Error::RequireEscape`], which refuses a `require` that is granted but names
+    /// a file outside the allowed root: here the call is refused before any module name is looked
+    /// at.
+    #[error("require denied: {detail}")]
+    RequireDenied {
+        /// What was refused and which grant would allow it.
+        detail: String,
+    },
+
     /// A host module refused an operation the policy does not grant.
     ///
     /// Names the module, the operation and what was refused, because "permission denied" without
@@ -488,6 +499,17 @@ mod tests {
         assert_eq!(
             err.to_string(),
             "module `../secrets` resolves outside the script directory `/scripts`"
+        );
+    }
+
+    #[test]
+    fn require_denied_names_require_and_the_detail() {
+        let err = Error::RequireDenied {
+            detail: "`require` is not granted — no access is granted".into(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "require denied: `require` is not granted — no access is granted"
         );
     }
 

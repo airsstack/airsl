@@ -23,14 +23,22 @@ local function replace_literal(text, needle, with)
   return table.concat(parts)
 end
 
+--- `text` with `dir` replaced by `role`, in both spellings `dir` can take: the one the host handed
+--- over, and the one the runtime writes into a message, which separates with `/` on every platform.
+--- On unix the two are the same string; on Windows the first separates with `\`.
+local function redact(text, dir, role)
+  text = replace_literal(text, dir, role)
+  return (replace_literal(text, (string.gsub(dir, "\\", "/")), role))
+end
+
 --- A message with the machine-specific directories replaced by their roles, and the Lua traceback
 --- that follows the first line dropped — it names absolute paths and line numbers, neither of
 --- which belongs in output meant to be diffed.
 local function stable(message)
   message = string.match(message, "^[^\n]*") or message
-  message = replace_literal(message, source, "<source>")
-  message = replace_literal(message, output, "<output>")
-  return replace_literal(message, outside, "<outside>")
+  message = redact(message, source, "<source>")
+  message = redact(message, output, "<output>")
+  return redact(message, outside, "<outside>")
 end
 
 --- Runs `body`, printing the refusal instead of propagating it.

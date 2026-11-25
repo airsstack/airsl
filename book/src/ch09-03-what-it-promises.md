@@ -13,6 +13,111 @@ A sandbox is only useful if you know exactly where its edges are. Here they are.
   reports include.
 - **Starting a script is fast.** It takes microseconds, and extension authors need no toolchain.
 
+## What `pure` guarantees
+
+The `pure` preset is for calculations, and it makes a stronger promise than the others. Unless you
+give it more, a `pure` script reaches no standard input, standard output or standard error, no
+clock, no working folder, no file on the host and no time-zone database. It cannot print, because
+`print` is not there, and it cannot seed its random numbers from the clock, because
+`math.randomseed()` with no seed is refused.
+
+So on a **fresh engine**, the same script given the same input produces the same output. Here is a
+script that draws a random number:
+
+```lua
+-- roll.lua
+airsstack.stdio.write(math.random(1, 1000000) .. "\n")
+```
+
+Under `pure`, every run draws the same number. The script needs `stdout` to write its answer, which
+[chapter 3](ch03-01-nothing-by-default.md) explains. Under `confined`, the number changes each run:
+
+```console
+$ airsl run --policy pure --allow-access stdout roll.lua
+275394
+$ airsl run --policy pure --allow-access stdout roll.lua
+275394
+$ airsl run --policy confined roll.lua
+693869
+$ airsl run --policy confined roll.lua
+561919
+```
+
+Each thing you grant opens its own route. A `pure` script that holds `clock` can read the time, so
+its output can then change from run to run.
+
+### Three things that can still differ
+
+The guarantee has three exceptions. They come from the Lua interpreter itself, and `airsl` does
+not control them:
+
+- **`pairs` order.** Walking a table with `pairs` can visit string keys in a different order on
+  each run. Collect the keys, sort them, and walk the sorted list.
+- **Printed addresses.** `tostring` of a table or function, and `string.format("%p", value)`,
+  show a memory address, which changes between runs.
+- **`table.sort` ties.** When the comparison treats two elements as equal, they can come out in a
+  different order on each run. A comparison that breaks every tie gives one order. Here, people of
+  the same age are ordered by name:
+
+```lua
+-- sort.lua
+local people = {
+  { name = "Mia", age = 30 },
+  { name = "Ben", age = 25 },
+  { name = "Zoe", age = 30 },
+  { name = "Ann", age = 25 },
+}
+table.sort(people, function(a, b)
+  if a.age ~= b.age then return a.age < b.age end
+  return a.name < b.name
+end)
+for _, p in ipairs(people) do
+  airsstack.stdio.write(p.age .. " " .. p.name .. "\n")
+end
+```
+
+```console
+$ airsl run --policy pure --allow-access stdout sort.lua
+25 Ann
+25 Ben
+30 Mia
+30 Zoe
+```
+
+### Reusing an engine
+
+The promise is for a fresh engine. An engine that runs several scripts keeps the globals they set,
+and it keeps going along the same random sequence rather than starting it again. The second script
+then sees a different number from the first. [Chapter 6](ch06-04-reuse.md) covers reuse. Use a new
+engine when each run must stand alone.
+
+### Granting `require`
+
+A `pure` script can load its own sibling files once you grant `require`. Doing so shows the script
+the absolute location of its folder. Each module receives its own absolute path as its second
+argument, and error messages name it:
+
+```lua
+-- greeting.lua
+local name, path = ...
+airsstack.stdio.write("loading " .. name .. " from " .. path .. "\n")
+return { hello = function(who) return "hello, " .. who end }
+```
+
+```lua
+-- main.lua
+local greeting = require("greeting")
+airsstack.stdio.write(greeting.hello("world") .. "\n")
+```
+
+```console
+$ airsl run --policy pure --allow-access stdout --allow-access require main.lua
+loading greeting from /home/you/proj/greeting.lua
+hello, world
+```
+
+If that location should stay private, do not grant `require`, or keep the scripts in one file.
+
 ## What it does not promise
 
 - **No protection from a bug in a module.** The sandbox lives at the boundary between Lua and Rust.

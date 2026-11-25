@@ -1,0 +1,55 @@
+# lua-src 550.1.1 / lua-5.4.8/lmathlib.c (vendored by mlua-sys 0.11.0, locked)
+609:static void setseed (lua_State *L, Rand64 *state,
+610:                     lua_Unsigned n1, lua_Unsigned n2) {
+611:  int i;
+612:  state[0] = Int2I(n1);
+613:  state[1] = Int2I(0xff);  /* avoid a zero state */
+614:  state[2] = Int2I(n2);
+615:  state[3] = Int2I(0);
+616:  for (i = 0; i < 16; i++)
+617:    nextrand(state);  /* discard initial values to "spread" seed */
+618:  lua_pushinteger(L, n1);
+619:  lua_pushinteger(L, n2);
+620:}
+621:
+622:
+623:/*
+624:** Set a "random" seed. To get some randomness, use the current time
+625:** and the address of 'L' (in case the machine does address space layout
+626:** randomization).
+627:*/
+628:static void randseed (lua_State *L, RanState *state) {
+629:  lua_Unsigned seed1 = (lua_Unsigned)time(NULL);
+630:  lua_Unsigned seed2 = (lua_Unsigned)(size_t)L;
+631:  setseed(L, state->s, seed1, seed2);
+632:}
+633:
+634:
+635:static int math_randomseed (lua_State *L) {
+636:  RanState *state = (RanState *)lua_touserdata(L, lua_upvalueindex(1));
+637:  if (lua_isnone(L, 1)) {
+638:    randseed(L, state);
+639:  }
+640:  else {
+641:    lua_Integer n1 = luaL_checkinteger(L, 1);
+642:    lua_Integer n2 = luaL_optinteger(L, 2, 0);
+643:    setseed(L, state->s, n1, n2);
+644:  }
+645:  return 2;  /* return seeds */
+646:}
+647:
+648:
+649:static const luaL_Reg randfuncs[] = {
+650:  {"random", math_random},
+651:  {"randomseed", math_randomseed},
+652:  {NULL, NULL}
+653:};
+654:
+655:
+656:/*
+657:** Register the random functions and initialize their state.
+658:*/
+659:static void setrandfunc (lua_State *L) {
+660:  RanState *state = (RanState *)lua_newuserdatauv(L, sizeof(RanState), 0);
+661:  randseed(L, state);  /* initialize with a "random" seed */
+662:  lua_pop(L, 2);  /* remove pushed seeds */

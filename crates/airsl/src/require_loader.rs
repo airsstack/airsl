@@ -3,12 +3,14 @@
 //! Built rather than narrowed. Under every surface below [`LanguageSurface::Full`] Lua's own
 //! `require`, `package` and chunk loaders are all absent, so there is nothing to constrain — this
 //! installs a Rust function that resolves, checks containment, and loads, with the VM never
-//! holding a path or a file.
+//! holding a path or a file. Where the grant set does not hold [`HostAccess::Require`] it installs
+//! a function that refuses instead.
 //!
 //! Responsibilities:
 //!
-//! - [`RequireDisposition`], which of the three possible `require` globals a script should get.
-//! - [`RequireLoader`], which installs and removes the `require` global for one script root.
+//! - [`RequireDisposition`], which of the four possible `require` globals a script should get.
+//! - [`RequireLoader`], which installs the confined `require` for one script root, installs the
+//!   `require` that refuses, and removes the global.
 //! - Resolution, containment, caching and cycle detection.
 //! - Running a module: read as an expression first, then called with its name and path, the two
 //!   arguments Lua's own `require` passes.
@@ -26,7 +28,7 @@ use mlua::Value;
 use crate::error::{Error, Result};
 use crate::paths::containment::is_within;
 use crate::paths::rules::native::{strip_verbatim, to_script_string};
-use crate::sandbox::LanguageSurface;
+use crate::sandbox::{GrantSet, HostAccess, LanguageSurface};
 use crate::types::RequireTarget;
 
 /// Registry key the table of already-loaded modules is stored under.
@@ -37,11 +39,15 @@ const REQUIRE: &str = "require";
 
 /// Which `require` a script should be given, before an engine goes and installs it.
 ///
-/// An enum rather than a predicate because the answer has three values, not two. Asking only
-/// "should this script get a *confined* `require`" collapses [`LanguageSurface::Full`] and
-/// [`LanguageSurface::Minimal`] onto one `false`, and those two must not share an answer: `Full`
-/// keeps the loader `package` installed, `Minimal` is entitled to none. Naming the third case is
-/// what stops a `Full` engine from clearing the global its own surface promises to provide.
+/// [`LanguageSurface::Full`] keeps Lua's own loader whatever the grant or the root. Below it, the
+/// `require` grant decides: not granted gives a function that refuses every call; granted with a
+/// directory to resolve against gives the confined loader; granted with no directory gives no
+/// `require` at all.
+///
+/// An enum rather than a predicate because those are four different outcomes, and "should this
+/// script get a *confined* `require`" would fold three of them onto one `false`. A refusing
+/// function, a missing one and Lua's own loader each tell the script something different, and the
+/// engine has to act differently for each.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum RequireDisposition<'a> {
     /// Leave Lua's own `require` exactly as `luaopen_package` installed it.
@@ -50,29 +56,40 @@ pub(crate) enum RequireDisposition<'a> {
     /// Install a `require` resolving under this directory and nowhere else.
     Confined(&'a Path),
 
-    /// Clear `require`. Either the surface withholds it or the script has no directory to
-    /// resolve against.
+    /// Install a `require` that refuses every call, because the grant set does not hold the
+    /// `require` member.
+    Refused,
+
+    /// Clear `require`. The member is granted but the script has no directory to resolve against.
     Absent,
 }
 
 impl<'a> RequireDisposition<'a> {
-    /// The disposition for a script with `root`, running on `surface`.
+    /// The disposition for a script with `root`, running on `surface` under `grants`.
     ///
     /// `Full` keeps Lua's own, which resolves through `package.path` and is deliberately left
     /// alone — a first-party script may depend on it, and the surface documents `require` as part
-    /// of what it grants. `Restricted` gets the confined loader, but only where there is a
-    /// directory to confine it to: a script built from source has none. `Minimal` gets nothing,
-    /// because that surface exists for evaluating expressions and generated snippets, and a loader
-    /// that opens files would contradict the one configuration whose guarantees are meant to be
-    /// easiest to state.
+    /// of what it grants — whatever the grant set holds. Below `Full` the answer follows the
+    /// [`HostAccess::Require`] member: without it the script gets a `require` that refuses; with
+    /// it the script gets the confined loader, but only where there is a directory to confine it
+    /// to, so a script built from source gets none.
     ///
     /// The match is exhaustive on purpose. A fourth surface should not be able to acquire a
     /// default here by falling into a wildcard; it should fail to compile until someone decides.
-    pub(crate) const fn decide(surface: LanguageSurface, root: Option<&'a Path>) -> Self {
-        match (surface, root) {
-            (LanguageSurface::Full, _) => Self::Native,
-            (LanguageSurface::Restricted, Some(root)) => Self::Confined(root),
-            (LanguageSurface::Restricted | LanguageSurface::Minimal, _) => Self::Absent,
+    pub(crate) const fn decide(
+        surface: LanguageSurface,
+        root: Option<&'a Path>,
+        grants: &GrantSet,
+    ) -> Self {
+        match surface {
+            LanguageSurface::Full => Self::Native,
+            LanguageSurface::Restricted | LanguageSurface::Minimal => {
+                match (grants.allows(HostAccess::Require), root) {
+                    (false, _) => Self::Refused,
+                    (true, Some(root)) => Self::Confined(root),
+                    (true, None) => Self::Absent,
+                }
+            }
         }
     }
 }
@@ -128,7 +145,33 @@ impl RequireLoader {
         lua.globals().set(REQUIRE, require).map_err(fail)
     }
 
-    /// Removes `require`, for a script that is not entitled to one.
+    /// Installs a `require` that refuses every call with [`Error::RequireDenied`] carrying `detail`.
+    ///
+    /// The function takes whatever arguments it is given and looks at none of them, so a call with
+    /// no argument or a table is refused the same way as a call with a name. The module cache is
+    /// not touched: it is unreachable without a loader to consult it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::EngineSetup`] when the function cannot be created or installed.
+    pub(crate) fn install_refusal(lua: &mlua::Lua, detail: String) -> Result<()> {
+        let fail = |source: mlua::Error| Error::EngineSetup {
+            stage: "refusing require",
+            source: Box::new(source),
+        };
+
+        let refusal = lua
+            .create_function(move |_, _: mlua::MultiValue| {
+                Err::<(), _>(mlua::Error::from(Error::RequireDenied {
+                    detail: detail.clone(),
+                }))
+            })
+            .map_err(fail)?;
+
+        lua.globals().set(REQUIRE, refusal).map_err(fail)
+    }
+
+    /// Removes `require`, for a script that has nothing to resolve against.
     ///
     /// The cache is left in place. It is unreachable without `require` to consult it, and keeping
     /// it means an engine that alternates between scripts from source and scripts on disk does not
@@ -283,7 +326,7 @@ mod tests {
 
     use super::RequireDisposition;
     use crate::paths::rules::native::{strip_verbatim, to_script_string};
-    use crate::sandbox::LanguageSurface;
+    use crate::sandbox::{GrantSet, HostAccess, LanguageSurface};
     use crate::types::RequireTarget;
     use crate::{Engine, Policy, Script};
     use mlua::Value;
@@ -304,32 +347,29 @@ mod tests {
     }
 
     #[test]
-    fn only_the_restricted_surface_gets_a_confined_require() {
+    fn a_granted_require_is_confined_on_restricted_and_minimal() {
         let root = Path::new("/scripts");
-        assert_eq!(
-            RequireDisposition::decide(LanguageSurface::Restricted, Some(root)),
-            RequireDisposition::Confined(root)
-        );
-        assert_eq!(
-            RequireDisposition::decide(LanguageSurface::Full, Some(root)),
-            RequireDisposition::Native
-        );
-        assert_eq!(
-            RequireDisposition::decide(LanguageSurface::Minimal, Some(root)),
-            RequireDisposition::Absent
-        );
+        for surface in [LanguageSurface::Restricted, LanguageSurface::Minimal] {
+            assert_eq!(
+                RequireDisposition::decide(surface, Some(root), &GrantSet::declared()),
+                RequireDisposition::Confined(root),
+                "{surface}"
+            );
+        }
     }
 
     #[test]
     fn the_full_surface_keeps_lua_s_own_require_whether_or_not_the_script_has_a_root() {
-        // The distinction this enum exists for: `Full` and `Minimal` both decline the confined
-        // loader, but only one of them wants the global cleared.
-        for root in [None, Some(Path::new("/scripts"))] {
-            assert_eq!(
-                RequireDisposition::decide(LanguageSurface::Full, root),
-                RequireDisposition::Native,
-                "{root:?}"
-            );
+        // `Full` keeps Lua's own `require` whatever the `require` grant and the script's root say:
+        // the confined loader and the refusing stub both belong only to the surfaces below it.
+        for grants in [GrantSet::sealed(), GrantSet::declared()] {
+            for root in [None, Some(Path::new("/scripts"))] {
+                assert_eq!(
+                    RequireDisposition::decide(LanguageSurface::Full, root, &grants),
+                    RequireDisposition::Native,
+                    "{root:?}"
+                );
+            }
         }
     }
 
@@ -337,11 +377,99 @@ mod tests {
     fn a_script_with_no_root_has_nothing_to_resolve_against_and_gets_no_require() {
         for surface in [LanguageSurface::Restricted, LanguageSurface::Minimal] {
             assert_eq!(
-                RequireDisposition::decide(surface, None),
+                RequireDisposition::decide(surface, None, &GrantSet::declared()),
                 RequireDisposition::Absent,
                 "{surface}"
             );
         }
+    }
+
+    #[test]
+    fn an_ungranted_require_is_refused_on_restricted_and_minimal() {
+        for surface in [LanguageSurface::Restricted, LanguageSurface::Minimal] {
+            for root in [None, Some(Path::new("/scripts"))] {
+                assert_eq!(
+                    RequireDisposition::decide(surface, root, &GrantSet::sealed()),
+                    RequireDisposition::Refused,
+                    "{surface} {root:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_refusing_require_ignores_its_argument() {
+        let engine = Engine::builder().policy(Policy::pure()).build().unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        for call in ["require()", "require({})", "require('x')"] {
+            write(dir.path(), "main.lua", &format!("return {call}"));
+            let script = Script::from_file(dir.path().join("main.lua")).unwrap();
+            let err = engine.eval(&script).unwrap_err();
+            assert!(
+                matches!(
+                    crate::test_support::raised(&err),
+                    Some(crate::Error::RequireDenied { .. })
+                ),
+                "{call}: {err}"
+            );
+            assert!(
+                err.to_string()
+                    .contains("require denied: `require` is not granted — no access is granted"),
+                "{call}: {err}"
+            );
+        }
+    }
+
+    /// A `pure` engine holding only the `require` member, which is the smallest policy that
+    /// still loads modules.
+    fn pure_with_require() -> Engine {
+        Engine::builder()
+            .policy(Policy::pure().with_grants(GrantSet::sealed().with_access(HostAccess::Require)))
+            .build()
+            .unwrap()
+    }
+
+    #[test]
+    fn a_pure_script_with_require_granted_loads_its_siblings() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "lib.lua", "return 42");
+        write(dir.path(), "main.lua", "return require('lib')");
+        let script = Script::from_file(dir.path().join("main.lua")).unwrap();
+        assert_eq!(pure_with_require().eval_to::<i64>(&script).unwrap(), 42);
+    }
+
+    #[test]
+    fn a_pure_script_with_require_granted_cannot_load_outside_its_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "main.lua", "return require('../secrets')");
+        let script = Script::from_file(dir.path().join("main.lua")).unwrap();
+        let err = pure_with_require().eval(&script).unwrap_err();
+        assert!(err.to_string().contains("require target"), "{err}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_pure_script_with_require_granted_cannot_follow_a_symlink_out_of_its_folder() {
+        let outside = tempfile::tempdir().unwrap();
+        write(outside.path(), "secrets.lua", "return 'leaked'");
+
+        let dir = tempfile::tempdir().unwrap();
+        crate::test_support::link_file(
+            &outside.path().join("secrets.lua"),
+            &dir.path().join("s.lua"),
+        )
+        .unwrap();
+        write(dir.path(), "main.lua", "return require('s')");
+
+        let script = Script::from_file(dir.path().join("main.lua")).unwrap();
+        let err = pure_with_require().eval(&script).unwrap_err();
+        assert!(
+            matches!(
+                crate::test_support::raised(&err),
+                Some(crate::Error::RequireEscape { .. })
+            ),
+            "{err}"
+        );
     }
 
     #[test]

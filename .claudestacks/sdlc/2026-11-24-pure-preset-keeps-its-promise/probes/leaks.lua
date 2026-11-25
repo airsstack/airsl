@@ -1,0 +1,10 @@
+local function show(label, ok, msg) airsstack.stdio.write(label .. ": " .. tostring(ok) .. " " .. tostring(msg):gsub("\n.*", "") .. "\n") end
+show("hash_file", pcall(airsstack.hash.hash_file, "p.lua"))
+show("fs.read", pcall(airsstack.fs.read, "p.lua"))
+show("glob.walk", pcall(airsstack.glob.walk, ".", "*.lua"))
+show("fs.read abs", pcall(airsstack.fs.read, "/etc/hosts"))
+show("time.parse %Q", pcall(airsstack.time.parse, "2024-07-01 12:00 America/New_York", "%Y-%m-%d %H:%M %Q"))
+show("time.parse %z", pcall(airsstack.time.parse, "2024-07-01 12:00 -0400", "%Y-%m-%d %H:%M %z"))
+show("isatty", pcall(airsstack.stdio.isatty, "stdout"))
+show("ext.granted", pcall(function() local g = airsstack.ext.granted() local k = {} for n in pairs(g) do k[#k+1] = n end table.sort(k) return table.concat(k, ",") end))
+show("error chunk", pcall(error, "boom"))

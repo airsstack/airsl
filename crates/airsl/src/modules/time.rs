@@ -5,22 +5,27 @@
 //! threads. On unix it reads `/etc/localtime` directly; on Windows, where there is no
 //! `/etc/localtime`, it carries its own tzdb.
 //!
-//! Needs no authority. It is nonetheless the module most able to make a script's output
+//! `now` and `monotonic` need the `clock` host access, and `parse` needs `zones` when the text it
+//! parses names a time zone, because looking one up reads the host's zone database. `format` and
+//! every other form of `parse` need nothing. It is the module most able to make a script's output
 //! irreproducible, so `format` takes an explicit instant rather than defaulting to "now", and the
 //! default rendering is RFC 3339 in UTC.
 //!
-//! Responsibilities: [`Time`], installing `now`, `monotonic`, `format` and `parse`.
+//! Responsibilities: [`Time`], installing `now`, `monotonic`, `format` and `parse`, and refusing
+//! the calls whose host access the policy does not grant.
 //!
 //! Non-responsibilities: sleeping. A sandboxed script that can block the host for an arbitrary
 //! period defeats the instruction ceiling, which is the one defence against a script that never
 //! finishes.
 
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 use std::time::Instant;
 
 use crate::description::{Function, LuaType, ModuleDescription};
 use crate::error::{Error, Result};
+use crate::modules::access::{self, Subject};
 use crate::modules::{HostModule, InstallContext};
+use crate::sandbox::HostAccess;
 use crate::types::ModuleName;
 
 /// The instant every `monotonic` reading is measured from.
@@ -76,17 +81,23 @@ impl HostModule for Time {
         &self,
         lua: &mlua::Lua,
         table: &mlua::Table,
-        _context: &InstallContext<'_>,
+        context: &InstallContext<'_>,
     ) -> Result<()> {
         let fail = |e: mlua::Error| Error::ModuleInstall {
             module: String::from("time"),
             reason: e.to_string(),
         };
 
+        let grants = Arc::new(context.grants().clone());
+
         // Seconds since the Unix epoch. An integer rather than a float because Lua 5.4
         // distinguishes them and a timestamp that silently became a float would print as `1.7e9`.
+        let g = Arc::clone(&grants);
         let now = lua
-            .create_function(|_, ()| Ok(jiff::Timestamp::now().as_second()))
+            .create_function(move |_, ()| {
+                access::check(&g, "time", "now", HostAccess::Clock)?;
+                Ok(jiff::Timestamp::now().as_second())
+            })
             .map_err(fail)?;
         table.set("now", now).map_err(fail)?;
 
@@ -104,8 +115,12 @@ impl HostModule for Time {
         // point is defined by the wall clock, so `jiff` and `chrono` both bottom out in
         // `SystemTime::now`; monotonic time has no epoch and no timezone, which is why it lives in
         // `std` as its own type.
+        let g = Arc::clone(&grants);
         let monotonic = lua
-            .create_function(|_, ()| Ok(ORIGIN.get_or_init(Instant::now).elapsed().as_secs_f64()))
+            .create_function(move |_, ()| {
+                access::check(&g, "time", "monotonic", HostAccess::Clock)?;
+                Ok(ORIGIN.get_or_init(Instant::now).elapsed().as_secs_f64())
+            })
             .map_err(fail)?;
         table.set("monotonic", monotonic).map_err(fail)?;
 
@@ -128,9 +143,10 @@ impl HostModule for Time {
             .map_err(fail)?;
         table.set("format", format).map_err(fail)?;
 
+        let g = grants;
         let parse = lua
             .create_function(
-                |_, (text, pattern): (mlua::LuaString, Option<mlua::LuaString>)| {
+                move |_, (text, pattern): (mlua::LuaString, Option<mlua::LuaString>)| {
                     let text = text.to_str()?;
                     let Some(pattern) = pattern else {
                         let stamp: jiff::Timestamp = text.parse().map_err(|e| {
@@ -142,6 +158,17 @@ impl HostModule for Time {
                     let parsed =
                         jiff::fmt::strtime::parse(pattern.to_str()?.as_ref(), text.as_ref())
                             .map_err(|e| invalid("parse", e.to_string()))?;
+                    // The parsed value names its zone before any lookup, so the refusal comes
+                    // before `to_zoned` reads the zone database. An offset-only pattern names none.
+                    if let Some(name) = parsed.iana_time_zone() {
+                        access::check_subject(
+                            &g,
+                            "time",
+                            "parse",
+                            HostAccess::Zones,
+                            Subject::NamedZone(name),
+                        )?;
+                    }
                     let stamp = parsed
                         .to_zoned()
                         .map_err(|e| invalid("parse", e.to_string()))?;
@@ -188,13 +215,30 @@ mod tests {
     )]
 
     use super::Time;
+    use crate::sandbox::{GrantSet, HostAccess};
     use crate::{Engine, HostModule as _, Policy, Script};
 
-    fn eval<T: mlua::FromLuaMulti>(source: &str) -> T {
-        let engine = Engine::builder().policy(Policy::pure()).build().unwrap();
+    fn eval_under<T: mlua::FromLuaMulti>(policy: Policy, source: &str) -> T {
+        let engine = Engine::builder().policy(policy).build().unwrap();
         engine
             .eval_to::<T>(&Script::from_source(source, "test").unwrap())
             .unwrap()
+    }
+
+    /// Evaluates under `pure` with only the clock granted, the one member most tests here need.
+    fn eval<T: mlua::FromLuaMulti>(source: &str) -> T {
+        eval_under(
+            Policy::pure().with_grants(GrantSet::sealed().with_access(HostAccess::Clock)),
+            source,
+        )
+    }
+
+    /// The error text a call raises under bare `pure`, which grants no host access at all.
+    fn refusal_under_pure(call: &str) -> String {
+        eval_under(
+            Policy::pure(),
+            &format!("local ok, err = pcall(function() return {call} end); return tostring(err)"),
+        )
     }
 
     #[test]
@@ -324,5 +368,81 @@ mod tests {
     #[test]
     fn its_description_matches_what_it_installs() {
         crate::luals::verify(&super::Time::new(), &crate::types::RootTable::default()).unwrap();
+    }
+
+    #[test]
+    fn now_is_refused_without_the_clock() {
+        let text = refusal_under_pure("airsstack.time.now()");
+        assert!(
+            text.contains("time.now denied: `clock` is not granted — no access is granted"),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn monotonic_is_refused_without_the_clock() {
+        let text = refusal_under_pure("airsstack.time.monotonic()");
+        assert!(
+            text.contains("time.monotonic denied: `clock` is not granted — no access is granted"),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn parse_of_a_named_zone_is_refused_without_zones() {
+        let text = refusal_under_pure(
+            "airsstack.time.parse('2024-07-01 12:00 America/New_York', '%Y-%m-%d %H:%M %Q')",
+        );
+        assert!(
+            text.contains(
+                "time.parse denied: the named time zone `America/New_York` needs `zones`, \
+                 which is not granted — no access is granted"
+            ),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn parse_with_an_offset_needs_no_zones() {
+        assert_eq!(
+            eval_under::<i64>(
+                Policy::pure(),
+                "return airsstack.time.parse('2024-07-01 12:00 -0400', '%Y-%m-%d %H:%M %z')"
+            ),
+            1_719_849_600
+        );
+    }
+
+    #[test]
+    fn parse_with_both_an_offset_and_a_zone_needs_zones() {
+        let text = refusal_under_pure(
+            "airsstack.time.parse('2024-07-01 12:00 -0400 America/New_York', \
+             '%Y-%m-%d %H:%M %z %Q')",
+        );
+        assert!(text.contains("needs `zones`"), "{text}");
+    }
+
+    #[test]
+    fn parse_without_a_pattern_needs_no_zones() {
+        assert_eq!(
+            eval_under::<i64>(
+                Policy::pure(),
+                "return airsstack.time.parse('2024-07-01T12:00:00-04:00[America/New_York]')"
+            ),
+            1_719_849_600
+        );
+    }
+
+    #[test]
+    fn parse_of_a_named_zone_is_not_refused_with_zones() {
+        // Whether the lookup succeeds depends on the host's zone database, and every `parse`
+        // failure is a `Denied`, so only the refusal's own words can tell the two apart.
+        let policy = Policy::pure().with_grants(GrantSet::sealed().with_access(HostAccess::Zones));
+        let text: String = eval_under(
+            policy,
+            "local ok, r = pcall(airsstack.time.parse, '2024-07-01 12:00 America/New_York', \
+             '%Y-%m-%d %H:%M %Q'); return tostring(r)",
+        );
+        assert!(!text.contains("needs `zones`"), "{text}");
     }
 }

@@ -24,7 +24,7 @@ mod test_support;
 
 use std::io;
 
-use airsl::{FailurePolicy, Policy};
+use airsl::FailurePolicy;
 use clap::Parser as _;
 
 fn main() -> std::process::ExitCode {
@@ -78,8 +78,8 @@ fn dispatch(
             test_runner::run(&path, &policy)
         }
         cli::Command::Check { path } => check::run(&path),
-        cli::Command::Doctor { policy } => {
-            print!("{}", doctor::report(&Policy::from(policy)));
+        cli::Command::Doctor { policy, grants } => {
+            print!("{}", doctor::run(policy, grants));
             0
         }
         cli::Command::Ext(command) => ext::run(command, stdin, stdout, stderr),

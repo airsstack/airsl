@@ -1,14 +1,17 @@
 # text-toolkit
 
-Parses, matches, hashes, formats and globs — under a policy that grants nothing at all.
+Parses, matches, hashes, formats and globs — under `pure`, given only `stdout` and `clock`.
 
 This is its own example because the other grant-axis examples all show a module *earning*
-authority, and the larger half of the roster never asks for any. `regex`, `path`, `hash`, `time`
-and `glob.match` compute over the arguments they are handed and reach nothing outside them, so they
-arrive whole even under `pure`, the tightest preset there is. Reading only
-[`filesystem-grants`](../filesystem-grants/) and [`env-and-proc`](../env-and-proc/) leaves the
-impression that an ungranted script can do nothing; it can in fact do most text work, and this is
-that script.
+authority, and the larger half of the roster asks for little. `regex`, `path`, `hash`, `time` and
+`glob.match` compute over the arguments they are handed, so they arrive whole even under `pure`,
+the tightest preset there is. Three functions among them read the host instead and need a host
+access member: `time.now` and `time.monotonic` need `clock`, and `path.absolute` needs `cwd`. This
+script calls `time.monotonic` and not the other two, so the host gives it `clock`, and `stdout`
+because `pure` has no `print`; nothing else.
+Reading only [`filesystem-grants`](../filesystem-grants/) and [`env-and-proc`](../env-and-proc/)
+leaves the impression that a script without a grant can do nothing; it can in fact do most text
+work, and this is that script.
 
 ## Run
 
@@ -22,13 +25,15 @@ The twin, `toolkit_test.lua`, is run by the binary rather than by a Rust host:
 cargo run -p airsl-cli -- test crates/airsl/examples/text-toolkit/
 ```
 
-No `--allow-*` flag, and none is needed — which is the point. A test file that required a grant
-would fail for whoever ran the obvious command.
+No `--allow-*` flag, and none is needed — which is the point. The test file uses nothing beyond
+the host access `confined` already holds (`clock` for `time.monotonic` and `cwd` for
+`path.absolute`), because a test file that required a grant would fail for whoever ran the obvious
+command.
 
 ## Output
 
 ```
-policy: pure — surface=minimal grants=none
+policy: pure — surface=minimal grants=access stdout,clock
 
 regex
   split gave 5 lines, all matched by one compiled pattern
@@ -45,7 +50,7 @@ path
   normalize:   crates/airsl/examples/toolkit.lua
   relative_to: examples/text-toolkit/toolkit.lua
   relative_to refuses a path outside its base: true
-  is_absolute: false here, true for /etc/hosts
+  is_absolute: false
 
 hash
   sha256: fa59177decf3530582300814daaadc7f3e14f386fde816c45659cf685d053fa4
@@ -82,7 +87,7 @@ crates/airsl/examples/text-toolkit/toolkit_test.lua
   ok    an_invalid_pattern_raises_rather_than_returning_a_sentinel
   ok    captures_arrive_under_their_number_and_their_name
   ok    hashing_reproduces_the_digests_the_command_line_tools_print
-  ok    is_absolute_reads_the_leading_separator_and_nothing_else
+  ok    is_absolute_distinguishes_a_rooted_path_from_a_relative_one
   ok    monotonic_does_not_go_backwards
   ok    normalize_resolves_dots_without_consulting_the_filesystem
   ok    parse_reads_back_what_format_wrote
@@ -98,17 +103,18 @@ crates/airsl/examples/text-toolkit/toolkit_test.lua
 ## What it demonstrates
 
 - **`pure` is not a reduced runtime.** It selects the smallest language surface — `string`, `table`,
-  `math`, `utf8` and nothing else (`LanguageSurface::libraries` in
-  `src/sandbox/language_surface.rs`) — and grants nothing (`Policy::pure` in
-  `src/sandbox/policy.rs`), and every call in `toolkit.lua` still runs. The surface governs *Lua's
-  own* libraries; what the host modules may touch is a separate question, and these five ask for
-  none of it.
+  `math`, `utf8` and nothing else (`LanguageSurface::Minimal` in
+  `src/sandbox/language_surface.rs`) — and holds no host access of its own, so the example gives it
+  two members, `stdout` and `clock`, and every call in `toolkit.lua` still runs. The surface
+  governs *Lua's own* libraries; what the host modules may touch is a separate question. Of the
+  calls the script makes, only `time.monotonic` needs a member beyond the output channel, and that
+  member is `clock`.
 - **A compiled pattern is compiled once.** `regex.compile` exists because the one-shot forms rebuild
-  the pattern on every call (`Regex::install` in `src/modules/regex.rs`), which a script scanning a
-  file pays once per line. The handle it returns carries the same operations bound to one pattern
-  (`compiled_table` in `src/modules/regex.rs`), so the example's loop over five lines compiles once,
-  above the loop — and `toolkit_test.lua`'s `a_compiled_pattern_is_reusable_across_calls` holds the
-  handle across three separate matches.
+  the pattern on every call (the comment on `compile` in `install`, `src/modules/regex.rs`), which a
+  script scanning a file pays once per line. The handle it returns carries the same operations bound
+  to one pattern (`compiled_table` in the same file), so the example's loop over five lines compiles
+  once, above the loop — and `toolkit_test.lua`'s `a_compiled_pattern_is_reusable_across_calls`
+  holds the handle across three separate matches.
 - **Captures arrive under their number and their name at once**, rather than one instead of the
   other (`captures_table` in `src/modules/regex.rs`), so a pattern can be read either way without
   the caller knowing which style it was written in. The `group 3 and the name ...` line above is
@@ -116,32 +122,32 @@ crates/airsl/examples/text-toolkit/toolkit_test.lua
 - **Alternation and `\b` are why this module exists.** The log pattern uses `INFO|WARN|ERROR` and
   `(?<name>...)`; a Lua pattern has neither, and a script needing them under raw Lua ends up
   shelling out.
-- **`path` is separate from `fs` because it needs no authority** (stated in the module doc of
-  `src/modules/path.rs`). None of the paths printed above exists on the machine that printed them,
-  and none was opened: `normalize` cancels `..` textually rather than asking the operating system
-  (in `src/modules/path.rs`). The corollary is worth keeping: normalising is *not* a
-  containment check. That decision belongs to `PathGuard` (in `src/modules/guard.rs`), against a
-  canonical path, inside `fs`.
-- **`relative_to` refuses a path outside its base** (in `src/modules/path.rs`) instead
+- **`path` is separate from `fs` because its string arithmetic needs no authority** (the module doc
+  of `src/modules/path.rs`; only `path.absolute` reads anything, and it needs `cwd`). None of the
+  paths printed above exists on the machine that printed them, and none was opened: `normalize`
+  cancels `..` textually rather than asking the operating system (`normalize` in the same file).
+  The corollary is worth keeping: normalising is *not* a containment check. That decision belongs
+  to `PathGuard` (`src/modules/guard.rs`), against a canonical path, inside `fs`.
+- **`relative_to` refuses a path outside its base** (`relative_to` in `src/modules/path.rs`) instead
   of answering `../../elsewhere`. The caller asked where this is *under* that; a path that is not
   under it has no answer to that question, and inventing one hides the mistake.
 - **`ext` returns an empty string, never `nil`** (`extension` in `src/modules/path.rs`), so absence
   and failure are never the same value and the result concatenates without a check.
-- **SHA-1 ships for compatibility, not for strength** (`Hash::install` in `src/modules/hash.rs`).
-  `cache key from sha1(path)` is the Lua spelling of `shasum | cut -c1-8` — a script naming
-  artifacts that already exist on disk, where offering only SHA-256 would silently re-key every one
-  of them. `hex` is lowercase for the same reason: it is what the command-line tools print (in
-  `src/modules/hash.rs`).
-- **`time.format` takes an explicit instant and renders UTC** (the module doc of
-  `src/modules/time.rs` and `Time::install` in the same file). There is no "now" default to fall
-  into, which is what lets a script write a timestamp into a file and get the same bytes on every
-  machine. The instant in the output above is parsed back out of the log corpus, which is why the
-  line is reproducible.
+- **SHA-1 ships for compatibility, not for strength** (the `sha1` function in
+  `src/modules/hash.rs`). `cache key from sha1(path)` is the Lua spelling of `shasum | cut -c1-8` —
+  a script naming artifacts that already exist on disk, where offering only SHA-256 would silently
+  re-key every one of them. `hex` is lowercase for the same reason: it is what the command-line
+  tools print (`hex` in the same file).
+- **`time.format` takes an explicit instant and renders UTC** (the module doc and the `format`
+  function in `src/modules/time.rs`). There is no "now" default to fall into, which is what lets a
+  script write a timestamp into a file and get the same bytes on every machine. The instant in the
+  output above is parsed back out of the log corpus, which is why the line is reproducible.
 - **A reading is not a fact, so no reading is printed.** `time.monotonic` returns something
-  different on every run (`Time::install` in `src/modules/time.rs`), so the example prints the
+  different on every run (`monotonic` in `src/modules/time.rs`), so the example prints the
   *property* a script measuring a duration actually depends on: a second reading is never below the
-  first. `time.now` and `path.absolute` are absent from the script for the same reason — both need
-  no grant, and both would put a different value in this README's output block on every run.
+  first. `time.now` and `path.absolute` are absent from the script for the same reason — each
+  returns something that depends on the machine and the moment, and either would put a different
+  value in this README's output block on every run.
 - **`glob`'s `*` stops at a directory separator** (`matcher` in `src/modules/glob.rs`), which is why
   `*.lua` is `false` for the nested path and `true` for the bare filename, while `**` stays
   recursive. The looser reading would let a rule declaring `*.lua` apply to files its author never
@@ -155,12 +161,12 @@ crates/airsl/examples/text-toolkit/toolkit_test.lua
 ### The two halves of `hash` and `glob`
 
 Both modules straddle the line this example is drawn along, which is why only half of each appears
-above. `hash.hash_file` reads a file (`Hash::install` in `src/modules/hash.rs`) and `glob.walk`
-reads directories (`Glob::install` in `src/modules/glob.rs`); both go through the same `PathGuard`
-every `fs` call does, and both need the read grant. `hash.sha256` and `glob.match` are handed their
-input and need nothing. That split is the rule about modules being capabilities applied *inside* a
-module rather than between two — see [`denials-are-data`](../denials-are-data/) for what either one
-says when it is called without the grant.
+above. `hash.hash_file` reads a file (`hash_file` in `src/modules/hash.rs`) and `glob.walk` reads
+directories (`walk` in `src/modules/glob.rs`); both go through the same `PathGuard` every `fs` call
+does, and both need the read grant. `hash.sha256` and `glob.match` are handed their input and need
+nothing. That split is the rule about modules being capabilities applied *inside* a module rather
+than between two — see [`denials-are-data`](../denials-are-data/) for what either one says when it
+is called without the grant.
 
 ## See also
 

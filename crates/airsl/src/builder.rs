@@ -18,7 +18,9 @@ use crate::engine::Engine;
 use crate::error::{Error, Result};
 use crate::modules::{InstallContext, ModuleSet, stdlib};
 use crate::sandbox::Policy;
-use crate::sandbox::language_surface::{CHUNK_LOADERS, UNSAFE_OS_FUNCTIONS};
+use crate::sandbox::language_surface::{
+    CHUNK_LOADERS, MINIMAL_RANDOM_SEED, MINIMAL_WITHHELD_GLOBALS, UNSAFE_OS_FUNCTIONS,
+};
 use crate::types::RootTable;
 
 /// Type-state marker: the policy has not been chosen yet.
@@ -109,6 +111,13 @@ impl EngineBuilder<Present> {
             withhold_unsafe_globals(&lua)?;
             protect_string_metatable(&lua)?;
         }
+        if self.policy.language().closes_ambient_channels() {
+            withhold_minimal_globals(&lua)?;
+            seed_minimal_random(&lua)?;
+        }
+        // Seeding must stay ahead of `apply`, so a script is never charged for the host's
+        // set-up. No test can observe a move: the instruction hook does not count C calls made
+        // from Rust, so a seeding moved below `apply` would still leave every test green.
         let budget = self.policy.limits().apply(&lua)?;
 
         let modules = match self.modules {
@@ -146,6 +155,53 @@ fn withhold_unsafe_globals(lua: &mlua::Lua) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Removes the globals only the minimal surface withholds, such as `print`.
+fn withhold_minimal_globals(lua: &mlua::Lua) -> Result<()> {
+    let globals = lua.globals();
+    for name in MINIMAL_WITHHELD_GLOBALS {
+        globals
+            .set(name, mlua::Value::Nil)
+            .map_err(|source| Error::EngineSetup {
+                stage: "withholding minimal-surface globals",
+                source: Box::new(source),
+            })?;
+    }
+    Ok(())
+}
+
+/// Makes `math.random` repeatable and stops a script re-seeding it from the clock.
+///
+/// Lua seeds `math.random` from the clock when the state is created, and `math.randomseed()` with
+/// no argument re-seeds from it and returns it. Both are a read of the host's clock, so the state
+/// is seeded with [`MINIMAL_RANDOM_SEED`] through Lua's own `math.randomseed`, and the global is
+/// replaced by a function that holds the original and refuses only the no-argument form. Any
+/// other call goes to the original unchanged, so a script that seeds itself keeps working. This
+/// runs before the instruction ceiling is armed, so a script is not charged for the host's set-up.
+fn seed_minimal_random(lua: &mlua::Lua) -> Result<()> {
+    let fail = |source: mlua::Error| Error::EngineSetup {
+        stage: "seeding math.random",
+        source: Box::new(source),
+    };
+
+    let math: Table = lua.globals().get("math").map_err(fail)?;
+    let original: mlua::Function = math.get("randomseed").map_err(fail)?;
+    original.call::<()>(MINIMAL_RANDOM_SEED).map_err(fail)?;
+
+    let guarded = lua
+        .create_function(move |_, args: mlua::MultiValue| {
+            if args.is_empty() {
+                return Err(mlua::Error::from(Error::Denied {
+                    module: "math",
+                    operation: "randomseed",
+                    detail: "a seed is required — the no-argument form reads the clock".into(),
+                }));
+            }
+            original.call::<mlua::MultiValue>(args)
+        })
+        .map_err(fail)?;
+    math.set("randomseed", guarded).map_err(fail)
 }
 
 /// Hides the string metatable behind `__metatable`, so a script cannot reach it.
@@ -220,6 +276,16 @@ mod tests {
             .unwrap()
     }
 
+    fn pure_engine() -> Engine {
+        Engine::builder().policy(Policy::pure()).build().unwrap()
+    }
+
+    fn eval_i64(engine: &Engine, source: &str) -> i64 {
+        engine
+            .eval_to::<i64>(&Script::from_source(source, "probe").unwrap())
+            .unwrap()
+    }
+
     #[test]
     fn a_confined_engine_withholds_the_chunk_loaders() {
         for name in ["load", "loadstring", "dofile", "loadfile"] {
@@ -275,6 +341,97 @@ mod tests {
     #[test]
     fn a_trusted_engine_exposes_io() {
         assert_eq!(probe(Policy::trusted(), "return type(io)"), "table");
+    }
+
+    #[test]
+    fn a_pure_engine_withholds_print() {
+        assert_eq!(probe(Policy::pure(), "return type(print)"), "nil");
+
+        let engine = Engine::builder().policy(Policy::pure()).build().unwrap();
+        let err = engine
+            .eval(&Script::from_source("print('x')", "probe").unwrap())
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("attempt to call a nil value (global 'print')"),
+            "unexpected error text: {err}"
+        );
+    }
+
+    #[test]
+    fn restricted_keeps_print_and_lua_seeding() {
+        for policy in [Policy::confined(), Policy::trusted()] {
+            assert_eq!(probe(policy, "return type(print)"), "function");
+        }
+
+        let found = probe(
+            Policy::confined(),
+            "local a, b = math.randomseed()
+             return math.type(a) .. '/' .. math.type(b)",
+        );
+        assert_eq!(found, "integer/integer");
+    }
+
+    #[test]
+    fn minimal_random_is_the_same_sequence_on_every_fresh_engine() {
+        for _ in 0..2 {
+            assert_eq!(
+                eval_i64(&pure_engine(), "return math.random(1, 1000000)"),
+                275_394
+            );
+        }
+    }
+
+    #[test]
+    fn minimal_random_continues_across_evaluations_on_one_engine() {
+        let engine = pure_engine();
+        assert_eq!(eval_i64(&engine, "return math.random(1, 1000000)"), 275_394);
+        assert_eq!(eval_i64(&engine, "return math.random(1, 1000000)"), 909_833);
+    }
+
+    #[test]
+    fn minimal_refuses_randomseed_without_a_seed() {
+        let err = pure_engine()
+            .eval(&Script::from_source("math.randomseed()", "probe").unwrap())
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains(
+                "math.randomseed denied: a seed is required — the no-argument form reads the clock"
+            ),
+            "unexpected error text: {err}"
+        );
+    }
+
+    #[test]
+    fn minimal_randomseed_with_a_seed_repeats() {
+        let engine = pure_engine();
+        let found = engine
+            .eval_to::<String>(
+                &Script::from_source(
+                    "local a, b = math.randomseed(42)
+                     local first = math.random(1, 1000000)
+                     math.randomseed(42)
+                     local second = math.random(1, 1000000)
+                     return a .. ',' .. b .. ',' .. tostring(first == second)",
+                    "probe",
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        assert_eq!(found, "42,0,true");
+    }
+
+    #[test]
+    fn minimal_randomseed_passes_lua_s_own_argument_error_through() {
+        let err = pure_engine()
+            .eval(&Script::from_source("math.randomseed(nil)", "probe").unwrap())
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("bad argument #1 to '?' (number expected, got nil)"),
+            "unexpected error text: {err}"
+        );
     }
 
     #[test]

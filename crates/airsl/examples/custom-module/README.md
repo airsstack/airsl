@@ -34,7 +34,7 @@ modules: json, path, fs, env, proc, regex, hash, time, glob, stdio, hook, ext, m
 
 ["myapp.metrics recorded requests","myapp.metrics recorded cache.hits","myapp.metrics recorded cache.misses"]
 reset allowed: false
-refusal: runtime error: metrics.reset denied: it needs a filesystem write grant — granted: none
+refusal: runtime error: metrics.reset denied: it needs a filesystem write grant — granted: access stdin,stdout,stderr,clock,cwd,require,zones
 ```
 
 ## What it demonstrates

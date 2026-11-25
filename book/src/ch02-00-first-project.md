@@ -45,7 +45,7 @@ Run it:
 
 ```console
 $ airsl run headings.lua
-airsl: lua error in headings.lua: fs.read denied: `/home/you/notes/notes.md` is outside the granted read roots: none are granted
+airsl: lua error in headings.lua: fs.read denied: `notes.md` is outside the granted read roots: none are granted
 stack traceback:
 	[C]: in field 'read'
 	headings.lua:2: in main chunk
@@ -62,13 +62,15 @@ The script is not broken. It asked to read a file, and nobody had said it may.
 Look closely at the message, because every refusal in `airsl` has the same shape:
 
 ```
-fs.read denied: `/home/you/notes/notes.md` is outside the granted read roots: none are granted
-└──────┬─────┘  └────────────┬───────────┘                                    └──────┬──────┘
-   what was           what it wanted                                         what it had
+fs.read denied: `notes.md` is outside the granted read roots: none are granted
+└──────┬─────┘  └────┬───┘                                    └──────┬──────┘
+   what was   what it wanted                                 what it had
    attempted
 ```
 
-It tells you the operation, the exact file, and what the script *was* allowed to read. Here, nothing.
+It tells you the operation, the file, and what the script *was* allowed to read. Here, nothing.
+When no folder was granted at all, the file is shown as the script wrote it. When some folder was
+granted, it is shown as a full path, as in the next refusal below.
 
 Notice also what was **not** refused. The `airsstack.regex` call would have worked fine. Matching
 text reaches nothing outside the script, so it needs no permission. The same is true of building
@@ -138,6 +140,12 @@ $ airsl run --allow-read . headings.lua notes.md
 `require` only looks in the script's own folder, and in folders beneath it. A module name cannot
 contain `..` or a path separator, so a script cannot reach for `require("../../secrets")`. You can
 still organise modules into subfolders: `require("lib.markdown")` loads `lib/markdown.lua`.
+
+`require` is a permission of its own: the `require` member of
+[host access](ch03-01-nothing-by-default.md). `confined`, the preset `airsl run` starts from, holds
+it, which is why this example needs no flag. Under `pure` the call is refused until
+`--allow-access require` gives it back. What granting it reveals about your folders is covered in
+[what `airsl` promises](ch09-03-what-it-promises.md).
 
 ## What a module receives
 
@@ -230,7 +238,8 @@ they run with no permission at all.
 - A script is refused when it reaches for something it was not granted, and the refusal names what
   it wanted and what it had.
 - `--allow-read DIR` grants a place, not a general permission.
-- `require` loads modules from the script's own folder and nowhere else.
+- `require` loads modules from the script's own folder and nowhere else, and needs the `require`
+  member of host access, which `confined` holds.
 - Code that does no I/O needs no permission, which makes it easy to test. Keep the I/O at the edges.
 
 The next chapter looks at every kind of permission a script can be given.

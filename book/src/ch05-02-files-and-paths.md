@@ -33,13 +33,14 @@ the `TODO` in its own pattern.
 ## Three modules, three jobs
 
 ```
-  path    builds and takes apart path strings        never needs a grant
+  path    builds and takes apart path strings        a relative path needs `cwd`
   glob    matches path patterns                      walk needs a read grant
   fs      reads and writes files                     always needs a grant
 ```
 
 They are separate because building a path touches nothing, while opening one does. A script that
-only works out file names can do that with no permission at all.
+only works out file names can do that with no permission at all. The one exception is `absolute`,
+described below.
 
 ## `path`
 
@@ -61,6 +62,23 @@ confused with "something went wrong".
 
 Paths are always written with `/`, on every platform, including Windows. A script never has to care
 which way the slashes go.
+
+### `path.absolute`
+
+`path.absolute(p)` makes a relative path absolute, by putting the folder the script was started in
+before it. That folder is something the script could not otherwise learn, so a relative path needs
+the `cwd` member of host access. A path that is already absolute needs nothing, and comes back
+unchanged.
+
+`confined` holds `cwd`, so under the default preset the call just works. Under `pure`, a script that
+calls `airsstack.path.absolute("lib/parse.lua")` is refused:
+
+```console
+$ airsl run --policy pure absolute.lua
+airsl: lua error in absolute.lua: path.absolute denied: the relative path `lib/parse.lua` needs `cwd`, which is not granted — no access is granted
+```
+
+`--allow-access cwd` gives it back.
 
 ## `glob`
 
@@ -113,3 +131,33 @@ end
 
 Checking `fs.exists` and then writing would not work. Two copies could both check, both see nothing,
 and both write.
+
+### Two rules before any file is touched
+
+`fs`, `glob.walk` and `hash.hash_file` all check the path before they look at the disk, and refuse
+without revealing anything about it. Two rules apply, in this order.
+
+**No roots granted.** If nothing is granted for the kind of access the call needs, the call is
+refused at once, with the path exactly as the script wrote it. Here `read-hosts.lua` reads
+`/etc/hosts`:
+
+```console
+$ airsl run --policy pure read-hosts.lua
+airsl: lua error in read-hosts.lua: fs.read denied: `/etc/hosts` is outside the granted read roots: none are granted
+```
+
+**A relative path needs `cwd`.** A relative path means "from the folder the script was started in".
+Unless the script holds the `cwd` member of host access, a relative path is refused even when it
+would have landed inside a granted folder. Here `read-notes.lua` reads `notes.md`:
+
+```console
+$ airsl run --policy pure --allow-read /usr read-notes.lua
+airsl: lua error in read-notes.lua: fs.read denied: the relative path `notes.md` needs `cwd`, which is not granted — no access is granted
+```
+
+The end of the message lists the host access the script does hold. With `--allow-access stderr` added
+it reads `the granted access is stderr`. Passing `--allow-access cwd` lets the relative path through
+to the usual check against `/usr`.
+
+`confined` holds `cwd`, so only the first rule can refuse a script there, as in
+[chapter 2](ch02-00-first-project.md).

@@ -8,6 +8,7 @@ works.
 - [C. Presets at a Glance](appendix-03-presets.md): `trusted`, `confined` and `pure` side by side
 - [D. Installation Details](appendix-04-installation.md): archives, checksums and verification
 - [E. Performance](appendix-05-performance.md): how long things take
+- [F. Lua Functions by Surface](appendix-06-surfaces.md): which Lua functions each preset loads
 
 For the Rust API, the reference is the generated documentation at
 [docs.rs/airsl](https://docs.rs/airsl).

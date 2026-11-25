@@ -31,11 +31,12 @@ A policy is three separate answers:
 | Part | Answers | Set with |
 |---|---|---|
 | language | which parts of Lua's own library the script sees | the preset |
-| grants | what the `airsstack` modules may touch | `--allow-…`, `GrantSet` |
+| grants | what the `airsstack` modules may touch, and which host access they have | `--allow-…`, `GrantSet` |
 | limits | how much memory and time the script may spend | `--memory-limit`, `ResourceLimits` |
 
 Keeping them apart is what lets you say things like "all of Lua, but only 8 MB of memory", or "no
-limits, but no grants either". If they were one setting, most combinations could not be expressed.
+limits, but nothing granted either". If they were one setting, most combinations could not be
+expressed.
 
 The limits are armed before any module is installed, so there is no moment, however brief, when an
 engine exists without them.

@@ -49,7 +49,7 @@ does not run one, which is the difference between "it builds" and "it works" —
 
 | Example | What it shows |
 | --- | --- |
-| [`text-toolkit`](text-toolkit/) | `regex`, `path`, `hash`, `time` and `glob.match` under a policy that grants nothing — plus the `_test.lua` twin `airsl test` runs. |
+| [`text-toolkit`](text-toolkit/) | `regex`, `path`, `hash`, `time` and `glob.match` under `pure`, given only `stdout` and `clock` — plus the `_test.lua` twin `airsl test` runs. |
 | [`multi-file-project`](multi-file-project/) | The confined `require`: a module tree, its cache, and the three different functions that share the name. |
 
 ### The shape of a real host
@@ -93,11 +93,12 @@ does not run one, which is the difference between "it builds" and "it works" —
   what it skipped, rather than the marked directory silently vanishing from the log (the `examples`
   task in `Makefile.toml`) — a newly added example with no marker runs on Windows and fails loudly
   there, which is the property the glob exists to protect.
-- **A shipped `*_test.lua` runs under `confined` with no grants.** `cargo make examples` finishes by
-  running `airsl test` over this whole tree, and that command's default policy is confined with an
-  empty grant set. Discovery is by directory rather than a list, for the reason the run above is: a
-  test file no command picks up is worse than no test file. So a test that needs authority to run is
-  a test this suite cannot carry.
+- **A shipped `*_test.lua` runs under `confined`, with no fs, env or exec grant.** `cargo make
+  examples` finishes by running `airsl test` over this whole tree, and that command's default policy is
+  confined, which holds host access (stdin, stdout, stderr, the clock, the working directory,
+  `require` and time zones) but no filesystem, environment or exec grant. Discovery is by directory
+  rather than a list, for the reason the run above is: a test file no command picks up is worse than
+  no test file. So a test that needs authority to run is a test this suite cannot carry.
 - **`Script::from_file` is a host read.** Loading a script from disk is not governed by `FsGrant`;
   the grant governs the `airsstack.fs.*` calls the script itself makes. An example may therefore
   load a script from a path that script could not read.
