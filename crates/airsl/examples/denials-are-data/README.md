@@ -47,25 +47,26 @@ which keeps the message identical on Linux and macOS. `<granted>` is substituted
 ## What it demonstrates
 
 - **A module is always present, even ungranted.** All twelve are asserted to be tables under a
-  policy that grants almost none of what they do. The roster comes from `modules::stdlib()`
-  (`src/modules/stdlib.rs:22`), which is the single list the engine, `airsl doctor` and the tests
-  all read.
+  policy that grants almost none of what they do. The roster comes from `modules::stdlib()` (in
+  `src/modules/stdlib.rs`), which is the single list the engine, `airsl doctor` and the tests all
+  read.
 - **Enforcement is per call, not per installation.** `HostModule::install` receives the policy
-  through `InstallContext` (`src/modules/registry.rs:33`) and captures what it needs into the
+  through `InstallContext` (in `src/modules/registry.rs`) and captures what it needs into the
   functions it creates — the check happens inside the host function, immediately before the
-  operation. That is why `fs` can be present, refuse `/`, and still serve a granted read in the
-  same run.
+  operation. That is why `fs` can be present, refuse `/`, and still serve a granted read in the same
+  run.
 - **Some modules need no authority at all.** `path` and `json` behave identically under every
   policy. `path` needs nothing and `fs` does, so they are separate modules rather than one
   convenient namespace — every module is a capability.
 - **Authority is borrowed, not invented.** `hash.hash_file` opens a file and `glob.walk` reads
   directories, so both answer to the *filesystem read* grant rather than getting an axis of their
-  own. They share `PathGuard` with `fs` — `src/modules/hash.rs:73` and `src/modules/glob.rs:89`,
-  against `src/modules/fs.rs:78`. `glob.match`, which is pure pattern arithmetic, needs nothing.
+  own. They share `PathGuard` with `fs` — `Hash::install` in `src/modules/hash.rs` and
+  `Glob::install` in `src/modules/glob.rs` each build one, as `Fs::install` in `src/modules/fs.rs`
+  does. `glob.match`, which is pure pattern arithmetic, needs nothing.
 - **Every refusal is actionable.** Each message names the module, the operation, what was refused,
-  and what *was* granted — `Error::Denied` (`src/error.rs:217`). "Permission denied" without those
-  is indistinguishable from the operating system's own refusal, and sends whoever reads it looking
-  at file modes instead of at the policy.
+  and what *was* granted — `Error::Denied` (in `src/error.rs`). "Permission denied" without those is
+  indistinguishable from the operating system's own refusal, and sends whoever reads it looking at
+  file modes instead of at the policy.
 
 ## See also
 

@@ -35,28 +35,29 @@ resolved: `sh` is `/bin/sh` on macOS and `/usr/bin/sh` on a usrmerge Linux.
 
 ## What it demonstrates
 
-- **An ungranted name raises; a granted-but-unset name returns `nil`.**
-  `src/modules/env.rs:153` states the reason: a script that cannot tell those apart cannot tell
-  "you may not ask" from "it is not set", and would report a missing configuration when it had
-  actually been denied. The refusal itself is built at `src/modules/env.rs:111` and lists the
-  allowed names.
-- **`env.all()` returns only the granted names**, and only those actually set —
-  `src/modules/env.rs:161`. Never everything the host process inherited. Note that `PATH` appears
-  and `AIRSL_EXAMPLE_UNSET` does not, though both are granted.
+- **An ungranted name raises; a granted-but-unset name returns `nil`.** The comment on `get` in
+  `Env::install` (`src/modules/env.rs`) states the reason: a script that cannot tell those apart
+  cannot tell "you may not ask" from "it is not set", and would report a missing configuration when
+  it had actually been denied. The refusal itself is built by `denied` in `src/modules/env.rs` and
+  lists the allowed names.
+- **`env.all()` returns only the granted names**, and only those actually set — `all` in
+  `Env::install` (`src/modules/env.rs`). Never everything the host process inherited. Note that
+  `PATH` appears and `AIRSL_EXAMPLE_UNSET` does not, though both are granted.
 - **`env.set` writes an overlay, not the host's environment.** `env.get`, `env.all` and `proc.run`
   all consult it, so the child sees `from-lua` — while the final line of the run asserts from Rust
   that the host process still has no such variable. Partly this is because `std::env::set_var` is
   `unsafe` in Edition 2024 and this crate forbids `unsafe`; mostly it is because a sandboxed script
   silently changing the host's environment is not a capability anyone meant to grant.
-- **`proc.run` takes an argv array and has no string form** — `src/modules/proc.rs:67`. There is no
-  shell, so there is no word splitting and no quoting bug available to write. `io.popen`, which
-  takes a shell string, is withheld below the `full` surface for the same reason.
-- **A non-zero exit status is a result, not an error.** `src/modules/proc.rs:131` keeps `status` a
-  number even for a signalled process (reporting `-1`), so `result.status ~= 0` stays the one way
-  to ask whether it worked. The `exit 3` above raises nothing.
-- **The executable allowlist matches the program name as written.** `ProcGrant::allow`
-  (`src/sandbox/grants.rs:193`) permitting `sh` does not permit `/bin/sh`, and the refusal
-  (`src/modules/proc.rs:48`) lists what was allowed.
+- **`proc.run` takes an argv array and has no string form** — `argv` in `src/modules/proc.rs`. There
+  is no shell, so there is no word splitting and no quoting bug available to write. `io.popen`,
+  which takes a shell string, is withheld below the `full` surface for the same reason.
+- **A non-zero exit status is a result, not an error.** `proc.run` (`Proc::install` in
+  `src/modules/proc.rs`) keeps `status` a number even for a signalled process (reporting `-1`), so
+  `result.status ~= 0` stays the one way to ask whether it worked. The `exit 3` above raises
+  nothing.
+- **The executable allowlist matches the program name as written.** `ProcGrant::allow` (in
+  `src/sandbox/grants.rs`) permitting `sh` does not permit `/bin/sh`, and the refusal (`denied` in
+  `src/modules/proc.rs`) lists what was allowed.
 
 ## See also
 

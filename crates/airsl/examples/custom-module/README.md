@@ -46,15 +46,17 @@ Three things a contributor needs to know, in the order they bite:
   written without naming those types. A separately declared `mlua` version produces type errors
   that never mention the real cause. This example writes `airsl::mlua::Lua` in full to make the
   point unmissable.
-- **`install` receives the policy** through `InstallContext` (`src/modules/registry.rs:33`). A
+- **`install` receives the policy** through `InstallContext` (in `src/modules/registry.rs`). A
   module that guards an operation reads its authority from `context.grants()`
-  (`src/modules/registry.rs:52`) rather than from a copy it was constructed with, which is what
-  makes it impossible for a module to enforce one thing while `airsl doctor` reports another.
-- **Name your own root table.** `RootTable::new("myapp")` (`src/builder.rs:83`); without it a
-  third-party module lands in a namespace called `airsstack`, which belongs to this crate rather
-  than to the embedding application. The module asks the context for the name
-  (`src/modules/registry.rs:61`) instead of hard-coding it, so its own messages stay correct under
-  whatever root the host picked — hence `myapp.metrics recorded …` in the output.
+  (`InstallContext::grants` in `src/modules/registry.rs`) rather than from a copy it was constructed
+  with, which is what makes it impossible for a module to enforce one thing while `airsl doctor`
+  reports another.
+- **Name your own root table.** `RootTable::new("myapp")`, handed to `EngineBuilder::root_table` (in
+  `src/builder.rs`); without it a third-party module lands in a namespace called `airsstack`, which
+  belongs to this crate rather than to the embedding application. The module asks the context for
+  the name (`InstallContext::root_table` in `src/modules/registry.rs`) instead of hard-coding it, so
+  its own messages stay correct under whatever root the host picked — hence
+  `myapp.metrics recorded …` in the output.
 
 And two things the output shows about the surrounding design:
 
@@ -66,10 +68,10 @@ And two things the output shows about the surrounding design:
   operation, so `pcall` *observes* the refusal without bypassing it. Lua never holds a handle to
   anything it was not granted.
 
-The module list in the output is insertion order (`src/modules/registry.rs:144` preserves it), which
-is why `metrics` appears last, after the twelve from `airsl::modules::stdlib()`
-(`src/modules/stdlib.rs:22`). `insert` rejects a duplicate name, so colliding with `json` is an
-error when the engine is built rather than a module that silently replaces another.
+The module list in the output is insertion order (`ModuleSet::insert` preserves it), which is why
+`metrics` appears last, after the twelve from `airsl::modules::stdlib()`. `insert` rejects a
+duplicate name, so colliding with `json` is an error when the engine is built rather than a module
+that silently replaces another.
 
 ## See also
 

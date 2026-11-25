@@ -54,7 +54,7 @@ The API reference is on [docs.rs](https://docs.rs/airsl).
 | Crate | What it is |
 |---|---|
 | [`airsl`](crates/airsl) | The library: the engine, the sandbox, and the modules scripts use |
-| [`airsl-cli`](crates/airsl-cli) | The `airsl` command: `run`, `test`, `check`, `doctor`, `ext` |
+| [`airsl-cli`](crates/airsl-cli) | The `airsl` command: `run`, `test`, `check`, `doctor`, `ext`, `lua` |
 
 `airsl` runs on Linux, macOS and Windows (`x86_64-pc-windows-msvc`). The prebuilt command needs
 nothing else installed. Building from source needs a C compiler, because Lua is compiled from its C

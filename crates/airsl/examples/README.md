@@ -64,30 +64,34 @@ does not run one, which is the difference between "it builds" and "it works" —
 | Example | What it shows |
 | --- | --- |
 | [`custom-module`](custom-module/) | Implementing `HostModule`, reading authority from `InstallContext`, and naming your own root table. |
+| [`notes-module`](notes-module/) | The module the book's chapter on writing your own builds: `HostModule` with `describe`, the editor files for your own root table, and the test that keeps them true. |
 | [`extension-host`](extension-host/) | Loading a directory of third-party extensions under one ceiling, and broadcasting one event to every extension that made it in. |
 
 ## Conventions these examples follow
 
 - **Output is deterministic.** No wall-clock timestamps, no absolute paths, no figures that differ
   between Linux, macOS and Windows. Every `## Output` block in a per-example README is real captured
-  stdout, and running the example again reproduces it byte for byte — the twelve examples that run
+  stdout, and running the example again reproduces it byte for byte — the thirteen examples that run
   on Windows included, because `airsl` returns `/`-separated paths on every platform precisely so an
   identical script produces identical bytes there too.
-- **Nothing is written inside the repository.** Examples that need a writable directory use a
-  temporary one, removed when the example ends.
+- **Nothing is written inside the repository, with one exception.** Examples that need a writable
+  directory use a temporary one, removed when the example ends. The exception is
+  `notes-module-setup`, which sets up an editor for the folder you run it from: it writes `.airsl/`
+  and `.luarc.json` there. Run it from a scratch folder, not from a checkout you want to keep clean.
 - **Printing from both sides is safe, and several examples do.** Lua's `print` writes to C `stdout`
   and `println!` writes to Rust's, which sounds like two buffers waiting to reorder — they are not.
   Lua flushes after every line (`lua_writeline` is `fwrite` followed by `fflush`), Rust's stdout is
   a `LineWriter` that flushes on the newline, and `airsstack.stdio.write` flushes explicitly
-  (`src/modules/stdio.rs:109`). So a run piped into a file has the same line order as a run on a
-  terminal, which is what lets an `## Output` block be captured through a pipe and still be true.
+  (`Stdio::install` in `src/modules/stdio.rs`). So a run piped into a file has the same line order
+  as a run on a terminal, which is what lets an `## Output` block be captured through a pipe and
+  still be true.
 - **Only `sh` is ever executed.** An example that wanted some other program would be an example that
   fails on a machine without it — and that reasoning is why [`env-and-proc`](env-and-proc/) and
   [`denials-are-data`](denials-are-data/) do not run on Windows: `sh` is the program not present
-  there, and nothing replaces them. Each carries a `unix-only` marker file in its own directory,
-  its text stating the reason. `cargo make examples` still discovers every directory by glob and
-  reports what it skipped, rather than the marked directory silently vanishing from the log
-  (`Makefile.toml:108-110`) — a newly added example with no marker runs on Windows and fails loudly
+  there, and nothing replaces them. Each carries a `unix-only` marker file in its own directory, its
+  text stating the reason. `cargo make examples` still discovers every directory by glob and reports
+  what it skipped, rather than the marked directory silently vanishing from the log (the `examples`
+  task in `Makefile.toml`) — a newly added example with no marker runs on Windows and fails loudly
   there, which is the property the glob exists to protect.
 - **A shipped `*_test.lua` runs under `confined` with no grants.** `cargo make examples` finishes by
   running `airsl test` over this whole tree, and that command's default policy is confined with an
@@ -98,18 +102,20 @@ does not run one, which is the difference between "it builds" and "it works" —
   the grant governs the `airsstack.fs.*` calls the script itself makes. An example may therefore
   load a script from a path that script could not read.
 - **Several examples name the chunk themselves.** `Script::from_file` takes the chunk name from the
-  path as given (`src/types/chunk_name.rs:60`), and these examples build that path from
-  `CARGO_MANIFEST_DIR` — so a raised error would carry an absolute path into the traceback, which is
-  neither reproducible nor anyone else's business. Where an example prints a failure, it uses:
+  path as given (`ChunkName::from_path` in `src/types/chunk_name.rs`), and these examples build that
+  path from `CARGO_MANIFEST_DIR` — so a raised error would carry an absolute path into the
+  traceback, which is neither reproducible nor anyone else's business. Where an example prints a
+  failure, it uses:
 
   ```rust
   let script = Script::from_file(&path)?.with_name("raises.lua")?;
   ```
 
   This is worth knowing outside the examples: a hook loaded from an absolute path puts that path in
-  every diagnostic it emits, and a hook's stderr often ends up in someone else's log. `with_name`
-  (`src/script.rs:119`) changes only the label — the source, the arguments and the root the file was
-  read from are untouched, so a renamed script still `require`s exactly what it could before.
+  every diagnostic it emits, and a hook's stderr often ends up in someone else's log.
+  `Script::with_name` in `src/script.rs` changes only the label — the source, the arguments and the
+  root the file was read from are untouched, so a renamed script still `require`s exactly what it
+  could before.
 
 ## See also
 

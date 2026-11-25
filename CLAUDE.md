@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `airsl` embeds Lua 5.4 in Rust and lets the **host** decide what a script may reach. Two crates in
 one workspace: `crates/airsl` (the library) and `crates/airsl-cli` (the `airsl` binary — `run`,
-`test`, `check`, `doctor`, `ext doctor`/`ext fire`).
+`test`, `check`, `doctor`, `ext doctor`/`ext fire`, `lua setup`).
 
 Build requirement that is not negotiable: **a C compiler** (`mlua`'s `vendored` feature compiles
 Lua 5.4 from C source and links it statically — no system Lua, no `pkg-config`). On Linux and macOS
@@ -78,10 +78,12 @@ Key seams:
   deadlock.
 - `Engine::builder()` is a **type-state builder** (`builder.rs`, `Missing`/`Present`): there is no
   `build()` until `policy()` has been called, so a sandbox cannot be forgotten.
-- `HostModule::install(&mlua::Lua, &mlua::Table, &InstallContext)` is the extension seam. `mlua` is
-  re-exported as `airsl::mlua` deliberately — it is part of the contract, and a separately declared
-  version produces type errors that never name the real cause. `InstallContext` carries the *engine's*
-  policy, so what a module enforces and what `airsl doctor` reports cannot diverge.
+- `HostModule::install(&mlua::Lua, &mlua::Table, &InstallContext)` is the extension seam, and
+  `describe` beside it lists the module's Lua surface for editors and the drift check
+  (`luals::verify`). `mlua` is re-exported as `airsl::mlua` deliberately — it is part of the
+  contract, and a separately declared version produces type errors that never name the real cause.
+  `InstallContext` carries the *engine's* policy, so what a module enforces and what `airsl doctor`
+  reports cannot diverge.
 - `modules::stdlib()` (`src/modules/stdlib.rs`) is the single list of built-ins; the engine, the
   doctor output, and tests all read it. A new module is registered there.
 - The filesystem containment rule is written in two places, each the only place for its half.

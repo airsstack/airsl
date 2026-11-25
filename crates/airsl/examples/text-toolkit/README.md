@@ -98,66 +98,69 @@ crates/airsl/examples/text-toolkit/toolkit_test.lua
 ## What it demonstrates
 
 - **`pure` is not a reduced runtime.** It selects the smallest language surface — `string`, `table`,
-  `math`, `utf8` and nothing else (`src/sandbox/language_surface.rs:86`) — and grants nothing
-  (`src/sandbox/policy.rs:87`), and every call in `toolkit.lua` still runs. The surface governs
-  *Lua's own* libraries; what the host modules may touch is a separate question, and these five ask
-  for none of it.
+  `math`, `utf8` and nothing else (`LanguageSurface::libraries` in
+  `src/sandbox/language_surface.rs`) — and grants nothing (`Policy::pure` in
+  `src/sandbox/policy.rs`), and every call in `toolkit.lua` still runs. The surface governs *Lua's
+  own* libraries; what the host modules may touch is a separate question, and these five ask for
+  none of it.
 - **A compiled pattern is compiled once.** `regex.compile` exists because the one-shot forms rebuild
-  the pattern on every call (`src/modules/regex.rs:162`), which a script scanning a file pays once
-  per line. The handle it returns carries the same operations bound to one pattern
-  (`src/modules/regex.rs:79`), so the example's loop over five lines compiles once, above the loop —
-  and `toolkit_test.lua`'s `a_compiled_pattern_is_reusable_across_calls` holds the handle across
-  three separate matches.
+  the pattern on every call (`Regex::install` in `src/modules/regex.rs`), which a script scanning a
+  file pays once per line. The handle it returns carries the same operations bound to one pattern
+  (`compiled_table` in `src/modules/regex.rs`), so the example's loop over five lines compiles once,
+  above the loop — and `toolkit_test.lua`'s `a_compiled_pattern_is_reusable_across_calls` holds the
+  handle across three separate matches.
 - **Captures arrive under their number and their name at once**, rather than one instead of the
-  other (`src/modules/regex.rs:68`), so a pattern can be read either way without the caller knowing
-  which style it was written in. The `group 3 and the name ...` line above is that asserted rather
-  than described.
+  other (`captures_table` in `src/modules/regex.rs`), so a pattern can be read either way without
+  the caller knowing which style it was written in. The `group 3 and the name ...` line above is
+  that asserted rather than described.
 - **Alternation and `\b` are why this module exists.** The log pattern uses `INFO|WARN|ERROR` and
   `(?<name>...)`; a Lua pattern has neither, and a script needing them under raw Lua ends up
   shelling out.
-- **`path` is separate from `fs` because it needs no authority** (`src/modules/path.rs:3`). None of
-  the paths printed above exists on the machine that printed them, and none was opened: `normalize`
-  cancels `..` textually rather than asking the operating system (`src/modules/path.rs:168`). The
-  corollary is worth keeping: normalising is *not* a containment check. That decision belongs to
-  `PathGuard` (`src/modules/guard.rs:57`), against a canonical path, inside `fs`.
-- **`relative_to` refuses a path outside its base** (`src/modules/path.rs:207`) instead of answering
-  `../../elsewhere`. The caller asked where this is *under* that; a path that is not under it has no
-  answer to that question, and inventing one hides the mistake.
-- **`ext` returns an empty string, never `nil`** (`src/modules/path.rs:158`), so absence and failure
-  are never the same value and the result concatenates without a check.
-- **SHA-1 ships for compatibility, not for strength** (`src/modules/hash.rs:82`). `cache key from
-  sha1(path)` is the Lua spelling of `shasum | cut -c1-8` — a script naming artifacts that already
-  exist on disk, where offering only SHA-256 would silently re-key every one of them. `hex` is
-  lowercase for the same reason: it is what the command-line tools print
-  (`src/modules/hash.rs:48`).
-- **`time.format` takes an explicit instant and renders UTC** (`src/modules/time.rs:8`,
-  `src/modules/time.rs:99`). There is no "now" default to fall into, which is what lets a script
-  write a timestamp into a file and get the same bytes on every machine. The instant in the output
-  above is parsed back out of the log corpus, which is why the line is reproducible.
+- **`path` is separate from `fs` because it needs no authority** (stated in the module doc of
+  `src/modules/path.rs`). None of the paths printed above exists on the machine that printed them,
+  and none was opened: `normalize` cancels `..` textually rather than asking the operating system
+  (in `src/modules/path.rs`). The corollary is worth keeping: normalising is *not* a
+  containment check. That decision belongs to `PathGuard` (in `src/modules/guard.rs`), against a
+  canonical path, inside `fs`.
+- **`relative_to` refuses a path outside its base** (in `src/modules/path.rs`) instead
+  of answering `../../elsewhere`. The caller asked where this is *under* that; a path that is not
+  under it has no answer to that question, and inventing one hides the mistake.
+- **`ext` returns an empty string, never `nil`** (`extension` in `src/modules/path.rs`), so absence
+  and failure are never the same value and the result concatenates without a check.
+- **SHA-1 ships for compatibility, not for strength** (`Hash::install` in `src/modules/hash.rs`).
+  `cache key from sha1(path)` is the Lua spelling of `shasum | cut -c1-8` — a script naming
+  artifacts that already exist on disk, where offering only SHA-256 would silently re-key every one
+  of them. `hex` is lowercase for the same reason: it is what the command-line tools print (in
+  `src/modules/hash.rs`).
+- **`time.format` takes an explicit instant and renders UTC** (the module doc of
+  `src/modules/time.rs` and `Time::install` in the same file). There is no "now" default to fall
+  into, which is what lets a script write a timestamp into a file and get the same bytes on every
+  machine. The instant in the output above is parsed back out of the log corpus, which is why the
+  line is reproducible.
 - **A reading is not a fact, so no reading is printed.** `time.monotonic` returns something
-  different on every run (`src/modules/time.rs:80`), so the example prints the *property* a script
-  measuring a duration actually depends on: a second reading is never below the first.
-  `time.now` and `path.absolute` are absent from the script for the same reason — both need no
-  grant, and both would put a different value in this README's output block on every run.
-- **`glob`'s `*` stops at a directory separator** (`src/modules/glob.rs:48`), which is why `*.lua`
-  is `false` for the nested path and `true` for the bare filename, while `**` stays recursive. The
-  looser reading would let a rule declaring `*.lua` apply to files its author never named — and
-  widening authority is the one direction a matcher must not be wrong in.
+  different on every run (`Time::install` in `src/modules/time.rs`), so the example prints the
+  *property* a script measuring a duration actually depends on: a second reading is never below the
+  first. `time.now` and `path.absolute` are absent from the script for the same reason — both need
+  no grant, and both would put a different value in this README's output block on every run.
+- **`glob`'s `*` stops at a directory separator** (`matcher` in `src/modules/glob.rs`), which is why
+  `*.lua` is `false` for the nested path and `true` for the bare filename, while `**` stays
+  recursive. The looser reading would let a rule declaring `*.lua` apply to files its author never
+  named — and widening authority is the one direction a matcher must not be wrong in.
 - **A test file needs no framework.** `airsl test` discovers `*_test.lua` and `test_*.lua`, expects
-  a table of named functions, and reads a return as a pass and a raise as a failure
-  (`crates/airsl-cli/src/test_runner.rs:11`) — so Lua's own `assert` is the whole assertion surface.
+  a table of named functions, and reads a return as a pass and a raise as a failure (the module doc
+  of `crates/airsl-cli/src/test_runner.rs`) — so Lua's own `assert` is the whole assertion surface.
   Both the discovery order and the order of cases within a file are sorted, so two machines report
   the same failures in the same order.
 
 ### The two halves of `hash` and `glob`
 
 Both modules straddle the line this example is drawn along, which is why only half of each appears
-above. `hash.hash_file` reads a file (`src/modules/hash.rs:97`) and `glob.walk` reads directories
-(`src/modules/glob.rs:102`); both go through the same `PathGuard` every `fs` call does, and both
-need the read grant. `hash.sha256` and `glob.match` are handed their input and need nothing. That
-split is the rule about modules being capabilities applied *inside* a module rather than between
-two — see [`denials-are-data`](../denials-are-data/) for what either one says when it is called
-without the grant.
+above. `hash.hash_file` reads a file (`Hash::install` in `src/modules/hash.rs`) and `glob.walk`
+reads directories (`Glob::install` in `src/modules/glob.rs`); both go through the same `PathGuard`
+every `fs` call does, and both need the read grant. `hash.sha256` and `glob.match` are handed their
+input and need nothing. That split is the rule about modules being capabilities applied *inside* a
+module rather than between two — see [`denials-are-data`](../denials-are-data/) for what either one
+says when it is called without the grant.
 
 ## See also
 

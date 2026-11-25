@@ -23,18 +23,18 @@ surface: restricted, grants: none
 ## What it demonstrates
 
 - **The builder is type-state.** `EngineBuilder<Missing>` has no `build()`; only `policy()` returns
-  the `EngineBuilder<Present>` that does — `src/builder.rs:41` and `src/builder.rs:67`. Forgetting
-  to sandbox an engine is not a mistake this API lets you make.
+  the `EngineBuilder<Present>` that does (both impls in `src/builder.rs`). Forgetting to sandbox an
+  engine is not a mistake this API lets you make.
 - **`eval` versus `eval_to`.** `eval` runs a chunk for its effects and discards the result
-  (`src/engine.rs:215`); `eval_to::<T>` converts whatever the chunk returned into a Rust type
-  through `FromLuaMulti` (`src/engine.rs:237`).
+  (`Engine::eval` in `src/engine.rs`); `eval_to::<T>` converts whatever the chunk returned into a
+  Rust type through `FromLuaMulti` (`Engine::eval_to` in `src/engine.rs`).
 - **`Script::from_source` names the chunk.** The name is what appears in an error message, so it is
-  a required argument rather than an option — `src/script.rs:37`.
-- **The policy reads back off the engine** (`src/engine.rs:131`). A module enforces the same object
-  the engine reports, which is why `airsl doctor` cannot describe one policy while the runtime
-  applies another.
+  a required argument rather than an option (`Script::from_source` in `src/script.rs`).
+- **The policy reads back off the engine** (`Engine::policy` in `src/engine.rs`). A module enforces
+  the same object the engine reports, which is why `airsl doctor` cannot describe one policy while
+  the runtime applies another.
 
-`Policy::confined()` (`src/sandbox/policy.rs:73`) grants nothing, so a script under it can compute
+`Policy::confined()` (in `src/sandbox/policy.rs`) grants nothing, so a script under it can compute
 but cannot reach the filesystem, the environment or a subprocess. Nothing here needs authority, so
 the empty grant set is never consulted.
 

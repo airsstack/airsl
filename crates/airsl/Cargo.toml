@@ -21,6 +21,13 @@ workspace = true
 name    = "eval"
 harness = false
 
+# Declared only to turn `test = true` on: the example's `#[test]` is the chapter's drift check for a
+# host's own module, and the gate runs examples as tests only when asked.
+[[example]]
+name = "notes-module-setup"
+path = "examples/notes-module/setup.rs"
+test = true
+
 [dependencies]
 mlua       = { workspace = true }
 serde      = { workspace = true }
