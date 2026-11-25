@@ -13,9 +13,24 @@ a luarc file into a project. LuaLS then stops reporting the root table as an und
 every module autocompletes.
 
 Every probe this spec cites is in `probes/`, and `probes/README.md` says how to re-run each one.
-Versions: LuaLS 3.19.2, mlua 0.12.0, serde_json 1.0.151 (`Cargo.lock`), rustc 1.99.0, checkout
-`577e401`. LuaLS results come from `probes/luals/run.sh` and are cited as `run.out <case>`, the
-case's block in `probes/luals/run.out`.
+Versions: LuaLS 3.19.2, mlua 0.12.0, serde_json 1.0.151 (`Cargo.lock`), and rustc 1.94.1, the
+toolchain `rust-toolchain.toml` pins (`channel = "1.94"`). Every Rust probe record states its
+toolchain on its first line. `probes/rerun.sh` re-records them all on that toolchain, against
+checkout `bb95c10`, which changes no code since `577e401`. LuaLS results come from
+`probes/luals/run.sh` and are cited as `run.out <case>`, the case's block in
+`probes/luals/run.out`.
+
+This spec replaces `spec-superseded-2026-11-25.md`. Changes from it:
+
+- D16 and §3.4: the type of every table a built-in returns.
+- D17 and §10: the platform scope of the symlink and special-file tests.
+- §3.1: description readers are `pub(crate)`.
+- §3.3: how a signature message names a record field.
+- §5: records are not checked against the installed table.
+- §7: the stream shape of `lua.rs`, and a failed report write.
+- §10: new tests, and the acceptance check reads every record field.
+- §13: the Windows risk.
+- Probes are re-recorded on the pinned toolchain.
 
 ## 1. Decisions settled with the author
 
@@ -36,6 +51,8 @@ case's block in `probes/luals/run.out`.
 | D13 | A UTF-8 BOM at the start of a luarc | Parse after it, and write it back on a rewrite |
 | D14 | A required parameter after an optional one | Allowed |
 | D15 | One setting written both dotted and nested | Refused only when the same key path is set both ways and a rewrite is needed (§6.1 L9) |
+| D16 | Types of the built-ins' table returns | Records `fs.Stat`, `regex.Compiled`, `proc.Output`, `ext.Granted`, `ext.GrantedFs`, `ext.GrantedProc`, `ext.GrantedLimits`. Maps for `env.all`, `regex.captures` and the name→`true` sets (§3.4) |
+| D17 | Platforms for the symlink and special-file tests | Unix only (`#[cfg(unix)]`). The special file is a Unix socket made with std's `UnixListener::bind`, not a FIFO (§10) |
 
 ## 2. Architecture (approved by the author)
 
@@ -163,6 +180,9 @@ LuaType::or(self, other) -> LuaType       // builds a union; a union is never em
 The builder pieces hold raw text. `build()` is the single validation point (§3.3), and only a
 validated `ModuleDescription` reaches `luals`. `LuaType::optional` is idempotent: the optional of
 an optional is the same optional. A `Signature` carries no docs; it renders only as a `fun(...)` type.
+The parts a description holds (names, docs, parameters, returns, fields, records, types) are read
+by `luals` through `pub(crate)` accessors. Hosts build descriptions but never read them back, so
+no reader is public.
 
 Example: `hash.hash_file`. Its live surface is
 `hash (4) hash_file:function hex:function sha1:function sha256:function`
@@ -216,10 +236,8 @@ reported. Calling a method on an unguarded `string?` return is also not reported
 
 The built-ins need no other shape. They expose 66 keys, all functions (`probes/probe-surface.txt`).
 The only variadic is in `path.rs`, and no module defines userdata (`probes/surface-greps.txt`).
-The record-shaped returns are `fs.stat`, `proc.run`, `regex.compile` (a table of 7 closures),
-`regex.captures` and `ext.granted`. The other table returns are sequences (`string[]`) or maps
-(`env.all`). These shapes come from reading the module sources: `probes/surface-inventory.md` gives each key's
-arguments and returns with `file:line`.
+`probes/surface-inventory.md` gives each key's arguments and returns with `file:line`, read from
+the module sources. §3.4 fixes the type of every table a built-in returns.
 
 ### 3.3 Validation in `build()`
 
@@ -255,15 +273,21 @@ Every other problem is `Error::InvalidDescription { reason }`, displayed as
 - ``record `R` ``
 - ``field `x` of record `R` ``
 
-For a parameter inside a nested `Signature`, `f` is the enclosing member.
+The three parameter rows below name their function as `{fn}`:
+
+- For a module function, `{fn}` is the function's name in backticks, e.g. `` `run` ``. This
+  includes a `Signature` nested anywhere in that function's parameter or return types.
+- For a `Signature` nested in a module field's type, it is the field's name in backticks.
+- For a `Signature` nested in a record field's type, it is ``field `x` of record `R` ``. For
+  example: ``parameter `text` of field `find` of record `Compiled` is described twice``.
 
 | Problem | `reason` |
 |---|---|
 | two members (functions or fields) share a name | ``{name}` is described twice`` |
 | a record shares a name with a member | ``{name}` is described both as a member and as a record`` |
-| two parameters of one function or signature share a name | ``parameter `{p}` of `{f}` is described twice`` |
-| `variadic` called twice on one function or signature | ``{f}` has two variadic parameters`` |
-| `param` or `optional` called after `variadic` | ``parameter `{p}` of `{f}` comes after the variadic parameter`` |
+| two parameters of one function or signature share a name | ``parameter `{p}` of {fn} is described twice`` |
+| `variadic` called twice on one function or signature | ``{fn} has two variadic parameters`` |
+| `param` or `optional` called after `variadic` | ``parameter `{p}` of {fn} comes after the variadic parameter`` |
 | two records share a name | ``record `{R}` is described twice`` |
 | two fields of one record share a name | ``field `{x}` of record `{R}` is described twice`` |
 | `LuaType::record(n)` names no record of this module | ``record `{n}` is used but not described`` |
@@ -281,6 +305,61 @@ Two cases are accepted:
 
 The `@` rule exists because a doc line that starts with `@` becomes a LuaLS annotation.
 `run.out spell` shows `---@deprecated` in a doc block producing `use.lua:7:1 [Warning] Deprecated.`.
+
+### 3.4 Tables the built-ins return (D16)
+
+Every table a built-in returns has exactly one of these types. Two functions return a value
+whose type depends on its input, so they return `any`. A record is declared with
+`ModuleDescriptionBuilder::record` in the module that returns it, so its class is
+`<root>.<module>.<Name>`.
+
+| Returned by | Type | Fields (record) |
+|---|---|---|
+| `fs.stat` | record `Stat` | `size: integer`, `kind: "dir"\|"symlink"\|"file"`, `readonly: boolean`, `modified: integer` |
+| `regex.compile` | record `Compiled` | `is_match: fun(text: string): boolean`, `find: fun(text: string): string?`, `find_all: fun(text: string): string[]`, `captures: fun(text: string): table<integer\|string, string>?`, `replace: fun(text: string, with: string): string`, `replace_all: fun(text: string, with: string): string`, `split: fun(text: string): string[]` |
+| `proc.run` | record `Output` | `stdout: string`, `stderr: string`, `status: integer` |
+| `ext.granted` | record `Granted` | `fs: GrantedFs`, `env: table<string, boolean>`, `proc: GrantedProc`, `limits: GrantedLimits`, `unrestricted: boolean` |
+| (field of `Granted`) | record `GrantedFs` | `read: string[]`, `write: string[]` |
+| (field of `Granted`) | record `GrantedProc` | `run: table<string, boolean>` |
+| (field of `Granted`) | record `GrantedLimits` | `memory: integer?`, `instructions: integer?` |
+| `regex.captures` | `table<integer\|string, string>?` | — a map, because its keys are group numbers and group names |
+| `env.all` | `table<string, string>` | — |
+| `fs.read_lines`, `fs.list`, `fs.walk`, `regex.find_all`, `regex.split`, `glob.walk`, `stdio.lines` | `string[]` | — |
+| `json.decode`, `hook.payload` | `any` | — any decoded JSON value: a table, number, string, boolean or JSON null |
+
+Field names written as `GrantedFs` stand for `LuaType::record("GrantedFs")`, which renders as
+`<root>.ext.GrantedFs`.
+
+Evidence:
+
+- The live shapes come from airsl itself (`probes/probe-shapes.txt`, `probes/shapes.lua` run
+  with `airsl run --policy confined` plus grants and both limits):
+  - `proc.run`: `[string status] = integer 0`, plus `stderr` and `stdout` strings.
+  - `regex.captures`: keys `[integer 0]`, `[integer 1]`, `[integer 2]` and `[string n]`, all
+    strings. An unmatched optional group is absent: `(c)?` adds no key.
+  - `ext.granted`: `env` maps `HOME` to `boolean true`. `fs.read` and `fs.write` are sequences of
+    strings. `limits` holds `instructions` and `memory` as integers. `proc.run` maps `echo` to
+    `boolean true`. `unrestricted` is a boolean.
+  - Under `--policy trusted`, `limits` is an empty table (same file, second run), so both of its
+    fields are optional.
+  - `json.decode('1')` is `integer 1`, `json.decode('"s"')` is `string s`, `json.decode('null')`
+    is `userdata userdata: 0x0`, and `hook.payload()` with stdin `"x"` is `string x`. Neither
+    always returns a table, so both are `any`. On blank stdin, `hook.payload` returns an empty
+    table (`hook.rs:89-93`).
+- `fs.stat`'s `kind` values and the `Compiled` closures come from the sources:
+  `surface-inventory.md` (`fs.rs:258`, fields at 237–254; `regex.rs:84`–`135`).
+- LuaLS accepts these spellings and checks through them. `run.out records` renders, in the §4
+  layout, every row above except `fs.stat` and the `string[]` and `env.all` returns: `Output`,
+  all seven `Compiled` fields, `regex.captures`, `json.decode`, `hook.payload` and the four
+  `Granted` records. `Stat` is covered by `run.out grammar` (`grammar-typefile.lua:31-35`), and
+  `string[]` and `table<string, string>` returns by `run.out grammar` too. `records-good.lua`
+  calls every `Compiled` field and reads every field of the other records, including `caps[0]`,
+  `caps.n`, `g.fs.read[1]`, `g.env.HOME`, `g.proc.run.echo` and `g.limits.memory + 1`. It also
+  uses an `any` result as a table, a number and a string. It gets no diagnostic. `bad.lua` gets all 6 of its expected warnings:
+  `Undefined field `nope`` on `Output`, `GrantedFs`, `GrantedLimits`, `GrantedProc` and
+  `Compiled`, and `Undefined field `upper`` on `status`.
+- The fixture is valid Lua: `probes/luals/check-typefiles.out`, third run →
+  `1 file(s) compiled, 0 failed`.
 
 ## 4. Rendering (`luals::render`)
 
@@ -356,6 +435,9 @@ pub struct Drift { /* undescribed, missing, not_a_function, not_a_field; accesso
    - **Undescribed**: every key from a raw walk of the table (`Table::pairs`) that is not a
      described name. `Table::pairs` ignores `__pairs` (`probes/probe-more.txt`:
      `Table::pairs keys: ["real"]`, while Lua's `pairs()` yields `fake`).
+   - "Described names" are the module's members: its functions and fields. Records are types and
+     are never installed, so a record name is neither expected on the table nor excused from it.
+     `fs`, `regex`, `proc` and `ext` describe records (§3.4) and still pass.
    - **Missing**: every described name whose `Table::get` is `nil`. `Table::get` honours
      `__index` (`probe-more.txt`: `Table::get(hidden) = "integer", raw_get(hidden) = "nil"`), so a
      module that serves members through a metatable is not reported missing.
@@ -406,13 +488,14 @@ temporary file names the target it was meant to replace, never the temporary fil
 3. If the resolved target exists and is not a regular file (directory, FIFO, socket, device),
    refuse with `it is not a regular file`. It is never opened, so a FIFO cannot block.
 
-Probe evidence (`probes/probe-fs-special.txt`, std, rustc 1.99.0):
+Probe evidence (`probes/probe-fs-special.txt`, std, rustc 1.94.1):
 
 | Behaviour | Result |
 |---|---|
 | a dangling link | `exists(): false`, but `symlink_metadata ok: true`. Resolution therefore uses `symlink_metadata`, so a dangling link is never mistaken for absence |
 | `canonicalize` on a dangling link | `NotFound` |
 | a FIFO | `is_file: false, is_dir: false` |
+| a Unix socket made by `UnixListener::bind` (`probes/probe-socket.txt`) | `is_file: false, is_dir: false, is_socket: true`. `File::open` on it fails: `Operation not supported on socket (os error 102)`. A symlink to it canonicalizes to a target with `is_file: false` |
 | writing a temp file beside the resolved target, then renaming it over the target | `link still symlink: true`, and the new content reads through the link |
 
 **Writing a target.** Write a temporary file in the resolved target's directory, then rename it
@@ -510,7 +593,14 @@ airsl lua setup [DIR]     DIR defaults to "."
 The CLI adds `Command::Lua(LuaCommand)` with `LuaCommand::Setup { dir: PathBuf }`. `lua.rs` calls
 `airsl::luals::setup(&dir, &airsl::modules::stdlib()?, &RootTable::default())`.
 
+`lua.rs`'s entry point takes `stdout` and `stderr` as `&mut impl Write` and returns the exit code,
+the shape `ext_fire::run` already has (`crates/airsl-cli/src/ext_fire.rs:91-98`), so its tests
+assert on both streams. `main.rs` passes the real streams.
+
 - On success it prints the report to stdout and exits 0.
+- If writing the report to stdout fails, it prints `airsl: {io error}` to stderr and exits 1. Both
+  files are already written by then. `ext_fire` handles a failed stdout write the same way, with
+  its own prefix `airsl ext fire: ` (`ext_fire.rs:25`, `:84-87`).
 - On any error it prints `airsl: {error}` to stderr and exits 1. That is the prefix `check`, `run`
   and `test` already use (`crates/airsl-cli/src/check.rs:33`, `run.rs:46`).
 - There is no `--root` flag. A host with its own root calls `luals::setup` itself.
@@ -587,6 +677,9 @@ Named tests, each in an inline `#[cfg(test)] mod tests`:
   - `a_required_parameter_may_follow_an_optional_one`
   - `an_unused_record_is_accepted`
   - `a_valid_description_builds`
+  - `a_signature_problem_in_a_record_field_names_the_field_and_record`: a record field typed
+    `fun(text: string, text: string)` gives
+    ``invalid module description: parameter `text` of field `find` of record `Compiled` is described twice``
 - `description/signature.rs`:
   - `param_optional_and_variadic_record_their_presence`
   - `returns_accumulate_in_order`
@@ -622,6 +715,7 @@ Named tests, each in an inline `#[cfg(test)] mod tests`:
   - `a_table_key_is_shown_by_its_type`
   - `drift_display_orders_and_joins_parts`
   - `a_describe_error_names_the_module`
+  - `a_described_record_is_not_reported_missing`
 - `luals/luarc.rs`:
   - one test per row L1–L12
   - `parse_refusals_win_over_shape_refusals`
@@ -638,11 +732,22 @@ Named tests, each in an inline `#[cfg(test)] mod tests`:
   - `a_file_as_project_is_refused`
   - `prefers_luarc_json_over_jsonc`
   - `edits_luarc_jsonc_when_it_is_the_only_one`
-  - `a_symlinked_luarc_is_written_through`
-  - `a_dangling_symlink_luarc_is_refused`
-  - `a_fifo_luarc_is_refused_without_blocking`
+  - `a_symlinked_luarc_is_written_through` (Unix only)
+  - `a_dangling_symlink_luarc_is_refused` (Unix only)
+  - `a_socket_luarc_is_refused_without_opening_it` (Unix only): binds a `UnixListener` at
+    `<tempdir>/.luarc.json` and expects `LuarcRefused` with `it is not a regular file`. The
+    assertion holds on every Unix. On macOS, opening the socket fails (`probe-socket.txt`:
+    `os error 102`), so code that opened the target before checking its type would return `Io`
+    there instead, and the test would fail. That open-before-check detection is proven on macOS
+    only. It was not probed on Linux, where CI also runs the test
   - `a_directory_at_the_type_file_path_is_refused`
   - `io_errors_name_the_joined_path`
+
+  **Platforms (D17).** The three tests marked Unix only are `#[cfg(unix)]`. They make links
+  with `std::os::unix::fs::symlink` and the socket with `std::os::unix::net::UnixListener`, both
+  std, with no external tool and no new dependency. All other tests run on every CI platform.
+  Windows runs the same resolution code, but no probe or test covers symlinks or special files
+  there.
 - Each of the 12 built-in module files: `its_description_matches_what_it_installs`, which calls
   `verify`. This is the drift gate (D2), and `cargo make dod` runs it.
 - `airsl-cli/src/cli.rs`:
@@ -651,6 +756,8 @@ Named tests, each in an inline `#[cfg(test)] mod tests`:
 - `airsl-cli/src/lua.rs`:
   - `prints_the_report_and_exits_zero`
   - `prints_the_error_with_the_airsl_prefix_and_exits_one`
+  - `a_failed_report_write_exits_one`: stdout is a writer whose every write fails with
+    `io::Error::other("boom")`. Asserts that stderr is `airsl: boom\n` and the exit code is 1
 - These stub `HostModule`s, plus the `registry.rs` doctest, each gain a `describe` that matches
   what they install. The list comes from `git grep "impl HostModule for"`:
   - `engine.rs`: Boomerang, EvalBoomerang, Poisoner
@@ -665,7 +772,7 @@ fixture. Do this twice: once with `.airsl/` not ignored (the default state), and
 `.airsl/` in `.gitignore` inside a `git init` repository. Each run must show:
 
 - no diagnostic on a script that calls at least one function of every module with correct
-  arguments;
+  arguments, and reads every field of every record in §3.4 the way `records-good.lua` does;
 - exactly one `undefined-field` on a script that reads `airsstack.json.nope`.
 
 This repeats the `run.out default_state` and `run.out dotted` cases on generated output.
@@ -716,3 +823,5 @@ This repeats the `run.out default_state` and `run.out dotted` cases on generated
   `describe`. The book and the example show the change.
 - **LuaLS behaviour is version-specific.** The grammar and luarc rules are proven on 3.19.2 only.
   `probes/luals/run.sh` re-runs them on another version.
+- **Symlinks and special files are untested on Windows** (D17). CI runs on `windows-latest`
+  (`.github/workflows/ci.yml:38`), but the three Unix-only tests do not run there.

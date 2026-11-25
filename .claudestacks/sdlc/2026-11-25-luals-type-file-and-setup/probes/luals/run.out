@@ -136,3 +136,15 @@ bad.lua:1:27 [Warning] Cannot assign `boolean` to `string|integer`.
 bad.lua:2:29 [Warning] Cannot assign `integer` to parameter `(fun(x: string):boolean)?`.
 bad.lua:4:13 [Warning] Undefined field `upper`. (undefined-field)
 Diagnosis complete, 3 problems found
+== records
+.gitignore: .airsl/ 
+.luarc.json: {"workspace.library":[".airsl/types"]}
+(git repo)
+$ cd records && lua-language-server --check . --checklevel=Information
+bad.lua:6:40 [Warning] Undefined field `nope`. (undefined-field)
+bad.lua:2:11 [Warning] Undefined field `nope`. (undefined-field)
+bad.lua:3:34 [Warning] Undefined field `nope`. (undefined-field)
+bad.lua:4:38 [Warning] Undefined field `nope`. (undefined-field)
+bad.lua:5:36 [Warning] Undefined field `nope`. (undefined-field)
+bad.lua:7:46 [Warning] Undefined field `upper`. (undefined-field)
+Diagnosis complete, 6 problems found

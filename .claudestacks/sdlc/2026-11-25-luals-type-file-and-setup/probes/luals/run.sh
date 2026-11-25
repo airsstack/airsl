@@ -90,7 +90,7 @@ cp "$LAYOUT" layout/.airsl/types/airsstack.lua
 printf 'local v = airsstack.info.version:upper()\nlocal hi = airsstack["end"].hello("me"):upper()\nlocal a = airsstack.info.nope\nlocal b = airsstack["end"].nope\nprint(v, hi, a, b)\n' > layout/use.lua
 check layout
 # --- grammar: modules, records, literal unions, variadic, optional params, maps, record fun fields, reserved-word module
-for g in grammar compose; do
+for g in grammar compose records; do
   mkdir -p $g/.airsl/types; (cd $g && git init -q . && printf '.airsl/\n' > .gitignore)
   printf '{"workspace.library":[".airsl/types"]}' > $g/.luarc.json
   cp "$SELF_DIR/$g-typefile.lua" $g/.airsl/types/airsstack.lua

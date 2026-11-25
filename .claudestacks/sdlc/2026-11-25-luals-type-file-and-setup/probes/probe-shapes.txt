@@ -1,0 +1,66 @@
+# cwd: the chain directory .claudestacks/sdlc/2026-11-25-luals-type-file-and-setup; <chain> in the output is that directory's absolute path. Binary built from checkout bb95c10, rustc 1.94.1. stdin is the 3 bytes "x" for both runs.
+$ printf '"x"' | cargo run -q --manifest-path ../../../Cargo.toml -p airsl-cli -- run --policy confined --allow-read . --allow-write . --allow-env HOME --allow-exec echo --memory-limit 100000000 --instruction-limit 100000000 probes/shapes.lua
+proc.run({'echo','hi'}) : table
+  [string status] = integer 0
+  [string stderr] = string 
+  [string stdout] = string hi
+
+regex.captures : table
+  [integer 0] = string ab
+  [integer 1] = string a
+  [integer 2] = string b
+  [string n] = string b
+ext.granted() : table
+  [string env] : table
+    [string HOME] = boolean true
+  [string fs] : table
+    [string read] : table
+      [integer 1] = string <chain>
+    [string write] : table
+      [integer 1] = string <chain>
+  [string limits] : table
+    [string instructions] = integer 100000000
+    [string memory] = integer 100000000
+  [string proc] : table
+    [string run] : table
+      [string echo] = boolean true
+  [string unrestricted] = boolean false
+fs.stat('.') : table
+  [string kind] = string dir
+  [string modified] = integer 1795590946
+  [string readonly] = boolean false
+  [string size] = integer 192
+json.decode('1') = integer 1
+json.decode('"s"') = string s
+json.decode('null') = userdata userdata: 0x0
+hook.payload() with stdin "x" = string x
+
+$ printf '"x"' | cargo run -q --manifest-path ../../../Cargo.toml -p airsl-cli -- run --policy trusted probes/shapes.lua
+proc.run({'echo','hi'}) : table
+  [string status] = integer 0
+  [string stderr] = string 
+  [string stdout] = string hi
+
+regex.captures : table
+  [integer 0] = string ab
+  [integer 1] = string a
+  [integer 2] = string b
+  [string n] = string b
+ext.granted() : table
+  [string env] : table
+  [string fs] : table
+    [string read] : table
+    [string write] : table
+  [string limits] : table
+  [string proc] : table
+    [string run] : table
+  [string unrestricted] = boolean true
+fs.stat('.') : table
+  [string kind] = string dir
+  [string modified] = integer 1795590946
+  [string readonly] = boolean false
+  [string size] = integer 192
+json.decode('1') = integer 1
+json.decode('"s"') = string s
+json.decode('null') = userdata userdata: 0x0
+hook.payload() with stdin "x" = string x
