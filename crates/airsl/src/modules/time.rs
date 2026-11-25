@@ -18,6 +18,7 @@
 use std::sync::OnceLock;
 use std::time::Instant;
 
+use crate::description::{Function, LuaType, ModuleDescription};
 use crate::error::{Error, Result};
 use crate::modules::{HostModule, InstallContext};
 use crate::types::ModuleName;
@@ -151,6 +152,31 @@ impl HostModule for Time {
         table.set("parse", parse).map_err(fail)?;
 
         Ok(())
+    }
+
+    fn describe(&self) -> Result<ModuleDescription> {
+        ModuleDescription::builder("Timestamps and their formatting.")
+            .function(
+                Function::new("now", "Returns the current time in Unix seconds.")
+                    .returns(LuaType::INTEGER),
+            )
+            .function(
+                Function::new("monotonic", "Returns seconds from a clock that never goes backwards, for measuring durations.")
+                    .returns(LuaType::NUMBER),
+            )
+            .function(
+                Function::new("format", "Formats a Unix time in UTC, as RFC 3339 unless a pattern is given.")
+                    .param("seconds", LuaType::INTEGER, "The time in Unix seconds.")
+                    .optional("pattern", LuaType::STRING, "A strftime pattern.")
+                    .returns(LuaType::STRING),
+            )
+            .function(
+                Function::new("parse", "Parses text into Unix seconds, as RFC 3339 unless a pattern is given.")
+                    .param("text", LuaType::STRING, "The text to parse.")
+                    .optional("pattern", LuaType::STRING, "A strftime pattern.")
+                    .returns(LuaType::INTEGER),
+            )
+            .build()
     }
 }
 
@@ -293,5 +319,10 @@ mod tests {
         // An arbitrary sleep would defeat the instruction ceiling, which is the only defence
         // against a script that never finishes.
         assert_eq!(eval::<String>("return type(airsstack.time.sleep)"), "nil");
+    }
+
+    #[test]
+    fn its_description_matches_what_it_installs() {
+        crate::luals::verify(&super::Time::new(), &crate::types::RootTable::default()).unwrap();
     }
 }

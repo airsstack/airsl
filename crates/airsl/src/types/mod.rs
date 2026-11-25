@@ -5,12 +5,13 @@
 //! behaviour in ways the compiler cannot see — a module name becomes a table key that may not be
 //! reachable with dot syntax, a root table name becomes a global that may shadow the standard
 //! library, and a chunk name is reinterpreted by Lua according to its first byte. Parsing them at
-//! construction removes that class of surprise from every call site. Six of the seven types here
+//! construction removes that class of surprise from every call site. Seven of the eight types here
 //! are validated this way; [`EnvName`] is the deliberate exception, and its own module doc says
 //! why.
 //!
 //! Responsibilities:
 //!
+//! - [`LuaName`] — an identifier Lua accepts in a name position, and the Lua reserved words.
 //! - [`ModuleName`] — the key a host module is installed under in the root table.
 //! - [`RootTable`] — the name of the single global those modules are installed under.
 //! - [`RequireTarget`] — a module name a confined script may pass to `require`.
@@ -26,6 +27,7 @@ pub mod chunk_name;
 pub mod env_name;
 pub mod event_name;
 pub mod extension_name;
+pub mod lua_name;
 pub mod module_name;
 pub mod require_target;
 pub mod root_table;
@@ -34,6 +36,7 @@ pub use chunk_name::ChunkName;
 pub use env_name::EnvName;
 pub use event_name::EventName;
 pub use extension_name::ExtensionName;
+pub use lua_name::LuaName;
 pub use module_name::ModuleName;
 pub use require_target::RequireTarget;
 pub use root_table::RootTable;

@@ -13,6 +13,7 @@
 
 use std::sync::Arc;
 
+use crate::description::{Function, LuaType, ModuleDescription, Record, Signature};
 use crate::error::{Error, Result};
 use crate::modules::{HostModule, InstallContext};
 use crate::types::ModuleName;
@@ -238,6 +239,135 @@ impl HostModule for Regex {
 
         Ok(())
     }
+
+    fn describe(&self) -> Result<ModuleDescription> {
+        ModuleDescription::builder("Regular expressions with the Rust regex syntax.")
+            .function(
+                Function::new("compile", "Compiles a pattern once for repeated use.")
+                    .param("pattern", LuaType::STRING, "The regular expression.")
+                    .returns(LuaType::record("Compiled")),
+            )
+            .function(
+                Function::new("is_match", "Reports whether a pattern matches anywhere in the text.")
+                    .param("pattern", LuaType::STRING, "The regular expression.")
+                    .param("text", LuaType::STRING, "The text to search.")
+                    .returns(LuaType::BOOLEAN),
+            )
+            .function(
+                Function::new("find", "Returns the first match of a pattern, or nil when there is none.")
+                    .param("pattern", LuaType::STRING, "The regular expression.")
+                    .param("text", LuaType::STRING, "The text to search.")
+                    .returns(LuaType::optional(LuaType::STRING)),
+            )
+            .function(
+                Function::new("find_all", "Returns every non-overlapping match of a pattern.")
+                    .param("pattern", LuaType::STRING, "The regular expression.")
+                    .param("text", LuaType::STRING, "The text to search.")
+                    .returns(LuaType::array(LuaType::STRING)),
+            )
+            .function(
+                Function::new("captures", "Returns the groups of the first match by number and by name, or nil when there is none.")
+                    .param("pattern", LuaType::STRING, "The regular expression.")
+                    .param("text", LuaType::STRING, "The text to search.")
+                    .returns(LuaType::optional(LuaType::map(LuaType::INTEGER.or(LuaType::STRING), LuaType::STRING))),
+            )
+            .function(
+                Function::new("replace", "Replaces the first match of a pattern.")
+                    .param("pattern", LuaType::STRING, "The regular expression.")
+                    .param("text", LuaType::STRING, "The text to search.")
+                    .param("with", LuaType::STRING, "The replacement text.")
+                    .returns(LuaType::STRING),
+            )
+            .function(
+                Function::new("replace_all", "Replaces every match of a pattern.")
+                    .param("pattern", LuaType::STRING, "The regular expression.")
+                    .param("text", LuaType::STRING, "The text to search.")
+                    .param("with", LuaType::STRING, "The replacement text.")
+                    .returns(LuaType::STRING),
+            )
+            .function(
+                Function::new("split", "Splits text around every match of a pattern.")
+                    .param("pattern", LuaType::STRING, "The regular expression.")
+                    .param("text", LuaType::STRING, "The text to split.")
+                    .returns(LuaType::array(LuaType::STRING)),
+            )
+            .record(compiled_record())
+            .build()
+    }
+}
+
+/// The record `compile` returns: the seven operations bound to one pattern.
+fn compiled_record() -> Record {
+    Record::new(
+        "Compiled",
+        "A pattern compiled once, with the same operations bound to it.",
+    )
+    .field(
+        "is_match",
+        LuaType::function(
+            Signature::new()
+                .param("text", LuaType::STRING)
+                .returns(LuaType::BOOLEAN),
+        ),
+        "Reports whether the pattern matches anywhere in the text.",
+    )
+    .field(
+        "find",
+        LuaType::function(
+            Signature::new()
+                .param("text", LuaType::STRING)
+                .returns(LuaType::optional(LuaType::STRING)),
+        ),
+        "Returns the first match, or nil when there is none.",
+    )
+    .field(
+        "find_all",
+        LuaType::function(
+            Signature::new()
+                .param("text", LuaType::STRING)
+                .returns(LuaType::array(LuaType::STRING)),
+        ),
+        "Returns every non-overlapping match.",
+    )
+    .field(
+        "captures",
+        LuaType::function(Signature::new().param("text", LuaType::STRING).returns(
+            LuaType::optional(LuaType::map(
+                LuaType::INTEGER.or(LuaType::STRING),
+                LuaType::STRING,
+            )),
+        )),
+        "Returns the groups of the first match by number and by name, or nil when there is none.",
+    )
+    .field(
+        "replace",
+        LuaType::function(
+            Signature::new()
+                .param("text", LuaType::STRING)
+                .param("with", LuaType::STRING)
+                .returns(LuaType::STRING),
+        ),
+        "Replaces the first match.",
+    )
+    .field(
+        "replace_all",
+        LuaType::function(
+            Signature::new()
+                .param("text", LuaType::STRING)
+                .param("with", LuaType::STRING)
+                .returns(LuaType::STRING),
+        ),
+        "Replaces every match.",
+    )
+    .field(
+        "split",
+        LuaType::function(
+            Signature::new()
+                .param("text", LuaType::STRING)
+                .returns(LuaType::array(LuaType::STRING)),
+        ),
+        "Splits the text around every match.",
+    )
 }
 
 #[cfg(test)]
@@ -421,5 +551,10 @@ mod tests {
         )
         .unwrap();
         assert_eq!(engine.eval_to::<String>(&script).unwrap(), "all");
+    }
+
+    #[test]
+    fn its_description_matches_what_it_installs() {
+        crate::luals::verify(&super::Regex::new(), &crate::types::RootTable::default()).unwrap();
     }
 }

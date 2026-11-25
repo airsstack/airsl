@@ -18,6 +18,7 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
+use crate::description::{Function, LuaType, ModuleDescription, Record, Signature};
 use crate::error::{Error, Result};
 use crate::modules::{HostModule, InstallContext};
 use crate::paths::rules::native;
@@ -117,6 +118,89 @@ impl HostModule for Ext {
         table.set("granted", granted).map_err(fail)?;
 
         Ok(())
+    }
+
+    fn describe(&self) -> Result<ModuleDescription> {
+        ModuleDescription::builder(
+            "What an extension registers with its host and the authority it was loaded with.",
+        )
+        .function(
+            Function::new("on", "Registers a handler for a host event.")
+                .param("event", LuaType::STRING, "The event name.")
+                .param(
+                    "handler",
+                    LuaType::function(
+                        Signature::new()
+                            .param("payload", LuaType::ANY)
+                            .returns(LuaType::ANY),
+                    ),
+                    "Called with the event payload.",
+                ),
+        )
+        .function(
+            Function::new(
+                "granted",
+                "Returns a copy of the authority this extension was granted.",
+            )
+            .returns(LuaType::record("Granted")),
+        )
+        .record(
+            Record::new("Granted", "The authority an extension was granted.")
+                .field("fs", LuaType::record("GrantedFs"), "Filesystem roots.")
+                .field(
+                    "env",
+                    LuaType::map(LuaType::STRING, LuaType::BOOLEAN),
+                    "Environment variable names, each mapped to true.",
+                )
+                .field("proc", LuaType::record("GrantedProc"), "Runnable programs.")
+                .field(
+                    "limits",
+                    LuaType::record("GrantedLimits"),
+                    "Resource ceilings.",
+                )
+                .field(
+                    "unrestricted",
+                    LuaType::BOOLEAN,
+                    "Whether the grants are unrestricted.",
+                ),
+        )
+        .record(
+            Record::new("GrantedFs", "The filesystem roots an extension may use.")
+                .field(
+                    "read",
+                    LuaType::array(LuaType::STRING),
+                    "Roots it may read.",
+                )
+                .field(
+                    "write",
+                    LuaType::array(LuaType::STRING),
+                    "Roots it may write.",
+                ),
+        )
+        .record(
+            Record::new("GrantedProc", "The programs an extension may run.").field(
+                "run",
+                LuaType::map(LuaType::STRING, LuaType::BOOLEAN),
+                "Program names, each mapped to true.",
+            ),
+        )
+        .record(
+            Record::new(
+                "GrantedLimits",
+                "The resource ceilings an extension runs under.",
+            )
+            .field(
+                "memory",
+                LuaType::optional(LuaType::INTEGER),
+                "Memory ceiling in bytes, when one is set.",
+            )
+            .field(
+                "instructions",
+                LuaType::optional(LuaType::INTEGER),
+                "Instruction ceiling, when one is set.",
+            ),
+        )
+        .build()
     }
 }
 
@@ -419,5 +503,10 @@ mod tests {
         )
         .unwrap();
         assert_eq!(found, "nil,true");
+    }
+
+    #[test]
+    fn its_description_matches_what_it_installs() {
+        crate::luals::verify(&super::Ext::new(), &crate::types::RootTable::default()).unwrap();
     }
 }

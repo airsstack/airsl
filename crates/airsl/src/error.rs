@@ -203,6 +203,51 @@ pub enum Error {
         reason: &'static str,
     },
 
+    /// A module description broke a rule `ModuleDescriptionBuilder::build` enforces.
+    ///
+    /// A name that is not a usable Lua identifier is reported as [`Error::InvalidName`] instead.
+    #[error("invalid module description: {reason}")]
+    InvalidDescription {
+        /// Which rule was broken and where, worded as a clause that follows the display prefix.
+        reason: String,
+    },
+
+    /// A host module's `describe` failed, so the module cannot be compared with what it installs.
+    ///
+    /// Wraps the error `describe` returned, usually [`Error::InvalidDescription`] or
+    /// [`Error::InvalidName`], and names the module so a host with many modules knows which one.
+    #[error("cannot describe host module `{module}`: {source}")]
+    DescribeFailed {
+        /// The module whose `describe` failed.
+        module: String,
+        /// What `describe` returned.
+        #[source]
+        source: Box<Self>,
+    },
+
+    /// A host module installs keys that differ from the ones it describes.
+    #[error("host module `{module}` does not match its description: {drift}")]
+    DescriptionDrift {
+        /// The module whose description and installed keys disagree.
+        module: String,
+        /// Every disagreement found.
+        drift: crate::luals::Drift,
+    },
+
+    /// The Lua VM failed while a host module was being compared with its description.
+    ///
+    /// Covers the checker's own calls: creating the table, walking it, reading a described name
+    /// (which a metatable's `__index` may raise from) and converting a key to text. An error from
+    /// the module's own `install` is returned as it is.
+    #[error("cannot verify host module `{module}`: {source}")]
+    VerifyFailed {
+        /// The module being verified.
+        module: String,
+        /// The VM failure.
+        #[source]
+        source: Box<mlua::Error>,
+    },
+
     /// A script file could not be read.
     #[error("cannot read script `{path}`: {source}")]
     ScriptRead {
@@ -405,6 +450,17 @@ mod tests {
         let text = err.to_string();
         let lua: mlua::Error = err.into();
         assert!(lua.to_string().contains(&text));
+    }
+
+    #[test]
+    fn an_invalid_description_prefixes_its_reason() {
+        let err = Error::InvalidDescription {
+            reason: "`f` is described twice".into(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "invalid module description: `f` is described twice"
+        );
     }
 
     #[test]

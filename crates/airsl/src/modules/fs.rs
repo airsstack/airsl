@@ -17,6 +17,7 @@ use std::io::Write as _;
 use std::path::Path as StdPath;
 use std::sync::Arc;
 
+use crate::description::{Function, LuaType, ModuleDescription, ModuleDescriptionBuilder, Record};
 use crate::error::{Error, Result};
 use crate::modules::guard::PathGuard;
 use crate::modules::{HostModule, InstallContext};
@@ -413,6 +414,181 @@ impl HostModule for Fs {
     fn name(&self) -> &ModuleName {
         &self.name
     }
+
+    fn describe(&self) -> Result<ModuleDescription> {
+        let builder = with_content_functions(ModuleDescription::builder(
+            "Filesystem access, limited to the paths the host granted.",
+        ))
+        .function(
+            Function::new("exists", "Reports whether a path exists.")
+                .param("path", LuaType::STRING, "The path to use.")
+                .returns(LuaType::BOOLEAN),
+        )
+        .function(
+            Function::new("is_file", "Reports whether a path is a regular file.")
+                .param("path", LuaType::STRING, "The path to use.")
+                .returns(LuaType::BOOLEAN),
+        )
+        .function(
+            Function::new("is_dir", "Reports whether a path is a directory.")
+                .param("path", LuaType::STRING, "The path to use.")
+                .returns(LuaType::BOOLEAN),
+        )
+        .function(
+            Function::new("stat", "Describes a file or directory.")
+                .param("path", LuaType::STRING, "The path to use.")
+                .returns(LuaType::record("Stat")),
+        )
+        .function(
+            Function::new(
+                "canonicalize",
+                "Resolves a path to an absolute path with symbolic links followed.",
+            )
+            .param("path", LuaType::STRING, "The path to use.")
+            .returns(LuaType::STRING),
+        )
+        .function(
+            Function::new(
+                "same_content",
+                "Reports whether two files hold the same bytes.",
+            )
+            .param("left", LuaType::STRING, "The first file.")
+            .param("right", LuaType::STRING, "The second file.")
+            .returns(LuaType::BOOLEAN),
+        )
+        .function(
+            Function::new("list", "Lists the names in a directory, sorted.")
+                .param("path", LuaType::STRING, "The directory to list.")
+                .returns(LuaType::array(LuaType::STRING)),
+        )
+        .function(
+            Function::new(
+                "walk",
+                "Lists every path under a directory, relative to it and sorted.",
+            )
+            .param("path", LuaType::STRING, "The directory to walk.")
+            .returns(LuaType::array(LuaType::STRING)),
+        )
+        .function(
+            Function::new("mkdir", "Creates a directory and any missing parents.").param(
+                "path",
+                LuaType::STRING,
+                "The directory to create.",
+            ),
+        )
+        .function(Function::new("remove", "Deletes a file.").param(
+            "path",
+            LuaType::STRING,
+            "The file to delete.",
+        ))
+        .function(
+            Function::new("remove_dir", "Deletes a directory and everything under it.").param(
+                "path",
+                LuaType::STRING,
+                "The directory to delete.",
+            ),
+        );
+        with_copy_and_scratch(builder).build()
+    }
+}
+
+/// Adds the functions that read and write a file's contents.
+fn with_content_functions(builder: ModuleDescriptionBuilder) -> ModuleDescriptionBuilder {
+    builder
+        .function(
+            Function::new("read", "Reads a whole file as text.")
+                .param("path", LuaType::STRING, "The file to read.")
+                .returns(LuaType::STRING),
+        )
+        .function(
+            Function::new(
+                "read_lines",
+                "Reads a file as a list of lines without their line endings.",
+            )
+            .param("path", LuaType::STRING, "The file to read.")
+            .returns(LuaType::array(LuaType::STRING)),
+        )
+        .function(
+            Function::new("write", "Writes text to a file, replacing its contents.")
+                .param("path", LuaType::STRING, "The file to write.")
+                .param("body", LuaType::STRING, "The text to write."),
+        )
+        .function(
+            Function::new(
+                "append",
+                "Appends text to a file, creating it when it is missing.",
+            )
+            .param("path", LuaType::STRING, "The file to append to.")
+            .param("body", LuaType::STRING, "The text to append."),
+        )
+        .function(
+            Function::new(
+                "atomic_write",
+                "Writes text to a file so readers see the old contents or the new, never a mix.",
+            )
+            .param("path", LuaType::STRING, "The file to write.")
+            .param("body", LuaType::STRING, "The text to write."),
+        )
+        .function(
+            Function::new(
+                "create_exclusive",
+                "Creates a file only when it does not exist yet, and reports whether it did.",
+            )
+            .param("path", LuaType::STRING, "The file to create.")
+            .optional(
+                "body",
+                LuaType::STRING,
+                "The initial contents, empty when omitted.",
+            )
+            .returns(LuaType::BOOLEAN),
+        )
+}
+
+/// Adds the functions that copy and move paths, the ones that make scratch paths, and the record
+/// `stat` returns.
+fn with_copy_and_scratch(builder: ModuleDescriptionBuilder) -> ModuleDescriptionBuilder {
+    builder
+        .function(
+            Function::new("copy", "Copies a file.")
+                .param("from", LuaType::STRING, "The file to copy.")
+                .param("to", LuaType::STRING, "Where to copy it."),
+        )
+        .function(
+            Function::new("rename", "Moves a file or directory.")
+                .param("from", LuaType::STRING, "The path to move.")
+                .param("to", LuaType::STRING, "Where to move it."),
+        )
+        .function(
+            Function::new(
+                "tempdir",
+                "Creates a temporary directory and returns its path.",
+            )
+            .returns(LuaType::STRING),
+        )
+        .function(
+            Function::new("tempfile", "Creates a temporary file and returns its path.")
+                .returns(LuaType::STRING),
+        )
+        .record(stat_record())
+}
+
+/// The record `stat` returns.
+fn stat_record() -> Record {
+    Record::new("Stat", "What a file or directory is.")
+        .field("size", LuaType::INTEGER, "Size in bytes.")
+        .field(
+            "kind",
+            LuaType::literal("dir")
+                .or(LuaType::literal("symlink"))
+                .or(LuaType::literal("file")),
+            "Whether it is a directory, a symbolic link or a regular file.",
+        )
+        .field("readonly", LuaType::BOOLEAN, "Whether it is read-only.")
+        .field(
+            "modified",
+            LuaType::INTEGER,
+            "Last modification time in Unix seconds.",
+        )
 }
 
 /// Seconds since the Unix epoch, or zero when the platform does not record it.
@@ -874,5 +1050,10 @@ mod tests {
             .unwrap()
             .with_args([crate::test_support::script_path(&root)]);
         assert_eq!(engine.eval_to::<String>(&script).unwrap(), "body");
+    }
+
+    #[test]
+    fn its_description_matches_what_it_installs() {
+        crate::luals::verify(&super::Fs::new(), &crate::types::RootTable::default()).unwrap();
     }
 }

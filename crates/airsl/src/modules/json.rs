@@ -11,6 +11,7 @@
 //! `convert` module and are shared with `airsstack.hook`.
 
 use crate::convert;
+use crate::description::{Function, LuaType, ModuleDescription};
 use crate::error::{Error, Result};
 use crate::modules::{HostModule, InstallContext};
 use crate::types::ModuleName;
@@ -83,6 +84,26 @@ impl HostModule for Json {
 
         Ok(())
     }
+
+    fn describe(&self) -> Result<ModuleDescription> {
+        ModuleDescription::builder("JSON encoding and decoding.")
+            .function(
+                Function::new("encode", "Encodes a value as compact JSON text.")
+                    .param("value", LuaType::ANY, "The value to encode.")
+                    .returns(LuaType::STRING),
+            )
+            .function(
+                Function::new("encode_pretty", "Encodes a value as indented JSON text.")
+                    .param("value", LuaType::ANY, "The value to encode.")
+                    .returns(LuaType::STRING),
+            )
+            .function(
+                Function::new("decode", "Decodes JSON text into a Lua value.")
+                    .param("text", LuaType::STRING, "The JSON text to decode.")
+                    .returns(LuaType::ANY),
+            )
+            .build()
+    }
 }
 
 #[cfg(test)]
@@ -152,5 +173,10 @@ mod tests {
             eval("local ok = pcall(airsstack.json.decode, '{oops'); return tostring(ok)"),
             "false"
         );
+    }
+
+    #[test]
+    fn its_description_matches_what_it_installs() {
+        crate::luals::verify(&super::Json::new(), &crate::types::RootTable::default()).unwrap();
     }
 }

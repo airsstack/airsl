@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [01]
 built-on: 044432888b01
@@ -130,3 +130,20 @@ Commit `feat(airsl)!: require HostModule::describe and verify it against install
 
 - `cargo make dod` is green, which includes the 12 per-module drift tests.
 - `git grep -n "impl HostModule for" -- crates` lists only types that now implement `describe`. The build would fail otherwise.
+
+## Review findings
+
+One review, `blocking: none` (0🔴 0🟡 8🔵). An isolated `cargo make dod` passed: 674 lib, 86 cli and 17 doctests. `cargo test -p airsl luals::verify` gave 19 passed. `its_description_matches_what_it_installs` gave 12 passed. `cargo run -p airsl --example custom-module` exited 0. All 19 `impl HostModule for` define `describe`.
+
+- **Fixed (orchestrator, before review)**: `luals/verify.rs::described_members` read the member kind from the derived `Debug` text. `description/mod.rs` now re-exports `pub(crate) use module::Member;` and the check is `matches!(member, Member::Function(_))`. `cargo make dod` → exit 0, `Build Done in 20.19 seconds`.
+- Open 🔵 In `examples/custom-module/main.rs` the trait `describe` sits beside a free fn `describe(grants)`. Rename the free fn.
+- Open 🔵 No test checks the descriptions of the test stubs and of `Metrics` against their installs. Calling `luals::verify` in the example would guard them.
+- Open 🔵 The `verify.rs:286` comment "its own text is an address" does not hold for boolean keys.
+- Open 🔵 The float-key arm and case-sensitive byte order have no test.
+- Open 🔵 `fs::with_copy_and_scratch` also adds the `Stat` record. The `hash` module doc leaves out `hex`.
+- Open 🔵 The `hook.context(event, additional)` and `proc.run(command)` parameter names follow the closure bindings, not the inventory's gloss. Both are valid.
+
+## Deviations
+
+- 2026-11-25 — Where the plan was silent the coder decided: nil-returning functions declare no `returns`; `stdio.isatty`'s stream is `string`, with the accepted values in its doc; parameter names follow the Rust closure bindings. clippy `too_many_lines` moved parts of `describe` into private helpers (`regex::compiled_record`, `fs::stat_record`, `fs::with_content_functions`, `fs::with_copy_and_scratch`); member order is unchanged.
+- 2026-11-25 — No commit is made per task. Execute commits nothing unless told to, so the `feat(airsl)!: …` commit is left to the author.

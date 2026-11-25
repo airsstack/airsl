@@ -14,6 +14,7 @@
 
 use std::io::{IsTerminal as _, Read as _, Write as _};
 
+use crate::description::{Function, LuaType, ModuleDescription};
 use crate::error::{Error, Result};
 use crate::modules::{HostModule, InstallContext};
 use crate::types::ModuleName;
@@ -154,6 +155,32 @@ impl HostModule for Stdio {
 
         Ok(())
     }
+
+    fn describe(&self) -> Result<ModuleDescription> {
+        ModuleDescription::builder("The process's own standard input, output and error streams.")
+            .function(
+                Function::new("read", "Reads all of standard input as text.")
+                    .returns(LuaType::STRING),
+            )
+            .function(
+                Function::new("lines", "Reads standard input as a list of lines without their line endings.")
+                    .returns(LuaType::array(LuaType::STRING)),
+            )
+            .function(
+                Function::new("write", "Writes bytes to standard output without adding a newline.")
+                    .param("body", LuaType::STRING, "The bytes to write."),
+            )
+            .function(
+                Function::new("error", "Writes bytes to standard error without adding a newline.")
+                    .param("body", LuaType::STRING, "The bytes to write."),
+            )
+            .function(
+                Function::new("isatty", "Reports whether a stream is a terminal.")
+                    .optional("stream", LuaType::STRING, "Either `stdin` or `stderr`; anything else, or nothing, means standard output.")
+                    .returns(LuaType::BOOLEAN),
+            )
+            .build()
+    }
 }
 
 #[cfg(test)]
@@ -229,5 +256,10 @@ mod tests {
             eval("airsstack.stdio.write(''); airsstack.stdio.error(''); return 'ok'"),
             "ok"
         );
+    }
+
+    #[test]
+    fn its_description_matches_what_it_installs() {
+        crate::luals::verify(&super::Stdio::new(), &crate::types::RootTable::default()).unwrap();
     }
 }

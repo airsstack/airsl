@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [02]
 built-on: 044432888b01
@@ -74,3 +74,17 @@ The text of every line above is the §4 layout with D21 applied.
 
 - `cargo make dod` is green.
 - `the_stdlib_type_file_compiles_as_lua` proves the rendered stdlib is valid Lua on the checkout.
+
+## Review findings
+
+One review, `blocking: none` (8🔵 code, 2🔵 plan). `cargo make dod` → exit 0. The rendered stdlib is 431 lines, with no trailing whitespace and no doubled blank lines. LuaLS 3.19.2 `--check` on it plus a use script reports only the planted `Undefined field `nope`. (undefined-field)`, and zero diagnostics in the type file.
+
+- **Fixed** (orchestrator): spec §10 requires `inline_docs_follow_a_hash` to check that an empty doc renders no `#`, but the plan had dropped that half. The test now asserts empty module-field and record-field docs render bare, and a documented variadic renders `---@param ... string # More text.`.
+- **Fixed** (orchestrator): nothing pinned `ModuleSet` insertion order. New test `renders_modules_in_insertion_order`. `cargo test -p airsl luals::render` → `14 passed; 0 failed`. `cargo make dod` → exit 0 (688 lib, 86 cli, 18 doctests).
+- Open 🔵 The doctest is on the `TypeFile` struct rather than on `TypeFile::render`. It renders a one-module set and checks `file_name()` as the plan asks.
+- Open 🔵 `TypeFile` stores `root: String` rather than `RootTable`. `TablePath { bracketed: bool }` would read better as an enum. The module class block is inline, not a helper. `Vec<String>` clones the parameter names.
+
+## Deviations
+
+- 2026-11-25 — Where the spec was silent the coder followed `probes/luals/layout-typefile.lua`: a reserved-word module keeps the dotted class name (`---@class airsstack.end`), and only the table and function lines use brackets.
+- 2026-11-25 — No commit is made. Execute commits nothing unless told to, so the commit is left to the author.

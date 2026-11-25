@@ -21,6 +21,7 @@
 
 use std::sync::Arc;
 
+use crate::description::{Function, LuaType, ModuleDescription, Record};
 use crate::error::{Error, Result};
 use crate::modules::env;
 use crate::modules::{HostModule, InstallContext};
@@ -188,6 +189,49 @@ impl HostModule for Proc {
         table.set("which", which).map_err(fail)?;
 
         Ok(())
+    }
+
+    fn describe(&self) -> Result<ModuleDescription> {
+        ModuleDescription::builder("Running programs, limited to the ones the host granted.")
+            .function(
+                Function::new(
+                    "run",
+                    "Runs a program to completion and returns what it printed and how it ended.",
+                )
+                .param(
+                    "command",
+                    LuaType::array(LuaType::STRING),
+                    "The program followed by its arguments.",
+                )
+                .returns(LuaType::record("Output")),
+            )
+            .function(
+                Function::new(
+                    "which",
+                    "Finds a program on the search path, or returns nil when it is not found.",
+                )
+                .param("program", LuaType::STRING, "The program name.")
+                .returns(LuaType::optional(LuaType::STRING)),
+            )
+            .record(
+                Record::new("Output", "What a finished program produced.")
+                    .field(
+                        "stdout",
+                        LuaType::STRING,
+                        "Everything it wrote to standard output.",
+                    )
+                    .field(
+                        "stderr",
+                        LuaType::STRING,
+                        "Everything it wrote to standard error.",
+                    )
+                    .field(
+                        "status",
+                        LuaType::INTEGER,
+                        "Its exit code, or -1 when it ended without one.",
+                    ),
+            )
+            .build()
     }
 }
 
@@ -738,5 +782,10 @@ mod tests {
             .unwrap();
             assert_eq!(status, 0);
         }
+    }
+
+    #[test]
+    fn its_description_matches_what_it_installs() {
+        crate::luals::verify(&super::Proc::new(), &crate::types::RootTable::default()).unwrap();
     }
 }

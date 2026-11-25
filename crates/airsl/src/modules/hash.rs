@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use sha1::Digest as _;
 
+use crate::description::{Function, LuaType, ModuleDescription};
 use crate::error::{Error, Result};
 use crate::modules::guard::PathGuard;
 use crate::modules::{HostModule, InstallContext};
@@ -126,6 +127,42 @@ impl HostModule for Hash {
         table.set("hex", hex_fn).map_err(fail)?;
 
         Ok(())
+    }
+
+    fn describe(&self) -> Result<ModuleDescription> {
+        ModuleDescription::builder("SHA-256 and SHA-1 digests.")
+            .function(
+                Function::new(
+                    "sha256",
+                    "Returns the SHA-256 digest of some bytes as lowercase hex.",
+                )
+                .param("body", LuaType::STRING, "The bytes to hash.")
+                .returns(LuaType::STRING),
+            )
+            .function(
+                Function::new(
+                    "sha1",
+                    "Returns the SHA-1 digest of some bytes as lowercase hex.",
+                )
+                .param("body", LuaType::STRING, "The bytes to hash.")
+                .returns(LuaType::STRING),
+            )
+            .function(
+                Function::new("hash_file", "Hashes a file's bytes.")
+                    .param("path", LuaType::STRING, "The file to hash.")
+                    .optional(
+                        "algorithm",
+                        LuaType::literal("sha256").or(LuaType::literal("sha1")),
+                        "Defaults to sha256.",
+                    )
+                    .returns(LuaType::STRING),
+            )
+            .function(
+                Function::new("hex", "Returns some bytes as lowercase hex.")
+                    .param("body", LuaType::STRING, "The bytes to encode.")
+                    .returns(LuaType::STRING),
+            )
+            .build()
     }
 }
 
@@ -274,5 +311,10 @@ mod tests {
             .with_args([crate::test_support::script_path(&root.join("a.txt"))]);
         let err = engine.eval_to::<String>(&script).unwrap_err();
         assert!(err.to_string().contains("md5"), "{err}");
+    }
+
+    #[test]
+    fn its_description_matches_what_it_installs() {
+        crate::luals::verify(&super::Hash::new(), &crate::types::RootTable::default()).unwrap();
     }
 }

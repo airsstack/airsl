@@ -48,7 +48,9 @@ mod script;
 mod test_support;
 mod version;
 
+pub mod description;
 pub mod extension;
+pub mod luals;
 pub mod modules;
 pub mod sandbox;
 pub mod types;
@@ -74,6 +76,6 @@ pub use sandbox::{
 };
 pub use script::Script;
 pub use types::{
-    ChunkName, EnvName, EventName, ExtensionName, ModuleName, RequireTarget, RootTable,
+    ChunkName, EnvName, EventName, ExtensionName, LuaName, ModuleName, RequireTarget, RootTable,
 };
 pub use version::VERSION;

@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 built-on: 044432888b01
 ---
@@ -178,3 +178,34 @@ crates/airsl/src/error.rs                   — modify  + Error::InvalidDescript
 
 - `cargo make dod` is green after each task: fmt-check, clippy with `-D warnings`, rustdoc with `-D warnings`, the tests, and the doctests.
 - `cargo test -p airsl types:: description::` runs every test named above.
+
+## Review findings
+
+Three reviews (Task 1; Task 2; Tasks 3–4), each `blocking: none`. The scoped `cargo make dod` was green after each task.
+
+- T1 🟡 `refuses_every_reserved_word` read the list under test. **Fixed**: the test now spells the 22 words and compares them with the sorted shared list. `cargo test -p airsl types::lua_name` → `7 passed; 0 failed`.
+- T1 ❓ The leading-digit and hyphen reason texts were checked against spec §3.3:325-326 and match exactly. No change.
+- T1 🔵 The `types/mod.rs` count "Seven of the eight", the Responsibilities order and the extra derives on `LuaName` are recorded and left as is.
+- T2 🟡 Reverting the union flattening failed no test. **Fixed**: `a_union_of_unions_is_flattened` now also compares values, both nested-vs-flat and optional-lifted. `cargo test -p airsl description::lua_type` → `15 passed; 0 failed`.
+- T2 🟡 The module-wide `dead_code` expect in signature.rs is sent to the fix round (see below).
+- T2 ❓ Function types in non-last `fun(...)` positions are refused by `build()` (D20 tests in module.rs). Literal escaping is refused by `build()` (`a_literal_with_a_quote_backslash_or_newline_is_refused`). No change.
+- T2 ❓ `STRING.or(STRING)` is not de-duplicated. The plan is silent, so it is left as is.
+- T2 🔵 `returns_types()` naming, the comment width and `Function` builders that repeat `Signature`'s are recorded only.
+- T3/4 ❓ The member-and-record, carriage-return and literal texts were checked against spec §3.3:352,359,362 and match exactly.
+- T3/4 🟡 The owner form "return value of `f`" is in spec §3.3:369. Not an addition; no change.
+- T3/4 🟡 `function(sig).or(NIL)` is not refused as a function-typed module field. Spec §3.3:363 refuses only "a function type, or the optional of one", and the code matches the spec. Left open for a later spec revision.
+- T3/4 🟡 The module-wide `dead_code` expect in module.rs, the untested record-reference arms, the `D20` const name and the stale `ModuleDescription::build` doc paths are sent to the fix round (see below).
+- T3/4 🔵 `escape_debug` also escapes `'`, which the spec requires. `LuaName` is validated and then dropped. Recorded only.
+
+## Deviations
+
+- 2026-11-25 — Task 4, test `a_signature_problem_in_a_module_field_or_nested_parameter_names_the_member`. The plan's fixture is a module field typed `fun(a: any, a: any)`. `build()` refuses a function-typed module field first (spec §3.3:363, test `a_function_typed_module_field_is_refused`), so the fixture wraps the type as `array(function(...))`. The asserted message is unchanged: ``parameter `a` of `on` is described twice``. Stage: plan.
+- 2026-11-25 — Task 4 added `pub(crate)` plumbing to Task 2's files: `Param::follows_variadic`, `Signature::variadic_calls`, and `LuaType::repr` with a `pub(crate) Repr`. Without them, `build()` cannot detect "two variadics", "after the variadic" or walk types.
+- 2026-11-25 — Commits are not made per task. Execute commits nothing unless told to, so the tasks' "Commit …" lines are left to the author.
+
+### Fix round (one coder, after the Tasks 3–4 review)
+
+- **Fixed** The `dead_code` expects are now item-level. In module.rs they are on `ModuleDescription::doc` and `::records`; `::members` needs none, because plan 02's verify reads it. In signature.rs only `Param::presence` carries one.
+- **Fixed** Five record-reference refusal tests were added: record field, module field, nested function type, map, and union. Reverting each arm in turn fails exactly its test. `cargo test -p airsl description::` → `62 passed`.
+- **Fixed** The const `D20` is now `NESTED_POSITION`. The stale `ModuleDescription::build` doc mentions are now intra-doc links to `ModuleDescriptionBuilder::build`. The `Repr`, `record.rs` and `DOC_BLANKS` docs were corrected.
+- Open 🔵 The `signature.rs` "Boxed because…" comment is longer than 100 columns.
