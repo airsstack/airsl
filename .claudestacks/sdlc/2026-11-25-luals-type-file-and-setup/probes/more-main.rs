@@ -5,6 +5,9 @@ fn main() {
         ("bom", b"\xEF\xBB\xBF{\"a\":1}".to_vec()),
         ("bom stripped", b"{\"a\":1}".to_vec()),
         ("not utf-8", b"{\"a\":\"\xFF\"}".to_vec()),
+        ("comment (from_slice)", b"{\n  // keep me\n  \"workspace.library\": []\n}".to_vec()),
+        ("trailing comma (from_slice)", b"{\"a\": 1,}".to_vec()),
+        ("non-object with trailing comma (from_slice)", b"[1, 2,]".to_vec()),
     ] {
         match serde_json::from_slice::<serde_json::Value>(&bytes) {
             Ok(v) => println!("{name}: ok -> {v}"),

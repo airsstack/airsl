@@ -94,6 +94,20 @@ Diagnosis complete, 1 problems found
 $ cd default_state && lua-language-server --check . --checklevel=Information
 main.lua:2:26 [Warning] Undefined field `nope`. (undefined-field)
 Diagnosis complete, 1 problems found
+== lua_prefix
+.gitignore: .airsl/ 
+.luarc.json: {"Lua.workspace.library":[".airsl/types"]}
+(git repo)
+$ cd lua_prefix && lua-language-server --check . --checklevel=Information
+main.lua:2:26 [Warning] Undefined field `nope`. (undefined-field)
+Diagnosis complete, 1 problems found
+== lua_nested
+.gitignore: .airsl/ 
+.luarc.json: {"Lua":{"workspace":{"library":[".airsl/types"]}}}
+(git repo)
+$ cd lua_nested && lua-language-server --check . --checklevel=Information
+main.lua:2:26 [Warning] Undefined field `nope`. (undefined-field)
+Diagnosis complete, 1 problems found
 == spell
 .luarc.json: {"workspace.library":[".airsl/types"]}
 (git repo)
@@ -148,3 +162,28 @@ bad.lua:4:38 [Warning] Undefined field `nope`. (undefined-field)
 bad.lua:5:36 [Warning] Undefined field `nope`. (undefined-field)
 bad.lua:7:46 [Warning] Undefined field `upper`. (undefined-field)
 Diagnosis complete, 6 problems found
+== unions
+.gitignore: .airsl/ 
+.luarc.json: {"workspace.library":[".airsl/types"]}
+(git repo)
+$ cd unions && lua-language-server --check . --checklevel=Information
+bad.lua:1:15 [Warning] Cannot assign `table` to parameter `boolean|string|integer`.
+bad.lua:2:18 [Warning] Cannot assign `boolean` to parameter `(string|integer)?`.
+bad.lua:3:23 [Warning] Cannot assign `string` to parameter `""`.
+bad.lua:4:27 [Warning] Cannot assign `string` to parameter `"a"?`.
+Diagnosis complete, 4 problems found
+== positions
+.gitignore: .airsl/ 
+.luarc.json: {"workspace.library":[".airsl/types"]}
+(git repo)
+$ cd positions && lua-language-server --check . --checklevel=Information
+bad.lua:3:20 [Warning] Cannot assign `boolean` to `(string|integer)?`.
+bad.lua:1:15 [Warning] Cannot assign `integer` to parameter `string?`.
+bad.lua:2:29 [Warning] Cannot assign `string` to parameter `"x"`.
+bad.lua:4:22 [Warning] Cannot assign `string` to parameter `"a|b"`.
+bad.lua:5:29 [Warning] Cannot assign `string` to parameter `"x?"`.
+bad.lua:8:35 [Warning] Cannot assign `integer` to parameter `string`.
+bad.lua:9:20 [Warning] Cannot assign `integer` to parameter `string|none`.
+bad.lua:6:30 [Warning] Undefined field `nope`. (undefined-field)
+bad.lua:7:21 [Warning] Undefined field `upper`. (undefined-field)
+Diagnosis complete, 9 problems found

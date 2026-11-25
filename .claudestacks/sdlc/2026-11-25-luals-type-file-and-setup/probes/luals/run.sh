@@ -36,7 +36,9 @@ proj nested_first_has ignore; printf '{"workspace":{"library":[".airsl/types"]},
 proj dotted_first_has ignore; printf '{"workspace.library":[".airsl/types"], "workspace":{"library":[]}}' > dotted_first_has/.luarc.json
 proj disjoint ignore; printf '{"workspace.library":[".airsl/types"], "workspace":{"checkThirdParty":false}}' > disjoint/.luarc.json
 proj default_state noignore; printf '{"workspace.library":[".airsl/types"]}' > default_state/.luarc.json
-for c in control dotted nested comments jsonc_only json_wins bom lastwins_has firstwins_has nested_first_has dotted_first_has disjoint default_state; do check $c; done
+proj lua_prefix ignore; printf '{"Lua.workspace.library":[".airsl/types"]}' > lua_prefix/.luarc.json
+proj lua_nested ignore; printf '{"Lua":{"workspace":{"library":[".airsl/types"]}}}' > lua_nested/.luarc.json
+for c in control dotted nested comments jsonc_only json_wins bom lastwins_has firstwins_has nested_first_has dotted_first_has disjoint default_state lua_prefix lua_nested; do check $c; done
 # --- type spellings
 mkdir -p spell/.airsl/types; (cd spell && git init -q .)
 printf '{"workspace.library":[".airsl/types"]}' > spell/.luarc.json
@@ -90,7 +92,7 @@ cp "$LAYOUT" layout/.airsl/types/airsstack.lua
 printf 'local v = airsstack.info.version:upper()\nlocal hi = airsstack["end"].hello("me"):upper()\nlocal a = airsstack.info.nope\nlocal b = airsstack["end"].nope\nprint(v, hi, a, b)\n' > layout/use.lua
 check layout
 # --- grammar: modules, records, literal unions, variadic, optional params, maps, record fun fields, reserved-word module
-for g in grammar compose records; do
+for g in grammar compose records unions positions; do
   mkdir -p $g/.airsl/types; (cd $g && git init -q . && printf '.airsl/\n' > .gitignore)
   printf '{"workspace.library":[".airsl/types"]}' > $g/.luarc.json
   cp "$SELF_DIR/$g-typefile.lua" $g/.airsl/types/airsstack.lua

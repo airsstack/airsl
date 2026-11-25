@@ -9,10 +9,10 @@ re-run on `bb95c10`, which changes no code (macOS, LuaLS 3.19.2).
 `sh luals/run.sh <empty-dir>` rebuilds every fixture and prints, for each case, the luarc and
 `.gitignore` contents, the exact command, and the diagnostics. `luals/run.out` is its output.
 The `*-typefile.lua`, `*-good.lua` and `*-bad.lua` files are the fixtures it copies.
-`luals/check-typefiles.out` is `cargo run -q -p airsl-cli -- check` on three fixtures, run from the
+`luals/check-typefiles.out` is `cargo run -q -p airsl-cli -- check` on five fixtures, run from the
 checkout. The `records` case and its fixtures (`records-typefile.lua`, `records-good.lua`,
-`records-bad.lua`) were added on checkout `bb95c10`; re-running `run.sh` there left every earlier
-case's output unchanged.
+`records-bad.lua`) were added on checkout `bb95c10`, and the `unions`, `positions`, `lua_prefix` and `lua_nested` cases on `2e2f973`. Each time,
+re-running `run.sh` left every earlier case's output unchanged.
 
 ## Rust
 
@@ -31,10 +31,14 @@ writes into.
 | `probe-io.txt` | `io-main.rs` | none (std) |
 | `probe-fs-special.txt` | `fs-special-main.rs` | none (std; uses `mkfifo`) |
 | `probe-socket.txt` | `socket-main.rs` | none (std) |
+| `probe-resolve.txt` | `resolve-main.rs` | none (std) |
+| `probe-mode.txt` | `mode-main.rs` | `tempfile = "=3.27.0"` |
 
 `surface-greps.txt` records two `grep` runs over `crates/airsl/src/modules/`, each with its command.
 `luals-provider-53-54.lua` is lines 50–58 of LuaLS 3.19.2
-`libexec/script/provider/provider.lua` (Mason install).
+`libexec/script/provider/provider.lua` (Mason install). `luals-config-207-224.lua`,
+`luals-luadoc-559-618.lua` and `luals-luadoc-1768.lua` are excerpts of the same install, each
+headed with its source file and line range.
 
 ## Other records
 

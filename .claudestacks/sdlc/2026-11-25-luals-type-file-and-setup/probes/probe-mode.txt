@@ -1,0 +1,6 @@
+# toolchain 1.94.1 (29ea6fb6a 2026-03-24), Darwin 25.3.0, src/main.rs = mode-main.rs, deps: tempfile
+tempfile_in default mode: 600
+created with explicit 0644: 644
+updated keeps old 0640: 640, content: updated
+0444 permissions().readonly(): true
+persist over 0444 file succeeds: true

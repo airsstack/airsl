@@ -7,3 +7,9 @@ exit=0
 $ cargo run -q -p airsl-cli -- check probes/luals/records-typefile.lua   (cwd: checkout bb95c10, rustc 1.94.1)
 1 file(s) compiled, 0 failed
 exit=0
+$ cargo run -q -p airsl-cli -- check probes/luals/unions-typefile.lua   (cwd: checkout 2e2f973, rustc 1.94.1)
+1 file(s) compiled, 0 failed
+exit=0
+$ cargo run -q -p airsl-cli -- check probes/luals/positions-typefile.lua   (cwd: checkout 2e2f973, rustc 1.94.1)
+1 file(s) compiled, 0 failed
+exit=0

@@ -20,7 +20,30 @@ checkout `bb95c10`, which changes no code since `577e401`. LuaLS results come fr
 `probes/luals/run.sh` and are cited as `run.out <case>`, the case's block in
 `probes/luals/run.out`.
 
-This spec replaces `spec-superseded-2026-11-25.md`. Changes from it:
+This spec replaces `spec-superseded-2026-11-25-2.md`, which replaced
+`spec-superseded-2026-11-25.md`.
+
+This revision also closes the findings of the review of that revision:
+
+- D20 and §3.3: types LuaLS cannot read inside `fun(...)` or a map are refused.
+- D21 and §4: inline docs follow ` # `, and the `@` rule covers all whitespace.
+- D22 and §6.1: every LuaLS spelling of `workspace.library`, and a stricter two-spellings rule.
+- D23 and §6: file modes, and read-only targets.
+- D24 and §5: `verify`'s own VM failures, and non-UTF-8 keys.
+- D25 and §3.1: the public API shapes and derives.
+- Assorted rules: function-typed module fields, validation detection points, the report's final newline, the §9 and §10 additions, and the §11 additions.
+
+Changes from the review of the revision before, all found by the plan-set review:
+
+- D18 and §6: what target resolution does with every error from `symlink_metadata` and `canonicalize`.
+- §6 step 4: when the type file is read.
+- D19 and §3.2: union flattening, an optional inside a union, the empty literal, and the limits of the check.
+- §3.3: a `\r` in a literal is refused.
+- §6.1 L4: the error texts are re-proven with `from_slice`.
+- §9 and §10: the new edge cases and tests.
+- §11: every page that lists the commands or the trait's methods.
+
+Changes in the previous revision:
 
 - D16 and §3.4: the type of every table a built-in returns.
 - D17 and §10: the platform scope of the symlink and special-file tests.
@@ -53,6 +76,14 @@ This spec replaces `spec-superseded-2026-11-25.md`. Changes from it:
 | D15 | One setting written both dotted and nested | Refused only when the same key path is set both ways and a rewrite is needed (§6.1 L9) |
 | D16 | Types of the built-ins' table returns | Records `fs.Stat`, `regex.Compiled`, `proc.Output`, `ext.Granted`, `ext.GrantedFs`, `ext.GrantedProc`, `ext.GrantedLimits`. Maps for `env.all`, `regex.captures` and the name→`true` sets (§3.4) |
 | D17 | Platforms for the symlink and special-file tests | Unix only (`#[cfg(unix)]`). The special file is a Unix socket made with std's `UnixListener::bind`, not a FIFO (§10) |
+| D18 | Errors while resolving a target | `NotFound` or `NotADirectory` from `symlink_metadata` means absent. Any other error from `symlink_metadata`, or from `canonicalize` other than `NotFound`, is `Io { operation: "read" }` on the target. All of them happen in step 4, before anything is written (§6) |
+| D20 | Types inside `fun(...)` and maps | Inside a function type's parameters, variadic and returns, a function type, a union outside a map's `<…>`, and any type spelled with a leading `(` are refused. A function type inside a map key or value is refused everywhere (§3.3) |
+| D21 | Doc text LuaLS could read as syntax | Inline docs are written after ` # `. A doc line whose first non-whitespace character (space, tab, vertical tab, form feed) is `@` is refused (§3.3, §4) |
+| D22 | LuaLS spellings of `workspace.library` | Any key path that reaches `workspace.library` after a leading `Lua` segment is dropped is a spelling. A rewrite is refused when two top-level keys reach one setting path of two or more segments (§6.1) |
+| D23 | File modes | A created file gets mode 0644 on Unix. A rewritten file keeps its permissions. A read-only target is refused (§6) |
+| D24 | `verify`'s own VM failures | `Error::VerifyFailed { module, source }`. A non-UTF-8 string key is shown lossily (§5) |
+| D25 | Public API shape | `LuaType` is an opaque struct with associated constants for the primitives. Every new public type derives `Debug`, `Clone`, `PartialEq` and `Eq` (`Copy` too for `FileChange`) (§3.1) |
+| D19 | Unions | Nested unions flatten. An optional member makes the whole union optional, so it is spelled `(a\|b)?`, never `a?\|b`. The empty literal `""` is allowed (§3.2) |
 
 ## 2. Architecture (approved by the author)
 
@@ -172,10 +203,14 @@ Signature::param(self, name: &str, ty: LuaType) / optional(..) / variadic(ty) / 
 Record::new(name: &str, doc: &str) -> Record
 Record::field(self, name: &str, ty: LuaType, doc: &str) -> Self
 
-LuaType::{Nil, Boolean, Integer, Number, String, Any, Table}
+LuaType::{NIL, BOOLEAN, INTEGER, NUMBER, STRING, ANY, TABLE}   // associated constants
 LuaType::literal(text) / array(t) / map(k, v) / optional(t) / function(Signature) / record(name)
 LuaType::or(self, other) -> LuaType       // builds a union; a union is never empty
 ```
+
+`LuaType` is an opaque `pub struct` whose representation is private, so a host can build a type
+only through the constructors and the `or` normalisation (D19, D25). Every new public type derives
+`Debug`, `Clone`, `PartialEq` and `Eq`. `FileChange` also derives `Copy`.
 
 The builder pieces hold raw text. `build()` is the single validation point (§3.3), and only a
 validated `ModuleDescription` reaches `luals`. `LuaType::optional` is idempotent: the optional of
@@ -193,9 +228,9 @@ fn describe(&self) -> Result<ModuleDescription> {
     ModuleDescription::builder("SHA-256 and SHA-1 digests.")
         .function(
             Function::new("hash_file", "Hashes a file's bytes.")
-                .param("path", LuaType::String, "File to hash.")
+                .param("path", LuaType::STRING, "File to hash.")
                 .optional("algorithm", LuaType::literal("sha256").or(LuaType::literal("sha1")), "Defaults to sha256.")
-                .returns(LuaType::String),
+                .returns(LuaType::STRING),
         )
         // … sha256, sha1, hex
         .build()
@@ -203,7 +238,7 @@ fn describe(&self) -> Result<ModuleDescription> {
 ```
 
 `ext.on`'s handler is described as `LuaType::function(Signature::new().param("payload",
-LuaType::Any).returns(LuaType::Any))`, which spells `fun(payload: any): any`. A `fun(...)` with no
+LuaType::ANY).returns(LuaType::ANY))`, which spells `fun(payload: any): any`. A `fun(...)` with no
 returns makes LuaLS warn on any callback that returns a value (`run.out spell`:
 `use.lua:4:57 … at most 0 return value(s) … (redundant-return-value)`). So a callback that may
 return a value is described with a return type.
@@ -223,16 +258,41 @@ file gets no diagnostic.
 | `optional(t)` | `t?`, or `(t)?` when `t` is a union or a function | compose `(string\|integer)?` and `(fun(x: string): boolean)?`, spell `string[]?` |
 | `function(sig)` | `fun(a: T, b?: U, ...: V): R1, R2`, with no `: …` when there are no returns | compose (variadic, multiple returns), spell `fun(a: string, b?: integer)` |
 | `record("Stat")` | `<root>.<module>.Stat` | grammar `airsstack.fs.Stat`, `airsstack.regex.Compiled` |
+| `a.or(b.or(c))`, `(a.or(b)).or(c)` | `a\|b\|c` (nested unions flatten, members keep left-to-right order) | unions `string\|integer\|boolean` |
+| `a.or(optional(b))`, `optional(a).or(b)` | `(a\|b)?`: an optional member makes the whole union optional, so `?` never appears inside a union | unions `(string\|integer)?`; compose |
+| `literal("")` | `""` | unions `""` |
+| `optional(literal("a"))` | `"a"?` | unions `"a"?` |
+| `array(map(k, v))` | `table<k, v>[]` (a map needs no parentheses) | unions `table<string, string>[]` |
 
 Why a function member of a union is parenthesised: LuaLS reads the bare
 `fun(x: string): boolean|string` as a function returning `boolean|string`. `run.out spell`:
 `use.lua:3:25 [Warning] Cannot assign `string` to parameter `fun(x: string):boolean|string`.`
 The parenthesised form accepts both a string and a function with no diagnostic.
 
-Limits of the check, from the same runs: an omitted argument to a required `any` parameter is not
-reported. Calling a method on an unguarded `string?` return is also not reported at
-`--checklevel=Information`. `grammar-bad.lua` has 7 misuse lines, and LuaLS reports 5
-(`run.out grammar`).
+Limits of the check, from the same runs:
+
+- An omitted argument to a required `any` parameter is not reported.
+- Calling a method on an unguarded `string?` return is not reported at `--checklevel=Information`.
+  `grammar-bad.lua` has 7 misuse lines, and LuaLS reports 5 (`run.out grammar`).
+- An array element of the wrong type inside `table<string, string>[]` is not reported.
+  `unions-bad.lua` has 5 misuse lines, and LuaLS reports 4; line 5 (`{ 1 }`) is the missed one
+  (`run.out unions`). Its `unions-good.lua` gets no diagnostic.
+- The unions fixture is valid Lua (`check-typefiles.out`, the `unions` run).
+- A wrong-typed variadic argument is not reported. `run.out positions` has
+  `---@param ... string # Parts to join.`, and `airsstack.p.join("a", 1)` (`positions-bad.lua`
+  line 10) gets no diagnostic.
+
+More spellings, from `run.out positions`. Good use gets no diagnostic, and bad use gets all 9
+expected warnings:
+
+- `---@return (string|integer)?`;
+- `---@return (fun(x: string): boolean)|string`;
+- `---@field g (fun(): string)? # …`;
+- `---@param h ((string|integer)?)[]`, which reports `Cannot assign `boolean` to `(string|integer)?``;
+- the literals `"a|b"` and `"x?"`, each type-checked;
+- a record class in a reserved-word module, `airsstack.end.R`, whose `.nope` is reported.
+
+`positions-typefile.lua` is valid Lua (`check-typefiles.out`).
 
 The built-ins need no other shape. They expose 66 keys, all functions (`probes/probe-surface.txt`).
 The only variadic is in `path.rs`, and no module defines userdata (`probes/surface-greps.txt`).
@@ -249,6 +309,11 @@ the module sources. §3.4 fixes the type of every table a built-in returns.
    is: its name, its doc, then its type. Types are walked depth-first, left to right.
 3. Each record in the order added: its name, its doc, then each field's name, doc and type.
 4. Cross-checks: member versus record name clashes, then record references.
+
+A duplicate (member, parameter, record or record field) is reported when its second occurrence is
+walked. A parameter after the variadic is reported when that parameter is walked. The name inside
+`LuaType::record(n)` is not parsed as a `LuaName`. It is checked only in step 4, where any name with
+no record of that name gives "used but not described".
 
 Names go through `LuaName::new`, which returns the existing `Error::InvalidName` with
 `kind: "Lua name"`. Its display is `invalid {kind} `{value}`: {reason}`
@@ -292,9 +357,24 @@ The three parameter rows below name their function as `{fn}`:
 | two fields of one record share a name | ``field `{x}` of record `{R}` is described twice`` |
 | `LuaType::record(n)` names no record of this module | ``record `{n}` is used but not described`` |
 | any doc contains `\r` | ``the doc of {owner} must not contain a carriage return`` |
-| a doc line starts with `@`, after leading spaces | ``a line in the doc of {owner} starts with `@` `` |
+| a doc line's first character after leading whitespace (space, tab, vertical tab, form feed) is `@`. LuaLS treats `^%-%s*@` as an annotation (`probes/luals-luadoc-1768.lua`) | ``a line in the doc of {owner} starts with `@` `` |
 | a parameter, variadic or field doc contains `\n` | ``the doc of {owner} must be one line`` |
-| a literal contains `"`, `\` or `\n` | ``string literal type `{text}` must not contain a double quote, a backslash or a line break`` |
+| a literal contains `"`, `\`, `\n` or `\r` | ``string literal type `{text}` must not contain a double quote, a backslash or a line break``, where `{text}` is written with Rust's `escape_debug`, so the message stays on one line |
+| a module field's type is a function type, or the optional of one | ``field `{x}` has a function type; describe it with `function` instead`` |
+| inside a function type's parameters, variadic or returns: a function type, a union (other than inside a map's `<…>`), or a type spelled with a leading `(` (an optional of a union, an array of a union, optional or function) | ``a function type in {owner} must not hold a function, a union or a parenthesised type as a parameter or return type`` |
+| a map key or value that is or contains a function type | ``a map type in {owner} must not hold a function type`` |
+
+For the last two rows, `{owner}` is the owner of the outermost type: the module field, the
+function's parameter or variadic (``parameter `p` of `f` ``, ``the variadic parameter of `f` ``),
+``return value of `f` `` for a function's return, or the record field.
+
+Why (D20): LuaLS's `fun(...)` grammar depends on position (`probes/luals-luadoc-559-618.lua`, LuaLS 3.19.2).
+A function type with returns, used as a non-last parameter, takes the next items as more of its
+own returns. A return that starts with `(` opens a parenthesised return list. What is allowed
+inside `fun(...)` is what was probed: `run.out positions` declares
+`fun(a: string?, b: string[]?, c: table<integer|string, string>, d: "x", e: airsstack.p.R): string?, integer[]`.
+Its good use gets no diagnostic, and a wrong `a` or `d` is reported. The built-ins need nothing
+more (§3.4).
 
 Two cases are accepted:
 
@@ -377,7 +457,12 @@ The exact layout:
 
 - Blocks are separated by one empty line, and the file ends with one `\n`.
 - A multi-line doc renders one `---<line>` per `\n`-separated line. An empty doc renders nothing.
-- A parameter, variadic or field doc is appended after one space, only when it is not empty.
+- A parameter, variadic or field doc is appended after ` # `, only when it is not empty (D21).
+  Without the `#`, LuaLS reads a doc that starts with `|`, `?`, `[]`, `<` or `(` as part of the
+  type. `run.out positions`: `---@param y string | none when unset` makes `nohash(1)` report
+  ``Cannot assign `integer` to parameter `string|none``, while `---@param x string # | none when unset`
+  keeps the type `string`. The `#` form works on `@param`, `@param ...` and `@field`
+  (`positions-typefile.lua`).
 
 ```
 ---@meta
@@ -389,16 +474,16 @@ The exact layout:
 
 ---<module doc>
 ---@class <root>.<m>
----@field <field> <type> <doc>              (one per described field, in order)
+---@field <field> <type> # <doc>            (one per described field, in order)
 <root>.<m> = {}
 
 ---<record doc>                             (one block per record, in order)
 ---@class <root>.<m>.<Record>
----@field <field> <type> <doc>
+---@field <field> <type> # <doc>
 
 ---<function doc>                           (one block per function, in order)
----@param <name> <type> <doc>               (`<name>?` when Presence::Optional)
----@param ... <type> <doc>                  (variadic)
+---@param <name> <type> # <doc>             (`<name>?` when Presence::Optional)
+---@param ... <type> # <doc>                (variadic)
 ---@return <type>                           (one per return)
 function <root>.<m>.<f>(<p1>, <p2>, ...) end
 ```
@@ -422,7 +507,11 @@ Evidence for this layout:
 
 ```rust
 pub fn verify(module: &dyn HostModule, root: &RootTable) -> Result<()>
-pub struct Drift { /* undescribed, missing, not_a_function, not_a_field; accessors */ }
+pub struct Drift { /* private */ }
+Drift::undescribed(&self) -> &[String]              // displayed key texts, sorted
+Drift::missing(&self) -> &[String]                  // sorted
+Drift::not_a_function(&self) -> &[(String, String)] // (name, installed type name), sorted by name
+Drift::not_a_field(&self) -> &[String]              // sorted
 ```
 
 1. Call `module.describe()`. A failure becomes `Error::DescribeFailed`.
@@ -458,13 +547,23 @@ displayed text (byte order) and backticked:
 
 Displayed key text:
 
-- A string key shows as itself.
+- A string key shows as itself. A string key that is not valid UTF-8 shows through
+  `String::from_utf8_lossy` (D24).
 - An integer or float key shows through `mlua::Value::to_string`.
 - Any other key shows as `<{type}>`, for example `<table>`. Its `to_string` is an address
   (`probe-more.txt`: `table: 0x…`), which would make the message change between runs.
 
 `{t}` is `mlua::Value::type_name()` (`probes/probe-mlua-typename.txt`: `string integer number
 boolean table function nil`).
+
+**`verify`'s own VM failures** (D24). Creating the table, iterating it, `Table::get` (which runs
+`__index` and may raise), and converting a key to text can each fail with an `mlua::Error`. Any of
+these becomes `Error::VerifyFailed { module, source: Box<mlua::Error> }`, displayed as
+``cannot verify host module `{module}`: {source}``. An `install` error is still returned unchanged.
+
+**A key that is not a Lua name.** A module that installs a key such as `end` or `my-key` can never
+pass `verify`. Such a key cannot be described, because `LuaName` refuses it, so it is always
+undescribed drift. This is a stated limit (§12).
 
 ## 6. Setup (`luals::setup`)
 
@@ -482,13 +581,25 @@ temporary file names the target it was meant to replace, never the temporary fil
 
 **Resolving a target** (the luarc file or the type file), done before anything is written:
 
-1. If `std::fs::symlink_metadata(path)` fails with `NotFound`, the target is absent.
-2. If the target is a symlink, resolve it with `std::fs::canonicalize`. If that fails, refuse with
-   `it is a dangling symlink`.
+1. If `std::fs::symlink_metadata(path)` fails with `NotFound` or `NotADirectory`, the target is
+   absent. `NotADirectory` means a parent of the path is a file (for example `.airsl`), so the
+   target cannot exist. Step 5's `create_dir_all` then reports the problem. Any other
+   `symlink_metadata` error, such as `PermissionDenied`, is
+   `Io { operation: "read", path: project.join(<rel>) }` (D18).
+2. If the target is a symlink, resolve it with `std::fs::canonicalize`. If that fails with
+   `NotFound`, refuse with `it is a dangling symlink`. Any other `canonicalize` error, such as
+   `FilesystemLoop` for a link cycle, is `Io { operation: "read", path: project.join(<rel>) }`.
 3. If the resolved target exists and is not a regular file (directory, FIFO, socket, device),
    refuse with `it is not a regular file`. It is never opened, so a FIFO cannot block.
 
-Probe evidence (`probes/probe-fs-special.txt`, std, rustc 1.94.1):
+Probe evidence (`probes/probe-fs-special.txt` and `probes/probe-resolve.txt`, std, rustc 1.94.1):
+
+| Case (`probe-resolve.txt`) | `symlink_metadata` / `canonicalize` result |
+|---|---|
+| parent `.airsl` is a regular file | `symlink_metadata`: `NotADirectory`, "Not a directory (os error 20)" |
+| parent `.airsl/types` has mode 000 | `symlink_metadata`: `PermissionDenied`, "Permission denied (os error 13)" |
+| parent missing | `symlink_metadata`: `NotFound` |
+| two links pointing at each other | `symlink_metadata` ok; `canonicalize`: `FilesystemLoop`, "Too many levels of symbolic links (os error 62)" |
 
 | Behaviour | Result |
 |---|---|
@@ -498,8 +609,23 @@ Probe evidence (`probes/probe-fs-special.txt`, std, rustc 1.94.1):
 | a Unix socket made by `UnixListener::bind` (`probes/probe-socket.txt`) | `is_file: false, is_dir: false, is_socket: true`. `File::open` on it fails: `Operation not supported on socket (os error 102)`. A symlink to it canonicalizes to a target with `is_file: false` |
 | writing a temp file beside the resolved target, then renaming it over the target | `link still symlink: true`, and the new content reads through the link |
 
-**Writing a target.** Write a temporary file in the resolved target's directory, then rename it
-over the resolved target. A symlink is therefore written through and survives (D12).
+**Writing a target.** Write a temporary file in the resolved target's directory with
+`tempfile::Builder::tempfile_in` (tempfile 3.27.0, already a dependency), then `persist` it over
+the resolved target. A symlink is therefore written through and survives (D12).
+
+File modes (D23), set on the temporary file before `persist`:
+
+- **Created:** on Unix the mode is set to `0o644`. tempfile's own default is `0o600`, which would
+  hide the file from other users (`probes/probe-mode.txt`: `tempfile_in default mode: 600`,
+  `created with explicit 0644: 644`). On other platforms tempfile's default stands.
+- **Updated:** the temporary file takes the existing target's `Permissions`
+  (`updated keeps old 0640: 640`).
+- **Read-only target:** an existing target whose `permissions().readonly()` is true is refused in
+  step 4 with `it is read-only`. A rename would otherwise replace it silently on Unix
+  (`0444 permissions().readonly(): true`, `persist over 0444 file succeeds: true`).
+
+Step 3 of resolution classifies a symlink's target with `std::fs::metadata` on the canonical path.
+A failure there is also `Io { operation: "read" }`.
 
 **Flow (D10).** Steps 1–4 write nothing, and the first error ends the call.
 
@@ -507,8 +633,8 @@ over the resolved target. A symlink is therefore written through and survives (D
 |---|---|---|
 | 1 | `std::fs::read_dir(project)` | `Io { operation: "open project directory", path: <project as given> }` |
 | 2 | `verify` every module in `modules`, in order | `DescribeFailed`, the install error, or `DescriptionDrift` |
-| 3 | `TypeFile::render(modules, root)` | none (step 2 already called every `describe`) |
-| 4 | Resolve the type file target and the luarc target. Read the luarc bytes if present. Plan the edit (§6.1) | `TypeFileRefused` / `LuarcRefused` / `Io { operation: "read" }` |
+| 3 | `TypeFile::render(modules, root)` | Its error is returned as is. Step 2 already called every `describe` successfully, so in practice none |
+| 4 | Resolve the type file target and the luarc target. Read the existing type file's bytes if present, and the luarc's bytes if present. Plan the edit (§6.1). Every read in the flow happens here, so a read failure writes nothing | `TypeFileRefused` / `LuarcRefused` / `Io { operation: "read" }` |
 | 5 | `create_dir_all(project/.airsl/types)`. Write the type file only if its bytes differ | `Io { operation: "create directory", path: <project>/.airsl/types }` / `Io { operation: "write" }` |
 | 6 | Write the luarc only if the plan is `Write` | `Io { operation: "write" }` |
 
@@ -537,7 +663,7 @@ ignored and no luarc, LuaLS reports `Undefined global `airsstack`` (`run.out con
 (`run.out dotted`).
 
 **Report.** One line each, the type file first, with paths relative to the project and `/`
-separators:
+separators. `SetupReport`'s `Display` joins the two lines with `\n` and adds no final newline:
 
 ```
 created .airsl/types/airsstack.lua
@@ -559,28 +685,57 @@ string. The rules are applied in this order, and the first that decides wins:
 | L1 | `None` (no file) | `Write` the bytes `{\n  "workspace.library": [\n    ".airsl/types"\n  ]\n}\n` | `probes/probe-more.txt`, `L1 bytes:` |
 | L2 | starts with `EF BB BF` | strip it, continue, and put it back in front of any `Write` (D13) | LuaLS accepts a BOM (`run.out bom`). serde_json does not: `bom: err -> expected value at line 1 column 1`; `bom stripped: ok` (`probe-more.txt`) |
 | L3 | empty or ASCII-whitespace only | treated as `{}`, continue from L5 | serde_json rejects it otherwise: `empty file: err -> EOF while parsing a value at line 1 column 0` (`probes/probe-serde.txt`) |
-| L4 | `serde_json::from_slice` fails: comments, trailing comma, invalid JSON, not UTF-8 | refuse: `it is not plain JSON ({serde error})` | `comment: err -> key must be a string at line 2 column 3`, `trailing comma: err -> trailing comma at line 1 column 9` (`probe-serde.txt`), `not utf-8: err -> invalid unicode code point at line 1 column 8` (`probe-more.txt`). LuaLS does read comments (`run.out comments`), so this case occurs in practice |
+| L4 | `serde_json::from_slice` fails: comments, trailing comma, invalid JSON, not UTF-8 | refuse: `it is not plain JSON ({serde error})` | through `from_slice`, the reader L4 uses (`probe-more.txt`): `comment (from_slice): err -> key must be a string at line 2 column 3`, `trailing comma (from_slice): err -> trailing comma at line 1 column 9`, `not utf-8: err -> invalid unicode code point at line 1 column 8`, and `non-object with trailing comma (from_slice): err -> trailing comma at line 1 column 7`, which shows L4 deciding before L5. `from_str` gives the same first two texts (`probe-serde.txt`). LuaLS does read comments (`run.out comments`), so this case occurs in practice |
 | L5 | the top level is not an object | refuse: `its top level is not a JSON object` | `not object: ok -> [` parses (`probe-serde.txt`) |
-| L6 | dotted `workspace.library` exists and is not an array | refuse: `` `workspace.library` is not an array`` | — |
-| L7 | `workspace` exists and is not an object, or nested `workspace` → `library` exists and is not an array | refuse: `` `workspace` is not an object`` / `` `workspace` → `library` is not an array`` | — |
+| L6 | a spelling of `workspace.library` (see below) whose value is not an array | refuse: `` `{spelled}` is not an array`` | — |
+| L7 | a key on the way to a spelling (`workspace`, `Lua`, `Lua.workspace`, or `Lua` → `workspace`) exists and is not an object | refuse: `` `{spelled}` is not an object`` | — |
 | L8 | every spelling of `workspace.library` that is present lists the entry, and at least one spelling is present | `Unchanged`: no write, bytes untouched | — |
-| L9 | a rewrite is needed, and some key path is set in two spellings | refuse: ``it sets `{path}` in two spellings`` (the first such path in byte order) | LuaLS uses the textually last spelling: `run.out nested_first_has` and `dotted_first_has` give `Undefined global`. A rewrite sorts keys (L11) and could flip which spelling wins. Disjoint key paths are safe (`run.out disjoint`) |
+| L9 | a rewrite is needed, and two different top-level keys reach one setting path of two or more segments | refuse: ``it sets `{path}` in two spellings`` | LuaLS uses the textually last spelling: `run.out nested_first_has` and `dotted_first_has` give `Undefined global`. A rewrite sorts keys (L11) and could flip which spelling wins. Disjoint key paths are safe (`run.out disjoint`) |
 | L10 | otherwise: a dotted `workspace.library` array (append) / a nested `workspace.library` array (append) / a nested `workspace` without `library` (add `"library": [".airsl/types"]`) / neither (add `"workspace.library": [".airsl/types"]`) | `Write` | dotted and nested are both honoured (`run.out dotted`, `run.out nested`) |
 | L11 | the bytes of any `Write` | `serde_json::to_string_pretty` + `\n`: 2-space indent, keys sorted, no comments | `order: ok -> {` … `"a": { "b": 2, "y": 1 }, "runtime.version": …, "z": 1` (`probe-serde.txt`). `cargo tree -e features -i serde_json` shows only `default` and `std`, so there is no `preserve_order` (`probes/cargo-tree-serde-json.txt`) |
 | L12 | duplicate keys | the last value is kept | serde_json gives `duplicate key: ok -> { "a": 2 }` (`probe-serde.txt`). LuaLS also keeps the last: `run.out lastwins_has` finds the types, `firstwins_has` does not. The effective setting is preserved |
 
-**Key paths for L9.** Each top-level key is split on `.` into a path. If its value is an object,
-the walk continues into it, and each nested key is split on `.` and appended. The walk stops at a
-value that is not an object, or at an empty object. A key path is "set in two spellings" when
-two different top-level keys reach the same path.
+**Spellings (D22).** LuaLS 3.19.2 applies a luarc key when the key, or `Lua.` plus the key, is a
+setting, and only otherwise descends into an object value (`probes/luals-config-207-224.lua`). So
+`workspace.library` has five spellings, each a path of JSON keys:
+
+- `workspace.library`
+- `workspace` → `library`
+- `Lua.workspace.library`
+- `Lua.workspace` → `library`
+- `Lua` → `workspace` → `library`
+
+`run.out lua_prefix` and `run.out lua_nested` show the two `Lua` forms honoured (only
+`Undefined field `nope``). `{spelled}` is the user's key path, each JSON key in backticks joined
+with ` → `, for example `` `Lua` → `workspace` → `library` ``.
+
+**Key paths for L9.** Each top-level key is split on `.` into segments. If its value is an object,
+the walk continues into it, splitting each nested key on `.` and appending. The walk stops at a
+value that is not an object, or at an empty object. A leading `Lua` segment is dropped. A key
+"reaches" every prefix of every path it walks. Two different top-level keys conflict when they
+both reach a path of two or more segments. `{path}` is the shortest such path, with segments
+joined by `.`. Among paths of equal length, the first in byte order of the joined text is used.
+
+Examples:
+
+- `{"workspace.library": [], "workspace": {"library": []}}` both reach `workspace.library`, so they
+  are refused.
+- `{"diagnostics.severity": {"a": "Error"}, "diagnostics": {"severity": {"b": "Hint"}}}` both
+  reach `diagnostics.severity`, so they are refused. LuaLS applies a map-valued setting as one
+  value, and a rewrite could flip which spelling wins.
+- `{"workspace.library": [], "workspace": {"checkThirdParty": false}}` share only `workspace`, one
+  segment, so they are accepted (`run.out disjoint`).
 
 **When L10 appends** to a library list that holds the entry in no spelling, it appends to the one
-spelling that is present. L9 has already refused the case where both spellings are present. Every
+spelling that is present, whichever of the five it is. L9 has already refused the case where two
+are present. With no spelling present, it adds `"library": [".airsl/types"]` to a top-level
+`workspace` object if one exists, and otherwise adds `"workspace.library": [".airsl/types"]`. Every
 other key and value is kept as parsed. Order and formatting are not kept (D10).
 
 **Refusals** become `Error::LuarcRefused { path, reason }`, displayed as
 ``will not edit `{path}`: {reason}; add ".airsl/types" to `workspace.library` by hand``.
-The two file-kind reasons from §6 use the same variant when the target is the luarc. For the type
+The file-kind reasons from §6 (`it is a dangling symlink`, `it is not a regular file`,
+`it is read-only`) use the same variant when the target is the luarc. For the type
 file they use `Error::TypeFileRefused { path, reason }`, displayed as
 ``will not write `{path}`: {reason}``.
 
@@ -600,7 +755,7 @@ assert on both streams. `main.rs` passes the real streams.
 - On success it prints the report to stdout and exits 0.
 - If writing the report to stdout fails, it prints `airsl: {io error}` to stderr and exits 1. Both
   files are already written by then. `ext_fire` handles a failed stdout write the same way, with
-  its own prefix `airsl ext fire: ` (`ext_fire.rs:25`, `:84-87`).
+  its own prefix `airsl ext fire: ` (`ext_fire.rs:25`, `:76-79`).
 - On any error it prints `airsl: {error}` to stderr and exits 1. That is the prefix `check`, `run`
   and `test` already use (`crates/airsl-cli/src/check.rs:33`, `run.rs:46`).
 - There is no `--root` flag. A host with its own root calls `luals::setup` itself.
@@ -616,6 +771,7 @@ New `Error` variants:
 | `DescriptionDrift { module: String, drift: Drift }` | ``host module `{module}` does not match its description: {drift}`` |
 | `LuarcRefused { path: String, reason: String }` | ``will not edit `{path}`: {reason}; add ".airsl/types" to `workspace.library` by hand`` |
 | `TypeFileRefused { path: String, reason: String }` | ``will not write `{path}`: {reason}`` |
+| `VerifyFailed { module: String, source: Box<mlua::Error> }` | ``cannot verify host module `{module}`: {source}`` |
 
 Two existing variants are reused:
 
@@ -639,6 +795,10 @@ surrounding format comes from the `Io` display above; this example was composed,
 | Type file or luarc is a directory, FIFO, socket or device | `TypeFileRefused` / `LuarcRefused`: `it is not a regular file`. Never opened | `setup.rs` |
 | Type file or luarc is a symlink to a regular file | Written through. The link survives (D12) | `setup.rs` |
 | Type file or luarc is a dangling symlink | Refused: `it is a dangling symlink` | `setup.rs` |
+| Luarc is a link in a cycle | `Io` "read" on `<project>/.luarc.json`. Nothing is written (D18) | `setup.rs` |
+| `.airsl/types` cannot be read (`PermissionDenied`) | `Io` "read" on `<project>/.airsl/types/<root>.lua`. Nothing is written (D18) | `setup.rs` |
+| A union holding an optional, or nested unions | Spelled `(a\|b)?` / `a\|b\|c` (D19) | `lua_type.rs` |
+| The empty literal | `""` | `lua_type.rs` |
 | Type file exists and is identical | `Unchanged`, not written | `setup.rs` |
 | Type file exists and was edited by the user | Overwritten (`Updated`). The header says not to edit it | `setup.rs` |
 | Other files in `.airsl/types/` | Untouched | `setup.rs` |
@@ -658,6 +818,18 @@ surrounding format comes from the `Io` display above; this example was composed,
 | A module that installs a table- or function-keyed entry | Reported as undescribed, shown as `<table>` or `<function>` | `verify.rs` |
 | `describe()` returns an error | `DescribeFailed { module, source }` from `render`, `verify` and `setup` | `luals` |
 | Re-run with nothing changed | Both lines say `unchanged`, and neither file's bytes are touched | `setup.rs` |
+| Type file or luarc is read-only | Refused: `it is read-only`. Nothing is written (D23) | `setup.rs` |
+| A created file | Mode 0644 on Unix (D23) | `setup.rs` |
+| An updated file | Keeps its permissions (D23) | `setup.rs` |
+| Library set as `Lua.workspace.library` (or another `Lua` spelling) | Treated like any spelling: listed is `Unchanged`, unlisted is appended to (D22) | `luarc.rs` |
+| A map-valued setting in two spellings, e.g. `diagnostics.severity` | Refused (L9) when a rewrite is needed | `luarc.rs` |
+| A module field typed as a function | Refused by `build()` | `module.rs` |
+| A function type inside `fun(...)` or a map, or a union inside `fun(...)` | Refused by `build()` (D20) | `module.rs` |
+| A doc line `\t@x` | Refused, like `@x` (D21) | `module.rs` |
+| A doc that starts with `\|` or `?` | Accepted. It renders after ` # `, so it stays doc text (D21) | `render.rs` |
+| A module that installs a key that is not a Lua name | Always undescribed drift. A stated limit (§12) | `verify.rs` |
+| A non-UTF-8 string key | Shown through `from_utf8_lossy` (D24) | `verify.rs` |
+| `__index` raises during `verify` | `VerifyFailed` (D24) | `verify.rs` |
 
 ## 10. Testing
 
@@ -677,6 +849,14 @@ Named tests, each in an inline `#[cfg(test)] mod tests`:
   - `a_required_parameter_may_follow_an_optional_one`
   - `an_unused_record_is_accepted`
   - `a_valid_description_builds`
+  - `a_function_typed_module_field_is_refused`
+  - `a_function_type_inside_a_function_type_is_refused`: `fun(cb: fun(): string, x: integer)`
+  - `a_union_or_parenthesised_type_inside_a_function_type_is_refused`: a return `(string|integer)?`
+    and a parameter `string|integer`
+  - `a_function_type_inside_a_map_is_refused`
+  - `a_doc_line_starting_with_at_after_a_tab_is_refused`
+  - `a_literal_refusal_escapes_its_text`: `literal("a\nb")` gives a one-line message containing `a\nb`
+  - `a_signature_problem_in_a_module_field_or_nested_parameter_names_the_member`
   - `a_signature_problem_in_a_record_field_names_the_field_and_record`: a record field typed
     `fun(text: string, text: string)` gives
     ``invalid module description: parameter `text` of field `find` of record `Compiled` is described twice``
@@ -693,6 +873,9 @@ Named tests, each in an inline `#[cfg(test)] mod tests`:
   - `a_function_in_a_union_is_parenthesised`
   - `an_array_of_an_optional_is_parenthesised`
   - `an_optional_array_needs_no_parentheses`
+  - `a_union_of_unions_is_flattened`
+  - `an_optional_member_makes_the_whole_union_optional`
+  - `an_empty_literal_spells_as_two_quotes`
 - `luals/render.rs`:
   - `renders_the_header_and_root_class`
   - `renders_a_reserved_word_module_with_brackets`
@@ -704,6 +887,8 @@ Named tests, each in an inline `#[cfg(test)] mod tests`:
   - `the_stdlib_type_file_compiles_as_lua`: loads the rendered stdlib file through `Engine::check`
     (`crates/airsl/src/engine.rs:321`)
   - `rendering_twice_is_byte_identical`
+  - `inline_docs_follow_a_hash`: a field doc renders as `---@field x string # Doc.`, and an empty
+    doc renders no `#`
   - `a_host_root_names_the_file_and_classes`
 - `luals/verify.rs`:
   - `a_matching_module_passes`
@@ -714,6 +899,12 @@ Named tests, each in an inline `#[cfg(test)] mod tests`:
   - `a_function_installed_as_a_value_is_drift`
   - `a_table_key_is_shown_by_its_type`
   - `drift_display_orders_and_joins_parts`
+  - `a_module_that_installs_nothing_passes`
+  - `keys_seen_only_through_pairs_are_not_walked`
+  - `a_function_key_is_shown_by_its_type`
+  - `a_non_utf8_key_is_shown_lossily`
+  - `a_vm_failure_during_verify_names_the_module`: an `__index` that raises gives
+    ``cannot verify host module `stub`: …``
   - `a_describe_error_names_the_module`
   - `a_described_record_is_not_reported_missing`
 - `luals/luarc.rs`:
@@ -722,6 +913,11 @@ Named tests, each in an inline `#[cfg(test)] mod tests`:
   - `a_listed_entry_in_both_spellings_is_unchanged`
   - `disjoint_spellings_are_rewritten`
   - `key_paths_split_nested_dotted_keys`
+  - `a_lua_prefixed_spelling_is_appended_to`
+  - `a_lua_prefixed_listing_is_unchanged`
+  - `a_map_valued_setting_in_two_spellings_is_refused`: the §6.1 `diagnostics.severity` example
+    gives ``it sets `diagnostics.severity` in two spellings``
+  - `a_listed_entry_in_one_of_two_spellings_is_refused`
 - `luals/setup.rs`, using tempdirs:
   - `first_run_creates_both_files`
   - `second_run_reports_unchanged_and_writes_nothing`: the mtimes are equal
@@ -741,7 +937,22 @@ Named tests, each in an inline `#[cfg(test)] mod tests`:
     there instead, and the test would fail. That open-before-check detection is proven on macOS
     only. It was not probed on Linux, where CI also runs the test
   - `a_directory_at_the_type_file_path_is_refused`
+  - `a_symlinked_type_file_is_written_through` (Unix only)
+  - `a_symlink_cycle_luarc_is_an_io_read_error` (Unix only): expects
+    ``read failed on `<project>/.luarc.json`: Too many levels of symbolic links (os error 62)``
+    on macOS. The test asserts the `read failed on `<path>`: ` prefix, because the OS text
+    differs by platform
+  - `an_unreadable_types_directory_is_an_io_read_error` (Unix only): `.airsl/types` with mode
+    000. Asserts the ``read failed on `<project>/.airsl/types/airsstack.lua`: `` prefix and that
+    `.luarc.json` was not written. It restores the mode before the tempdir is dropped
+  - `an_empty_module_set_sets_up_a_project`
+  - `a_describe_error_stops_setup_before_writing`
   - `io_errors_name_the_joined_path`
+  - `a_created_file_has_mode_644` (Unix only)
+  - `an_updated_file_keeps_its_mode` (Unix only)
+  - `a_read_only_luarc_is_refused`: every platform; the test clears the flag before the tempdir
+    is dropped
+  - `a_dangling_symlink_type_file_is_refused` (Unix only)
 
   **Platforms (D17).** The three tests marked Unix only are `#[cfg(unix)]`. They make links
   with `std::os::unix::fs::symlink` and the socket with `std::os::unix::net::UnixListener`, both
@@ -784,12 +995,19 @@ This repeats the `run.out default_state` and `run.out dotted` cases on generated
   - running `airsl lua setup`;
   - what it writes;
   - the note about gitignoring `.airsl/`;
-  - re-running setup after an upgrade.
+  - re-running setup after an upgrade;
+  - that a luarc which needs an edit is rewritten with sorted keys and its own formatting lost
+    (D10, L11).
 
   Every transcript is run against the checkout before it lands.
-- `book/src/appendix-01-cli.md`: the `lua setup` entry.
+- `book/src/appendix-01-cli.md`: `airsl lua setup [DIR]` in the synopsis block (lines 3–10), a
+  row in the Commands table (lines 14–22), and a row in the Exit codes table (lines 51–57).
+- `README.md:57`: the `airsl-cli` row's command list becomes `run`, `test`, `check`, `doctor`,
+  `ext`, `lua`.
+- `crates/airsl-cli/README.md:62-68`: a row `airsl lua setup [DIR]` in the command table.
 - `book/src/ch07-00-your-own-module.md`:
-  - the sentence "The trait has two methods" becomes three methods, naming `describe`;
+  - the sentence "The trait has two methods" (line 18) becomes three methods, naming `describe`;
+  - the Summary bullet at line 160 ("a `name`, and an `install` …") names `describe` too;
   - every `HostModule` example gains `describe`;
   - a short section shows `luals::verify` in a host's test and `luals::setup` for a host's own root.
 - Rustdoc for every new public item. `LuaName::new`, `ModuleDescription::builder`,
@@ -798,6 +1016,20 @@ This repeats the `run.out default_state` and `run.out dotted` cases on generated
   `git grep -n "HostModule for" -- '*README*'` finds nothing, while the control
   `git grep -n "HostModule" -- '*README*'` finds `crates/airsl/examples/README.md:66`. Update that
   README line if its wording becomes wrong, and compile any README example that changes.
+- `crates/airsl/examples/custom-module/README.md:69` cites `src/modules/registry.rs:144` for
+  `ModuleSet::insert`. Adding `describe` to the trait moves that line, so the citation is updated
+  to the new line.
+- How ch07's Rust blocks are checked before landing. Each changed block becomes `src/main.rs` of
+  a throwaway crate against the checkout.
+  - The block at lines 21–51 has no `main`, so `fn main() {}` is appended.
+  - The block at lines 65–113 is compiled with its hidden `# ` prefixes removed.
+  - The `rust,ignore` fragment at lines 139–144 is not a `HostModule` impl, and stays as it is.
+- `crates/airsl-cli/Cargo.toml:3`: the description "run, test, check and doctor" gains `lua setup`.
+- `book/src/ch01-00-getting-started.md`: the intro sentence that lists what the chapter covers
+  gains setting up an editor. The last sentence of ch01-03 ("In the next chapter…") stays true,
+  because the next chapter is still ch02.
+- The project `CLAUDE.md`: its command list (line 9) gains `lua setup`, and its extension-seam
+  bullet (line 81) names `describe` beside `install`.
 
 ## 12. Non-goals
 
@@ -806,6 +1038,8 @@ This repeats the `run.out default_state` and `run.out dotted` cases on generated
 - Any LuaLS setting other than `workspace.library`. That rules out `runtime.version`,
   diagnostics tuning, and hiding `io`/`os` per policy.
 - Typing a project's own Lua files, or what a script loads with `require`.
+- Describing a module key that is not a Lua name. Such a module cannot pass `verify` (§5).
+- Function types inside `fun(...)` or maps, and unions inside `fun(...)` (D20).
 - Editor-specific configuration beyond the luarc file.
 - Keeping key order, formatting or comments in a luarc that needs an edit. A file with comments
   is refused instead (L4).
