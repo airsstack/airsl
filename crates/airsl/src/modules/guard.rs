@@ -215,14 +215,14 @@ impl PathGuard {
     /// disagree, and the lexical answer is the wrong one.
     ///
     /// The [`Component::ParentDir`] arm below is reachable on unix only. On Windows,
-    /// `std::path::absolute` is `GetFullPathNameW`, which collapses `..` out of the string lexically
-    /// before this function ever sees it, so a `..` component below the deepest existing ancestor
-    /// simply cannot occur there. This looks like the same unsound lexical collapse the paragraph
-    /// above warns against, but it is not: Win32 normalises `..` out of the path string *before* the
-    /// object manager resolves what remains, so the check performed here and the open the operating
-    /// system later performs are working from the same already-collapsed string and necessarily
-    /// agree. Soundness holds on both platforms, by different arguments — this is documented and
-    /// pinned by tests rather than left to be rediscovered.
+    /// `std::path::absolute` is `GetFullPathNameW`, which collapses `..` out of the string
+    /// lexically before this function ever sees it, so a `..` component below the deepest existing
+    /// ancestor simply cannot occur there. This looks like the same unsound lexical collapse the
+    /// paragraph above warns against, but it is not: Win32 normalises `..` out of the path string
+    /// *before* the object manager resolves what remains, so the check performed here and the open
+    /// the operating system later performs are working from the same already-collapsed string and
+    /// necessarily agree. Soundness holds on both platforms, by different arguments — this is
+    /// documented and pinned by tests rather than left to be rediscovered.
     ///
     /// [`PathGuard::read`] and [`PathGuard::write`] call this only after the spelling, no-roots and
     /// relative-path refusals, so a path no root could allow never reaches the filesystem. It
@@ -236,8 +236,8 @@ impl PathGuard {
     ///
     /// # Errors
     ///
-    /// [`Error::UncheckablePath`] when the path is a spelling this runtime cannot reason about, when
-    /// it cannot be made absolute, or when it ends in an unresolvable `..`.
+    /// [`Error::UncheckablePath`] when the path is a spelling this runtime cannot reason about,
+    /// when it cannot be made absolute, or when it ends in an unresolvable `..`.
     fn resolve(raw: &str) -> Result<ResolvedPath> {
         reject_lexically(raw)?;
 
@@ -400,10 +400,10 @@ mod tests {
         let attack = format!("{}/link/../secret", script_path(&root));
         let result = guard.read("read", &attack);
 
-        // Unix resolves `link` before it sees the `..`, so the escape is caught. Windows collapses
-        // `..` out of the string lexically before the guard ever sees `link` — see the doc comment
-        // on `resolve` — so the same raw string never reaches through the symlink there at all;
-        // both platforms are sound, by different arguments.
+        // Unix resolves `link` before it sees the `..`, so the escape is caught. Windows
+        // collapses `..` out of the string lexically before the guard ever sees `link` — see the
+        // doc comment on `resolve` — so the same raw string never reaches through the symlink
+        // there at all; both platforms are sound, by different arguments.
         #[cfg(unix)]
         assert!(result.is_err(), "{attack} was permitted");
         #[cfg(windows)]
@@ -435,10 +435,10 @@ mod tests {
         let result = guard.write("write", &format!("{}/absent/../ok.txt", script_path(&root)));
 
         // Unix reaches the `ParentDir` arm, because `absent` never gets created and `..` is never
-        // collapsed lexically. Windows collapses `..` out of the string before the guard ever sees
-        // it — see the doc comment on `resolve` — so this reaches the ordinary "does not exist yet"
-        // path against `root` itself, which is granted, rather than the unreachable `ParentDir`
-        // arm.
+        // collapsed lexically. Windows collapses `..` out of the string before the guard ever
+        // sees it — see the doc comment on `resolve` — so this reaches the ordinary "does not
+        // exist yet" path against `root` itself, which is granted, rather than the unreachable
+        // `ParentDir` arm.
         #[cfg(unix)]
         {
             let err = result.unwrap_err();

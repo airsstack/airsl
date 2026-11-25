@@ -246,7 +246,7 @@ first, so no test reads stdin or writes stdout.
 - 🟡 registry.rs:104 — `HostModule::install` doc named `path` as needing no authority. Fixed: names `json`. `cargo make dod` exit 0 (2026-11-25, after all fixes): airsl 643 lib tests + 16 doctests, airsl-cli 86 tests; fmt, clippy -D warnings, rustdoc -D warnings green.
 - 🟡 no test pinned "argument error wins over a refusal". Fixed: `an_argument_error_wins_over_a_refusal` (stdio.rs).
 - 🔵 access.rs:10 "first shape" spec vocabulary — fixed; hook.rs `context` shadowing — fixed (`context_fn`); stdio.rs module doc logic + no-arg `isatty` — fixed; time.rs doc "pattern names a zone" → "text names a zone" — fixed; path.rs grants now in `Arc` — fixed.
-- 🔵 duplicated `refusal` test helper (hook.rs, stdio.rs) — open, left duplicated (differing docs, no natural shared spot).
+- 🔵 duplicated `refusal` test helper (hook.rs, stdio.rs) — fixed: one copy in `test_support`.
 - 🔵 mod.rs stdio/hook bullets rewritten beyond the plan's list — accepted.
 - Reviewer mutation runs: removing the `path.absolute` check, making it unconditional, removing the `time.parse` zone check, and mapping every `isatty` to stdout each fail a named test.
 

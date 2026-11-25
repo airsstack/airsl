@@ -114,7 +114,7 @@ table. Failure maps to `Error::EngineSetup` with a stage name, as `withhold_unsa
 
 - 🔵 language_surface.rs:77-79, :112 — doc overstated "last route to stdout" and a 120-col line. Fixed (route that needs no host module; rewrapped). `cargo make dod` exit 0 (2026-11-25, after all fixes): airsl 643 lib tests + 16 doctests, airsl-cli 86 tests; fmt, clippy -D warnings, rustdoc -D warnings green.
 - 🔵 test renamed `only_minimal_withholds_print` → `only_minimal_withholds_print_and_seeds_random` (Task 2 extends the predicate) — accepted.
-- 🔵 asserts restating constants; seeding-before-limits order unguarded; helper placement in builder.rs tests — open, accepted.
+- 🔵 asserts restating constants — fixed (removed). Seeding-before-limits order — fixed: call-site comment says why, and that no test can observe a move. Helper placement in builder.rs tests — fixed.
 - Reviewer reproduced 275394 / 909833, `42,0,true`, the randomseed refusal text and `bad argument #1 to '?' (number expected, got nil)`.
 - CLI: `airsl run --policy pure` → `math.random(1,1000000)` = 275394; `math.randomseed()` → "math.randomseed denied: a seed is required — the no-argument form reads the clock"; `type(print)` = nil.
 

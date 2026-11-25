@@ -115,12 +115,13 @@ impl GrantSet {
     ///
     /// For first-party code trusted to the same degree as the host. A module consulting this set
     /// performs no containment check at all, so the per-axis allowlists are not consulted and need
-    /// not be populated.
+    /// not be populated. It holds every [`HostAccess`] member, so [`GrantSet::with_access`] on it
+    /// changes nothing and the result still equals the original.
     #[must_use]
     pub const fn unrestricted() -> Self {
         Self {
             reach: GrantReach::Unrestricted,
-            access: 0,
+            access: HostAccess::ALL_BITS,
             fs: FsGrant::none(),
             env: EnvGrant::none(),
             proc: ProcGrant::none(),
@@ -317,19 +318,24 @@ mod tests {
     #[test]
     fn sealed_grants_nothing_and_is_empty() {
         let grants = GrantSet::sealed();
+        assert!(grants.is_empty());
         for member in HostAccess::ALL {
             assert!(!grants.allows(member), "{member}");
         }
-        assert!(grants.is_empty());
         assert_eq!(grants.to_string(), "none");
     }
 
     #[test]
     fn sealed_grants_nothing_and_waives_nothing() {
         let grants = GrantSet::sealed();
-        assert!(grants.is_empty());
         assert!(!grants.is_unrestricted());
-        assert_eq!(grants.access().count(), 0);
+        let root = crate::test_support::abs("/a");
+        assert!(!grants.fs().allows_read(root.as_ref()));
+        assert!(!grants.fs().allows_write(root.as_ref()));
+        assert!(grants.fs().read_roots().is_empty());
+        assert!(grants.fs().write_roots().is_empty());
+        assert_eq!(grants.env().names().count(), 0);
+        assert_eq!(grants.proc().executables().count(), 0);
     }
 
     #[test]
@@ -345,6 +351,13 @@ mod tests {
         for member in HostAccess::ALL {
             assert!(grants.allows(member), "{member}");
         }
+        assert_eq!(grants.access().collect::<Vec<_>>(), HostAccess::ALL);
+    }
+
+    #[test]
+    fn adding_a_member_to_an_unrestricted_set_changes_nothing() {
+        let grants = GrantSet::unrestricted().with_access(HostAccess::Clock);
+        assert_eq!(grants, GrantSet::unrestricted());
         assert_eq!(grants.access().collect::<Vec<_>>(), HostAccess::ALL);
     }
 

@@ -138,10 +138,7 @@ impl core::fmt::Display for LanguageSurface {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        CHUNK_LOADERS, LanguageSurface, MINIMAL_RANDOM_SEED, MINIMAL_WITHHELD_GLOBALS,
-        UNSAFE_OS_FUNCTIONS,
-    };
+    use super::{CHUNK_LOADERS, LanguageSurface, UNSAFE_OS_FUNCTIONS};
     use mlua::StdLib;
 
     #[test]
@@ -201,8 +198,6 @@ mod tests {
         assert!(LanguageSurface::Minimal.closes_ambient_channels());
         assert!(!LanguageSurface::Restricted.closes_ambient_channels());
         assert!(!LanguageSurface::Full.closes_ambient_channels());
-        assert_eq!(MINIMAL_WITHHELD_GLOBALS, ["print"]);
-        assert_eq!(MINIMAL_RANDOM_SEED, 0);
     }
 
     #[test]

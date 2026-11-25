@@ -21,6 +21,8 @@
 //!   absolute, not what it is.
 //! - [`raised`], the host error a Lua call carried out inside its `Lua` failure, so a test can
 //!   assert on the refusal's variant rather than on its text.
+//! - [`refusal`], the message a script's call is refused with under `Policy::pure()`, for the
+//!   modules whose every call a sealed grant set turns away.
 //!
 //! Non-responsibilities: deciding whether a path is inside a grant, and choosing which of read or
 //! write an operation needs. Both stay with [`crate::modules::guard`], the module most of these
@@ -184,6 +186,26 @@ pub(crate) fn raised(err: &crate::Error) -> Option<&crate::Error> {
         crate::Error::Lua { source, .. } => source.downcast_ref::<crate::Error>(),
         _ => None,
     }
+}
+
+/// The text of the refusal `source` raises under `Policy::pure()`, where nothing is granted.
+///
+/// For modules whose calls are all refused before they touch a stream or any other resource, so
+/// the test never reads stdin or writes stdout.
+///
+/// # Panics
+///
+/// When the engine cannot be built or `source` is not refused, which for a fixture means the
+/// premise of the test does not hold.
+pub(crate) fn refusal(source: &str) -> String {
+    let engine = crate::Engine::builder()
+        .policy(crate::Policy::pure())
+        .build()
+        .unwrap();
+    engine
+        .eval_to::<mlua::Value>(&crate::Script::from_source(source, "test").unwrap())
+        .unwrap_err()
+        .to_string()
 }
 
 #[cfg(test)]

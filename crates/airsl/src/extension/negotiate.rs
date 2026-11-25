@@ -596,8 +596,16 @@ mod tests {
         );
         let grants = n.policy().grants();
         assert!(
-            grants.fs().is_empty() && grants.env().is_empty() && grants.proc().is_empty(),
-            "presence assertions add nothing to the policy"
+            grants.fs().is_empty(),
+            "presence assertions add no filesystem grant"
+        );
+        assert!(
+            grants.env().is_empty(),
+            "presence assertions add no environment grant"
+        );
+        assert!(
+            grants.proc().is_empty(),
+            "presence assertions add no process grant"
         );
     }
 

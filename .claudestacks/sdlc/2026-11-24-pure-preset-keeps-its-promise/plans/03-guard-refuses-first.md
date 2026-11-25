@@ -122,7 +122,7 @@ refusal before `resolve`. With `cwd` granted, a relative path resolves as today.
 - 🔴 guard.rs:661-668 — `a_relative_path_with_cwd_resolves_as_before` compared a verbatim `\\?\` canonical cwd with `resolve`'s stripped path, failing on windows-latest. Fixed: uses `test_support::canonical`. Not run on Windows here. `cargo make dod` exit 0 (2026-11-25, after all fixes): airsl 643 lib tests + 16 doctests, airsl-cli 86 tests; fmt, clippy -D warnings, rustdoc -D warnings green.
 - 🟡 guard.rs:570 — lexical-before-rule-1 unguarded when roots are granted. Fixed: `a_nul_relative_path_is_uncheckable_even_with_roots_and_no_cwd`; fails when `reject_lexically` runs after the cwd refusal (coder mutation run).
 - 🔵 order hidden in `refuse_if_no_roots` — fixed: `refuse_before_resolving` runs lexical → rule 2 → rule 1, then `resolve`.
-- 🔵 doc lines >100 cols, ambiguous `read` lead, history wording in `resolve` doc — fixed; six pre-existing >100-col lines left as they were at HEAD.
+- 🔵 doc lines >100 cols, ambiguous `read` lead, history wording in `resolve` doc — fixed; six pre-existing >100-col lines later rewrapped too.
 - Plan proof: `airsl run --policy pure` with `airsstack.fs.read("/etc/hosts")` → "fs.read denied: `/etc/hosts` is outside the granted read roots: none are granted" (rc=1).
 
 ## Deviations

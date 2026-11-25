@@ -179,6 +179,7 @@ mod tests {
     )]
 
     use super::Hook;
+    use crate::test_support::refusal;
     use crate::{Engine, HostModule as _, Policy, Script};
 
     fn eval(source: &str) -> String {
@@ -251,18 +252,6 @@ mod tests {
             !specific.contains_key("permissionDecision"),
             "envelope must not carry a permissionDecision field: {specific:?}"
         );
-    }
-
-    /// The text of the refusal `source` raises under `Policy::pure()`, where nothing is granted.
-    ///
-    /// Every call here is refused before it touches a stream, so no test reads stdin or writes
-    /// stdout.
-    fn refusal(source: &str) -> String {
-        let engine = Engine::builder().policy(Policy::pure()).build().unwrap();
-        engine
-            .eval_to::<mlua::Value>(&Script::from_source(source, "test").unwrap())
-            .unwrap_err()
-            .to_string()
     }
 
     #[test]

@@ -115,6 +115,9 @@ impl EngineBuilder<Present> {
             withhold_minimal_globals(&lua)?;
             seed_minimal_random(&lua)?;
         }
+        // Seeding must stay ahead of `apply`, so a script is never charged for the host's
+        // set-up. No test can observe a move: the instruction hook does not count C calls made
+        // from Rust, so a seeding moved below `apply` would still leave every test green.
         let budget = self.policy.limits().apply(&lua)?;
 
         let modules = match self.modules {
@@ -273,6 +276,16 @@ mod tests {
             .unwrap()
     }
 
+    fn pure_engine() -> Engine {
+        Engine::builder().policy(Policy::pure()).build().unwrap()
+    }
+
+    fn eval_i64(engine: &Engine, source: &str) -> i64 {
+        engine
+            .eval_to::<i64>(&Script::from_source(source, "probe").unwrap())
+            .unwrap()
+    }
+
     #[test]
     fn a_confined_engine_withholds_the_chunk_loaders() {
         for name in ["load", "loadstring", "dofile", "loadfile"] {
@@ -357,16 +370,6 @@ mod tests {
              return math.type(a) .. '/' .. math.type(b)",
         );
         assert_eq!(found, "integer/integer");
-    }
-
-    fn pure_engine() -> Engine {
-        Engine::builder().policy(Policy::pure()).build().unwrap()
-    }
-
-    fn eval_i64(engine: &Engine, source: &str) -> i64 {
-        engine
-            .eval_to::<i64>(&Script::from_source(source, "probe").unwrap())
-            .unwrap()
     }
 
     #[test]

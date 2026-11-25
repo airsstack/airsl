@@ -166,7 +166,10 @@ crates/airsl-cli/src/ext_doctor.rs        — modify: four whole-output expectat
 - 🟡 grant_set.rs:426 — `allows` proven const only at runtime. Fixed: `const _: () = { … core::mem::forget(g); }` block; removing `const` from `allows` fails with E0015 at grant_set.rs:444 (coder mutation run).
 - 🟡 policy.rs:91 — reverting `pure()` to `declared()` failed no test. Fixed: `pure_is_tighter_than_confined_on_every_axis_that_can_be` asserts `pure.grants().is_empty()` and no member allowed.
 - 🔵 host_access.rs:9 — `Responsibilities:` not a list; doctests not under `# Examples`. Fixed.
-- 🔵 sealed tests overlap (plan-named); `unrestricted().with_access(x) != unrestricted()`; host_access doc names CLI/refusal users ahead of plans 02–07; negotiate.rs:600 joined `&&` assert — open, accepted.
+- 🔵 sealed tests overlap — fixed: `_is_empty` checks emptiness and no member, `_waives_nothing` checks not unrestricted and no fs/env/proc reach.
+- 🔵 `unrestricted().with_access(x) != unrestricted()` — fixed: `unrestricted()` holds every access bit; `adding_a_member_to_an_unrestricted_set_changes_nothing`.
+- 🔵 negotiate.rs:600 joined `&&` assert — fixed: three asserts, each naming its axis.
+- 🔵 host_access doc names CLI users ahead of plan 07 — open; true once plan 07 lands.
 - 🔵 unplanned `HostAccess::ALL_BITS` and three extra tests — accepted (coverage only).
 - Plan proof: `airsl doctor --policy pure` → `  grants:       none`; `--policy confined` → `  grants:       access stdin,stdout,stderr,clock,cwd,require,zones`.
 
