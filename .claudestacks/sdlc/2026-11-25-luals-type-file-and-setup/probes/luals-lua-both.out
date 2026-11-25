@@ -1,0 +1,48 @@
+# Before the L9 fix: the reviewer's run of probes/luals-case.sh with airsl built from the checkout before the fix
+## lua_both_unlisted  .luarc.json before: {"Lua": {"workspace": {"library": []}, "workspace.library": []}}
+$ airsl lua setup .
+unchanged .airsl/types/airsstack.lua
+updated .luarc.json
+
+--- .luarc.json after:
+{
+  "Lua": {
+    "workspace": {
+      "library": [
+        ".airsl/types"
+      ]
+    },
+    "workspace.library": []
+  }
+}
+nope.lua:1:7 [Warning] Undefined global `airsstack`. (undefined-global)
+Diagnosis complete, 1 problems found
+## lua_both_nested_listed  .luarc.json before: {"Lua": {"workspace": {"library": [".airsl/types"]}, "workspace.library": []}}
+$ airsl lua setup .
+unchanged .airsl/types/airsstack.lua
+updated .luarc.json
+
+--- .luarc.json after:
+{
+  "Lua": {
+    "workspace": {
+      "library": [
+        ".airsl/types",
+        ".airsl/types"
+      ]
+    },
+    "workspace.library": []
+  }
+}
+nope.lua:1:7 [Warning] Undefined global `airsstack`. (undefined-global)
+Diagnosis complete, 1 problems found
+
+# After the L9 fix (same script and LuaLS; airsl rebuilt from the fixed checkout)
+$ sh luals-case.sh airsl W lua_both_unlisted '{"Lua": {"workspace": {"library": []}, "workspace.library": []}}' yes
+## lua_both_unlisted  .luarc.json before: {"Lua": {"workspace": {"library": []}, "workspace.library": []}}
+$ airsl lua setup .
+airsl: will not edit `./.luarc.json`: it sets `workspace.library` in two spellings; add ".airsl/types" to `workspace.library` by hand
+
+--- .luarc.json after:
+{"Lua": {"workspace": {"library": []}, "workspace.library": []}}nope.lua:1:7 [Warning] Undefined global `airsstack`. (undefined-global)
+Diagnosis complete, 1 problems found

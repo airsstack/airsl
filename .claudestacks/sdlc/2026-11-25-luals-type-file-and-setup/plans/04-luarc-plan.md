@@ -1,8 +1,9 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [03]
 built-on: 044432888b01
+disproves: 044432888b01
 ---
 
 # Luarc Plan Implementation Plan
@@ -90,3 +91,35 @@ crates/airsl/src/luals/mod.rs     — modify  mod luarc; (no public re-export)
 
 - `cargo make dod` is green.
 - `cargo test -p airsl luals::luarc` runs one test per L-rule plus the §9 cases.
+
+## Review findings
+
+There was one review: 0🔴 3🟡 7🔵. The plan's checks pass: 22 named tests with exact texts, L4 runs before any shape rule, L8 runs before L9, and the L9 walk and the L10 targets match the plan. The full report is at `.airsstack/cc/plugins/claudestacks/handoff/20261125-164553-edd2/02-reviewer-plan04.md`.
+
+- **Fixed** (blocking 🟡): a sixth spelling, `Lua` → `workspace.library`, was missed. `{"Lua": {"workspace.library": ["lib"]}}` gained a top-level `workspace.library` beside it, so one setting was written in two spellings. It is now in `SPELLINGS`. New tests: `a_lua_object_with_a_dotted_library_is_a_spelling` and `a_lua_object_with_a_dotted_library_that_is_not_an_array_is_refused`.
+- **Fixed** 🟡: the leading `Lua` strip in L9 was unguarded. New test `a_lua_prefixed_and_a_plain_spelling_conflict`.
+- **Fixed** 🟡: the byte-order tie-break was unguarded. New test `the_shortest_shared_path_tie_breaks_by_byte_order`.
+- **Fixed** 🔵: the doc on the `written` test helper, the missing doc on `split`, and the segment count, which was recomputed after `join`.
+- For all of the above, `cargo test -p airsl luals::luarc` → `test result: ok. 26 passed; 0 failed`.
+- Fixed in the follow-up round 🔵 (was open): when a spelling is not an array and another is blocked by a non-object parent, the not-an-array refusal is reported first. No test pins this order. The plan sets no order between L6 and L7.
+- Fixed in the follow-up round 🔵 (was open): `Result<LuarcPlan, String>` carries the refusal as a bare string. This is the signature the plan asks for.
+- Fixed in the follow-up round 🔵 (was open): `map_err(|e| e.to_string())` on the serialization, which cannot fail, returns a reason that is not shaped like "it …".
+- Fixed in the follow-up round 🔵 (was open): `u8::is_ascii_whitespace` counts form feed as whitespace, so a file holding only form feed (0x0C) is treated as empty (L3) instead of being refused by L4.
+
+## Deviations
+
+- 2026-11-25. The spec §6.1 (D22) claim was: "So `workspace.library` has five spellings". It is disproved by the source the spec itself cites, `probes/luals-config-207-224.lua` (LuaLS 3.19.2 `expand`). That code joins nested keys with `.` and applies `fullKey` or `Lua.` + `fullKey` when either is a setting. `{"Lua": {"workspace.library": …}}` therefore gives `fullKey = "Lua.workspace.library"`, a setting. The key paths that join to `[Lua.]workspace.library` are six: the five listed plus `Lua` → `workspace.library`. Six spellings were built, and the new tests above fail on the five-spelling code. `disproves: 044432888b01` is set, and `design` clears it with a one-word fix to the spec (five → six, plus the sixth bullet).
+- 2026-11-25. There was no task-briefer pass. This is a one-task plan, and the coder read the task section directly.
+- 2026-11-25. The review ran while plan 05's coder was editing `luals/setup.rs`. A clippy failure in setup.rs during the review was out of scope. The review checked luarc.rs in a scratch crate with the workspace's lint table instead.
+- 2026-11-25. No commit was made. Execute commits nothing unless told to.
+
+## Follow-up round (2026-11-25, at the author's request: "fix all of findings, fix the spec")
+
+- Every open 🔵 above is fixed:
+  - `Refusal(String)` with `into_reason` replaces the bare string.
+  - L3 treats only space, tab, LF and CR as empty, and a lone form feed is an L4 refusal: `it is not plain JSON (expected value at line 1 column 1)`.
+  - The L6-before-L7 order is pinned with `{"workspace": 1, "Lua.workspace.library": "x"}`.
+  - A serialization failure gives `it could not be written as JSON (…)`.
+- **Fixed 🔴** (spec review): L9 refused only when two *top-level keys* reached one setting. The sixth spelling shares the `Lua` key with `Lua` → `workspace` → `library`, so `{"Lua": {"workspace": {"library": []}, "workspace.library": []}}` was rewritten, and LuaLS still reported `Undefined global` (`probes/luals-lua-both.out`). L9 now compares the JSON-key spellings at any depth. New tests: `two_spellings_under_one_lua_object_are_refused`, `a_map_valued_setting_in_two_spellings_under_lua_is_refused`, `a_maps_own_keys_are_not_two_spellings`, `several_non_array_spellings_name_the_first_in_list_order` and `several_blocked_parents_name_the_first_in_list_order`. After the fix, the same LuaLS case is refused and the file is left untouched (same record).
+- The spec was redesigned to match: `spec-superseded-2026-11-25-3.md` is the old text, and the new `spec.md` is a draft awaiting the author's approval.
+- Deviation: plan 04's Architecture and Task 1 still name `Result<LuarcPlan, String>` and "five spellings". This plan is kept as executed, and the spec carries the current signature (`Refusal`) and the six spellings.

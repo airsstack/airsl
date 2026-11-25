@@ -20,8 +20,21 @@ checkout `bb95c10`, which changes no code since `577e401`. LuaLS results come fr
 `probes/luals/run.sh` and are cited as `run.out <case>`, the case's block in
 `probes/luals/run.out`.
 
-This spec replaces `spec-superseded-2026-11-25-2.md`, which replaced
-`spec-superseded-2026-11-25.md`.
+This spec replaces `spec-superseded-2026-11-25-3.md`, which replaced
+`spec-superseded-2026-11-25-2.md`, which replaced `spec-superseded-2026-11-25.md`.
+
+This revision follows plan 04's execution, which disproved "five spellings", and the review of
+plans 04–07:
+
+- D22 and §6.1: six spellings of `workspace.library`. L9 refuses two spellings of one setting at
+  any depth, not only under two top-level keys. When several spellings fail L6 or L7, the list
+  order decides which is named.
+- §6.1: `Refusal` replaces the bare reason string. L3 treats only JSON whitespace as empty. L11
+  has a reason for a serialization failure.
+- §6: the `FileReport` accessors, what a rewrite keeps and why the owner is not copied,
+  `make_in` with `sync_all`, and error text that holds only the OS error.
+- §9 and §10: the new rows and tests. §11: ch07's code is a compiled example, README
+  citations are by name, and user-facing terms match.
 
 This revision also closes the findings of the review of that revision:
 
@@ -79,7 +92,7 @@ Changes in the previous revision:
 | D18 | Errors while resolving a target | `NotFound` or `NotADirectory` from `symlink_metadata` means absent. Any other error from `symlink_metadata`, or from `canonicalize` other than `NotFound`, is `Io { operation: "read" }` on the target. All of them happen in step 4, before anything is written (§6) |
 | D20 | Types inside `fun(...)` and maps | Inside a function type's parameters, variadic and returns, a function type, a union outside a map's `<…>`, and any type spelled with a leading `(` are refused. A function type inside a map key or value is refused everywhere (§3.3) |
 | D21 | Doc text LuaLS could read as syntax | Inline docs are written after ` # `. A doc line whose first non-whitespace character (space, tab, vertical tab, form feed) is `@` is refused (§3.3, §4) |
-| D22 | LuaLS spellings of `workspace.library` | Any key path that reaches `workspace.library` after a leading `Lua` segment is dropped is a spelling. A rewrite is refused when two top-level keys reach one setting path of two or more segments (§6.1) |
+| D22 | LuaLS spellings of `workspace.library` | Any key path that reaches `workspace.library` after a leading `Lua` segment is dropped is a spelling. A rewrite is refused when one setting path of two or more segments is reached through two different spellings, at any depth (§6.1) |
 | D23 | File modes | A created file gets mode 0644 on Unix. A rewritten file keeps its permissions. A read-only target is refused (§6) |
 | D24 | `verify`'s own VM failures | `Error::VerifyFailed { module, source }`. A non-UTF-8 string key is shown lossily (§5) |
 | D25 | Public API shape | `LuaType` is an opaque struct with associated constants for the primitives. Every new public type derives `Debug`, `Clone`, `PartialEq` and `Eq` (`Copy` too for `FileChange`) (§3.1) |
@@ -115,7 +128,7 @@ crates/airsl-cli/src/
 
 Public surface. `description/mod.rs` re-exports `ModuleDescription`, `ModuleDescriptionBuilder`,
 `Function`, `Signature`, `Param`, `Presence`, `Record`, `Field` and `LuaType`. `luals/mod.rs`
-re-exports `verify`, `Drift`, `TypeFile`, `setup`, `SetupReport` and `FileChange`. `luarc.rs` stays
+re-exports `verify`, `Drift`, `TypeFile`, `setup`, `SetupReport`, `FileReport` and `FileChange`. `luarc.rs` stays
 `pub(crate)`: hosts reach it only through `setup`.
 
 Why each new module exists:
@@ -569,11 +582,26 @@ undescribed drift. This is a stated limit (§12).
 
 ```rust
 pub fn setup(project: &Path, modules: &ModuleSet, root: &RootTable) -> Result<SetupReport>
-SetupReport::type_file(&self) -> (&str, FileChange)   // (".airsl/types/<root>.lua", …)
-SetupReport::luarc(&self) -> (&str, FileChange)       // (".luarc.json" | ".luarc.jsonc", …)
+SetupReport::type_file(&self) -> &FileReport         // path ".airsl/types/<root>.lua"
+SetupReport::luarc(&self) -> &FileReport             // path ".luarc.json" | ".luarc.jsonc"
+FileReport::path(&self) -> &str
+FileReport::change(&self) -> FileChange
 impl Display for SetupReport                          // two lines, below
 pub enum FileChange { Created, Updated, Unchanged }   // Display: created / updated / unchanged
 ```
+
+`FileReport` derives `Debug`, `Clone`, `PartialEq` and `Eq`. It names one target and what happened
+to it, so a caller reads `report.luarc().change()` rather than the second half of a tuple.
+
+**What a rewrite keeps.** Setup replaces a file by renaming a new file over it. The new file takes
+the old one's permissions. It does not take the old file's extended attributes, and a hard link to
+the old file keeps the old bytes (`probes/rewrite-keeps.out`, a real `airsl lua setup` run on a
+mode-640 `.luarc.json` with an xattr and a hard link: after it, `-rw-r----- links=1`, the
+`com.example.probe` attribute is gone, and `link.json` still reads `{}`). The new file is owned by
+the user who runs setup. Setup does not copy the old owner: std's `fchown` compiles under
+`#![forbid(unsafe_code)]`, but an unprivileged process may not give a file to another user
+(`probes/probe-chown.txt`: `fchown(file, Some(0), None) as uid 501 -> Err("Operation not permitted
+(os error 1)")`), and setup normally runs as the project's owner. Setup states this in its rustdoc.
 
 **Paths in errors.** Every path in an error is `project.join(<relative path>)` shown with
 `Path::display()`. The project path is shown as the caller gave it. A failure while writing a
@@ -609,15 +637,32 @@ Probe evidence (`probes/probe-fs-special.txt` and `probes/probe-resolve.txt`, st
 | a Unix socket made by `UnixListener::bind` (`probes/probe-socket.txt`) | `is_file: false, is_dir: false, is_socket: true`. `File::open` on it fails: `Operation not supported on socket (os error 102)`. A symlink to it canonicalizes to a target with `is_file: false` |
 | writing a temp file beside the resolved target, then renaming it over the target | `link still symlink: true`, and the new content reads through the link |
 
-**Writing a target.** Write a temporary file in the resolved target's directory with
-`tempfile::Builder::tempfile_in` (tempfile 3.27.0, already a dependency), then `persist` it over
-the resolved target. A symlink is therefore written through and survives (D12).
+**Writing a target.** Create a temporary file in the resolved target's directory with
+`tempfile::Builder::make_in` (tempfile 3.27.0, already a dependency), opening it with
+`OpenOptions::new().write(true).create_new(true)` (mode `0o600` on Unix) inside the closure. Write
+the bytes, call `sync_all`, then `persist` it over the resolved target. A symlink is therefore
+written through and survives (D12). `sync_all` before the rename means a crash never leaves the
+target empty.
+
+A failed write's message names the target and holds only the OS error. tempfile's own
+`tempfile_in` and its `NamedTempFile` `Write` impl wrap errors as `{err} at path "{temp}"`
+(`tempfile-3.27.0/src/error.rs:10-13`, applied by `.with_err_path` in `src/file/mod.rs:953-1001`), and `PathError::source()` returns `err.source()`, not
+`err` (`:16-19`), so the OS code cannot be recovered from them. `make_in` instead returns the
+closure's own `io::Error` unchanged (`tempfile-3.27.0/src/util.rs:68-74`, `return match f(path)
+{ … res => res }`), and setup writes through `as_file_mut()`. `NamedTempFile::persist` returns the raw
+rename error in `PersistError.error` (`src/file/mod.rs:767-775`, which takes it from
+`TempPath::persist`'s `match imp::persist(…)` at `:204-205`). Only `PersistError`'s own `Display`
+adds the path, and setup uses `.error`. The test
+`a_failed_write_names_the_target_not_the_temporary_file` (Unix) asserts the source text is exactly
+`Permission denied (os error 13)`.
 
 File modes (D23), set on the temporary file before `persist`:
 
-- **Created:** on Unix the mode is set to `0o644`. tempfile's own default is `0o600`, which would
-  hide the file from other users (`probes/probe-mode.txt`: `tempfile_in default mode: 600`,
-  `created with explicit 0644: 644`). On other platforms tempfile's default stands.
+- **Created:** on Unix the mode is set to `0o644`. The temporary file is opened with mode `0o600`,
+  which would hide the file from other users (`probes/probe-mode.txt` measured the same `600` for
+  tempfile's own default: `tempfile_in default mode: 600`, `created with explicit 0644: 644`). On
+  other platforms the file keeps the mode it was created with. Tests: `a_created_file_has_mode_644`,
+  `an_updated_file_keeps_its_mode`.
 - **Updated:** the temporary file takes the existing target's `Permissions`
   (`updated keeps old 0640: 640`).
 - **Read-only target:** an existing target whose `permissions().readonly()` is true is refused in
@@ -674,8 +719,12 @@ created .luarc.json
 
 ```rust
 pub(crate) enum LuarcPlan { Unchanged, Write(Vec<u8>) }
-pub(crate) fn plan(existing: Option<&[u8]>) -> Result<LuarcPlan, String /* refusal reason */>
+pub(crate) struct Refusal(String)     // the reason; Refusal::into_reason(self) -> String
+pub(crate) fn plan(existing: Option<&[u8]>) -> Result<LuarcPlan, Refusal>
 ```
+
+`Refusal` carries the reason text that `setup` puts into `LuarcRefused`, so a refusal cannot be
+mistaken for any other string.
 
 The entry is the string `.airsl/types`. "Listed" means an array element that is exactly that
 string. The rules are applied in this order, and the first that decides wins:
@@ -684,51 +733,71 @@ string. The rules are applied in this order, and the first that decides wins:
 |---|---|---|---|
 | L1 | `None` (no file) | `Write` the bytes `{\n  "workspace.library": [\n    ".airsl/types"\n  ]\n}\n` | `probes/probe-more.txt`, `L1 bytes:` |
 | L2 | starts with `EF BB BF` | strip it, continue, and put it back in front of any `Write` (D13) | LuaLS accepts a BOM (`run.out bom`). serde_json does not: `bom: err -> expected value at line 1 column 1`; `bom stripped: ok` (`probe-more.txt`) |
-| L3 | empty or ASCII-whitespace only | treated as `{}`, continue from L5 | serde_json rejects it otherwise: `empty file: err -> EOF while parsing a value at line 1 column 0` (`probes/probe-serde.txt`) |
+| L3 | empty, or only JSON whitespace (space, tab, line feed, carriage return) | treated as `{}`, continue from L5 | serde_json rejects it otherwise: `empty file: err -> EOF while parsing a value at line 1 column 0` (`probes/probe-serde.txt`). A form feed is not JSON whitespace: `"\x0C"` goes to L4 and is refused with `it is not plain JSON (expected value at line 1 column 1)` (test `a_form_feed_only_file_is_not_plain_json`, serde_json 1.0.151) |
 | L4 | `serde_json::from_slice` fails: comments, trailing comma, invalid JSON, not UTF-8 | refuse: `it is not plain JSON ({serde error})` | through `from_slice`, the reader L4 uses (`probe-more.txt`): `comment (from_slice): err -> key must be a string at line 2 column 3`, `trailing comma (from_slice): err -> trailing comma at line 1 column 9`, `not utf-8: err -> invalid unicode code point at line 1 column 8`, and `non-object with trailing comma (from_slice): err -> trailing comma at line 1 column 7`, which shows L4 deciding before L5. `from_str` gives the same first two texts (`probe-serde.txt`). LuaLS does read comments (`run.out comments`), so this case occurs in practice |
 | L5 | the top level is not an object | refuse: `its top level is not a JSON object` | `not object: ok -> [` parses (`probe-serde.txt`) |
-| L6 | a spelling of `workspace.library` (see below) whose value is not an array | refuse: `` `{spelled}` is not an array`` | — |
+| L6 | a spelling of `workspace.library` (see below) whose value is not an array | refuse: `` `{spelled}` is not an array``. L6 is checked across every present spelling before L7, so `{"workspace": 1, "Lua.workspace.library": "x"}` gets the L6 text. When several spellings fail L6, the refusal names the first in the order of the spellings list below; the same holds for L7 | — |
 | L7 | a key on the way to a spelling (`workspace`, `Lua`, `Lua.workspace`, or `Lua` → `workspace`) exists and is not an object | refuse: `` `{spelled}` is not an object`` | — |
 | L8 | every spelling of `workspace.library` that is present lists the entry, and at least one spelling is present | `Unchanged`: no write, bytes untouched | — |
-| L9 | a rewrite is needed, and two different top-level keys reach one setting path of two or more segments | refuse: ``it sets `{path}` in two spellings`` | LuaLS uses the textually last spelling: `run.out nested_first_has` and `dotted_first_has` give `Undefined global`. A rewrite sorts keys (L11) and could flip which spelling wins. Disjoint key paths are safe (`run.out disjoint`) |
+| L9 | a rewrite is needed, and one setting path of two or more segments is reached through two different spellings (see "Key paths for L9") | refuse: ``it sets `{path}` in two spellings`` | LuaLS uses the textually last spelling: `run.out nested_first_has` and `dotted_first_has` give `Undefined global`. A rewrite sorts keys (L11) and could flip which spelling wins. Disjoint key paths are safe (`run.out disjoint`) |
 | L10 | otherwise: a dotted `workspace.library` array (append) / a nested `workspace.library` array (append) / a nested `workspace` without `library` (add `"library": [".airsl/types"]`) / neither (add `"workspace.library": [".airsl/types"]`) | `Write` | dotted and nested are both honoured (`run.out dotted`, `run.out nested`) |
-| L11 | the bytes of any `Write` | `serde_json::to_string_pretty` + `\n`: 2-space indent, keys sorted, no comments | `order: ok -> {` … `"a": { "b": 2, "y": 1 }, "runtime.version": …, "z": 1` (`probe-serde.txt`). `cargo tree -e features -i serde_json` shows only `default` and `std`, so there is no `preserve_order` (`probes/cargo-tree-serde-json.txt`) |
+| L11 | the bytes of any `Write` | `serde_json::to_string_pretty` + `\n`: 2-space indent, keys sorted, no comments. Serializing a parsed `Value` cannot fail in practice; if it did, the refusal is `it could not be written as JSON ({serde error})` | `order: ok -> {` … `"a": { "b": 2, "y": 1 }, "runtime.version": …, "z": 1` (`probe-serde.txt`). `cargo tree -e features -i serde_json` shows only `default` and `std`, so there is no `preserve_order` (`probes/cargo-tree-serde-json.txt`) |
 | L12 | duplicate keys | the last value is kept | serde_json gives `duplicate key: ok -> { "a": 2 }` (`probe-serde.txt`). LuaLS also keeps the last: `run.out lastwins_has` finds the types, `firstwins_has` does not. The effective setting is preserved |
 
 **Spellings (D22).** LuaLS 3.19.2 applies a luarc key when the key, or `Lua.` plus the key, is a
 setting, and only otherwise descends into an object value (`probes/luals-config-207-224.lua`). So
-`workspace.library` has five spellings, each a path of JSON keys:
+`workspace.library` has six spellings, each a path of JSON keys. They are every way to split
+`workspace.library` or `Lua.workspace.library` into JSON keys, because `expand` joins a nested key
+to its parent with `.` (`fullKey = left .. '.' .. key`):
 
 - `workspace.library`
 - `workspace` → `library`
 - `Lua.workspace.library`
 - `Lua.workspace` → `library`
 - `Lua` → `workspace` → `library`
+- `Lua` → `workspace.library`
 
-`run.out lua_prefix` and `run.out lua_nested` show the two `Lua` forms honoured (only
-`Undefined field `nope``). `{spelled}` is the user's key path, each JSON key in backticks joined
+`run.out lua_prefix` and `run.out lua_nested` show two `Lua` forms honoured (only
+`Undefined field `nope``). The sixth is shown by `probes/run-lua-dotted-library.out` (LuaLS 3.19.2,
+`.airsl/` gitignored): with no luarc, `Undefined global `airsstack``; with
+`{"Lua": {"workspace.library": [".airsl/types"]}}`, only `Undefined field `nope``. `{spelled}` is the user's key path, each JSON key in backticks joined
 with ` → `, for example `` `Lua` → `workspace` → `library` ``.
 
 **Key paths for L9.** Each top-level key is split on `.` into segments. If its value is an object,
 the walk continues into it, splitting each nested key on `.` and appending. The walk stops at a
-value that is not an object, or at an empty object. A leading `Lua` segment is dropped. A key
-"reaches" every prefix of every path it walks. Two different top-level keys conflict when they
-both reach a path of two or more segments. `{path}` is the shortest such path, with segments
-joined by `.`. Among paths of equal length, the first in byte order of the joined text is used.
+value that is not an object, or at an empty object. A leading `Lua` segment is dropped. A walk
+"reaches" every prefix of every segment path it walks. The *spelling* of a reached path is the
+sequence of JSON keys the walk took until its segments cover that path; the last key may carry
+segments beyond it. Two walks conflict when they reach one path of two or more segments with
+different spellings. `{path}` is the shortest such path, with segments joined by `.`. Among
+paths of equal length, the first in byte order of the joined text is used.
+
+Two different top-level keys always give different spellings. Inside one top-level key, two
+nested keys can too, which is why the rule is not "two top-level keys".
 
 Examples:
 
 - `{"workspace.library": [], "workspace": {"library": []}}` both reach `workspace.library`, so they
   are refused.
+- `{"Lua": {"workspace": {"library": []}, "workspace.library": []}}` reaches `workspace.library`
+  as `Lua` → `workspace` → `library` and as `Lua` → `workspace.library`, so it is refused.
+  Without this, setup appended to one spelling, sorted the other after it, and LuaLS still
+  reported `Undefined global `airsstack`` (`probes/luals-lua-both.out`, case `lua_both_unlisted`,
+  run before the fix). After it, setup refuses with ``it sets `workspace.library` in two
+  spellings`` and leaves the file untouched (same record, "After the L9 fix").
 - `{"diagnostics.severity": {"a": "Error"}, "diagnostics": {"severity": {"b": "Hint"}}}` both
   reach `diagnostics.severity`, so they are refused. LuaLS applies a map-valued setting as one
-  value, and a rewrite could flip which spelling wins.
+  value, and a rewrite could flip which spelling wins. The same pair inside `{"Lua": {…}}` is
+  refused too.
+- `{"diagnostics": {"severity": {"a": "Error", "b": "Hint"}}}` reaches `diagnostics.severity`
+  twice with the one spelling `diagnostics` → `severity`, so it is accepted: a map's own keys are
+  not two spellings.
 - `{"workspace.library": [], "workspace": {"checkThirdParty": false}}` share only `workspace`, one
   segment, so they are accepted (`run.out disjoint`).
 
 **When L10 appends** to a library list that holds the entry in no spelling, it appends to the one
-spelling that is present, whichever of the five it is. L9 has already refused the case where two
-are present. With no spelling present, it adds `"library": [".airsl/types"]` to a top-level
+spelling that is present, whichever of the six it is. L9 has already refused every case where two
+are present, including two under one `Lua` object. With no spelling present, it adds `"library": [".airsl/types"]` to a top-level
 `workspace` object if one exists, and otherwise adds `"workspace.library": [".airsl/types"]`. Every
 other key and value is kept as parsed. Order and formatting are not kept (D10).
 
@@ -821,7 +890,14 @@ surrounding format comes from the `Io` display above; this example was composed,
 | Type file or luarc is read-only | Refused: `it is read-only`. Nothing is written (D23) | `setup.rs` |
 | A created file | Mode 0644 on Unix (D23) | `setup.rs` |
 | An updated file | Keeps its permissions (D23) | `setup.rs` |
-| Library set as `Lua.workspace.library` (or another `Lua` spelling) | Treated like any spelling: listed is `Unchanged`, unlisted is appended to (D22) | `luarc.rs` |
+| Library set as `Lua.workspace.library` (or another `Lua` spelling, including `Lua` → `workspace.library`) | Treated like any spelling: listed is `Unchanged`, unlisted is appended to (D22) | `luarc.rs` |
+| Luarc holds only a form feed (`0x0C`) | Not JSON whitespace, so not L3: L4 refusal | `luarc.rs` |
+| A spelling is not an array and another's parent is not an object | The L6 text (L6 before L7) | `luarc.rs` |
+| Several spellings fail L6, or several fail L7 | The first in the §6.1 spellings list order is named | `luarc.rs` |
+| Two spellings of one setting under one top-level key, e.g. `{"Lua": {"workspace": {"library": []}, "workspace.library": []}}` | Refused (L9) when a rewrite is needed | `luarc.rs` |
+| A map-valued setting's own keys, e.g. `{"diagnostics": {"severity": {"a": …, "b": …}}}` | One spelling, accepted | `luarc.rs` |
+| Type file or luarc is a symlink to a read-only file | Refused: `it is read-only` (D23) | `setup.rs` |
+| A write fails | `Io` "write" naming the target. The message holds the OS error only, never the temporary file | `setup.rs` |
 | A map-valued setting in two spellings, e.g. `diagnostics.severity` | Refused (L9) when a rewrite is needed | `luarc.rs` |
 | A module field typed as a function | Refused by `build()` | `module.rs` |
 | A function type inside `fun(...)` or a map, or a union inside `fun(...)` | Refused by `build()` (D20) | `module.rs` |
@@ -918,9 +994,24 @@ Named tests, each in an inline `#[cfg(test)] mod tests`:
   - `a_map_valued_setting_in_two_spellings_is_refused`: the §6.1 `diagnostics.severity` example
     gives ``it sets `diagnostics.severity` in two spellings``
   - `a_listed_entry_in_one_of_two_spellings_is_refused`
+  - `a_lua_object_with_a_dotted_library_is_a_spelling` and
+    `a_lua_object_with_a_dotted_library_that_is_not_an_array_is_refused` (the sixth spelling)
+  - `a_lua_prefixed_and_a_plain_spelling_conflict`
+  - `the_shortest_shared_path_tie_breaks_by_byte_order`
+  - `a_non_array_spelling_is_reported_before_a_non_object_parent`
+  - `a_form_feed_only_file_is_not_plain_json`
+  - `two_spellings_under_one_lua_object_are_refused`
+  - `a_map_valued_setting_in_two_spellings_under_lua_is_refused`
+  - `a_maps_own_keys_are_not_two_spellings`
+  - `several_non_array_spellings_name_the_first_in_list_order`
+  - `several_blocked_parents_name_the_first_in_list_order`
 - `luals/setup.rs`, using tempdirs:
   - `first_run_creates_both_files`
-  - `second_run_reports_unchanged_and_writes_nothing`: the mtimes are equal
+  - `second_run_reports_unchanged_and_writes_nothing`: the mtimes are equal, and on Unix the inode
+    numbers too
+  - `a_failed_write_names_the_target_not_the_temporary_file` (Unix only)
+  - `a_symlink_to_a_read_only_luarc_is_refused` (Unix only)
+  - `a_read_only_type_file_is_refused`
   - `a_changed_module_updates_only_the_type_file`
   - `a_luarc_refusal_writes_nothing`
   - `a_drifting_module_writes_nothing`
@@ -954,7 +1045,7 @@ Named tests, each in an inline `#[cfg(test)] mod tests`:
     is dropped
   - `a_dangling_symlink_type_file_is_refused` (Unix only)
 
-  **Platforms (D17).** The three tests marked Unix only are `#[cfg(unix)]`. They make links
+  **Platforms (D17).** Every test marked Unix only is `#[cfg(unix)]`. They make links
   with `std::os::unix::fs::symlink` and the socket with `std::os::unix::net::UnixListener`, both
   std, with no external tool and no new dependency. All other tests run on every CI platform.
   Windows runs the same resolution code, but no probe or test covers symlinks or special files
@@ -1017,17 +1108,29 @@ This repeats the `run.out default_state` and `run.out dotted` cases on generated
   `git grep -n "HostModule" -- '*README*'` finds `crates/airsl/examples/README.md:66`. Update that
   README line if its wording becomes wrong, and compile any README example that changes.
 - `crates/airsl/examples/custom-module/README.md:69` cites `src/modules/registry.rs:144` for
-  `ModuleSet::insert`. Adding `describe` to the trait moves that line, so the citation is updated
-  to the new line.
-- How ch07's Rust blocks are checked before landing. Each changed block becomes `src/main.rs` of
-  a throwaway crate against the checkout.
-  - The block at lines 21–51 has no `main`, so `fn main() {}` is appended.
-  - The block at lines 65–113 is compiled with its hidden `# ` prefixes removed.
-  - The `rust,ignore` fragment at lines 139–144 is not a `HostModule` impl, and stays as it is.
+  `ModuleSet::insert`. Adding `describe` to the trait and to every built-in moved that line and
+  about twenty other `file:line` citations in the example READMEs (custom-module,
+  denials-are-data, agent-hook, and `examples/README.md`), and many more were already stale. All
+  of them, about 136 across 15 READMEs, are rewritten. Every `file:line` citation in
+  `crates/airsl/examples/**/README.md` becomes a citation by item name, so moving lines cannot
+  stale it again. `grep -rnE '\.rs:[0-9]+' crates/airsl/examples --include=README.md` finds
+  nothing afterwards.
+- How ch07's Rust code is checked. It lives in a compiled example, `crates/airsl/examples/
+  notes-module/` (`notes.rs` holds the `Notes` module, `main.rs` installs and runs it, `setup.rs`
+  shows `luals::setup` and a `#[test]` calling `luals::verify`). ch07 includes the code with
+  mdBook's `{{#rustdoc_include …:anchor}}`, so the book shows exactly the compiled text. `setup.rs`
+  is the `[[example]] notes-module-setup` with `test = true`, so `cargo make dod`
+  (`--all-targets`) compiles both and runs the test. It is a separate target so that
+  `cargo make examples` does not run a program that writes `.airsl/` into the working directory.
+  The `rust,ignore` fragment that shows a lone `install` stays as it is.
+- The terms in user-facing pages match the Editor Support chapter: "description" and "the
+  language server's settings file", in the CLI appendix, the `airsl-cli` README, ch07 and the
+  `lua setup` help text.
 - `crates/airsl-cli/Cargo.toml:3`: the description "run, test, check and doctor" gains `lua setup`.
 - `book/src/ch01-00-getting-started.md`: the intro sentence that lists what the chapter covers
-  gains setting up an editor. The last sentence of ch01-03 ("In the next chapter…") stays true,
-  because the next chapter is still ch02.
+  gains setting up an editor. The last sentence of ch01-03 ("In the next chapter…") no longer
+  holds in page order, because Editor Support now sits between ch01-03 and ch02. It links to
+  A First Project by name and points to Editor Support first.
 - The project `CLAUDE.md`: its command list (line 9) gains `lua setup`, and its extension-seam
   bullet (line 81) names `describe` beside `install`.
 
@@ -1058,4 +1161,4 @@ This repeats the `run.out default_state` and `run.out dotted` cases on generated
 - **LuaLS behaviour is version-specific.** The grammar and luarc rules are proven on 3.19.2 only.
   `probes/luals/run.sh` re-runs them on another version.
 - **Symlinks and special files are untested on Windows** (D17). CI runs on `windows-latest`
-  (`.github/workflows/ci.yml:38`), but the three Unix-only tests do not run there.
+  (`.github/workflows/ci.yml:38`), but the Unix-only tests do not run there.

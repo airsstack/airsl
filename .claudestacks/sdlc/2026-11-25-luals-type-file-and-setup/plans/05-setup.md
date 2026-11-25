@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [04]
 built-on: 044432888b01
@@ -133,3 +133,32 @@ Commit `feat(airsl): resolve symlinked and special setup targets before writing`
 
 - `cargo make dod` is green.
 - `cargo test -p airsl luals::` runs every `verify`, `render`, `luarc` and `setup` test together.
+
+## Review findings
+
+One review of Tasks 1–2 together: code 0🔴 2🟡 6🔵, plan 1🟡 1🔵. The blocking item was setup.rs:309. All 25 named tests were present, and they checked the flow, modes, symlinks, the special-file errors and the report format as the plan states. The full report is at `.airsstack/cc/plugins/claudestacks/handoff/20261125-164553-edd2/05-reviewer-plan05.md`.
+
+- **Fixed (blocking 🟡):** a failed write's message named the temporary file. tempfile 3.27.0 appends `at path "<dir>/.tmpXXXX"` to its errors. Every `io::Error` that goes into `Io` is now rebuilt from its OS code, or from its kind when there is no code. New Unix test: `a_failed_write_names_the_target_not_the_temporary_file`, seen failing first.
+- **Fixed 🟡:** nothing covered the read-only check on a symlink's target, or `TypeFileRefused` "it is read-only". New tests: `a_symlink_to_a_read_only_luarc_is_refused` (Unix) and `a_read_only_type_file_is_refused`.
+- **Fixed (plan 🔵):** `a_drifting_module_writes_nothing` now uses a stub that installs a key its description misses, as the plan says.
+- **Fixed 🔵:** the mtime test also asserts unchanged inode numbers on Unix.
+- After the fixes: `cargo test -q -p airsl luals::` gives `test result: ok. 87 passed; 0 failed`.
+- **Fixed in the follow-up round 🔵 (was open):** a failed temporary-file *create* now shows the kind text (`permission denied`), not the OS text. tempfile's `PathError::source()` returns `self.err.source()`, not the inner OS error (`tempfile-3.27.0/src/error.rs:16-19`), so the code cannot be recovered. The message still names only the target.
+- **Fixed in the follow-up round 🔵 (was open):** there is no `sync_all` before `persist`. A rename keeps the permissions but not the owner, ACLs or xattrs. `SetupReport` stores tuples. The test `Stub` takes `describes: bool`. `an_unreadable_types_directory_is_an_io_read_error` fails when run as root.
+
+## Deviations
+
+- 2026-11-25. Tasks 1 and 2 edit the same file, so one coder did both in order. No task-briefer pass was run.
+- 2026-11-25. No commit was made.
+
+## Follow-up round (2026-11-25, at the author's request)
+
+- Every open 🔵 above is fixed:
+  - `FileReport { path, change }` replaces the tuples.
+  - `sync_all` runs before `persist`.
+  - The rustdoc states what a rewrite keeps. This is proven by `probes/rewrite-keeps.out` (the mode is kept, the xattr is dropped, a hard link keeps the old bytes) and `probes/probe-chown.txt` (unprivileged `fchown` to another uid gives `Operation not permitted (os error 1)`).
+  - The test stub takes enums.
+  - The root-sensitive tests return early when run as root.
+  - A failed temporary-file create now shows the OS text: `Permission denied (os error 13)`.
+- Deviation: writes go through `tempfile::Builder::make_in` with our own `create_new` open, not the `tempfile_in` named in Task 1. `make_in` returns the closure's `io::Error` unwrapped (`tempfile-3.27.0/src/util.rs:68-74`), so the message holds only the OS error. `a_failed_write_names_the_target_not_the_temporary_file` asserts the exact OS text and that no `.tmp*` file is left behind.
+- The re-export list also gains `FileReport`.

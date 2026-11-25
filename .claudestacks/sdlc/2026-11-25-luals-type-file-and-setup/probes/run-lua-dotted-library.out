@@ -1,0 +1,9 @@
+# sh probes/luals-case.sh <airsl> <workdir> <case> <luarc> <setup-after>; LuaLS 3.19.2 (Mason); airsl from checkout 9b1a837 + uncommitted work; .airsl/ gitignored; script: print(airsstack.json.nope)
+$ sh luals-case.sh airsl W control NONE no
+## control  .luarc.json before: (none)
+nope.lua:1:7 [Warning] Undefined global `airsstack`. (undefined-global)
+Diagnosis complete, 1 problems found
+$ sh luals-case.sh airsl W lua_dotted '{"Lua": {"workspace.library": [".airsl/types"]}}' no
+## lua_dotted  .luarc.json before: {"Lua": {"workspace.library": [".airsl/types"]}}
+nope.lua:1:22 [Warning] Undefined field `nope`. (undefined-field)
+Diagnosis complete, 1 problems found

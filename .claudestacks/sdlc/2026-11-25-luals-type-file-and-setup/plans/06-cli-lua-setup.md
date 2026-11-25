@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [05]
 built-on: 044432888b01
@@ -96,3 +96,58 @@ Each directory holds two scripts:
 - `cargo make dod` is green.
 - `cargo run -p airsl-cli -- lua setup <tempdir>` run twice: the second run prints two `unchanged` lines.
 - Task 2's two LuaLS runs are recorded.
+
+## Review findings
+
+There was one review of Task 1. Verdict: `blocking: none`, 0🔴 0🟡 2🔵. `cargo make dod-crate airsl-cli` exited 0, with 91 tests passing. Two manual runs printed `created` ×2, then `unchanged` ×2. A missing directory gives `airsl: open project directory failed on …` and exit 1.
+
+- **Fixed** 🔵: the test helper `setup` shared its name with the private `setup`. It is renamed to `setup_command`. `cargo test -q -p airsl-cli lua::` → `test result: ok. 3 passed; 0 failed`.
+- **Fixed** 🔵: the `Lua` arm had no test. `main.rs` now has `dispatch(command, stdin, stdout, stderr)`, which `main` calls with the process streams, and the test `the_lua_setup_command_reports_on_stdout_and_leaves_stderr_empty` drives `airsl lua setup <tempdir>` through it. Both the `Ext` and `Lua` arms go through it now.
+
+**Task 2: LuaLS 3.19.2 acceptance check.** The scratch directories were deleted afterwards. `good.lua` calls functions in all 12 modules. It reads every field of `Stat`, `Output`, `Compiled`, `Granted`, `GrantedFs`, `GrantedProc` and `GrantedLimits`, and it uses `json.decode` and `hook.payload` results as a table, a number and a string. `nope.lua` is `print(airsstack.json.nope)`.
+
+Run A: a plain directory.
+
+```
+$ cargo run -q -p airsl-cli -- lua setup <scratch>/a
+created .airsl/types/airsstack.lua
+created .luarc.json
+$ cd <scratch>/a && ~/.local/share/nvim/mason/bin/lua-language-server --check . --checklevel=Information
+nope.lua:1:22 [Warning] Undefined field `nope`. (undefined-field)
+    print(airsstack.json.nope)
+                         ^^^^
+>>>>>>>>>>>>>>>>>>>> 3/3 [Found 1 problems in 1 files]
+Diagnosis complete, 1 problems found
+```
+
+Run B: `git init`, with `.gitignore` holding `.airsl/`. `git status --short --ignored` shows `!! .airsl/`.
+
+```
+$ cargo run -q -p airsl-cli -- lua setup <scratch>/b
+created .airsl/types/airsstack.lua
+created .luarc.json
+$ cd <scratch>/b && ~/.local/share/nvim/mason/bin/lua-language-server --check . --checklevel=Information
+nope.lua:1:22 [Warning] Undefined field `nope`. (undefined-field)
+    print(airsstack.json.nope)
+                         ^^^^
+>>>>>>>>>>>>>>>>>>>> 3/3 [Found 1 problems in 1 files]
+Diagnosis complete, 1 problems found
+```
+
+LuaLS printed ANSI colour codes, which are removed above.
+
+Both runs report no diagnostic for `good.lua` and exactly one `undefined-field` for `nope.lua`.
+
+As a control in run B, `bad.lua` read `airsstack.proc.run({"x"}).nostatus`. It got `Undefined field `nostatus`. (undefined-field)`. So the record fields are really checked, and `good.lua`'s clean result means something.
+
+## Deviations
+
+- 2026-11-25. There was no task-briefer pass. The coder read Task 1 directly. Task 2 was run by the orchestrator.
+- 2026-11-25. The help text says "Lua language server", not "LuaLS". Clippy's `doc_markdown` would require backticks, which clap prints literally.
+- 2026-11-25. No commit was made.
+
+## Follow-up round (2026-11-25, at the author's request)
+
+- **Fixed** 🔵: `main.rs` now calls `dispatch(command, stdin, stdout, stderr)`. New test: `the_lua_setup_command_reports_on_stdout_and_leaves_stderr_empty`.
+- **Fixed 🔴** (it appeared in this round's review): `dispatch` first received `io::stdin().lock()` for every command. Stdin's lock is not reentrant, so `airsl run` with `stdio.read` or `hook.payload` hung. The unlocked handles are now passed in, which also removes the same hang from the `Ext` arm, where it existed before this chain. Checked by hand on the rebuilt binary: `echo hello | airsl run read.lua` printed `hello` with rc=0, and `echo '{"x":1}' | airsl run hook.lua` printed `1` with rc=0. No automated guard exists, because the crate has no binary-spawning tests.
+- The help text now says "description" and "the language server's settings file".

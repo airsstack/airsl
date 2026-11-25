@@ -14,6 +14,18 @@ checkout. The `records` case and its fixtures (`records-typefile.lua`, `records-
 `records-bad.lua`) were added on checkout `bb95c10`, and the `unions`, `positions`, `lua_prefix` and `lua_nested` cases on `2e2f973`. Each time,
 re-running `run.sh` left every earlier case's output unchanged.
 
+`rewrite-keeps.out` runs `airsl lua setup` (checkout `9b1a837` plus the uncommitted work) on a
+`.luarc.json` of mode 640 with an extended attribute and a hard link, and records each command
+with `stat` and `xattr -l` before and after.
+
+`luals-case.sh` (adopted from the spec review of this revision) sets up one case: a `git init` directory with
+`.airsl/` ignored and `nope.lua`, runs `airsl lua setup`, writes the given luarc (or removes it),
+optionally runs setup again, and prints the LuaLS diagnostics. `run-lua-dotted-library.out` records
+its `control` and `lua_dotted` cases, each command line first. `luals-lua-both.out` records the
+same script on `{"Lua": {"workspace": {"library": []}, "workspace.library": []}}`, first with the
+airsl built before the L9 fix (setup rewrote the file and LuaLS still reported `Undefined global`),
+then after it (setup refuses and leaves the file untouched).
+
 ## Rust
 
 Each `*-main.rs` is `src/main.rs` of a throwaway crate run with `cargo +1.94 run -q`. Each crate
@@ -33,6 +45,7 @@ writes into.
 | `probe-socket.txt` | `socket-main.rs` | none (std) |
 | `probe-resolve.txt` | `resolve-main.rs` | none (std) |
 | `probe-mode.txt` | `mode-main.rs` | `tempfile = "=3.27.0"` |
+| `probe-chown.txt` | `chown-main.rs` | none (std) |
 
 `surface-greps.txt` records two `grep` runs over `crates/airsl/src/modules/`, each with its command.
 `luals-provider-53-54.lua` is lines 50–58 of LuaLS 3.19.2

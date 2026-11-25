@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [06]
 built-on: 044432888b01
@@ -131,3 +131,31 @@ Its example is a two-line Lua script that calls `airsstack.json.encode`. The cha
 - `cargo make book-build` succeeds.
 - `cargo make dod` is green.
 - Every transcript and Rust example in the changed chapters came from a run on this checkout.
+
+## Review findings
+
+There was one review of Tasks 1–4: code 2🔴 1🟡 6🔵 and spec 1🔴, all from the same cause. The setup transcripts and the refusal message matched real runs. The three ch07 Rust blocks compiled and ran on 1.94. `registry.rs:170` is `pub fn insert`. Report: `.airsstack/cc/plugins/claudestacks/handoff/20261125-164553-edd2/10-reviewer-plan07.md`.
+
+- **Fixed (🔴 ×2, plan drift):** the chapter's script had a `-- hello.lua` first line, so the LuaLS transcripts' `1:14` and `1:29` did not match a real run, which reports `2:14` and `2:29`. I dropped the comment, which also makes the script two lines as the plan says, and re-ran LuaLS 3.19.2 in a scratch dir (since deleted). The results now match the chapter: `hello.lua:1:14 … Undefined global `airsstack``, `Diagnosis completed, no problems found` after setup, and `typo.lua:1:29 … Undefined field `encod``.
+- **Fixed 🔵:** "keys in alphabetical order" now reads "keys sorted". serde_json sorts by byte order.
+- **Fixed 🔵:** the doctor chapter's closing "In the next chapter…" now links to A First Project and points to Editor Support first. `cargo make book-build` builds.
+- **Fixed 🔵:** the ch07 `cargo test --quiet` transcript now carries cargo's blank line before `running 1 test`, pasted from a real run of the example's test.
+- **Fixed 🔵:** the appendix, the CLI README and ch07 now say "description" and "the language server's settings file", as the Editor Support chapter does. ch07 says once, where it first names the file `setup` writes, that it is the description file the editor reads.
+- **Fixed 🔵:** the synopsis line is `airsl lua setup  [<DIR>]`, placed beside the `ext` lines and aligned to their argument column, with `<DIR>` spelled as they spell it.
+- **Fixed 🔵:** the custom-module README cites `ModuleSet::insert` and `stdlib()` by name.
+- **Fixed 🟡 (Rust blocks):** the three ch07 blocks are now `crates/airsl/examples/notes-module/{notes,main,setup}.rs`, included with `rustdoc_include` anchors. `cargo make dod` compiles them, and runs the `verify` test through an `[[example]]` with `test = true`. The LuaLS transcripts stay ungated, because CI has no LuaLS.
+
+## Deviations
+
+- 2026-11-25. One coder did all four tasks in order, with no task-briefer pass. The tasks are text edits, and Tasks 1 and 3 share the transcript workflow.
+- 2026-11-25. The Getting Started closing paragraph in `ch01-03-airsl-doctor.md`, a file not in the plan's list, was edited so that it still points the right way once the new chapter sits between it and chapter 2.
+- 2026-11-25. No commit was made. The plan's per-task commits are left to the author.
+
+## Follow-up round (2026-11-25, at the author's request)
+
+- **Fixed:**
+  - The notes-module hidden lines are reworded for readers.
+  - `use std::path::Path;` now sits inside the visible anchor.
+  - `examples/README.md` names `notes-module-setup` as the one example that writes into the working directory.
+  - Every `file:line` citation in `crates/airsl/examples/**/README.md`, about 136 across 15 READMEs, is now a citation by name. About twenty had moved when `describe` was added, and many others, including `builder.rs:83` and `error.rs:217`, were already wrong. `grep -rnE '\.rs:[0-9]+' crates/airsl/examples --include=README.md` now finds nothing.
+- **Declined** 🔵 "book-build is not in dod": CI's `book` job (`.github/workflows/ci.yml`, `mdbook build book`) already builds the book on every PR. Adding mdbook to `dod` would make every local gate need mdbook installed.
