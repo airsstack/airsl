@@ -159,3 +159,9 @@ There was one review of Tasks 1–4: code 2🔴 1🟡 6🔵 and spec 1🔴, all 
   - `examples/README.md` names `notes-module-setup` as the one example that writes into the working directory.
   - Every `file:line` citation in `crates/airsl/examples/**/README.md`, about 136 across 15 READMEs, is now a citation by name. About twenty had moved when `describe` was added, and many others, including `builder.rs:83` and `error.rs:217`, were already wrong. `grep -rnE '\.rs:[0-9]+' crates/airsl/examples --include=README.md` now finds nothing.
 - **Declined** 🔵 "book-build is not in dod": CI's `book` job (`.github/workflows/ci.yml`, `mdbook build book`) already builds the book on every PR. Adding mdbook to `dod` would make every local gate need mdbook installed.
+
+## Follow-up round 2 (2026-11-25, post-commit review of `889ce3f`, at the author's request: "fix review findings")
+
+- **Fixed 🟡**: `values-and-json/README.md` cited `sorted` for "an empty table encodes as `{}`". It now cites `to_json` in `src/convert.rs`, whose doc says so.
+- **Fixed 🔵**: `extension-host/README.md` now cites `Intersection::apply` (where `request.modules()` is checked), and `multi-file-project/README.md` cites `is_within` in `src/paths/containment.rs` (called from `resolve`).
+- `cargo make dod`: exit 0.

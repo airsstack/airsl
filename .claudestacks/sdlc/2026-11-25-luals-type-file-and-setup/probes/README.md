@@ -26,6 +26,21 @@ same script on `{"Lua": {"workspace": {"library": []}, "workspace.library": []}}
 airsl built before the L9 fix (setup rewrote the file and LuaLS still reported `Undefined global`),
 then after it (setup refuses and leaves the file untouched).
 
+`luals-map-case.sh` is `luals-case.sh` plus `io.lua`, which uses the `io` global, so a luarc that
+disables the `io` builtin shows that LuaLS applied the map-valued `runtime.builtin`.
+`luals-map-keys.out` runs it on `runtime.builtin` with dotted map keys, first with airsl built
+from `889ce3f` (setup refused it), then from the fixed checkout (setup adds the entry).
+`luals-over-refusal.out` runs the same script, on the fixed checkout, on two luarcs L9 refuses
+though LuaLS reads each one way.
+`luals-setting-names.txt` lists every setting name in `template.lua`, with segment counts once a
+leading `Lua` is dropped, the names without a `Lua.` prefix, and the count of numeric segments.
+`long-key-luarc.sh <dots> <dir>` writes a luarc with one key of that many dots plus a `z.y`
+conflict. `long-key-cost.out` runs `/usr/bin/time -l airsl lua setup` on it, with debug builds of
+`889ce3f` (built in a scratch `git worktree` with its own `CARGO_TARGET_DIR`, since deleted) and of
+the fixed checkout.
+`luals-map-settings.txt` lists every map-typed (`Type.Hash`) setting in LuaLS 3.19.2's
+`template.lua`, with its key and value types (`grep -n -A3`).
+
 ## Rust
 
 Each `*-main.rs` is `src/main.rs` of a throwaway crate run with `cargo +1.94 run -q`. Each crate
