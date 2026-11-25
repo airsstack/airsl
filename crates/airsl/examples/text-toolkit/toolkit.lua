@@ -107,13 +107,10 @@ say("  relative_to: " .. airsstack.path.relative_to(TARGET, "crates/airsl"))
 -- and a path that is not under it has no answer to that question.
 local outside = pcall(airsstack.path.relative_to, TARGET, "crates/other")
 say("  relative_to refuses a path outside its base: " .. tostring(not outside))
-say(
-  "  is_absolute: "
-    .. tostring(airsstack.path.is_absolute(TARGET))
-    .. " here, "
-    .. tostring(airsstack.path.is_absolute("/etc/hosts"))
-    .. " for /etc/hosts"
-)
+-- Only the relative half is shown. Absoluteness follows the platform's own path grammar, and no
+-- literal is absolute on both: `/etc/hosts` is absolute on unix and only drive-relative on Windows,
+-- where `C:/Windows` is absolute and unix reads it as relative.
+say("  is_absolute: " .. tostring(airsstack.path.is_absolute(TARGET)))
 
 -- --- hash: content addressing over strings ---------------------------------------------------
 

@@ -50,7 +50,7 @@ path
   normalize:   crates/airsl/examples/toolkit.lua
   relative_to: examples/text-toolkit/toolkit.lua
   relative_to refuses a path outside its base: true
-  is_absolute: false here, true for /etc/hosts
+  is_absolute: false
 
 hash
   sha256: fa59177decf3530582300814daaadc7f3e14f386fde816c45659cf685d053fa4

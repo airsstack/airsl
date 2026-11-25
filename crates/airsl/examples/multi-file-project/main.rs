@@ -19,7 +19,7 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
-use airsl::{Engine, GrantSet, HostAccess, Policy, Script};
+use airsl::{Engine, FsGrant, GrantSet, HostAccess, Policy, Script};
 
 /// A confined script the engine has no directory for, because it never came from one.
 ///
@@ -34,7 +34,7 @@ const FROM_MEMORY: &str = r#"print(string.format(
 ))"#;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let dir = project_dir()?;
+    let dir = project_dir();
     let root = dir.display().to_string();
     let app = Script::from_file(dir.join("app.lua"))?.with_name("app.lua")?;
 
@@ -101,11 +101,13 @@ fn run(app: &Script, root: &str, heading: &str) -> Script {
 /// `CARGO_MANIFEST_DIR` rather than the working directory, so the example runs the same from the
 /// workspace root, from the crate directory, or from a `cargo run` in an editor.
 ///
-/// Canonical because the loader canonicalises the root before naming it in a refusal. A path that
-/// still held a symlink would be printed in one form and handed to the script in another, and the
-/// substitution the script performs would then miss.
-fn project_dir() -> Result<PathBuf, Box<dyn Error>> {
-    Ok(Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("examples/multi-file-project")
-        .canonicalize()?)
+/// Resolved through [`FsGrant::resolve_root`] because the loader canonicalises the root before
+/// naming it in a refusal. A path that still held a symlink would be printed in one form and
+/// handed to the script in another, and the substitution the script performs would then miss.
+/// `resolve_root` rather than `Path::canonicalize`, because on Windows `canonicalize` adds a
+/// `\\?\` prefix that no refusal ever shows.
+fn project_dir() -> PathBuf {
+    FsGrant::resolve_root(
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/multi-file-project"),
+    )
 }
