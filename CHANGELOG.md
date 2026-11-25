@@ -2,12 +2,97 @@
 
 Notable changes to both crates in this workspace, newest first. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and both crates follow
-[SemVer](https://semver.org/) — with the caveat that for a `0.1.z` version the *middle* number is
+[SemVer](https://semver.org/) — with the caveat that for a `0.y.z` version the *middle* number is
 the slot Cargo treats as breaking, so a compatible change ships as a `z` bump.
 
 The two crates are versioned independently, and each entry names every crate it releases. Every
 release is tagged per crate — `airsl-v0.1.4`, `airsl-cli-v0.1.3` — because one commit has shipped
 two crates under two different numbers, which a single `vX.Y.Z` tag cannot name.
+
+## airsl 0.2.0 — airsl-cli 0.2.0 — 2026-11-25
+
+A breaking release: `Policy::pure()` now keeps the promise its name makes, which stops scripts that
+worked on 0.1.6, and the documented meaning of `GrantSet::declared()` changes. Both crates take a
+middle-number bump, per the rule above. It closes
+[#11](https://github.com/airsstack/airsl/issues/11),
+[#12](https://github.com/airsstack/airsl/issues/12),
+[#13](https://github.com/airsstack/airsl/issues/13) and
+[#14](https://github.com/airsstack/airsl/issues/14). What `pure` guarantees, and what it still
+leaves to the VM, is in
+[What airsl Can and Cannot Promise](https://airsstack.github.io/airsl/ch09-03-what-it-promises.html).
+
+### Breaking
+
+- **`pure` reaches no host.** A `pure` script no longer has `print`, and the host modules refuse
+  what reached the host: `stdio` and `hook` (stdin, stdout and stderr), `time.now` and
+  `time.monotonic` (the clock), `time.parse` of text that names an IANA time zone such as `UTC`
+  or `America/New_York` (a numeric offset such as `+0400` still parses), and `path.absolute` of a
+  relative path (the working directory). A refusal names the access that would allow it. Each of
+  these worked under `pure` on 0.1.6. To grant one back, pass `--allow-access NAME` on the command
+  line, or build the policy on `GrantSet::sealed().with_access(HostAccess::…)` in Rust.
+- **A relative path needs `cwd` under `pure`.** `fs`, `hash.hash_file` and `glob.walk` refuse a
+  relative path such as `p.txt` unless `cwd` is granted, even when filesystem roots are, because a
+  relative path is read against the working directory. An absolute path inside a granted root is
+  unaffected. On 0.1.6, `pure` with `--allow-read .` accepted relative paths; now it also needs
+  `--allow-access cwd`. The same holds for any policy built on `GrantSet::sealed()` that does not
+  add `cwd`; `confined` holds `cwd` and `trusted` holds everything, so neither is affected.
+- **`math.randomseed()` with no argument is refused under `pure`**, because it reads the clock.
+  `math.randomseed(n)` still works.
+- **`math.random` repeats under `pure`.** Every fresh engine starts from the same seed, so the same
+  script gives the same numbers on every run. A reused engine continues the sequence, as it
+  keeps its Lua state.
+- **`require` is a refusing function under `pure`**, where it was `nil`. Calling it fails with
+  `require denied`, so a script that tested `require == nil` to detect the sandbox now sees a
+  function. Granting `require` (`--allow-access require`) gives back the loader confined to the
+  script's folder.
+- **`GrantSet::declared()` now holds all seven host-access members**, so
+  `GrantSet::declared().is_empty()` is `false` and `GrantSet::declared().to_string()` is
+  `access stdin,stdout,stderr,clock,cwd,require,zones` where it was `none`. A host that built a
+  `pure`-based policy on `declared()` or `default()` reopens every member; build on
+  `GrantSet::sealed()` instead. See
+  [Granting from Rust](https://airsstack.github.io/airsl/ch06-03-granting.html).
+
+### Added
+
+- **`HostAccess`**, the seven capabilities that need no path, variable or program: `stdin`,
+  `stdout`, `stderr`, `clock`, `cwd`, `require` and `zones`. A host gives a `pure`-based policy any
+  of them back, `require` included, and each host module checks its member before acting.
+- **`GrantSet::sealed()`**, which holds no member and is what `pure` is built on, and
+  **`GrantSet::with_access`**, **`allows`** and **`access`** to add, test and list members.
+- **`Error::RequireDenied`**, returned by the refusing `require`.
+- **`--allow-access NAME`** on `run`, `test`, `ext doctor` and `ext fire`, repeatable, naming a
+  member to give back to `pure`. It changes nothing under `confined`, which holds every member, and
+  `trusted` ignores it, as it ignores every grant flag. `ext doctor` and `ext fire` always use the
+  `confined` ceiling, so there the flag cannot change it.
+- **`airsl doctor` takes the grant flags**, so it reports the policy a script would get from the
+  same command line, for example `airsl doctor --policy pure --allow-access stderr`.
+- **Appendix F, "Lua Functions by Surface"**, in the book: every base global and library name
+  each surface loads, and which preset uses which.
+
+### Changed
+
+- **A refusal names the path as the script wrote it.** With no filesystem roots granted, `fs`,
+  `hash.hash_file` and `glob.walk` refuse before touching the filesystem, so `/etc/hosts` is
+  reported as `/etc/hosts` rather than as the symlink-resolved `/private/etc/hosts` it becomes on
+  macOS, and `p.lua` rather than the path joined to the working directory. A refusal no longer
+  reveals where the process runs.
+- **A path that could not be resolved is now `Error::Denied`** when no filesystem roots are
+  granted, where it was `Error::UncheckablePath`: when the working directory could not be read,
+  when the path climbs through a directory that does not exist, and when no part of it exists. A
+  caller that matched the variant or the text for those inputs should match `Error::Denied`. The
+  cases `UncheckablePath` still names, a NUL byte, a verbatim path and a device path, are
+  unchanged.
+- **The `grants:` lines of `airsl doctor` and `airsl ext doctor` list host access.** Every
+  `confined` line now starts with `access stdin,stdout,stderr,clock,cwd,require,zones`, ahead of
+  any allowlist entries. Where it read `none` it reads that list alone, and where it read
+  `exec git` it now reads
+  `access stdin,stdout,stderr,clock,cwd,require,zones; exec git`. A program that parses these
+  lines must expect the prefix. `pure` still reads `none` until a member or an entry is granted.
+- **`ext.granted()` gains an `access` key**, a list of the granted members in declaration order,
+  empty when none is granted. A script that iterates the table's keys sees one more. An extension
+  holds the ceiling's host access and cannot request more.
+- **`print`, `require` and the random seeding are unchanged under `confined` and `trusted`**, which
+  behave there as on 0.1.6.
 
 ## airsl 0.1.6 — airsl-cli 0.1.6 — 2026-11-24
 

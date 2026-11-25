@@ -1,0 +1,22 @@
+# airsl 0.1.6 (checkout f281887); cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-pure-preset-keeps-its-promise/4c2de4e2-94e1-47ef-b0d7-2b099af0c596/scratchpad/cli-probe
+$ airsl run --policy pure leaks.lua
+hash_file: false hash.hash_file denied: `/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-pure-preset-keeps-its-promise/4c2de4e2-94e1-47ef-b0d7-2b099af0c596/scratchpad/cli-probe/p.lua` is outside the granted read roots: none are granted
+fs.read: false fs.read denied: `/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-pure-preset-keeps-its-promise/4c2de4e2-94e1-47ef-b0d7-2b099af0c596/scratchpad/cli-probe/p.lua` is outside the granted read roots: none are granted
+glob.walk: false glob.walk denied: `/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-pure-preset-keeps-its-promise/4c2de4e2-94e1-47ef-b0d7-2b099af0c596/scratchpad/cli-probe` is outside the granted read roots: none are granted
+fs.read abs: false fs.read denied: `/private/etc/hosts` is outside the granted read roots: none are granted
+time.parse %Q: true 1719849600
+time.parse %z: true 1719849600
+isatty: true false
+ext.granted: true env,fs,limits,proc,unrestricted
+error chunk: false boom
+$ airsl run --policy pure tz.lua
+1719849600
+$ TZDIR=/nonexistent airsl run --policy pure tz.lua
+1719849600
+$ TZDIR=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-pure-preset-keeps-its-promise/4c2de4e2-94e1-47ef-b0d7-2b099af0c596/scratchpad/cli-probe/faketz airsl run --policy pure tz.lua   # America/New_York replaced by Asia/Tokyo's TZif file
+1719802800
+$ airsl run --policy pure proc.lua
+proc.run ls: false proc.run denied: `ls` is not granted — no executables are
+proc.run ./nope: false proc.run denied: `./nope` is not granted — no executables are
+fs.exists /etc/hosts: false fs.exists denied: `/private/etc/hosts` is outside the granted read roots: none are granted
+fs.exists /nonexistent: false fs.exists denied: `/nonexistent/x` is outside the granted read roots: none are granted

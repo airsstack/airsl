@@ -58,7 +58,7 @@ decoded back: name=widget observed_at=1700000000 tags=2
 
 `Script::from_file` reading `encode.lua` is a **host** read and is not governed by `FsGrant`. The
 grant governs `airsstack.fs.*` calls made *by* the script, which is why this example loads a file
-from disk while running on the confined preset's empty grant set.
+from disk while running on the confined preset, which holds no filesystem grant.
 
 ## See also
 

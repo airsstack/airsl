@@ -46,7 +46,8 @@ for _, name in ipairs(installed) do
 end
 print("modules installed: " .. table.concat(installed, ", "))
 
--- Two of them need no authority at all, and work identically under every policy.
+-- Two of the functions called here need no authority at all, and work identically under every
+-- policy. `path.absolute` is not among them: it reads the working directory, so it needs `cwd`.
 print("path.join needs nothing: " .. airsstack.path.join("a", "b", "c.txt"))
 print("json.encode needs nothing: " .. airsstack.json.encode({ ok = true }))
 

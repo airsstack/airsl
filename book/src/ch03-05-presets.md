@@ -8,7 +8,8 @@ Choose one with `--policy`.
 
 This is what every example so far has used. The script gets the everyday parts of Lua (`string`,
 `table`, `math`, `utf8`, `coroutine`, and the harmless parts of `os` such as `os.time`) plus the
-`airsstack` modules. It gets no grants until you add them, and it runs under a 64 MiB memory limit
+`airsstack` modules. It holds every kind of [host access](ch03-01-nothing-by-default.md#host-access),
+and no folder, variable or program grants until you add them. It runs under a 64 MiB memory limit
 and a 100 million instruction limit.
 
 What it does **not** get are the parts of Lua that reach outside the script without asking:
@@ -41,11 +42,21 @@ $ airsl run --policy pure script.lua
 ```
 
 A pure script gets only `string`, `table`, `math` and `utf8`. It has no `os`, so it cannot even read
-the clock, and no `require`. Its limits are tighter: 16 MiB of memory and 10 million instructions.
+the clock, and no `print`. It holds no host access. Anything that would reach outside the script,
+such as writing output, is refused until you add it with `--allow-access`, as
+[Nothing Is Allowed by Default](ch03-01-nothing-by-default.md#host-access) showed. Its limits are
+tighter: 16 MiB of memory and 10 million instructions.
 
-Use it to evaluate something that should be a pure calculation, such as a configuration file written
-in Lua, or an expression a user typed in. Given the same input, a pure script always produces the
-same output.
+Two details follow from keeping a script repeatable. `math.random` gives the same numbers on every
+fresh run, and `math.randomseed()` with no seed is refused, because that form reads the clock.
+`math.randomseed(42)` with a seed works.
+
+`require` is there, but it refuses every call until you grant the `require` member. With the member,
+it loads files from the script's own folder, just as it does under `confined`.
+
+Use `pure` to evaluate something that should be a pure calculation, such as a configuration file
+written in Lua, or an expression a user typed in. What it promises, and the three things it does not
+control, are in [chapter 9](ch09-03-what-it-promises.md#what-pure-guarantees).
 
 ## Side by side
 
@@ -53,14 +64,19 @@ same output.
 |---|---|---|---|
 | Lua's `io`, `os.execute`, `load` | yes | no | no |
 | `os.time`, `os.clock` | yes | yes | no |
-| `require` | Lua's own | script's folder only | none |
+| `print` | yes | yes | no |
+| `math.random` | different each run | different each run | the same each run |
+| `math.randomseed()` with no seed | yes | yes | refused |
+| Host access | all | all | none |
+| `require` | Lua's own | script's folder only | refused; with the `require` member, script's folder only |
 | `airsstack` modules | unrestricted | only what is granted | only what is granted |
 | Memory limit | none | 64 MiB | 16 MiB |
 | Instruction limit | none | 100 million | 10 million |
 
 ## Summary
 
-- There are four kinds of grant: read a folder, write a folder, use a variable, run a program.
+- There are four kinds of grant: read a folder, write a folder, use a variable, run a program. Host
+  access covers the rest, and only `pure` starts without it.
 - Each grant names exactly what it covers.
 - A refusal is always an error that names what was missing.
 - Presets decide which parts of Lua a script sees, and how much it may spend.

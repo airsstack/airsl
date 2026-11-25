@@ -1,0 +1,7 @@
+# airsl 0.1.6 (checkout f281887)
+$ airsl run --policy pure require.lua
+nil
+false	attempt to call a nil value
+$ airsl run --policy confined require.lua
+function
+true	42

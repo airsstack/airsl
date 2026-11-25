@@ -1,0 +1,20 @@
+# jiff 0.2.35
+$ jiff-probe
+%Q iana_time_zone() before lookup: Some("America/New_York")
+%Q offset() before lookup: None
+%Q to_zoned: Ok(1719849600)
+%z iana_time_zone(): None
+%z to_zoned: Ok(1719849600)
+rfc9557 annotated Timestamp parse: Ok(1719849600)
+rfc9557 unknown-zone Timestamp parse: Ok(1719849600)
+$ TZDIR=faketz jiff-probe   # America/New_York replaced by Asia/Tokyo
+%Q iana_time_zone() before lookup: Some("America/New_York")
+%Q offset() before lookup: None
+%Q to_zoned: Ok(1719802800)
+%z iana_time_zone(): None
+%z to_zoned: Ok(1719849600)
+rfc9557 annotated Timestamp parse: Ok(1719849600)
+rfc9557 unknown-zone Timestamp parse: Ok(1719849600)
+$ grep -A1 'name = "jiff"$' Cargo.lock   # this probe crate's lockfile
+name = "jiff"
+version = "0.2.35"

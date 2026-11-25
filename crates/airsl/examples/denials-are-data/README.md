@@ -55,9 +55,10 @@ which keeps the message identical on Linux and macOS. `<granted>` is substituted
   functions it creates — the check happens inside the host function, immediately before the
   operation. That is why `fs` can be present, refuse `/`, and still serve a granted read in the
   same run.
-- **Some modules need no authority at all.** `path` and `json` behave identically under every
-  policy. `path` needs nothing and `fs` does, so they are separate modules rather than one
-  convenient namespace — every module is a capability.
+- **Some functions need no authority at all.** `path.join` and `json.encode` behave identically
+  under every policy. `path`'s string arithmetic needs nothing and `fs` does, so they are separate
+  modules rather than one convenient namespace — every module is a capability. `path.absolute` is
+  the exception within `path`: it reads the working directory, so it needs the `cwd` host access.
 - **Authority is borrowed, not invented.** `hash.hash_file` opens a file and `glob.walk` reads
   directories, so both answer to the *filesystem read* grant rather than getting an axis of their
   own. They share `PathGuard` with `fs` — `src/modules/hash.rs:73` and `src/modules/glob.rs:89`,

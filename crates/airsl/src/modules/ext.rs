@@ -147,7 +147,10 @@ fn sorted_roots(roots: &[PathBuf]) -> Vec<String> {
     rendered
 }
 
-/// Renders the grants and ceilings as the table `ext.granted()` returns.
+/// Renders the grants, host access and ceilings as the table `ext.granted()` returns.
+///
+/// `access` is a sequence of the granted host-access names in declaration order, empty when none
+/// is granted.
 ///
 /// Built once at install and copied per call, so a script that mutates what it was handed
 /// cannot change what the next call reports.
@@ -199,6 +202,12 @@ fn granted_table(
         ceilings.set("instructions", instructions.get())?;
     }
     root.set("limits", ceilings)?;
+
+    let access = lua.create_table()?;
+    for (i, member) in grants.access().enumerate() {
+        access.set(i + 1, member.as_str())?;
+    }
+    root.set("access", access)?;
 
     root.set("unrestricted", grants.is_unrestricted())?;
     Ok(root)
@@ -407,6 +416,24 @@ mod tests {
         )
         .unwrap();
         assert_eq!(found, "nil");
+    }
+
+    #[test]
+    fn granted_lists_access_members_in_order() {
+        let every_member = "stdin,stdout,stderr,clock,cwd,require,zones";
+        for (policy, expected) in [
+            (Policy::confined(), every_member),
+            (Policy::trusted(), every_member),
+            (Policy::pure(), ""),
+        ] {
+            let engine = Engine::builder().policy(policy).build().unwrap();
+            let found = run(
+                &engine,
+                "return table.concat(airsstack.ext.granted().access, ',')",
+            )
+            .unwrap();
+            assert_eq!(found, expected);
+        }
     }
 
     #[test]

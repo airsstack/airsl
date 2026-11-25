@@ -32,6 +32,14 @@ local function replace_literal(text, needle, with)
   return table.concat(parts)
 end
 
+--- `text` with `dir` replaced by `role`, in both spellings `dir` can take: the one the host handed
+--- over, and the one the runtime writes into a message, which separates with `/` on every platform.
+--- On unix the two are the same string; on Windows the first separates with `\`.
+local function redact(text, dir, role)
+  text = replace_literal(text, dir, role)
+  return (replace_literal(text, (string.gsub(dir, "\\", "/")), role))
+end
+
 --- The first line of `message`, with the project directory replaced by its role. The traceback
 --- after that line names absolute paths, which belong nowhere near output meant to be diffed.
 local function stable(message)
@@ -39,7 +47,7 @@ local function stable(message)
   if root == "" then
     return message
   end
-  return replace_literal(message, root, "<project>")
+  return redact(message, root, "<project>")
 end
 
 --- Requires `name`, printing the refusal instead of propagating it.

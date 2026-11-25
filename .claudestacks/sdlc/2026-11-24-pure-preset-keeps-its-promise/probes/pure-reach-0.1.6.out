@@ -1,0 +1,82 @@
+# airsl 0.1.6 (checkout f281887)
+$ airsl run --policy pure pure-reach.lua   # run 1
+print:	function	stdio:	table	hook:	table	time:	table
+now:	true	1795581841
+absolute:	true	/Users/hiraq/.herdr/worktrees/airsl/pure-preset-keeps-its-promise/.claudestacks/sdlc/2026-11-24-pure-preset-keeps-its-promise/probes/x
+hash_file:	false	hash.hash_file denied: `/Users/hiraq/.herdr/worktrees/airsl/pure-preset-keeps-its-promise/.claudestacks/sdlc/2026-11-24-pure-preset-keeps-its-promise/probes/p.lua` is outside the granted read roots: none are granted
+stack traceback:
+	[C]: in ?
+	[C]: in function 'pcall'
+	pure-reach.lua:4: in main chunk
+
+walk:	false	bad argument #2: error converting Lua nil to string (expected string or number)
+stack traceback:
+	[C]: in ?
+	[C]: in function 'pcall'
+	pure-reach.lua:5: in main chunk
+
+env:	false	env.get denied: `HOME` is not granted — no environment variables are
+stack traceback:
+	[C]: in ?
+	[C]: in function 'pcall'
+	pure-reach.lua:6: in main chunk
+
+<via stdio>
+stdio.write:	true
+random:	540745
+pairs:	delta,gamma,zeta,alpha,eps,eta,beta,theta
+tostring:	table: 0x928c14600
+$ airsl run --policy pure pure-reach.lua   # run 2
+print:	function	stdio:	table	hook:	table	time:	table
+now:	true	1795581841
+absolute:	true	/Users/hiraq/.herdr/worktrees/airsl/pure-preset-keeps-its-promise/.claudestacks/sdlc/2026-11-24-pure-preset-keeps-its-promise/probes/x
+hash_file:	false	hash.hash_file denied: `/Users/hiraq/.herdr/worktrees/airsl/pure-preset-keeps-its-promise/.claudestacks/sdlc/2026-11-24-pure-preset-keeps-its-promise/probes/p.lua` is outside the granted read roots: none are granted
+stack traceback:
+	[C]: in ?
+	[C]: in function 'pcall'
+	pure-reach.lua:4: in main chunk
+
+walk:	false	bad argument #2: error converting Lua nil to string (expected string or number)
+stack traceback:
+	[C]: in ?
+	[C]: in function 'pcall'
+	pure-reach.lua:5: in main chunk
+
+env:	false	env.get denied: `HOME` is not granted — no environment variables are
+stack traceback:
+	[C]: in ?
+	[C]: in function 'pcall'
+	pure-reach.lua:6: in main chunk
+
+<via stdio>
+stdio.write:	true
+random:	325554
+pairs:	theta,delta,eta,alpha,zeta,eps,beta,gamma
+tostring:	table: 0xc5d04c6c0
+$ airsl run --policy pure pure-reach.lua   # run 3
+print:	function	stdio:	table	hook:	table	time:	table
+now:	true	1795581841
+absolute:	true	/Users/hiraq/.herdr/worktrees/airsl/pure-preset-keeps-its-promise/.claudestacks/sdlc/2026-11-24-pure-preset-keeps-its-promise/probes/x
+hash_file:	false	hash.hash_file denied: `/Users/hiraq/.herdr/worktrees/airsl/pure-preset-keeps-its-promise/.claudestacks/sdlc/2026-11-24-pure-preset-keeps-its-promise/probes/p.lua` is outside the granted read roots: none are granted
+stack traceback:
+	[C]: in ?
+	[C]: in function 'pcall'
+	pure-reach.lua:4: in main chunk
+
+walk:	false	bad argument #2: error converting Lua nil to string (expected string or number)
+stack traceback:
+	[C]: in ?
+	[C]: in function 'pcall'
+	pure-reach.lua:5: in main chunk
+
+env:	false	env.get denied: `HOME` is not granted — no environment variables are
+stack traceback:
+	[C]: in ?
+	[C]: in function 'pcall'
+	pure-reach.lua:6: in main chunk
+
+<via stdio>
+stdio.write:	true
+random:	523488
+pairs:	theta,delta,beta,gamma,eps,eta,zeta,alpha
+tostring:	table: 0x96f058700

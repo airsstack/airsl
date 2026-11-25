@@ -1,0 +1,9 @@
+$ sortpivot   # mlua 0.12.0, Lua 5.4.8, Minimal libraries
+-- run 1
+key//1: distinct orders over 100 sorts of identical input: 1
+key//2: distinct orders over 100 sorts of identical input: 100
+key//4: distinct orders over 100 sorts of identical input: 100
+-- run 2
+key//1: distinct orders over 100 sorts of identical input: 1
+key//2: distinct orders over 100 sorts of identical input: 100
+key//4: distinct orders over 100 sorts of identical input: 100

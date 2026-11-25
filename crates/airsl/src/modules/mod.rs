@@ -8,6 +8,7 @@
 //!
 //! Responsibilities:
 //!
+//! - `access` — the check and refusal text for a host-access member the policy does not grant.
 //! - [`registry`] — the [`HostModule`] trait, [`InstallContext`] and [`ModuleSet`].
 //! - [`mod@env`] — environment variables, guarded by a name allowlist.
 //! - [`mod@ext`] — what an extension registers with the host, and the grants it was loaded with.
@@ -15,18 +16,21 @@
 //! - [`mod@proc`] — subprocesses, guarded by an executable allowlist.
 //! - [`mod@regex`] — real regular expressions, needing no authority.
 //! - [`mod@hash`] — SHA-256 and SHA-1; `hash_file` inherits the filesystem read grants.
-//! - [`mod@time`] — timestamps and formatting, needing no authority.
+//! - [`mod@time`] — timestamps and formatting; the clock needs `clock`, a named zone needs `zones`.
 //! - [`mod@glob`] — glob matching; `walk` inherits the filesystem read grants.
-//! - [`mod@stdio`] — the process's own standard streams.
-//! - [`mod@hook`] — the agent-hook contract, over `stdio` and `json`.
+//! - [`mod@stdio`] — the process's own standard streams, each needing its stream's host access.
+//! - [`mod@hook`] — the agent-hook contract, over `stdio` and `json`, needing `stdin` or `stdout`.
 //! - [`json`] — JSON encoding and decoding.
-//! - [`mod@path`] — path manipulation, needing no authority.
+//! - [`mod@path`] — path manipulation; `absolute` of a relative path needs `cwd`, the rest needs no
+//!   authority.
 //! - [`mod@stdlib`] — the default module set the engine installs.
 //!
 //! Non-responsibilities: sandboxing. Which Lua standard libraries a script sees is
 //! [`crate::Policy`]'s decision, applied by the engine before any of these are installed.
 
 mod guard;
+
+pub(crate) mod access;
 
 pub mod env;
 pub mod ext;

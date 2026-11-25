@@ -101,7 +101,7 @@ pub trait HostModule: Send + Sync {
     /// Populates `table` with this module's functions.
     ///
     /// `context` carries the policy the engine was built with. A module needing no authority — a
-    /// pure computation like `path` — ignores it; one that guards an operation captures the grants
+    /// pure computation like `json` — ignores it; one that guards an operation captures the grants
     /// it needs into the functions it creates, and checks them there rather than here.
     ///
     /// # Errors

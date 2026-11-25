@@ -1,0 +1,6 @@
+$ both   # jiff 0.2.35
+both iana_time_zone(): Some("America/New_York")
+both to_zoned: Ok(1719849600)
+$ TZDIR=<faketz: America/New_York replaced by Asia/Tokyo> both
+both iana_time_zone(): Some("America/New_York")
+both to_zoned: Err(datetime could not resolve to a timestamp since `reject` conflict resolution was chosen, and because datetime has offset `-04`, but the time zone `America/New_York` for the given datetime unambiguously has offset `+09`)

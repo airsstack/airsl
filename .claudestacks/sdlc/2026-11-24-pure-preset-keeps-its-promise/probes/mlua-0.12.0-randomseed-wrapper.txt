@@ -1,0 +1,50 @@
+$ wrap   # mlua 0.12.0, Lua 5.4.8
+-- run 1
+first=275394
+noarg=false runtime error: no-argument form refused
+stack traceback:
+	[C]: in function 'math.randomseed'
+	[C]: in function 'pcall'
+	src/bin/wrap.rs:19:3: in main chunk
+
+returns=42,0
+repeat=161510,161510
+nil-arg=false runtime error: bad argument #1 to '?' (number expected, got nil)
+stack traceback:
+	[C]: in ?
+	[C]: in ?
+	[C]: in function 'math.randomseed'
+	[C]: in function 'pcall'
+	src/bin/wrap.rs:19:8: in main chunk
+stack traceback:
+	[C]: in function 'math.randomseed'
+	[C]: in function 'pcall'
+	src/bin/wrap.rs:19:8: in main chunk
+
+-- run 2
+first=275394
+noarg=false runtime error: no-argument form refused
+stack traceback:
+	[C]: in function 'math.randomseed'
+	[C]: in function 'pcall'
+	src/bin/wrap.rs:19:3: in main chunk
+
+returns=42,0
+repeat=161510,161510
+nil-arg=false runtime error: bad argument #1 to '?' (number expected, got nil)
+stack traceback:
+	[C]: in ?
+	[C]: in ?
+	[C]: in function 'math.randomseed'
+	[C]: in function 'pcall'
+	src/bin/wrap.rs:19:8: in main chunk
+stack traceback:
+	[C]: in function 'math.randomseed'
+	[C]: in function 'pcall'
+	src/bin/wrap.rs:19:8: in main chunk
+
+$ grep -A1 'name = "mlua"$' Cargo.lock   # this probe crate's lockfile
+name = "mlua"
+version = "0.12.0"
+name = "lua-src"
+version = "550.1.1"

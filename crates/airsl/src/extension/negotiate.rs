@@ -270,13 +270,20 @@ fn list<'a>(items: impl Iterator<Item = &'a str>) -> String {
 ///
 /// Required misses become denials, optional misses become reductions, and every grant from
 /// either block lands in the returned policy. The language surface is the ceiling's; the
-/// limits are the lower of request and ceiling on each axis.
+/// limits are the lower of request and ceiling on each axis. Host access
+/// ([`HostAccess`](crate::HostAccess)) is never requested: the policy holds exactly the members
+/// the ceiling holds.
 #[must_use]
 pub fn negotiate(manifest: &Manifest, ceiling: &Ceiling, modules: &ModuleSet) -> Negotiation {
+    let base = ceiling
+        .policy()
+        .grants()
+        .access()
+        .fold(GrantSet::sealed(), GrantSet::with_access);
     let mut work = Intersection {
         ceiling,
         modules,
-        grants: GrantSet::declared(),
+        grants: base,
         reduced: Vec::new(),
         denied: Vec::new(),
     };
@@ -328,7 +335,7 @@ mod tests {
     use crate::extension::variables::Variables;
     use crate::modules::stdlib;
     use crate::test_support::abs;
-    use crate::{GrantSet, InstructionLimit, MemoryLimit, Policy, ResourceLimits};
+    use crate::{GrantSet, HostAccess, InstructionLimit, MemoryLimit, Policy, ResourceLimits};
 
     /// Writes a manifest whose `[capabilities]` body is `required` and optional body is
     /// `optional`, into a fresh directory, and loads it with `$HOME` = the directory.
@@ -587,9 +594,60 @@ mod tests {
             "{}",
             n.denied()[0]
         );
+        let grants = n.policy().grants();
         assert!(
-            n.policy().grants().is_empty(),
-            "presence assertions add nothing to the policy"
+            grants.fs().is_empty(),
+            "presence assertions add no filesystem grant"
         );
+        assert!(
+            grants.env().is_empty(),
+            "presence assertions add no environment grant"
+        );
+        assert!(
+            grants.proc().is_empty(),
+            "presence assertions add no process grant"
+        );
+    }
+
+    #[test]
+    fn a_pure_ceiling_negotiates_no_access() {
+        let dir = tempfile::tempdir().unwrap();
+        let m = manifest(dir.path(), "", "", "");
+        let n = negotiate(
+            &m,
+            &Ceiling::new(Policy::pure()).unwrap(),
+            &stdlib().unwrap(),
+        );
+        assert_eq!(n.policy().grants().access().count(), 0);
+    }
+
+    #[test]
+    fn a_confined_ceiling_negotiates_every_member() {
+        let dir = tempfile::tempdir().unwrap();
+        let m = manifest(dir.path(), "", "", "");
+        let n = negotiate(
+            &m,
+            &Ceiling::new(Policy::confined()).unwrap(),
+            &stdlib().unwrap(),
+        );
+        let held: Vec<_> = n.policy().grants().access().collect();
+        assert_eq!(held, HostAccess::ALL);
+    }
+
+    #[test]
+    fn a_ceiling_with_stderr_and_require_passes_exactly_those() {
+        let dir = tempfile::tempdir().unwrap();
+        let m = manifest(dir.path(), "", "", "");
+        let c = Ceiling::new(
+            Policy::pure().with_grants(
+                GrantSet::sealed()
+                    .with_access(HostAccess::Stderr)
+                    .with_access(HostAccess::Require),
+            ),
+        )
+        .unwrap();
+        let n = negotiate(&m, &c, &stdlib().unwrap());
+        let held: Vec<_> = n.policy().grants().access().collect();
+        assert_eq!(held, [HostAccess::Stderr, HostAccess::Require]);
     }
 }

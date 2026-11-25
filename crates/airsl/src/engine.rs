@@ -23,9 +23,10 @@ use crate::builder::{EngineBuilder, Missing};
 use crate::error::{Error, Result};
 use crate::instruction_budget::{BudgetExhausted, InstructionBudget};
 use crate::modules::ModuleSet;
+use crate::modules::access;
 use crate::modules::ext::HANDLERS_KEY;
 use crate::require_loader::{RequireDisposition, RequireLoader};
-use crate::sandbox::Policy;
+use crate::sandbox::{HostAccess, Policy};
 use crate::script::Script;
 use crate::types::{EventName, ModuleName, RootTable};
 
@@ -268,22 +269,29 @@ impl Engine {
         self.lua.globals().set("arg", table).map_err(fail)
     }
 
-    /// Gives the script about to run whichever `require` its surface and its root call for.
+    /// Gives the script about to run whichever `require` its surface, the `require` grant and its
+    /// root call for.
     ///
     /// Per evaluation because the directory it resolves against belongs to the script, not to the
-    /// engine. A confined script built from source has no directory and so gets no `require` at
-    /// all.
+    /// engine. Below the full surface, a policy that does not grant `require` gets one that refuses
+    /// every call, and a script built from source under a granting policy has no directory
+    /// and so gets no `require` at all.
     ///
     /// The table of already-loaded modules outlives this call: it is keyed by canonical absolute
     /// path, so it stays correct across roots, and discarding it would make every evaluation
     /// re-run every module it requires.
     fn set_require(&self, script: &Script) -> Result<()> {
-        match RequireDisposition::decide(self.policy.language(), script.root()) {
+        let grants = self.policy.grants();
+        match RequireDisposition::decide(self.policy.language(), script.root(), grants) {
             // Nothing to install and — the part worth stating — nothing to clear. The `require`
             // sitting in the globals table is the one `package` brought with it when the state was
             // opened, and it is part of what this surface promises.
             RequireDisposition::Native => Ok(()),
             RequireDisposition::Confined(root) => RequireLoader::new(root).install(&self.lua),
+            RequireDisposition::Refused => RequireLoader::install_refusal(
+                &self.lua,
+                access::detail(grants, HostAccess::Require),
+            ),
             RequireDisposition::Absent => RequireLoader::remove(&self.lua),
         }
     }
@@ -455,9 +463,10 @@ mod tests {
     use serde_json::json;
 
     use super::Engine;
+    use crate::error::Error;
     use crate::modules::{Ext, HostModule, InstallContext, ModuleSet, stdlib};
     use crate::{
-        EventName, ExhaustedLimit, InstructionLimit, MemoryLimit, ModuleName, Policy,
+        EventName, ExhaustedLimit, GrantSet, InstructionLimit, MemoryLimit, ModuleName, Policy,
         ResourceLimits, RootTable, Script,
     };
 
@@ -808,7 +817,7 @@ mod tests {
     }
 
     #[test]
-    fn a_pure_policy_gives_no_require_even_to_a_script_on_disk() {
+    fn a_pure_policy_gives_a_refusing_require_to_a_script_on_disk() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("lib.lua"), "return 1").unwrap();
         let path = dir.path().join("main.lua");
@@ -816,7 +825,38 @@ mod tests {
 
         let engine = Engine::builder().policy(Policy::pure()).build().unwrap();
         let script = Script::from_file(&path).unwrap();
-        assert_eq!(engine.eval_to::<String>(&script).unwrap(), "nil");
+        assert_eq!(engine.eval_to::<String>(&script).unwrap(), "function");
+
+        std::fs::write(&path, "return require('lib')").unwrap();
+        let err = engine.eval(&Script::from_file(&path).unwrap()).unwrap_err();
+        assert!(
+            matches!(
+                crate::test_support::raised(&err),
+                Some(Error::RequireDenied { .. })
+            ),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn a_confined_policy_with_sealed_grants_refuses_require() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("lib.lua"), "return 1").unwrap();
+        let path = dir.path().join("main.lua");
+        std::fs::write(&path, "return require('lib')").unwrap();
+
+        let engine = Engine::builder()
+            .policy(Policy::confined().with_grants(GrantSet::sealed()))
+            .build()
+            .unwrap();
+        let err = engine.eval(&Script::from_file(&path).unwrap()).unwrap_err();
+        assert!(
+            matches!(
+                crate::test_support::raised(&err),
+                Some(Error::RequireDenied { .. })
+            ),
+            "{err}"
+        );
     }
 
     #[test]

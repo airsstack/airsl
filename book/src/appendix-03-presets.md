@@ -10,7 +10,11 @@
 | `load`, `loadstring`, `dofile`, `loadfile` | yes | no | no |
 | `os.execute`, `exit`, `getenv`, `remove`, `rename`, `tmpname`, `setlocale` | yes | no | no |
 | `os.time`, `os.clock`, `os.date` | yes | yes | no |
-| `require` | Lua's own | the script's folder only | none |
+| `print` | yes | yes | no |
+| `math.random` | different each run | different each run | the same each run |
+| `math.randomseed()` with no seed | yes | yes | refused |
+| Host access | all seven members | all seven members | none |
+| `require` | Lua's own | the script's folder only | refused; with the `require` member, the script's folder only |
 | `airsstack` modules | all, unrestricted | all, only what is granted | all, only what is granted |
 | Memory limit | none | 64 MiB | 16 MiB |
 | Instruction limit | none | 100 million | 10 million |

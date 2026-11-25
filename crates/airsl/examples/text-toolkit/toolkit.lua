@@ -1,16 +1,25 @@
--- Real text work under an empty grant set: parsing, matching, hashing, formatting, globbing.
+-- Real text work under `pure` plus two host-access members, `stdout` and `clock`: parsing,
+-- matching, hashing, formatting, globbing.
 --
--- Nothing below is *permitted* by a grant, because there is nothing here to permit. `regex`,
--- `path`, `hash`, `time` and `glob.match` compute over the arguments they are handed and reach
--- nothing outside them, which is why they are installed whole even under the pure preset.
+-- Nothing below needs a file, a variable or a program. `regex`, `path`, `hash`, `time` and
+-- `glob.match` compute over the arguments they are handed, which is why they are installed whole
+-- even under the pure preset. Three of their functions read the host and so need a host access
+-- member: `time.now` and `time.monotonic` need `clock`, and `path.absolute` needs `cwd`. The two
+-- members the host grants are `stdout`, because `pure` has no `print` and the output goes through
+-- `airsstack.stdio.write`, and `clock`, because `time.monotonic` reads the monotonic clock.
 --
--- Two functions that need no grant are still absent from this file on purpose. `time.now` and
--- `path.absolute` need no authority, but they read the wall clock and the process working
--- directory — so their results differ between two runs on one machine, and this example's output
--- has to be checkable against its own README.
+-- Two functions are still absent from this file on purpose. `time.now` and `path.absolute` read
+-- the wall clock and the process working directory — so their results differ between two runs on
+-- one machine, and this example's output has to be checkable against its own README.
 
---- The corpus, written into the script rather than read from a file: reading one would need the
---- read grant this example exists to do without.
+--- One line to standard output. The `pure` surface has no `print`, and `stdio.write` adds no
+--- newline of its own, so the line break is supplied here.
+local function say(line)
+  airsstack.stdio.write(line .. "\n")
+end
+
+--- The corpus, written into the script rather than read from a file: reading one would need a
+--- read grant this example does not hold.
 local LOG = table.concat({
   "2023-11-14T22:13:20Z INFO  engine builds the state in 4 ms",
   "2023-11-14T22:13:21Z WARN  fs denied: /etc/shadow is outside the granted read roots",
@@ -25,7 +34,7 @@ local TARGET = airsstack.path.join("crates", "airsl", "examples", "text-toolkit"
 
 -- --- regex: one compiled pattern, applied five times ---------------------------------------
 
-print("regex")
+say("regex")
 
 -- `split` on a real expression is what replaces the `string.gmatch("[^\n]+")` dance, and unlike
 -- that dance it does not silently drop an empty field.
@@ -54,7 +63,7 @@ for _, line in ipairs(lines) do
   stamps[#stamps + 1] = caught.stamp
 end
 
-print("  split gave " .. #lines .. " lines, all matched by one compiled pattern")
+say("  split gave " .. #lines .. " lines, all matched by one compiled pattern")
 
 -- `pairs` walks a table in Lua's hash order, which differs between runs. Sorting the keys is what
 -- makes this line printable at all — the same reason the host sorts JSON keys and directory
@@ -67,72 +76,69 @@ table.sort(levels)
 for index, level in ipairs(levels) do
   levels[index] = level .. "=" .. counts[level]
 end
-print("  levels: " .. table.concat(levels, " "))
-print("  group 3 and the name `module` are the same span: " .. tostring(named_and_numbered_agree))
+say("  levels: " .. table.concat(levels, " "))
+say("  group 3 and the name `module` are the same span: " .. tostring(named_and_numbered_agree))
 
 local found = airsstack.regex.find_all([[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z]], LOG)
-print("  find_all timestamps: " .. #found .. ", first " .. found[1])
+say("  find_all timestamps: " .. #found .. ", first " .. found[1])
 
 -- A replacement can refer to a capture, so the part of the match to keep does not have to be
 -- rebuilt by hand. `${1}` rather than `$1`, because `$1<path>` would read as a group named `1`
 -- followed by nothing this pattern defines.
-print("  replace_all: " .. airsstack.regex.replace_all([[(denied: )/\S+]], lines[2], "${1}<path>"))
+say("  replace_all: " .. airsstack.regex.replace_all([[(denied: )/\S+]], lines[2], "${1}<path>"))
 
 -- --- path: separators, and no filesystem at all ---------------------------------------------
 
-print("")
-print("path")
-print("  join:        " .. TARGET)
-print("  dirname:     " .. airsstack.path.dirname(TARGET))
-print("  basename:    " .. airsstack.path.basename(TARGET))
-print("  stem / ext:  " .. airsstack.path.stem(TARGET) .. " / " .. airsstack.path.ext(TARGET))
+say("")
+say("path")
+say("  join:        " .. TARGET)
+say("  dirname:     " .. airsstack.path.dirname(TARGET))
+say("  basename:    " .. airsstack.path.basename(TARGET))
+say("  stem / ext:  " .. airsstack.path.stem(TARGET) .. " / " .. airsstack.path.ext(TARGET))
 
 -- Lexical: `..` cancels the component before it textually, without asking whether either exists.
 -- That also means normalising is not a containment check — confinement is decided against a
 -- canonical path, inside `fs`.
 local dotted = "crates/airsl/../airsl/./examples//toolkit.lua"
-print("  normalize:   " .. airsstack.path.normalize(dotted))
-print("  relative_to: " .. airsstack.path.relative_to(TARGET, "crates/airsl"))
+say("  normalize:   " .. airsstack.path.normalize(dotted))
+say("  relative_to: " .. airsstack.path.relative_to(TARGET, "crates/airsl"))
 
 -- Refuses rather than answering `../../elsewhere`: the caller asked where this is *under* that,
 -- and a path that is not under it has no answer to that question.
 local outside = pcall(airsstack.path.relative_to, TARGET, "crates/other")
-print("  relative_to refuses a path outside its base: " .. tostring(not outside))
-print(
-  "  is_absolute: "
-    .. tostring(airsstack.path.is_absolute(TARGET))
-    .. " here, "
-    .. tostring(airsstack.path.is_absolute("/etc/hosts"))
-    .. " for /etc/hosts"
-)
+say("  relative_to refuses a path outside its base: " .. tostring(not outside))
+-- Only the relative half is shown. Absoluteness follows the platform's own path grammar, and no
+-- literal is absolute on both: `/etc/hosts` is absolute on unix and only drive-relative on Windows,
+-- where `C:/Windows` is absolute and unix reads it as relative.
+say("  is_absolute: " .. tostring(airsstack.path.is_absolute(TARGET)))
 
 -- --- hash: content addressing over strings ---------------------------------------------------
 
-print("")
-print("hash")
+say("")
+say("hash")
 
 local body = "the grant is checked inside the host function, before the operation.\n"
-print("  sha256: " .. airsstack.hash.sha256(body))
-print("  sha1:   " .. airsstack.hash.sha1(body))
+say("  sha256: " .. airsstack.hash.sha256(body))
+say("  sha1:   " .. airsstack.hash.sha1(body))
 
 -- The Lua spelling of `shasum | cut -c1-8`: a short key naming an artifact, where the hash was
 -- never chosen for its strength. SHA-1 ships for that case and for no other.
-print("  cache key from sha1(path): " .. string.sub(airsstack.hash.sha1(TARGET), 1, 8))
-print("  hex: " .. airsstack.hash.hex("airsl"))
+say("  cache key from sha1(path): " .. string.sub(airsstack.hash.sha1(TARGET), 1, 8))
+say("  hex: " .. airsstack.hash.hex("airsl"))
 
 -- --- time: an instant the host supplies, never one the clock does ---------------------------
 
-print("")
-print("time")
+say("")
+say("time")
 
 -- The instant comes out of the corpus, which is why this line is the same on every run. `format`
 -- takes an explicit instant for exactly this reason — there is no "now" default to fall into.
 local seconds = airsstack.time.parse(stamps[1])
-print("  parse " .. stamps[1] .. " -> " .. seconds)
-print("  format:          " .. airsstack.time.format(seconds))
-print("  format %Y-%m-%d: " .. airsstack.time.format(seconds, "%Y-%m-%d"))
+say("  parse " .. stamps[1] .. " -> " .. seconds)
+say("  format:          " .. airsstack.time.format(seconds))
+say("  format %Y-%m-%d: " .. airsstack.time.format(seconds, "%Y-%m-%d"))
 local round_tripped = airsstack.time.parse(airsstack.time.format(seconds))
-print("  parse(format(t)) == t: " .. tostring(round_tripped == seconds))
+say("  parse(format(t)) == t: " .. tostring(round_tripped == seconds))
 
 -- `monotonic` is a reading, not a fact: printing one would put a different number in the output on
 -- every run. The property is what is printable, and it is the property a script measuring a
@@ -144,21 +150,21 @@ for i = 1, 10000 do
 end
 assert(sum == 50005000, "the loop between the two readings did not run")
 local after = airsstack.time.monotonic()
-print("  monotonic is non-decreasing across two reads: " .. tostring(after >= before))
+say("  monotonic is non-decreasing across two reads: " .. tostring(after >= before))
 
 -- --- glob: matching a path that is only a string ---------------------------------------------
 
-print("")
-print("glob")
+say("")
+say("glob")
 
 for _, pattern in ipairs({ "*.lua", "**/*.lua", "crates/**/text-toolkit/*.lua", "**/*.rs" }) do
-  print(string.format("  %-30s %s", pattern, tostring(airsstack.glob.match(pattern, TARGET))))
+  say(string.format("  %-30s %s", pattern, tostring(airsstack.glob.match(pattern, TARGET))))
 end
 
 -- `*` stops at a separator, so the first pattern above is false for the nested path and true here.
 -- The looser reading would let a rule declaring `*.lua` apply to files its author never named.
 local bare = airsstack.glob.match("*.lua", "toolkit.lua")
-print(string.format("  %-30s %s", "*.lua, against toolkit.lua", tostring(bare)))
+say(string.format("  %-30s %s", "*.lua, against toolkit.lua", tostring(bare)))
 
 -- `glob.walk` is the other half of this module and is deliberately not called: it reads
 -- directories, goes through the same guard `fs` does, and would need a read grant.

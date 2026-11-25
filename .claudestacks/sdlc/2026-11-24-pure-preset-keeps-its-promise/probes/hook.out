@@ -1,0 +1,4 @@
+# airsl 0.1.6 (checkout f281887)
+$ printf '{"a":1}' | airsl run --policy pure hook.lua
+{"got":1}
+exit=0
