@@ -18,9 +18,10 @@ cargo make examples
 
 The gate, `cargo make dod`, is what keeps the `## Output` blocks true: its tests include the
 `docs-check` crate, which runs each example and fails unless the block of its README is exactly what
-the example printed. Every example needs such a block, or a `no-output` marker file holding the
-reason and its name in the `EXPECTED_NO_OUTPUT` list of `crates/docs-check/src/examples.rs`. The
-same crate fails if a README or `CLAUDE.md` cites a `.rs` source path that does not exist, or cites
+the example printed. An example that prints a different path on Windows adds a `### Windows`
+sub-heading inside `## Output`, and on Windows the first block under it is the one compared. Every
+example needs an `## Output` block, or a `no-output` marker file holding the reason and its name in
+the `EXPECTED_NO_OUTPUT` list of `crates/docs-check/src/examples.rs`. The same crate fails if a README or `CLAUDE.md` cites a `.rs` source path that does not exist, or cites
 one with a line number.
 
 `cargo make examples` is not part of the gate. CI runs it as a separate step, and it covers what the

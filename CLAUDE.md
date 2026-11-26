@@ -36,7 +36,9 @@ doctests need their own run because `--all-targets` excludes them.
 The tests step also runs `crates/docs-check`, the unpublished member that guards the prose. It
 checks these four things and nothing else:
 
-- Each example README's `## Output` block equals what the example prints. An example with no block
+- Each example README's `## Output` block equals what the example prints. Where Windows prints
+  something else (a path that starts with a drive), the first block under a `### Windows`
+  sub-heading inside `## Output` is what Windows must print instead. An example with no block
   must carry a `no-output` marker file holding the reason, and be named in `EXPECTED_NO_OUTPUT` in
   `crates/docs-check/src/examples.rs`; an example with a `unix-only` marker file must be named in
   `EXPECTED_UNIX_ONLY` there. The `examples` task of `Makefile.toml` may compare output with the

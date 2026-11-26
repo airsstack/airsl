@@ -37,7 +37,11 @@ word-count: {"longest":"quick","words":9}
 ```
 
 The `fs.read` value is the filesystem root, which `main.rs`'s `OUTSIDE_ROOT` spells for each
-platform. Above is unix. On Windows it is the drive root:
+platform. Above is unix.
+
+### Windows
+
+On Windows the `fs.read` value is the drive root:
 
 ```
 loaded: word-count

@@ -10,6 +10,13 @@
 //! `## Output` block, or a marker file named `no-output` whose text is the reason there is none.
 //! A marker file named `unix-only` excuses an example from running on Windows.
 //!
+//! An example whose output names something each platform spells its own way, such as the
+//! filesystem root, keeps the block every other platform prints first and adds a `### Windows`
+//! sub-heading inside `## Output` whose first block is what Windows prints instead. Windows is the
+//! one platform that differs because a path there starts with a drive, while Linux and macOS share
+//! the unix spelling, so one heading covers every case the examples have; a Windows block with no
+//! shared block before it is refused, so no platform is left without an expectation.
+//!
 //! A passing test prints nothing a reader sees, so an excused example cannot be reported by name
 //! as it is skipped. Instead the excusals are an explicit list in this file (`EXPECTED_NO_OUTPUT`
 //! and `EXPECTED_UNIX_ONLY`) that `every_marker_file_is_named_in_its_expected_list` asserts the
@@ -29,8 +36,8 @@
 //!
 //! Responsibilities:
 //!
-//! - Running each example and comparing its stdout with its README's `## Output` block, line
-//!   endings folded.
+//! - Running each example and comparing its stdout with its README's `## Output` block for the
+//!   current platform, line endings folded.
 //! - Requiring every example to have a block or an explicit `no-output` marker.
 //! - Asserting the marked examples against the expected lists.
 //! - Keeping the `examples` task of `Makefile.toml` from comparing an example's output with README
@@ -205,27 +212,77 @@ fn example_command(cargo: &Path, build: &OuterBuild, root: &Path, name: &str) ->
     command
 }
 
-/// The text of the first fenced block under a `## Output` heading, without its trailing newlines.
-///
-/// `None` when the document has no such heading, or the heading is followed by another heading
-/// before any fence.
-fn output_block(readme: &str) -> Option<String> {
-    let text = normalize(readme);
-    let mut lines = text.lines();
-    lines.find(|line| line.trim_end() == "## Output")?;
-    let mut lines = lines.skip_while(|line| !line.starts_with("```") && !line.starts_with("## "));
-    let opener = lines.next()?;
-    if !opener.starts_with("```") {
-        return None;
+/// The platform an example runs on, as far as which output block it is held to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Platform {
+    /// Windows, held to a `### Windows` block when the README has one.
+    Windows,
+    /// Every other platform, held to the shared block.
+    Other,
+}
+
+impl Platform {
+    /// The platform this test binary was built for.
+    const fn current() -> Self {
+        if cfg!(windows) {
+            Self::Windows
+        } else {
+            Self::Other
+        }
     }
-    let body: Vec<&str> = lines.take_while(|line| !line.starts_with("```")).collect();
-    Some(body.join("\n").trim_end_matches('\n').to_owned())
+}
+
+/// The fenced blocks of a README's `## Output` section, each without its trailing newlines.
+#[derive(Debug, Default, PartialEq, Eq)]
+struct OutputBlocks {
+    /// The first fence outside a `### Windows` sub-section: what every platform prints, Windows
+    /// included when it has no block of its own.
+    shared: Option<String>,
+    /// The first fence inside a `### Windows` sub-section: what Windows prints instead.
+    windows: Option<String>,
+}
+
+/// The blocks of the `## Output` section, which ends at the next first- or second-level heading.
+///
+/// Both are `None` when the document has no such heading, or no fence before the section ends. A
+/// `###` heading other than `### Windows` ends a Windows sub-section, so a fence under it is read
+/// as shared.
+fn output_blocks(readme: &str) -> OutputBlocks {
+    let text = normalize(readme);
+    let mut blocks = OutputBlocks::default();
+    let mut lines = text.lines();
+    if !lines.any(|line| line.trim_end() == "## Output") {
+        return blocks;
+    }
+    let mut in_windows = false;
+    while let Some(line) = lines.next() {
+        if line.starts_with("```") {
+            // The body is consumed here, so a `#` line inside a fence is never read as a heading.
+            let body: Vec<&str> = lines
+                .by_ref()
+                .take_while(|line| !line.starts_with("```"))
+                .collect();
+            let slot = if in_windows {
+                &mut blocks.windows
+            } else {
+                &mut blocks.shared
+            };
+            if slot.is_none() {
+                *slot = Some(body.join("\n").trim_end_matches('\n').to_owned());
+            }
+        } else if line.starts_with("# ") || line.starts_with("## ") {
+            break;
+        } else if let Some(heading) = line.strip_prefix("### ") {
+            in_windows = heading.trim_end() == "Windows";
+        }
+    }
+    blocks
 }
 
 /// What an example directory promises about its output.
 #[derive(Debug, PartialEq, Eq)]
 enum Expectation {
-    /// The README's `## Output` block, which the example must print exactly.
+    /// The README's `## Output` block for this platform, which the example must print exactly.
     Output(String),
     /// A `no-output` marker excuses the example from having a block.
     Exempt,
@@ -233,22 +290,52 @@ enum Expectation {
     Unstated(String),
 }
 
-/// Reads an example directory's expectation.
-fn expectation(dir: &Path) -> Expectation {
+/// Reads an example directory's expectation on `platform`.
+fn expectation(dir: &Path, platform: Platform) -> Expectation {
     let readme = fs::read_to_string(dir.join("README.md")).ok();
-    let block = readme.as_deref().and_then(output_block);
+    let blocks = readme.as_deref().map(output_blocks).unwrap_or_default();
     let marked = dir.join("no-output").is_file();
-    match (block, marked, readme.is_some()) {
-        (Some(_), true, _) => Expectation::Unstated(
+    match (blocks, marked, readme.is_some()) {
+        (
+            OutputBlocks {
+                shared: None,
+                windows: None,
+            },
+            true,
+            _,
+        ) => Expectation::Exempt,
+        (_, true, _) => Expectation::Unstated(
             "it has a `no-output` marker and an `## Output` block; keep one".to_owned(),
         ),
-        (Some(block), false, _) => Expectation::Output(block),
-        (None, true, _) => Expectation::Exempt,
-        (None, false, true) => Expectation::Unstated(
+        (
+            OutputBlocks {
+                shared: Some(shared),
+                windows,
+            },
+            false,
+            _,
+        ) => Expectation::Output(match platform {
+            Platform::Windows => windows.unwrap_or(shared),
+            Platform::Other => shared,
+        }),
+        // Refused on every platform, not only where the shared block would be read, so a README
+        // that cannot be checked off Windows fails on the platform its author ran it on.
+        (
+            OutputBlocks {
+                shared: None,
+                windows: Some(_),
+            },
+            false,
+            _,
+        ) => Expectation::Unstated(
+            "its `## Output` section has a `### Windows` block but no block before it for the other platforms"
+                .to_owned(),
+        ),
+        (_, false, true) => Expectation::Unstated(
             "its README has no `## Output` block (add one, or a `no-output` marker file holding the reason)"
                 .to_owned(),
         ),
-        (None, false, false) => Expectation::Unstated(
+        (_, false, false) => Expectation::Unstated(
             "it has no README.md (add one with an `## Output` block, or a `no-output` marker file holding the reason)"
                 .to_owned(),
         ),
@@ -284,8 +371,34 @@ mod tests {
     fn output_block_is_the_first_fence_under_the_heading() {
         let readme = "# t\n\n## Run\n\n```bash\ncargo run\n```\n\n## Output\n\n```\nline one\n\nline three\n```\n\n## Next\n\n```\nnot this\n```\n";
         assert_eq!(
-            output_block(readme).as_deref(),
+            output_blocks(readme).shared.as_deref(),
             Some("line one\n\nline three")
+        );
+    }
+
+    #[test]
+    fn a_windows_block_is_read_apart_from_the_shared_one_and_a_fenced_heading_is_not_a_heading() {
+        let readme = "## Output\n\n```\nunix\n## not a heading\n```\n\nprose\n\n```\nsecond\n```\n\n\
+            ### Windows\n\nOn Windows:\n\n```\nwindows\n```\n\n### Notes\n\n```\nnotes\n```\n\n## Next\n";
+        assert_eq!(
+            output_blocks(readme),
+            OutputBlocks {
+                shared: Some("unix\n## not a heading".to_owned()),
+                windows: Some("windows".to_owned()),
+            }
+        );
+    }
+
+    #[test]
+    fn a_fence_under_another_sub_heading_after_windows_is_shared() {
+        let readme =
+            "## Output\n\n### Windows\n\n```\nwindows\n```\n\n### Unix\n\n```\nunix\n```\n";
+        assert_eq!(
+            output_blocks(readme),
+            OutputBlocks {
+                shared: Some("unix".to_owned()),
+                windows: Some("windows".to_owned()),
+            }
         );
     }
 
@@ -293,16 +406,19 @@ mod tests {
     fn output_block_ignores_crlf_line_endings() {
         let lf = "## Output\n\n```\na\nb\n```\n";
         let crlf = lf.replace('\n', "\r\n");
-        assert_eq!(output_block(&crlf), output_block(lf));
-        assert_eq!(output_block(&crlf).as_deref(), Some("a\nb"));
+        assert_eq!(output_blocks(&crlf), output_blocks(lf));
+        assert_eq!(output_blocks(&crlf).shared.as_deref(), Some("a\nb"));
     }
 
     #[test]
     fn output_block_is_absent_without_a_heading_or_before_the_next_heading() {
-        assert_eq!(output_block("# t\n\n```\nx\n```\n"), None);
         assert_eq!(
-            output_block("## Output\n\nprose only\n\n## Next\n\n```\nx\n```\n"),
-            None
+            output_blocks("# t\n\n```\nx\n```\n"),
+            OutputBlocks::default()
+        );
+        assert_eq!(
+            output_blocks("## Output\n\nprose only\n\n## Next\n\n```\nx\n```\n"),
+            OutputBlocks::default()
         );
     }
 
@@ -371,22 +487,74 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let dir = tmp.path();
         assert!(
-            matches!(expectation(dir), Expectation::Unstated(why) if why.contains("no README.md"))
+            matches!(expectation(dir, Platform::Other), Expectation::Unstated(why) if why.contains("no README.md"))
         );
 
         fs::write(dir.join("README.md"), "# t\n\n## Output\n\nprose only\n").unwrap();
         assert!(
-            matches!(expectation(dir), Expectation::Unstated(why) if why.contains("no `## Output` block"))
+            matches!(expectation(dir, Platform::Other), Expectation::Unstated(why) if why.contains("no `## Output` block"))
         );
 
         fs::write(dir.join("no-output"), "prints nothing").unwrap();
-        assert_eq!(expectation(dir), Expectation::Exempt);
+        assert_eq!(expectation(dir, Platform::Other), Expectation::Exempt);
 
         fs::write(dir.join("README.md"), "## Output\n\n```\nhi\n```\n").unwrap();
-        assert!(matches!(expectation(dir), Expectation::Unstated(why) if why.contains("keep one")));
+        assert!(
+            matches!(expectation(dir, Platform::Other), Expectation::Unstated(why) if why.contains("keep one"))
+        );
 
         fs::remove_file(dir.join("no-output")).unwrap();
-        assert_eq!(expectation(dir), Expectation::Output("hi".to_owned()));
+        assert_eq!(
+            expectation(dir, Platform::Other),
+            Expectation::Output("hi".to_owned())
+        );
+    }
+
+    #[test]
+    fn windows_is_held_to_its_own_block_and_falls_back_to_the_shared_one() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path();
+        fs::write(dir.join("README.md"), "## Output\n\n```\n/\n```\n").unwrap();
+        assert_eq!(
+            expectation(dir, Platform::Windows),
+            Expectation::Output("/".to_owned())
+        );
+
+        fs::write(
+            dir.join("README.md"),
+            "## Output\n\n```\n/\n```\n\n### Windows\n\n```\nC:/\n```\n",
+        )
+        .unwrap();
+        assert_eq!(
+            expectation(dir, Platform::Windows),
+            Expectation::Output("C:/".to_owned())
+        );
+        assert_eq!(
+            expectation(dir, Platform::Other),
+            Expectation::Output("/".to_owned())
+        );
+    }
+
+    #[test]
+    fn a_windows_block_alone_is_refused_on_every_platform_and_counts_against_a_marker() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path();
+        fs::write(
+            dir.join("README.md"),
+            "## Output\n\n### Windows\n\n```\nC:/\n```\n",
+        )
+        .unwrap();
+        for platform in [Platform::Windows, Platform::Other] {
+            assert!(
+                matches!(expectation(dir, platform), Expectation::Unstated(why) if why.contains("no block before it")),
+                "{platform:?}"
+            );
+        }
+
+        fs::write(dir.join("no-output"), "prints nothing").unwrap();
+        assert!(
+            matches!(expectation(dir, Platform::Windows), Expectation::Unstated(why) if why.contains("keep one"))
+        );
     }
 
     #[test]
@@ -431,7 +599,7 @@ mod tests {
         let mut checked = 0_usize;
         for dir in dirs {
             let name = dir.file_name().unwrap().to_string_lossy().into_owned();
-            let expected = match expectation(&dir) {
+            let expected = match expectation(&dir, Platform::current()) {
                 Expectation::Output(block) => block,
                 Expectation::Exempt => continue,
                 Expectation::Unstated(why) => {
@@ -469,7 +637,8 @@ mod tests {
             if actual != expected {
                 let _ = write!(
                     failures,
-                    "example `{name}`: its output differs from the `## Output` block in {}\n--- README shows\n{expected}\n--- example printed\n{actual}\n",
+                    "example `{name}`: its output differs from the `## Output` block for {:?} in {}\n--- README shows\n{expected}\n--- example printed\n{actual}\n",
+                    Platform::current(),
                     dir.join("README.md").display(),
                 );
             }
