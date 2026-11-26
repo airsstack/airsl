@@ -205,3 +205,13 @@ Quoted measurements are a snapshot from `cargo bench -p airsl` on one machine, n
 
 Commits follow Conventional Commits with a scope naming the affected area (`fix(ci):`,
 `chore(workspace):`, `docs:`).
+
+## Working in this repository with Claude
+
+- The main thread is for discussion with the author and progress reports only. Every job goes to a
+  subagent, however small: reading or searching files, probes, builds, gate runs, edits, status
+  flips, and verification. Batch independent jobs into parallel subagents.
+- The main thread reports only the outcome of each job, never the job's raw output.
+- Keep the author's machine responsive: cargo runs with `CARGO_BUILD_JOBS=2`, builds run one at a
+  time, at most one Docker container runs at once, and no emulated-architecture builds run
+  locally (use a CI runner for another architecture).
