@@ -1,0 +1,128 @@
+# Probe 236 — where the rock jobs get <version>: the release tag dist hands the publish job, and the airsl-cli version every plan carries
+question: plan-set review finding 2 (spec §10.3, §5.6.4) and the build-rocks half of finding 1 (§9.4): (a) for this repository at
+  HEAD, what announcement_tag and releases[].app_version does dist 0.33.1 put in the plan for the release tag airsl-cli-v0.2.0, and
+  for a pull request (no tag)? Does dist refuse a tag whose version is not the package's, or does not parse? (b) does the publish
+  job's reading (jq -r '.announcement_tag // ""', then the bash test ^airsl-cli-v([0-9]+\.[0-9]+\.[0-9]+)$) give the version, and
+  the spec's message for every other plan: the PR plan, null, missing, empty plan, empty string, short, prerelease, the library's
+  tag, a number, a trailing newline, non-JSON? (c) does build-rocks' reading (the single airsl-cli release's app_version) give the
+  version on both plans, and its messages otherwise? (d) can a tag name end in a newline? (e) does build-rocks' file test
+  (files.sh) find both rockspecs named from the version, and name the first missing one?
+versions: cargo-dist 0.33.1 (dist-workspace.toml:7); jq-1.7.1-apple; GNU bash 3.2.57 (macOS 26.3.1 arm64); git as printed. The
+  ubuntu-26.04 runner has Bash 5.3.9 and jq 1.8.1 (probes/47-ci-lua-tooling/runner-images/Ubuntu2604-Readme.md:16, :78); those were
+  not run with these scripts. Probe 220 ran the same input path on that runner: the publish job got `inputs.plan` as env PLAN
+  (probes/220-publish-downloads-build-artifacts.txt:298, echoed :301), and the build job's `jq -r .announcement_tag <<<"$PLAN"`
+  printed "airsl-cli-v0.0.0" (:50, :60).
+setup: a copy of HEAD made with `git archive HEAD` in a scratch directory (git-initialised so dist sees a repository), deleted after.
+  `dist plan --tag=…` is the plan step of airsl-cli-release.yml:80 for a pull request; a tag push runs `dist host --steps=create
+  --tag=<ref_name>` there instead, which needs a GitHub token and was not run. Sources: 236-release-version-source/tag.sh,
+  app-version.sh, files.sh.
+date: 2026-11-26
+--- raw output ---
+$ dist --version; jq --version; bash --version | head -1
+cargo-dist 0.33.1
+jq-1.7.1-apple
+GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)
+(a) dist plan in a copy of HEAD 9a1fbd8 (git archive), per tag; stderr kept except dist's needs_coherence note
+$ dist plan --tag=airsl-cli-v0.2.0 --output-format=json
+[exit 0]
+{"announcement_tag":"airsl-cli-v0.2.0","announcement_is_prerelease":false,"releases":[{"app_name":"airsl-cli","app_version":"0.2.0"}]}
+$ dist plan --output-format=json   (no tag: what a pull_request run gets)
+[exit 0]
+{"announcement_tag":"v0.2.0","announcement_is_prerelease":false,"releases":[{"app_name":"airsl-cli","app_version":"0.2.0"}]}
+$ dist plan --tag=airsl-cli-v0.3.0 --output-format=json
+  × The provided announcement tag (airsl-cli-v0.3.0) claims we're releasing airsl-cli 0.3.0, but that package is
+  │ version 0.2.0
+[exit 255]
+$ dist plan --tag=airsl-cli-v0.2 --output-format=json
+  × Couldn't parse the version from the provided announcement tag (airsl-cli-v0.2)
+  ╰─▶ unexpected end of input while parsing minor version number
+[exit 255]
+$ dist plan --tag=airsl-cli-v0.2.0-rc.1 --output-format=json
+  × The provided announcement tag (airsl-cli-v0.2.0-rc.1) claims we're releasing airsl-cli 0.2.0-rc.1, but that
+  │ package is version 0.2.0
+[exit 255]
+(b) tag.sh (publish-rocks) on each plan
+$ PLAN=<plan-tag.json> bash tag.sh
+version=0.2.0
+[exit 0]
+$ PLAN=<plan-pr.json> bash tag.sh
+publish-rocks: the release tag v0.2.0 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":"airsl-cli-v0.0.0","announcement_is_prerelease":false,"publish_prereleases":false,"artifacts":{}}' bash tag.sh
+version=0.0.0
+[exit 0]
+$ PLAN='{"announcement_tag":null}' bash tag.sh
+publish-rocks: the release plan names no tag; nothing was uploaded
+[exit 1]
+$ PLAN='{}' bash tag.sh
+publish-rocks: the release plan names no tag; nothing was uploaded
+[exit 1]
+$ PLAN='' bash tag.sh
+publish-rocks: the release plan names no tag; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":""}' bash tag.sh
+publish-rocks: the release plan names no tag; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":"airsl-cli-v0.2"}' bash tag.sh
+publish-rocks: the release tag airsl-cli-v0.2 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":"airsl-cli-v0.2.0-rc.1"}' bash tag.sh
+publish-rocks: the release tag airsl-cli-v0.2.0-rc.1 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":"airsl-v0.2.0"}' bash tag.sh
+publish-rocks: the release tag airsl-v0.2.0 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":5}' bash tag.sh
+publish-rocks: the release tag 5 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":"airsl-cli-v0.2.0
+"}' bash tag.sh
+version=0.2.0
+[exit 0]
+$ PLAN='not json' bash tag.sh
+jq: parse error: Invalid numeric literal at line 1, column 4
+publish-rocks: could not read the release plan: jq exit status 5
+[exit 1]
+(c) app-version.sh (build-rocks) on each plan
+$ PLAN=<plan-tag.json> bash app-version.sh
+version=0.2.0
+[exit 0]
+$ PLAN=<plan-pr.json> bash app-version.sh
+version=0.2.0
+[exit 0]
+$ PLAN='{"releases":[]}' bash app-version.sh
+build-rocks: the release plan names no single airsl-cli release
+[exit 1]
+$ PLAN='{}' bash app-version.sh
+build-rocks: the release plan names no single airsl-cli release
+[exit 1]
+$ PLAN='' bash app-version.sh
+build-rocks: the release plan names no single airsl-cli release
+[exit 1]
+$ PLAN='{"releases":[{"app_name":"airsl","app_version":"0.2.0"},{"app_name":"airsl-cli","app_version":"0.2.0"}]}' bash app-version.sh
+version=0.2.0
+[exit 0]
+$ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":"0.2"}]}' bash app-version.sh
+build-rocks: the release plan's airsl-cli version 0.2 is not <major>.<minor>.<patch>
+[exit 1]
+$ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":"0.2.0"},{"app_name":"airsl-cli","app_version":"0.3.0"}]}' bash app-version.sh
+build-rocks: the release plan names no single airsl-cli release
+[exit 1]
+$ PLAN='not json' bash app-version.sh
+jq: parse error: Invalid numeric literal at line 1, column 4
+build-rocks: could not read the release plan: jq exit status 5
+[exit 1]
+(d) can a tag name end in a newline (the one breaker tag.sh tolerates)?
+$ git check-ref-format 'refs/tags/airsl-cli-v0.2.0<LF>'
+[exit 1]
+$ git check-ref-format 'refs/tags/airsl-cli-v0.2.0'   (control)
+[exit 0]
+git version 2.39.3 (Apple Git-146)
+(e) files.sh (build-rocks file test) against probe 235's checkout tree <235src> = 235-rockspec-only-install-and-docs/src
+$ bash files.sh <235src> 0.2.0
+found crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec
+found crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec
+[exit 0]
+$ bash files.sh <235src> 0.3.0
+build-rocks: crates/airsl-lua/rockspecs/airsstack-0.3.0-1.rockspec is missing
+[exit 1]

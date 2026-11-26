@@ -1,0 +1,11 @@
+[package]
+name = "p244"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+# The workspace's own declaration (Cargo.toml:48), pinned to the Cargo.lock version (1.2.2+spec-1.1.0), as probe 238.
+toml = { version = "=1.2.2", default-features = false, features = ["std", "serde", "parse"] }

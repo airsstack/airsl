@@ -1,0 +1,71 @@
+# Probe 249 — `{toml error}` in form B: toml 1.2.2's first error line, `: `, then the reason line
+question: author decision 2026-11-26 (form B for docs-check's "is not valid TOML" message, spec §5.6.3): `{toml error}` is the
+  first line of toml's error Display, then ": ", then the reason. Which line is the reason, and does the rule give one non-empty
+  line for every kind of invalid manifest? The rule probed (src/main.rs `toml_error`): split the Display with `str::lines`;
+  keep the first line; the reason is the last line after the first that is not empty; when there is none (a Display of one
+  line), `{toml error}` is the first line alone. Cases: probe 244's six, then kinds chosen to break it: a CRLF file, an error
+  with no span (the key recursion limit, 100 dotted parts: toml's `de/parser/key.rs:67-68` reports `ParseError::new("recursion
+  limit")` with no `with_unexpected`, and `de/error.rs:117-160` prints the source excerpt only when there is a span), nesting
+  past the parser's depth limit, a date-time error (text from toml_datetime), `\n` in the expected list (`render_literal`
+  prints it as "newline", `de/error.rs:93-96`), a bare carriage return, an invalid escape, an error at the end of a file with no
+  final newline, a dotted key extending a value.
+answer: every error with a span prints five lines (the position line, a three-line excerpt, the reason) and the reason is one
+  non-empty line; the message becomes, e.g., "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 1, column 9:
+  unclosed table, expected `]`". The error with no span prints one line, "recursion limit", and no position: the first line is
+  then NOT "TOML parse error at …", and the rule gives "… is not valid TOML: recursion limit". No case gave a reason of several
+  lines or an empty one. A CRLF file's excerpt line keeps its `\r` ("1 | [package\r\n"), which `str::lines` leaves on the
+  excerpt line only; the first and last lines carry none.
+versions: rustc/cargo 1.94.1 (the repository's rust-toolchain.toml, copied); toml 1.2.2+spec-1.1.0 with the workspace's features
+  (std, serde, parse; Cargo.toml:48) and the workspace's Cargo.lock versions of its dependencies, pinned in this probe's
+  Cargo.lock (toml_parser 1.1.6+spec-1.1.0, toml_datetime 1.1.3+spec-1.1.0, serde_core 1.0.229, serde_spanned 1.1.3, winnow
+  1.0.5; `cargo tree` below). (Probe 244 had no lock file, so it did not pin toml_parser; its six cases print the same Display here,
+  byte for byte, under the pinned 1.1.6.) macOS 26.3.1 arm64; built offline,
+  CARGO_BUILD_JOBS=2, in a scratch copy, target/ deleted. The same crate ran on the three GitHub runners: probe 251.
+sources: 249-toml-error-reason-line/ (Cargo.toml, Cargo.lock, rust-toolchain.toml, src/main.rs).
+date: 2026-11-26
+--- raw output ---
+$ cargo --version   (rust-toolchain.toml copied from the repository)
+cargo 1.94.1 (29ea6fb6a 2026-03-24)
+$ CARGO_BUILD_JOBS=2 cargo run --offline --locked --quiet
+unclosed header: Display has 5 lines; full = "TOML parse error at line 1, column 9\n  |\n1 | [package\n  |         ^\nunclosed table, expected `]`\n"
+unclosed header: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 1, column 9: unclosed table, expected `]`"
+missing value: Display has 5 lines; full = "TOML parse error at line 2, column 7\n  |\n2 | name =\n  |       ^\nstring values must be quoted, expected literal string\n"
+missing value: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 7: string values must be quoted, expected literal string"
+duplicate key: Display has 5 lines; full = "TOML parse error at line 3, column 1\n  |\n3 | name = \"b\"\n  | ^^^^\nduplicate key\n"
+duplicate key: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 3, column 1: duplicate key"
+unterminated string: Display has 5 lines; full = "TOML parse error at line 2, column 14\n  |\n2 | name = \"airsl\n  |              ^\ninvalid basic string, expected `\"`\n"
+unterminated string: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 14: invalid basic string, expected `\"`"
+error on line 3: Display has 5 lines; full = "TOML parse error at line 3, column 21\n  |\n3 | version.workspace = = true\n  |                     ^\nextra `=`, expected nothing\n"
+error on line 3: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 3, column 21: extra `=`, expected nothing"
+duplicate table: Display has 5 lines; full = "TOML parse error at line 2, column 2\n  |\n2 | [package]\n  |  ^^^^^^^\nduplicate key\n"
+duplicate table: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 2: duplicate key"
+crlf unclosed header: Display has 5 lines; full = "TOML parse error at line 1, column 9\n  |\n1 | [package\r\n  |         ^\nunclosed table, expected `]`\n"
+crlf unclosed header: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 1, column 9: unclosed table, expected `]`"
+dotted key of 100 parts: Display has 1 lines; full = "recursion limit\n"
+dotted key of 100 parts: message = "crates/airsl/Cargo.toml: is not valid TOML: recursion limit"
+arrays nested 100 deep: Display has 5 lines; full = "TOML parse error at line 1, column 85\n  |\n1 | x = [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\n  |                                                                                     ^\ncannot recurse further; max recursion depth met\n"
+arrays nested 100 deep: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 1, column 85: cannot recurse further; max recursion depth met"
+invalid date-time: Display has 5 lines; full = "TOML parse error at line 2, column 8\n  |\n2 | date = 2026-13-45\n  |        ^^^^^^^^^^\ninvalid date, expected month between 01 and 12\n"
+invalid date-time: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 8: invalid date, expected month between 01 and 12"
+two values on one line: Display has 5 lines; full = "TOML parse error at line 2, column 12\n  |\n2 | name = \"a\" version = \"b\"\n  |            ^\nunexpected key or value, expected newline, `#`\n"
+two values on one line: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 12: unexpected key or value, expected newline, `#`"
+bare carriage return: Display has 5 lines; full = "TOML parse error at line 2, column 12\n  |\n2 | name = \"a\"\r\r\n  |            ^\ncarriage return must be followed by newline, expected newline\n"
+bare carriage return: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 12: carriage return must be followed by newline, expected newline"
+invalid escape: Display has 5 lines; full = "TOML parse error at line 2, column 10\n  |\n2 | name = \"\\q\"\n  |          ^\nmissing escaped value, expected `b`, `e`, `f`, `n`, `r`, `\\`, `\"`, `x`, `u`, `U`\n"
+invalid escape: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 10: missing escaped value, expected `b`, `e`, `f`, `n`, `r`, `\\`, `\"`, `x`, `u`, `U`"
+end of file, no newline: Display has 5 lines; full = "TOML parse error at line 2, column 7\n  |\n2 | name =\n  |       ^\nstring values must be quoted, expected literal string\n"
+end of file, no newline: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 7: string values must be quoted, expected literal string"
+dotted key extends a value: Display has 5 lines; full = "TOML parse error at line 3, column 1\n  |\n3 | version.workspace = true\n  | ^^^^^^^\ncannot extend value of type integer with a dotted key\n"
+dotted key extends a value: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 3, column 1: cannot extend value of type integer with a dotted key"
+[exit 0]
+$ cargo tree --offline --locked
+p249 v0.0.0 (<scratch>/p249)
+└── toml v1.2.2+spec-1.1.0
+    ├── serde_core v1.0.229
+    ├── serde_spanned v1.1.3
+    │   └── serde_core v1.0.229
+    ├── toml_datetime v1.1.3+spec-1.1.0
+    │   └── serde_core v1.0.229
+    ├── toml_parser v1.1.6+spec-1.1.0
+    │   └── winnow v1.0.5
+    └── winnow v1.0.5

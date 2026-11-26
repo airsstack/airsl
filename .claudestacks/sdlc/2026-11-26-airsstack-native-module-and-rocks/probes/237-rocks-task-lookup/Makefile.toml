@@ -1,0 +1,53 @@
+# probe 237: the rocks task's tool lookup and rockspec lookup, in cargo-make's @duckscript.
+[config]
+skip_core_tasks = true
+
+# Control: the spec's old pattern <package>-*-1.rockspec.
+[tasks.old-glob]
+script_runner = "@duckscript"
+script = '''
+dir = get_env PROBE_DIR
+files = glob_array ${dir}/airsstack-*-1.rockspec
+n = array_length ${files}
+joined = array_join ${files} " "
+echo "old airsstack-*-1.rockspec -> ${n}: ${joined}"
+'''
+
+# The tool lookup, then the anchored pattern per package, then the version from the name.
+[tasks.rocks-lookup]
+script_runner = "@duckscript"
+script = '''
+luarocks = get_env AIRSL_LUAROCKS
+if is_empty ${luarocks}
+    luarocks = set luarocks
+end
+found = which ${luarocks}
+echo "which ${luarocks} -> [${found}]"
+if is_empty ${found}
+    echo "rocks: `${luarocks}` was not found; install LuaRocks or set AIRSL_LUAROCKS to its path"
+    exit 1
+end
+dir = get_env PROBE_DIR
+packages = array airsstack airsstack-luajit
+for package in ${packages}
+    files = glob_array ${dir}/${package}-[0-9]*-1.rockspec
+    n = array_length ${files}
+    if eq ${n} 0
+        echo "rocks: no `${package}-<version>-1.rockspec` in `${dir}`"
+        exit 1
+    end
+    if greater_than ${n} 1
+        names = array_join ${files} ", "
+        echo "rocks: ${n} files match `${package}-<version>-1.rockspec` in `${dir}` (${names}); docs-check allows one per package"
+        exit 1
+    end
+    rockspec = array_get ${files} 0
+    name = basename ${rockspec}
+    prefix = concat ${package} -
+    start = length ${prefix}
+    stop = length ${name}
+    stop = calc ${stop} - 11
+    version = substring ${name} ${start} ${stop}
+    echo "${package}: rockspec ${rockspec} version [${version}]"
+end
+'''

@@ -1,0 +1,69 @@
+# probe 247: how duckscript's `cd` moves the working directory inside one cargo-make task, and how the rocks task returns
+# to the workspace root after `pack` (spec §9.3 rocks row). `exec ls` stands for `luarocks make <relative rockspec>` and
+# for `<interpreter> crates/airsl-lua/lua/check.lua`; `exec touch` in target/rocks/dist stands for `luarocks pack`,
+# which writes into the working directory.
+[config]
+default_to_workspace = false
+skip_core_tasks = true
+
+[tasks.cd-probe]
+script_runner = "@duckscript"
+script = '''
+root = pwd
+echo "start: pwd [${root}]"
+wd = get_env CARGO_MAKE_WORKING_DIRECTORY
+echo "CARGO_MAKE_WORKING_DIRECTORY [${wd}]"
+mkdir ${root}/target/rocks/dist
+packages = array airsstack airsstack-luajit
+for package in ${packages}
+    exec --fail-on-error ls crates/airsl-lua/rockspecs/${package}-0.2.0-1.rockspec
+    cd ${root}/target/rocks/dist
+    here = pwd
+    echo "${package}: pack cwd [${here}]"
+    exec --fail-on-error touch ${package}-0.2.0-1.probe.rock
+    cd ${root}
+    here = pwd
+    echo "${package}: back at [${here}]"
+    exec --fail-on-error ls crates/airsl-lua/lua/check.lua
+end
+exec --fail-on-error ls target/rocks/dist
+'''
+
+# Control: without the `cd ${root}` after pack, the relative check.lua path is looked up in target/rocks/dist.
+[tasks.cd-control]
+script_runner = "@duckscript"
+script = '''
+root = pwd
+mkdir ${root}/target/rocks/dist
+cd ${root}/target/rocks/dist
+here = pwd
+echo "control: cwd [${here}]"
+exec --fail-on-error ls crates/airsl-lua/lua/check.lua
+echo "control: not reached"
+'''
+
+# What `cd` answers for a directory that does not exist, and where the task then stands.
+[tasks.cd-missing]
+script_runner = "@duckscript"
+script = '''
+root = pwd
+r = cd ${root}/no/such/dir
+echo "cd to a missing directory answered [${r}]"
+here = pwd
+echo "cwd after it [${here}]"
+'''
+
+# The check the rocks task makes after each `cd`: `cd` answers empty when it cannot change directory (cd-missing), so the
+# task tests the answer and fails with its own message rather than run `pack` or `check.lua` in the wrong directory.
+[tasks.cd-checked]
+script_runner = "@duckscript"
+script = '''
+root = pwd
+dir = set ${root}/no/such/dir
+entered = cd ${dir}
+if is_empty ${entered}
+    echo "rocks: could not change into `${dir}`"
+    exit 1
+end
+echo "not reached"
+'''

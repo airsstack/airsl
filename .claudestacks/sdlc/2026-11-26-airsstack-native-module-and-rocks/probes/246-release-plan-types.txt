@@ -1,0 +1,191 @@
+# Probe 246 — the release plan's JSON types: publish-rocks' tag read and build-rocks' app_version read, with wrong types named
+question: spec review round 2, finding R4 (spec §5.6.4, §5.6.6, §5.6.7): the round-1 snippets (probe 241 tag.sh, probe 236
+  app-version.sh) report any JSON that is not of the shape they index as "could not read the release plan" (`[1]`, `5`, `"x"`,
+  `{"releases":[5]}`) and read `"announcement_tag": false` as "names no tag". With each read rewritten as one `jq -r -s` program
+  that names the JSON type it met (jq's `type`, mapped to "null", "a boolean", "a number", "a string", "an array", "an object")
+  and counts the JSON texts of the input: (1) does every input of probes 236 (b)/(c) and 241 print what it printed there (all but
+  `{"announcement_tag":5}`, which now gets the wrong-type message by design)? (2) what does each wrong type, null, an empty
+  `app_version`, and two JSON texts print?
+versions: GNU bash 3.2.57 and jq 1.7.1 (macOS 26.3.1 arm64), the versions of probes 236 and 241. Not run under the runners' bash
+  5.3.9 / jq 1.8.1 (probe 242 ran the round-1 snippets there; the rewritten programs have not been).
+sources: 246-release-plan-types/tag.sh (publish-rocks), app-version.sh (build-rocks), run.sh (driver), plan-tag.json and plan-pr.json
+  (probe 241's copies of probe 236 (a)'s `dist plan` output).
+comparison: every line printed for an input that probe 241 (tag.sh) or probe 236 (c) (app-version.sh) also ran is identical to
+  that probe's, except `{"announcement_tag":5}` (probe 241: "publish-rocks: the release tag 5 is not airsl-cli-v<major>.<minor>.<patch>;
+  nothing was uploaded"). Probe 236 (c)'s two-airsl-cli-release input used versions 0.2.0 and 0.3.0; here both are 0.2.0; both
+  print the no-single-release message.
+date: 2026-11-26
+--- raw output ---
+$ bash --version | head -1; jq --version
+GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)
+jq-1.7.1-apple
+$ bash run.sh 246-release-plan-types
+## publish-rocks: tag.sh
+$ PLAN=<plan-tag.json> bash tag.sh
+version=0.2.0
+[exit 0]
+$ PLAN=<plan-pr.json> bash tag.sh
+publish-rocks: the release tag v0.2.0 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":"airsl-cli-v0.0.0","announcement_is_prerelease":false,"publish_prereleases":false,"artifacts":{}}' bash tag.sh
+version=0.0.0
+[exit 0]
+$ PLAN='{"announcement_tag":null}' bash tag.sh
+publish-rocks: the release plan names no tag; nothing was uploaded
+[exit 1]
+$ PLAN='{}' bash tag.sh
+publish-rocks: the release plan names no tag; nothing was uploaded
+[exit 1]
+$ PLAN='' bash tag.sh
+publish-rocks: the release plan names no tag; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":""}' bash tag.sh
+publish-rocks: the release plan names no tag; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":"airsl-cli-v0.2"}' bash tag.sh
+publish-rocks: the release tag airsl-cli-v0.2 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":"airsl-cli-v0.2.0-rc.1"}' bash tag.sh
+publish-rocks: the release tag airsl-cli-v0.2.0-rc.1 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":"airsl-v0.2.0"}' bash tag.sh
+publish-rocks: the release tag airsl-v0.2.0 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":"airsl-cli-v0.2.0\n"}' bash tag.sh
+version=0.2.0
+[exit 0]
+$ PLAN='{"announcement_tag":"airsl-cli-v0.2.0
+"}' bash tag.sh
+jq: parse error: Invalid string: control characters from U+0000 through U+001F must be escaped at line 2, column 1
+publish-rocks: could not read the release plan: jq exit status 5; nothing was uploaded
+[exit 1]
+$ PLAN='not json' bash tag.sh
+jq: parse error: Invalid numeric literal at line 1, column 4
+publish-rocks: could not read the release plan: jq exit status 5; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":5}' bash tag.sh
+publish-rocks: in the release plan, announcement_tag is a number, not a string; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":false}' bash tag.sh
+publish-rocks: in the release plan, announcement_tag is a boolean, not a string; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":true}' bash tag.sh
+publish-rocks: in the release plan, announcement_tag is a boolean, not a string; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":["airsl-cli-v0.2.0"]}' bash tag.sh
+publish-rocks: in the release plan, announcement_tag is an array, not a string; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":{}}' bash tag.sh
+publish-rocks: in the release plan, announcement_tag is an object, not a string; nothing was uploaded
+[exit 1]
+$ PLAN='[1]' bash tag.sh
+publish-rocks: in the release plan, the top level is an array, not an object; nothing was uploaded
+[exit 1]
+$ PLAN='5' bash tag.sh
+publish-rocks: in the release plan, the top level is a number, not an object; nothing was uploaded
+[exit 1]
+$ PLAN='"x"' bash tag.sh
+publish-rocks: in the release plan, the top level is a string, not an object; nothing was uploaded
+[exit 1]
+$ PLAN='null' bash tag.sh
+publish-rocks: in the release plan, the top level is null, not an object; nothing was uploaded
+[exit 1]
+$ PLAN='true' bash tag.sh
+publish-rocks: in the release plan, the top level is a boolean, not an object; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":"airsl-cli-v0.2.0"} {"announcement_tag":"airsl-cli-v0.2.0"}' bash tag.sh
+publish-rocks: the release plan holds 2 JSON values, not one; nothing was uploaded
+[exit 1]
+$ PLAN='{} 5' bash tag.sh
+publish-rocks: the release plan holds 2 JSON values, not one; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":"airsl-cli-v0.2.0"} not json' bash tag.sh
+jq: parse error: Invalid numeric literal at line 1, column 44
+publish-rocks: could not read the release plan: jq exit status 5; nothing was uploaded
+[exit 1]
+## build-rocks: app-version.sh
+$ PLAN=<plan-tag.json> bash app-version.sh
+version=0.2.0
+[exit 0]
+$ PLAN=<plan-pr.json> bash app-version.sh
+version=0.2.0
+[exit 0]
+$ PLAN='{"releases":[{"app_name":"airsl","app_version":"0.2.0"},{"app_name":"airsl-cli","app_version":"0.2.0"}]}' bash app-version.sh
+version=0.2.0
+[exit 0]
+$ PLAN='{"releases":[]}' bash app-version.sh
+build-rocks: the release plan names no single airsl-cli release
+[exit 1]
+$ PLAN='{}' bash app-version.sh
+build-rocks: the release plan names no single airsl-cli release
+[exit 1]
+$ PLAN='' bash app-version.sh
+build-rocks: the release plan names no single airsl-cli release
+[exit 1]
+$ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":"0.2.0"},{"app_name":"airsl-cli","app_version":"0.2.0"}]}' bash app-version.sh
+build-rocks: the release plan names no single airsl-cli release
+[exit 1]
+$ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":"0.2"}]}' bash app-version.sh
+build-rocks: the release plan's airsl-cli version 0.2 is not <major>.<minor>.<patch>
+[exit 1]
+$ PLAN='not json' bash app-version.sh
+jq: parse error: Invalid numeric literal at line 1, column 4
+build-rocks: could not read the release plan: jq exit status 5
+[exit 1]
+$ PLAN='{"releases":null}' bash app-version.sh
+build-rocks: the release plan names no single airsl-cli release
+[exit 1]
+$ PLAN='{"releases":5}' bash app-version.sh
+build-rocks: in the release plan, releases is a number, not an array
+[exit 1]
+$ PLAN='{"releases":{"app_name":"airsl-cli"}}' bash app-version.sh
+build-rocks: in the release plan, releases is an object, not an array
+[exit 1]
+$ PLAN='{"releases":"x"}' bash app-version.sh
+build-rocks: in the release plan, releases is a string, not an array
+[exit 1]
+$ PLAN='{"releases":[5]}' bash app-version.sh
+build-rocks: in the release plan, releases[0] is a number, not an object
+[exit 1]
+$ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":"0.2.0"},null]}' bash app-version.sh
+build-rocks: in the release plan, releases[1] is null, not an object
+[exit 1]
+$ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":5}]}' bash app-version.sh
+build-rocks: in the release plan, the airsl-cli release's app_version is a number, not a string
+[exit 1]
+$ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":null}]}' bash app-version.sh
+build-rocks: in the release plan, the airsl-cli release's app_version is null, not a string
+[exit 1]
+$ PLAN='{"releases":[{"app_name":"airsl-cli"}]}' bash app-version.sh
+build-rocks: in the release plan, the airsl-cli release's app_version is null, not a string
+[exit 1]
+$ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":["0.2.0"]}]}' bash app-version.sh
+build-rocks: in the release plan, the airsl-cli release's app_version is an array, not a string
+[exit 1]
+$ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":""}]}' bash app-version.sh
+build-rocks: in the release plan, the airsl-cli release's app_version is an empty string
+[exit 1]
+$ PLAN='{"releases":[{"app_name":5,"app_version":"0.2.0"}]}' bash app-version.sh
+build-rocks: the release plan names no single airsl-cli release
+[exit 1]
+$ PLAN='[1]' bash app-version.sh
+build-rocks: in the release plan, the top level is an array, not an object
+[exit 1]
+$ PLAN='5' bash app-version.sh
+build-rocks: in the release plan, the top level is a number, not an object
+[exit 1]
+$ PLAN='"x"' bash app-version.sh
+build-rocks: in the release plan, the top level is a string, not an object
+[exit 1]
+$ PLAN='null' bash app-version.sh
+build-rocks: in the release plan, the top level is null, not an object
+[exit 1]
+$ PLAN='false' bash app-version.sh
+build-rocks: in the release plan, the top level is a boolean, not an object
+[exit 1]
+$ PLAN='{} {}' bash app-version.sh
+build-rocks: the release plan holds 2 JSON values, not one
+[exit 1]
+$ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":"0.2.0"}]} {}' bash app-version.sh
+build-rocks: the release plan holds 2 JSON values, not one
+[exit 1]

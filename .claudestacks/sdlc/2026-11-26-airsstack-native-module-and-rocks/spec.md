@@ -22,6 +22,16 @@ header names the question, tool versions and date, and the quoted line is from i
 config example below was parsed by its real tool in the cited probe and is pasted byte for byte.
 §13 lists every probe this spec relies on.
 
+**This draft reopens the approved spec** (now `spec-superseded-2026-11-26.md`) to settle the gaps the
+plan-set review found (its findings 1, 2, 3, 4, 6, 7 and 8), and the spec review's second round
+(its risk findings 1–7). The text is the approved text with the amendments S19–S26 of §1.2 applied
+and S12's last sentence corrected, plus two additions that serve those amendments and are named by
+no S-row: §1.3's version lines for the tools they were proven with, and §5.6.7, the generic shapes
+of the gate and release messages.
+Lines cited by those amendments were opened at HEAD `9a1fbd8`, which differs from `9d054c4` outside
+`.claudestacks/` only in `CLAUDE.md` (`git diff --stat 9d054c4 9a1fbd8 -- . ':!.claudestacks'`:
+"CLAUDE.md | 10 ++++++++++").
+
 ## 1. Premises and settled decisions
 
 ### 1.1 Facts the design stands on
@@ -59,13 +69,21 @@ config example below was parsed by its real tool in the cited probe and is paste
 | S9 | Release: dist `precise-builds = true`; rocks built in a `global-artifacts-jobs` entry so a failed leg blocks the release; uploaded by a `publish-jobs` entry after `host`. Per package: upload the rockspec, then at once every rock. The publish job checks the API key first and fails when the name belongs to another account. Prerequisite: a luarocks.org account without upload two-factor, its key in the secret `LUAROCKS_API_KEY`. |
 | S10 | Gate: `dod` drops `--all-features`; `airsl-lua` is excluded from `--workspace` runs; a native-load step builds each ABI and runs a check script in real `lua5.4` and `luajit`, failing (never skipping) when an interpreter is missing; a `rocks` task sits outside `dod`. CI installs interpreters with apt / Homebrew / MSVC source builds, not gh-actions-lua. `deny.toml`: skip `syn@2` and `allow-wildcard-paths`. `airsl-lua` depends on `airsl` by path. |
 | S11 | Docs: book chapters, READMEs and `CLAUDE.md` as listed in §11; Neovim gets a book note only. |
-| S12 | (2026-11-26, review finding 4) No source rock. A release uploads per package the rockspec, which creates the version, and the five binary rocks. A platform without a binary rock installs from the rockspec alone: luarocks clones `source.url` at `source.tag` and builds with cargo, so it needs git and cargo. This replaces M12's source packing. It departs from the approved intent, whose outcome (`intent.md:44` "uploads the source rock and the binary rocks") and constraint 3 (`intent.md:62` "source and binary rocks for both packages") name a source rock; the intent's other outcome, "from source with cargo" (`intent.md:41-42`), still holds through the rockspec. The intent is amended through the `intent` skill before this spec is approved, and `built-on` then re-confirmed. |
+| S12 | (2026-11-26, review finding 4) No source rock. A release uploads per package the rockspec, which creates the version, and the five binary rocks. A platform without a binary rock installs from the rockspec alone: luarocks clones `source.url` at `source.tag` and builds with cargo, so it needs git and cargo. This replaces M12's source packing. The intent says the same: its outcome "uploads the rockspec and the binary rocks of both packages … A platform without a binary rock installs from the rockspec, which needs git and cargo" (`intent.md:44-46`) and constraint 3 "a rockspec and binary rocks for both packages, no source rock" (`intent.md:63-64`); its outcome "from source with cargo" (`intent.md:41-42`) holds through the rockspec. |
 | S13 | (2026-11-26, review finding 4) The binary rocks do not carry `CLAUDE.md`. The rockspecs set `copy_directories = { "crates/airsl-lua/doc" }`, a directory holding only `LICENSE`; this replaces S8's "binary rocks carrying `doc/` files is accepted". |
 | S14 | (2026-11-26) The Windows success hint names a cmd form and a PowerShell form (§4), the two that worked in `probes/221-windows-local-install-path.txt`. |
 | S15 | (2026-11-26) The publish job uploads in two phases: phase 1 uploads both rockspecs, each followed by its root-manifest name check, and stops before any binary rock if either check fails; phase 2 then uploads all ten binary rocks (§10.3). This replaces S9's "per package: upload the rockspec, then at once every rock". |
 | S16 | (2026-11-26) Library-only releases are forbidden: every release is a full lockstep release started by an `airsl-cli-v<version>` tag, with `airsl-v<version>` tagged on the same commit (§2.5). |
 | S17 | (2026-11-26, review finding 5) The stock-Lua chapter ships with this change; its `luarocks install` and `airsl lua setup --native` sections carry no output block until the release, when a release step pastes the real output (§11). |
 | S18 | (2026-11-26) Risks R12 and R13 are accepted. |
+| S19 | (drafted 2026-11-26, plan-set review findings 1 and 8; pending the author) The `rocks` task looks up its three tools before it builds anything: luarocks as `AIRSL_LUAROCKS` (default `luarocks`), the interpreters as native-load names them (`AIRSL_LUA54`, default `lua5.4`; `AIRSL_LUAJIT`, default `luajit`), each with duckscript's `which`. It finds each package's rockspec with the anchored pattern `<package>-[0-9]*-1.rockspec`, requires exactly one match, and reads `<version>` from that name. Messages in §5.6.5. |
+| S20 | (drafted 2026-11-26, plan-set review finding 2 and the `build-rocks` half of finding 1; pending the author) No rock job globs. `publish-rocks` reads `<version>` from the release tag dist hands it (the plan's `announcement_tag`, `airsl-cli-v<major>.<minor>.<patch>`), so every file it requires has a name before the download. `build-rocks` reads it from the plan's `airsl-cli` release (`app_version`), which a pull-request plan carries too, in a first `version` job whose output the five legs use. `publish-rocks` downloads the rocks into `rocks/` and checks the tag out into `src/`, in the forms probe 220 ran (it downloaded into `dl-c/` and checked out into `co`, §10.3 steps 2 and 3). Messages in §5.6.4 and §5.6.6. |
+| S21 | (drafted 2026-11-26, plan-set review findings 3 and 7; pending the author) docs-check names each shape of a member manifest that does not inherit the workspace version (no `[package]` table, no `version`, a string, any other type) with its own message, and the missing-line message is written out for `package`, `version` and `tag` (§5.6.3). |
+| S22 | (drafted 2026-11-26, plan-set review finding 4; pending the author) docs-check splits a rockspec file name from the right at its last two `-`, and a name that does not split into a package, a version and a revision of ASCII digits gets its own message (§5.6.3). |
+| S23 | (drafted 2026-11-26, plan-set review finding 6; pending the author) This chain writes the `### Breaking` item of §2.5 under a new `## Unreleased` heading at the top of `CHANGELOG.md`'s entries; the release renames that heading to the release's own (§2.5, §11). |
+| S24 | (signed off by the author 2026-11-26; spec review round 2 findings R1, R2 and R7) docs-check skips every entry of `crates/airsl-lua/rockspecs/` whose name starts with `.` (a `.DS_Store` the Finder writes, `.gitkeep`) with no message; it takes `fs::metadata` of a current rockspec before opening it, and anything but a regular file gets its own message, on every OS alike; `{toml error}` is the first line of toml's error, then `: `, then its reason line (form B, the author's choice of 2026-11-26) (§5.6.3). |
+| S25 | (signed off by the author 2026-11-26; spec review round 2 findings R3 and R4) The publish job and the `version` job of `build-rocks` read the plan with one `jq -s` program each that counts the plan's JSON texts and names the JSON type it meets where the plan is not the shape dist writes; `{file}` in every publish-rocks message is the relative path the job tested or sent (§5.6.4, §5.6.6). |
+| S26 | (signed off by the author 2026-11-26; spec review round 2 findings R5 and R6) `ci/manylinux.sh` takes three arguments, the checkout, the output directory and `<version>`, and names both rockspecs from `<version>` (§9.4); the `rocks` task records `<root>` with `pwd` at its start, returns to it after each `pack`, and fails on a `cd` that does not take (§5.6.5, §9.3). |
 
 ### 1.3 Tool and dependency versions this spec was proven against
 
@@ -77,8 +95,30 @@ Ubuntu apt (`probes/162-y1-docker-manylinux-x86_64.txt`: "/opt/lr54/bin/luarocks
 `probes/167-y4-windows-msvc-luarocks.txt`: "luarocks 3.12.2"; `probes/165-y3-brew-macos-arm64.txt`:
 "luarocks 3.13.0_1"; `probes/164-y2-ubuntu-apt.txt`: "luarocks	3.8.0+dfsg1-2"); luarocks-build-rust-mlua 0.2.7-1 (`probes/146-rockspecs-make-server.txt`);
 cargo-deny 0.20.2 (`probes/144-cargo-deny-features.txt` header); dist 0.33.1 (`dist-workspace.toml:7`);
-cargo-make 0.37.24 locally (`probes/233-native-load-task-form.txt`; the repo requires 0.37.0, `Makefile.toml:27`);
-jq 1.7.1 locally, 1.8.1 on the Ubuntu 26.04 runner (`probes/234-publish-jq-checks.txt` header).
+cargo-make 0.37.24 locally (`probes/233-native-load-task-form.txt`; the repo requires 0.37.0, `Makefile.toml:27`)
+and on the ubuntu-latest, macos-latest and windows-latest runners for the rocks task's lookups
+(`probes/243-ci-rocks-task-lookup.txt`: "cargo-make 0.37.24" in each job);
+jq 1.7.1 locally, 1.8.1 on the Ubuntu 26.04 runner (`probes/234-publish-jq-checks.txt` header;
+"jq-1.8.1" printed there, `probes/242-ci-release-version-snippets.txt`);
+toml 1.2.2+spec-1.1.0 (`Cargo.lock:844-845`; `probes/238-member-version-shapes.txt`); the release-job
+shell snippets ran under GNU bash 3.2.57 and jq 1.7.1 locally (probes 236, 241) and, with the same
+output, under the ubuntu-26.04 runner's "GNU bash, version 5.3.9(1)-release" and "jq-1.8.1", the
+runner the version and publish jobs use (`probes/242-ci-release-version-snippets.txt`; also macOS
+bash 3.2.57 / jq 1.8.2 and Windows Git Bash 5.3.15 / jq 1.8.2 there); git 2.39.3 locally
+(`probes/236-release-version-source.txt`). The round-2 additions ran locally first: the rewritten plan
+reads under bash 3.2.57 and jq 1.7.1 (`probes/246-release-plan-types.txt`), `ci/manylinux.sh`'s
+argument check under bash 3.2.57 (`probes/248-manylinux-args.txt`), the rocks task's `cd` under
+cargo-make 0.37.24 (`probes/247-rocks-task-cwd.txt`), toml 1.2.2's error text with toml_parser
+1.1.6 and toml_datetime 1.1.3, the workspace's `Cargo.lock` versions (`probes/249-toml-error-reason-line.txt`;
+`Cargo.lock:860`, `:869`), and the rockspecs directory's entry kinds under rustc 1.94.1 on macOS
+(`probes/245-rockspecs-dir-entries.txt`). Each then ran, with the same output, on the
+ubuntu-latest, macos-latest and windows-latest runners: the plan reads under the bash and jq of
+probe 242 (`probes/250-ci-release-plan-types.txt`), the entry kinds and the toml text under rustc
+1.94.1 (`probes/251-ci-rockspecs-entries-and-toml.txt`), the `cd` under cargo-make 0.37.24
+(`probes/252-ci-rocks-task-cwd.txt`); and the argument check under "GNU bash, version
+4.2.46(2)-release (x86_64-redhat-linux-gnu)" inside `quay.io/pypa/manylinux2014_x86_64`, digest
+`sha256:8a79ff36ce155d8f242dc8013d73c5e8bbe937defb15de7d7afb342c1ab537f4`
+(`probes/253-ci-manylinux-args.txt`).
 
 ## 2. Architecture
 
@@ -103,16 +143,19 @@ dist-workspace.toml                ~ global-artifacts-jobs += "./build-rocks"; p
 Makefile.toml                      ~ clippy/doc/test/test-doc/clippy-fix/dod-crate: no --all-features,
                                      airsl-lua excluded from --workspace and run per ABI;
                                      + task native-load (part of test); + task rocks (outside dod)
-CHANGELOG.md                       ~ lockstep wording replaces "versioned independently"; the release
-                                     entry carries a "### Breaking" item for airsl's features (§2.9 D2)
+CHANGELOG.md                       ~ lockstep wording replaces "versioned independently"; a new
+                                     "## Unreleased" section carries a "### Breaking" item for airsl's
+                                     features (§2.9 D2, S23)
 CLAUDE.md                          ~ build requirement, commands, docs-check's five checks, architecture
 README.md                          ~ crate table, build and gate needs, versioning, releases (§11)
 .github/workflows/
   ci.yml                           ~ dod job installs Lua 5.4 and LuaJIT per OS before `cargo make dod`
-+ build-rocks.yml                    dist global-artifacts job: five platform legs, each builds, packs
-                                     and loads both binary rocks; uploads them as `rocks-<arch>` artifacts
-+ publish-rocks.yml                  dist publish job: key check, file check, upload of the rockspecs and
-                                     the binary rocks to luarocks.org, root check (no source rock, S12)
++ build-rocks.yml                    dist global-artifacts job: a `version` job reads <version> from the
+                                     plan (S20); five platform legs, each builds, packs and loads both
+                                     binary rocks; uploads them as `rocks-<arch>` artifacts
++ publish-rocks.yml                  dist publish job: key check, <version> from the release tag (S20),
+                                     file check, upload of the rockspecs and the binary rocks to
+                                     luarocks.org, root check (no source rock, S12)
   airsl-cli-release.yml            ~ regenerated by `dist generate`
   airsl-cli-smoke.yml, pages.yml     unchanged
 
@@ -372,6 +415,23 @@ with a `compile_error!`.
   breaking"), and its CHANGELOG entry carries a `### Breaking` item (the heading the 0.2.0 entry
   uses, `CHANGELOG.md:24`): `default-features = false` now needs `lua54` or `luajit`, and
   `Engine` is `Send + Sync` only with the default `send` feature.
+  - Where the item is written (S23): this chain adds it now, under a new `## Unreleased` heading
+    placed above the newest entry `## airsl 0.2.0 — airsl-cli 0.2.0 — 2026-11-25` (`CHANGELOG.md:12`)
+    and below the preamble (`CHANGELOG.md:1-10`), with the `### Breaking` sub-heading under it. The
+    file declares Keep a Changelog 1.1.0 (`CHANGELOG.md:3-4`), which keeps "an `Unreleased` section at
+    the top to track upcoming changes" and, "At release time, … move[s] the `Unreleased` section
+    changes into a new release version section" (`probes/240-keep-a-changelog-1.1.0.txt`, the page
+    saved at `probes/240-keep-a-changelog-1.1.0/index.html`:289). The heading is written `## Unreleased`,
+    without the format's `[…]` link brackets (`index.html`:8 `## [Unreleased]`), because no release
+    heading in the file uses brackets (probe 240's `grep -n "^## \|^### " CHANGELOG.md`: every `## `
+    heading is a plain version-and-date line, such as `## airsl 0.2.0 — airsl-cli 0.2.0 — 2026-11-25`
+    (:12), `## airsl-cli 0.1.4 — 2026-10-22` (:132) and `## airsl 0.1.0 — 2026-08-22` (:291)), and the file has had no Unreleased section
+    before (probe 240: `grep -n -i unreleased CHANGELOG.md` "[exit 1]"). Owner of the rename at
+    release: the maintainer who prepares the release, who turns `## Unreleased` into the release's
+    `## airsl <version> — airsl-cli <version> — <date>` heading, as the file's entries are written today.
+  - Edges: if a `## Unreleased` section already exists when this lands (another change added one),
+    the item joins it, under its `### Breaking` sub-heading, created if absent; there is never a
+    second `## Unreleased`. An empty `## Unreleased` is never written.
 
 Cargo gives each member the workspace number (`probes/201-lockstep-manifests.txt`: "airsl 0.2.0",
 "airsl-cli 0.2.0", "airsl-lua 0.2.0", "docs-check 0.0.0"). The rockspecs carry today's `0.2.0`
@@ -629,7 +689,9 @@ Guideline: `claudestacks-guideline-rust` (rust-guidelines skill and every refere
 - **`src/rockspecs.rs`** (fifth check; test-only like the rest of the crate, `lib.rs:28-33`): reads
   `[workspace.package].version` of the root `Cargo.toml` with `toml` (as `crates/airsl/src/version.rs:37`
   already parses a manifest), the `[package] version` of `crates/airsl`, `crates/airsl-cli` and
-  `crates/airsl-lua`, and every entry of `crates/airsl-lua/rockspecs/`. Rockspec lines are read as
+  `crates/airsl-lua` (classified as §5.6.3 "Member manifests" says), and every entry of
+  `crates/airsl-lua/rockspecs/` but those whose name starts with `.` (its name split as §5.6.3
+  says; a current rockspec's file type checked with `fs::metadata` before it is opened). Rockspec lines are read as
   text: the first line starting `package = `, `version = ` and `   tag = `. Messages in §5.6.3.
 - **`src/examples.rs`**: the inner `cargo run` no longer passes `--all-features`; the module doc
   (`examples.rs:26-34`) and the test at `:473` follow.
@@ -835,7 +897,8 @@ being already `LuaJIT 2.1.…` (`probes/230-real-module-set-stock-lua.txt`: "int
 
 #### 5.6.3 docs-check fifth check (`crates/docs-check/src/rockspecs.rs`)
 
-Problems are collected one per line and asserted empty, as the citation guards do
+Owner of every check in this section: `crates/docs-check/src/rockspecs.rs`, run by the `test` step
+of `dod`. Problems are collected one per line and asserted empty, as the citation guards do
 (`crates/docs-check/src/citations/source.rs:111-132`: `"{shown}:{line}: cites …, which …"`).
 With workspace version `0.2.0`:
 
@@ -844,23 +907,201 @@ crates/airsl-lua/rockspecs: has no `airsstack-0.2.0-1.rockspec`, which the works
 crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec:2: declares `package = "airsstack-lua"`, which does not match its file name; luarocks refuses such a rockspec
 crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec:3: declares `version = "0.1.0-1"`, which does not match its file name; luarocks refuses such a rockspec
 crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec:6: declares `tag = "airsl-cli-v0.1.0"`, which is not the release tag `airsl-cli-v0.2.0`
+crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec: declares no `package = "…"` line
 crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec: declares no `version = "…"` line
+crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec: declares no `tag = "…"` line
 crates/airsl-lua/rockspecs/airsstack-0.1.0-1.rockspec: names version 0.1.0, which is not the workspace version 0.2.0; rename it rather than keep a copy
 crates/airsl-lua/rockspecs/airsstack-0.2.0-2.rockspec: has revision 2; a release publishes revision 1 only
 crates/airsl-lua/rockspecs/other-0.2.0-1.rockspec: names package other, which is neither airsstack nor airsstack-luajit
+crates/airsl-lua/rockspecs/airsstack-0.2.0.rockspec: is not named `<package>-<version>-<revision>.rockspec`
 crates/airsl-lua/rockspecs/notes.txt: is not a rockspec; only the two rockspecs live here
+crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec: is not a regular file, so it cannot be a rockspec
 crates/airsl/Cargo.toml: sets its own version, which must come from the workspace (`version.workspace = true`) so airsl, airsl-cli and airsl-lua share one number
+crates/airsl/Cargo.toml: declares no version; it must inherit the workspace version (`version.workspace = true`) so airsl, airsl-cli and airsl-lua share one number
+crates/airsl/Cargo.toml: has no `[package]` table, so it cannot inherit the workspace version (`version.workspace = true`)
+crates/airsl/Cargo.toml: has a version that is an integer; it must be `version.workspace = true` so airsl, airsl-cli and airsl-lua share one number
 ```
 
 (The `:2`, `:3`, `:6` are the lines the §8.1 layout puts those keys on; the check reports the line
-where it found the key.)
+where it found the key. The three "declares no" lines are one message with the key substituted:
+`{path}: declares no `{key} = "…"` line`, `{key}` being `package`, `version` or `tag`, each looked for
+as §3.4 says; a file missing two keys gets two lines, in the order `package`, `version`, `tag`.)
 
-Which checks a file gets: only a file named `<package>-<workspace version>-1.rockspec`, for one of the
-two packages, gets the per-line checks (`package`, `version`, `tag`, missing line). Any other entry
-gets exactly one message, the first of these that applies: not ending `.rockspec` ("is not a
-rockspec"); a package other than the two ("names package"); another version ("names version …;
-rename it rather than keep a copy"); another revision ("has revision"). So a leftover
-`airsstack-0.1.0-1.rockspec` is reported once, by name, and its contents are not read.
+**How a rockspec file name is split** (S22). Every entry of `crates/airsl-lua/rockspecs/` is
+classified by its name alone; the name is taken with `to_string_lossy`, so a name that is not
+valid UTF-8 shows U+FFFD where its bad bytes were (`probes/204-std-trim-escape.txt`: `\xff5.4` shown
+`�5.4`) and can never equal one of the two current names, which are ASCII. First, an entry whose
+name starts with `.` is skipped (S24): it is not classified, not opened, and gets no message, whatever
+kind of entry it is. That keeps `dod` green over files the platform or a tool drops there, such as
+the `.DS_Store` the macOS Finder writes (the repository's `.gitignore` ignores `*.DS*`, so CI never
+sees one) and a `.gitkeep`; neither current name starts with `.`. Every other entry, in order, the
+first that applies:
+
+1. The name does not end `.rockspec` (case-sensitive) → `{path}: is not a rockspec; only the two
+   rockspecs live here`.
+2. Strip `.rockspec`; split what is left from the right at its last two `-`: the revision is after
+   the last `-`, the version between the last two, the package everything before. If there are
+   fewer than two `-`, or the package or the version is empty, or the revision is not one or more
+   ASCII digits → ``{path}: is not named `<package>-<version>-<revision>.rockspec` ``.
+3. The package is neither `airsstack` nor `airsstack-luajit` (compared exactly, case-sensitive) →
+   `{path}: names package {package}, which is neither airsstack nor airsstack-luajit`.
+4. The version is not the workspace version (compared as strings) → `{path}: names version
+   {version}, which is not the workspace version {workspace}; rename it rather than keep a copy`.
+5. The revision is not `1` (compared as strings) → `{path}: has revision {revision}; a release
+   publishes revision 1 only`.
+6. Otherwise it is the current rockspec of its package. Its `fs::metadata`, which follows a
+   symlink, is taken before it is opened (S24): an error (a dangling symlink) gives the
+   `could not be read` line below; anything but a regular file (a directory, a FIFO, a socket, a
+   symlink to one of those) gives `{path}: is not a regular file, so it cannot be a rockspec`; a
+   regular file is read with `fs::read_to_string`, whose error (content that is not UTF-8 included)
+   gives the `could not be read` line, and otherwise gets the per-line checks (`package`,
+   `version`, `tag`, missing line). Only such a file is opened. A current name that is not a
+   regular file counts as present for the "has no" line: it gets its own line and no second one.
+
+So a leftover `airsstack-0.1.0-1.rockspec` is reported once, by name, and its contents are not read.
+Splitting from the right is what makes `airsstack-luajit-0.2.0-1.rockspec` read as package
+`airsstack-luajit`, the reading luarocks itself gives (`path.parse_name`, below). Checked examples,
+workspace `0.2.0`, run in std Rust by `probes/239-rockspec-name-split.txt` (a), beside luarocks
+3.12.2's own `path.parse_name` (b):
+
+| Name | Outcome (probe 239 (a)) | luarocks' reading (probe 239 (b)) |
+|---|---|---|
+| `airsstack-0.2.0-1.rockspec` | current, package `airsstack` | `airsstack 0.2.0-1` |
+| breaker `airsstack-luajit-0.2.0-1.rockspec` | current, package `airsstack-luajit` (never `airsstack` with version `luajit-0.2.0`) | `airsstack-luajit 0.2.0-1` |
+| `airsstack.rockspec` | step 2, fewer than two `-` | `nil nil` |
+| `airsstack-0.2.0.rockspec` | step 2, fewer than two `-` | `nil nil` |
+| breaker `airsstack-luajit-0.2.0.rockspec` | step 2, revision `0.2.0` is not digits | `nil nil` |
+| `airsstack-0.2.0-x.rockspec` | step 2, revision `x` | `nil nil` |
+| `airsstack--1.rockspec` | step 2, empty version | `nil nil` |
+| `airsstack-0.2.0-.rockspec` | step 2, empty revision | `nil nil` |
+| `-0.2.0-1.rockspec` | step 2, empty package | ` 0.2.0-1` (empty name) |
+| `.rockspec` | skipped, the name starts with `.` (probe 245, fixture A; probe 239 (a), which ran the split alone, gives step 2) | `nil nil` |
+| breaker `airsstack-0.2.0-rc.1-1.rockspec` | step 3, `names package airsstack-0.2.0` (a prerelease-shaped version cannot exist: `crates/airsl/src/version.rs:43-50` requires three numeric parts, and dist refuses a tag whose version is not the package's, `probes/236-release-version-source.txt`) | `airsstack-0.2.0 rc.1-1` |
+| `other-0.2.0-1.rockspec`, `AIRSSTACK-0.2.0-1.rockspec` | step 3, `names package other` / `names package AIRSSTACK` | — |
+| `airsstack-0.1.0-1.rockspec`, `airsstack-luajit-0.1.0-1.rockspec` | step 4, `names version 0.1.0` | — |
+| `airsstack-0.2.0-2.rockspec`, `airsstack-0.2.0-01.rockspec` | step 5, `has revision 2` / `has revision 01` | `airsstack 0.2.0-01` for the second |
+| `airsstack-0.2.0-1.ROCKSPEC`, `airsstack-0.2.0-1.rockspec.bak`, `notes.txt` | step 1, not a rockspec | `airsstack 0.2.0-1` for `.rockspec.bak` (luarocks' pattern is not anchored at the end) |
+| `.DS_Store`, `.gitkeep`, `.airsstack-0.2.0-1.rockspec`, a directory `.hidden-dir` | skipped, no message (probe 245, fixtures A and D) | — |
+
+The rule is stricter than luarocks in two places, both refused here: an empty package and a name
+that continues after `.rockspec`. luarocks itself refuses a rockspec whose name does not split, with
+"Expected filename in format 'name-version-revision.rockspec'." for `airsstack.rockspec` and
+`airsstack-0.2.0.rockspec`, and with "Inconsistency between rockspec filename
+(airsstack-0.2.0-x.rockspec) and its contents (airsstack-0.2.0-1.rockspec)." for
+`airsstack-0.2.0-x.rockspec` (probe 239 (c), `luarocks lint`, each "[exit 1]"; the check is
+`fetch.lua:405-431` `load_local_rockspec`).
+
+Directory edges: an entry whose name starts with `.` is skipped, whatever it is. Any other entry is
+classified by name whatever it is, so a subdirectory named `notes` gets the step 1 message like a
+file. An entry with a current name is checked by its file type before it is opened (step 6), so the
+outcome does not depend on how an OS fails to read a directory (on macOS, `fs::read_to_string` on a
+directory so named gives `Err(Os { code: 21, kind: IsADirectory, message: "Is a directory" })`,
+probe 245's control), and a FIFO so named is never opened (reading one with no writer would block
+`dod`). Checked examples, workspace `0.2.0`, run in std Rust over real directories on macOS
+(`probes/245-rockspecs-dir-entries.txt`), and again on ubuntu-latest, macos-latest and
+windows-latest (`probes/251-ci-rockspecs-entries-and-toml.txt`, below the table):
+
+| Entry | Output (probe 245) |
+|---|---|
+| `.DS_Store`, `.airsstack-0.2.0-1.rockspec`, `.rockspec` (files), `.hidden-dir` (a directory) | no line (`trace: skipped …`) |
+| `airsstack-0.2.0-1.rockspec`, a directory | `crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec: is not a regular file, so it cannot be a rockspec` |
+| `airsstack-luajit-0.2.0-1.rockspec`, a FIFO | `crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec: is not a regular file, so it cannot be a rockspec` (the run finished, so it was not opened) |
+| `notes`, a directory; `notes.txt` | `crates/airsl-lua/rockspecs/notes: is not a rockspec; only the two rockspecs live here`, the same for `notes.txt` |
+| `airsstack-0.2.0-1.rockspec`, a symlink to a regular file | read; the per-line checks run |
+| `airsstack-luajit-0.2.0-1.rockspec`, a symlink to a directory | `…: is not a regular file, so it cannot be a rockspec` |
+| `airsstack-0.2.0-1.rockspec`, a dangling symlink | `crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec: could not be read: No such file or directory (os error 2)` |
+| `airsstack-luajit-0.2.0-1.rockspec`, a regular file holding byte `0xff` | `crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec: could not be read: stream did not contain valid UTF-8` |
+| a directory holding only `.DS_Store` and `.gitkeep` | the two "has no" lines, `airsstack` first |
+
+The rule uses only `fs::metadata` and `Metadata::is_file`, the same calls on every OS. On
+ubuntu-latest and macos-latest the table's lines come out byte for byte (probe 251, "diff: no
+output"). On windows-latest, with the same fixtures made by std's `symlink_file`/`symlink_dir` and
+no FIFO, every outcome is the same, and only the dangling symlink's `{io error}` is Windows' own
+text: "crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec: could not be read: The system cannot
+find the file specified. (os error 2)". There `fs::read_to_string` on a directory so named gives
+`Err(Os { code: 5, kind: PermissionDenied, message: "Access is denied." })` (probe 251's control),
+so without the metadata check the same directory would read as a permission error on Windows and
+as `IsADirectory` elsewhere. A test therefore asserts `could not be read: ` and not the OS's text.
+The `dod` job's Windows and Linux legs run the §9.1 tests over real directories (the FIFO and
+symlink cases on unix only) at the pull request that adds the check. Both current rockspecs present
+is the normal state; one absent gives one "has no" line, neither present gives two, one per package,
+`airsstack` first. A directory cannot hold two entries of one name, so a current rockspec cannot be
+duplicated; a leftover beside it is reported by steps 3–5.
+
+**Member manifests** (S21). For each of `crates/airsl/Cargo.toml`, `crates/airsl-cli/Cargo.toml` and
+`crates/airsl-lua/Cargo.toml`, read with `toml` into a `toml::Value`, the first that applies:
+
+1. Not valid TOML → `{path}: is not valid TOML: {toml error}` (S24, form B). `{toml error}` is built
+   from toml's error `Display`, split with `str::lines`: its first line, then `: `, then the
+   **reason line**, which is the last line after the first that is not empty. When the `Display`
+   has no such line (it is one line), `{toml error}` is the first line alone, with no `: `.
+   toml 1.2.2 prints an error that has a source position as five lines: `TOML parse error at line
+   {l}, column {c}`, a source excerpt of three lines with a caret, and the reason
+   (`toml-1.2.2/src/de/error.rs:116-165`); the reason is toml_parser's description, then
+   `, expected …` when the parser names what it expected (`de/error.rs:14-35`), and an expected
+   newline is printed as the word "newline" (`de/error.rs:93-96`), so the reason is one line. An error with no position prints its reason alone, one line: the key
+   recursion limit (`de/parser/key.rs:67-68`, `ParseError::new("recursion limit")` with no span).
+   Checked over fifteen invalid manifests, probe 244's six and nine chosen to break the rule
+   (`probes/249-toml-error-reason-line.txt`, toml 1.2.2 with the workspace's `Cargo.lock`
+   versions; the same 31 lines on ubuntu-latest, macos-latest and windows-latest,
+   `probes/251-ci-rockspecs-entries-and-toml.txt`):
+
+   | Manifest | `{path}: is not valid TOML: {toml error}` (probe 249) |
+   |---|---|
+   | `[package` | ``crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 1, column 9: unclosed table, expected `]` `` |
+   | `[package]`, then `name =` | `… TOML parse error at line 2, column 7: string values must be quoted, expected literal string` (the same with no final newline) |
+   | `name` twice; `[package]` twice | `… TOML parse error at line 3, column 1: duplicate key`; `… at line 2, column 2: duplicate key` |
+   | `version.workspace = = true` on line 3 | ``… TOML parse error at line 3, column 21: extra `=`, expected nothing`` |
+   | an unterminated string; an invalid escape `"\q"` | ``… at line 2, column 14: invalid basic string, expected `"` ``; ``… at line 2, column 10: missing escaped value, expected `b`, `e`, `f`, `n`, `r`, `\`, `"`, `x`, `u`, `U` `` |
+   | a CRLF file, `[package` | ``… TOML parse error at line 1, column 9: unclosed table, expected `]` `` (the `\r` stays on the excerpt line, `"1 \| [package\r\n"`, which is not kept) |
+   | two values on one line | ``… at line 2, column 12: unexpected key or value, expected newline, `#` `` |
+   | a bare carriage return | `… at line 2, column 12: carriage return must be followed by newline, expected newline` |
+   | `date = 2026-13-45` | `… at line 2, column 8: invalid date, expected month between 01 and 12` |
+   | arrays nested 100 deep | `… at line 1, column 85: cannot recurse further; max recursion depth met` |
+   | `version = 1`, then `version.workspace = true` | `… at line 3, column 1: cannot extend value of type integer with a dotted key` |
+   | breaker: a dotted key of 100 parts | `crates/airsl/Cargo.toml: is not valid TOML: recursion limit` (`Display has 1 lines; full = "recursion limit\n"`) |
+
+   No case gives a reason of several lines or an empty one. toml's `Display` has one more shape, a
+   position-less reason followed by `` in `{keys}` `` (`de/error.rs:159-161`); no case of probe 249
+   met it, and the rule would still give one line, ending in that `in …` line. Two lines are kept, not the whole
+   `Display`, so that each problem stays one line: the position line points at the fault and the
+   reason says what it is; the excerpt is left out. Probe 238 cut at the first line only
+   (`.lines().next()`, its `src/main.rs`), which form B replaces.
+2. No `package` key, or `package` is not a table → `{path}: has no `[package]` table, so it cannot
+   inherit the workspace version (`version.workspace = true`)`.
+3. `[package]` has no `version` key → `{path}: declares no version; it must inherit the workspace
+   version (`version.workspace = true`) so airsl, airsl-cli and airsl-lua share one number`.
+4. `version` is a table holding exactly one key, `workspace`, whose value is the boolean `true` →
+   inherits; no message.
+5. `version` is a string (an empty one included) → `{path}: sets its own version, which must come
+   from the workspace (`version.workspace = true`) so airsl, airsl-cli and airsl-lua share one number`.
+6. Any other value → `{path}: has a version that is {type}; it must be `version.workspace = true` so
+   airsl, airsl-cli and airsl-lua share one number`, `{type}` named from `Value::type_str()`:
+   `integer` → `an integer`, `float` → `a float`, `boolean` → `a boolean`, `datetime` →
+   `a date-time`, `array` → `an array`, `table` → ``a table other than `{ workspace = true }` ``.
+
+Checked examples, `probes/238-member-version-shapes.txt` (toml 1.2.2, the workspace's features):
+
+| `[package]` holds | `toml::Value` reads (probe 238) | Outcome |
+|---|---|---|
+| `version.workspace = true` | `ok: inherits` | inherits |
+| `version = { workspace = true }` | `ok: inherits` (the same value as the dotted form) | inherits |
+| `version = "0.2.0"` / `version = ""` | `SETS-OWN (string "0.2.0")` / `(string "")` | step 5 |
+| no `version` key | `NO-VERSION` | step 3 |
+| no `[package]` (`[lib]` only; an empty file) | `manifest.get("package") = None` | step 2 |
+| `package = "airsl"` at the top level | `Some("string")` | step 2 |
+| `version = 1` | `type_str = "integer"` | step 6, `an integer` |
+| `version = 0.2` | `"float"` | step 6, `a float` |
+| `version = true` | `"boolean"` | step 6, `a boolean` |
+| `version = 2026-11-26` | `"datetime"` | step 6, `a date-time` |
+| `version = ["0.2.0"]` | `"array"` | step 6, `an array` |
+| breaker `version.workspace = false` | `"table"`, `{"workspace": Boolean(false)}` | step 6, a table other than `{ workspace = true }` |
+| breaker `version = { workspace = true, path = "x" }` | `"table"`, two keys | step 6, the same |
+| `[package` | `TOML parse error at line 1, column 9` (the first line, which probe 238 printed) | step 1, `{toml error}` ``TOML parse error at line 1, column 9: unclosed table, expected `]` `` (probe 249) |
+
+Keys other than `version` in a member manifest are not read: they are cargo's to check. The root
+manifest's `[workspace.package].version` keeps its one message below, which already covers a missing
+key and a value that is not a string.
 
 Inputs the check cannot read, each one line, after which that input's other checks are skipped:
 
@@ -873,7 +1114,11 @@ crates/airsl-lua/rockspecs: could not be listed: {io error}
 crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec: could not be read: {io error}
 ```
 
-A member manifest that is not valid TOML is reported as `{path}: is not valid TOML: {toml error}`.
+The member line is the same for `crates/airsl-cli/Cargo.toml` and `crates/airsl-lua/Cargo.toml`.
+`{toml error}` is built as in member step 1 (first line, `: `, reason line); `{io error}` is the
+`std::io::Error`'s `Display` (probe 245: "No such file or directory (os error 2)", "stream did not
+contain valid UTF-8"). When the root manifest cannot give a version, the rockspec checks are skipped (they have nothing to
+compare with) and the member checks still run.
 
 #### 5.6.4 `publish-rocks.yml`
 
@@ -883,11 +1128,84 @@ failure; nothing after it runs.
 | Check | When | Message |
 |---|---|---|
 | API key | first, before any download or request: the variable is tested for the empty string, which is what an undefined secret arrives as under `secrets: inherit` (`probes/220-publish-downloads-build-artifacts.txt`:302 "LUAROCKS_API_KEY length: 0") | `publish-rocks: LUAROCKS_API_KEY is empty; add the luarocks.org API key as a repository secret` |
-| every file present | after the download, before any request | `publish-rocks: {file} is missing; nothing was uploaded` |
+| release plan unreadable | second, before any download: the read below exits non-zero because the plan is not JSON (a text that does not parse, or a valid JSON text followed by one that does not) | `publish-rocks: could not read the release plan: jq exit status {code}; nothing was uploaded` (jq's own error line above it, e.g. "jq: parse error: Invalid numeric literal at line 1, column 4" and exit status 5) |
+| more than one JSON text | the plan holds `{n}` ≥ 2 JSON texts (dist writes one) | `publish-rocks: the release plan holds {n} JSON values, not one; nothing was uploaded` |
+| wrong type | the plan's one JSON text is not an object, or its `announcement_tag` is present, not `null` and not a string | `publish-rocks: in the release plan, {where} is {type}, not {expected}; nothing was uploaded`, where `{where} is {type}, not {expected}` is one of `the top level is {type}, not an object` (`{type}` one of `null`, `a boolean`, `a number`, `a string`, `an array`) and `announcement_tag is {type}, not a string` (`{type}` one of `a boolean`, `a number`, `an array`, `an object`); the type words are jq's `type` mapped by the read's `word` |
+| no tag | the plan is empty (no JSON text), or `announcement_tag` is missing, `null` or `""` | `publish-rocks: the release plan names no tag; nothing was uploaded` |
+| tag shape | the tag does not match `^airsl-cli-v([0-9]+\.[0-9]+\.[0-9]+)$` (bash `[[ =~ ]]`); the group is `<version>` | `publish-rocks: the release tag {tag} is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded` |
+| every file present | after the download and the checkout, before any request; the twelve names are built from `<version>` (§10.3 step 4), so a missing rockspec is named like a missing rock | `publish-rocks: {file} is missing; nothing was uploaded`; the first missing in the order of §10.3 step 4 is named |
 | transport | `curl` exits non-zero (no HTTP answer) | `publish-rocks: could not reach luarocks.org to upload {file}: curl exit status {code}` (curl's own `-sS` error line above it) |
 | HTTP refusal | an answer outside 200–299 | `publish-rocks: luarocks.org refused {file} (HTTP {code}): {response body}` |
 | no version id | `/upload` answers 2xx but `jq -e '.version.id \| numbers'` fails | `publish-rocks: luarocks.org answered {file} without a version id: {response body}` |
 | name owned by another account | phase 1, after each `/upload`, before any binary rock of either package: the answer's `manifests` holds no entry whose `name` is `root` (`jq -e '.manifests \| any(.name == "root")'`) | `publish-rocks: luarocks.org did not put {package} in its root manifest, so the name {package} belongs to another account; no binary rock was uploaded for either package` |
+
+`{file}`, in every row above and in the partial-state line below, is the path the job tested or
+sent, relative to the job's working directory, in one form (S25):
+`src/crates/airsl-lua/rockspecs/<package>-<version>-1.rockspec` for a rockspec and
+`rocks/<package>-<version>-1.<arch>.rock` for a binary rock, never a base name alone. The
+partial-state line's `{files, in upload order}` lists such paths joined by `, `.
+
+**The tag read** (S25). The step reads the plan with one `jq -r -s` program and acts on its one-word
+answer; this is the step's text, pasted from `probes/246-release-plan-types/tag.sh`, where it ran:
+
+```bash
+read=$(jq -r -s '
+  def word: {"null": "null", "boolean": "a boolean", "number": "a number", "string": "a string",
+             "array": "an array", "object": "an object"}[type];
+  if length == 0 then "none"
+  elif length > 1 then "many \(length)"
+  else .[0]
+    | if type != "object" then "type the top level is \(word), not an object"
+      elif .announcement_tag == null or .announcement_tag == "" then "none"
+      elif (.announcement_tag | type) != "string" then "type announcement_tag is \(.announcement_tag | word), not a string"
+      else "tag \(.announcement_tag)" end
+  end' <<<"$PLAN") || { code=$?; echo "publish-rocks: could not read the release plan: jq exit status $code; nothing was uploaded"; exit 1; }
+case $read in
+  none) echo "publish-rocks: the release plan names no tag; nothing was uploaded"; exit 1 ;;
+  "many "*) echo "publish-rocks: the release plan holds ${read#many } JSON values, not one; nothing was uploaded"; exit 1 ;;
+  "type "*) echo "publish-rocks: in the release plan, ${read#type }; nothing was uploaded"; exit 1 ;;
+esac
+```
+
+`-s` gathers every JSON text of the plan into one array, so an empty plan is `[]` (no tag) and two
+texts are counted rather than read as two tags. After the `case`, the tag-shape test and the
+`version=` line are as before. The cases, under bash 3.2.57 and jq 1.7.1
+(`probes/246-release-plan-types.txt`): every plan probe 241 ran prints what it printed there, except
+`{"announcement_tag":5}`, which now prints "publish-rocks: in the release plan, announcement_tag is a
+number, not a string; nothing was uploaded"; `false`, `true`, `["airsl-cli-v0.2.0"]` and `{}` as the
+tag print "is a boolean", "is a boolean", "is an array" and "is an object, not a string"; the plans
+`[1]`, `5`, `"x"`, `null` and `true` print "in the release plan, the top level is an array, not an
+object; nothing was uploaded" and "is a number", "is a string", "is null", "is a boolean"; two JSON
+texts (`{…} {…}`, `{} 5`) print "publish-rocks: the release plan holds 2 JSON values, not one; nothing
+was uploaded"; a valid text followed by `not json` prints jq's parse error and "jq exit status 5". The
+same cases print the same lines, jq's parse errors included, under ubuntu-26.04's bash 5.3.9 and
+jq 1.8.1, the runner the publish job uses, and under the macOS and Windows runners' bash and jq
+(`probes/250-ci-release-plan-types.txt`: probe 246's output, diff after stripping the log's
+timestamps: no output, on all three).
+
+The round-1 form of the tag checks, `jq -r '.announcement_tag // ""'`, was run in `probes/236-release-version-source.txt`
+(b) (`236-release-version-source/tag.sh`): the plan `dist plan --tag=airsl-cli-v0.2.0` produced for
+this repository gives "version=0.2.0" "[exit 0]", and probe 220's plan shape gives "version=0.0.0";
+the pull-request plan (`announcement_tag` "v0.2.0"), `airsl-cli-v0.2`, `airsl-cli-v0.2.0-rc.1`,
+`airsl-v0.2.0` and (in that form only) the number `5` each print the tag-shape message and "[exit 1]"; `null`, `{}`, an
+empty plan and `""` print the no-tag message; `not json` prints jq's parse error, then the unreadable
+message with "jq exit status 5". The unreadable message ends "; nothing was uploaded" like the other
+two; with that ending, `probes/241-publish-rocks-message-endings.txt` re-ran every case above with
+the same results and printed "publish-rocks: could not read the release plan: jq exit status 5;
+nothing was uploaded" "[exit 1]" for `not json`, and the same for a raw newline inside the JSON
+string ("jq: parse error: Invalid string: control characters from U+0000 through U+001F must be
+escaped at line 2, column 1"). A tag ending in a newline (the JSON escape `\n`) would be read as the
+version without it, because the command substitution drops trailing newlines (probes 236 and 241,
+"version=0.2.0"). Every case printed the same lines under the ubuntu-26.04 runner's bash 5.3.9 and
+jq 1.8.1, and under the macOS and Windows runners' bash and jq (`probes/242-ci-release-version-snippets.txt`:
+the logged output compared with probe 241's by `diff`, no difference). No tag can
+end so (probe 236 (d): `git check-ref-format` "[exit 1]", control "[exit 0]"). On a real release, a tag
+whose version does not parse or is not the package's stops at dist's plan step ("claims we're
+releasing airsl-cli 0.3.0, but that package is version 0.2.0", "Couldn't parse the version from the
+provided announcement tag (airsl-cli-v0.2)", each "[exit 255]", probe 236 (a)); a tag outside
+`airsl-cli**[0-9]+.[0-9]+.[0-9]+*` starts no release (`.github/workflows/airsl-cli-release.yml:44-45`);
+and the pull-request plan's `v0.2.0` never reaches the job, which runs only for a release (§10.3).
+The checks stay, because the job must not upload under a version it cannot name.
 
 Both `jq` tests were run on answers of that shape (`probes/234-publish-jq-checks.txt`): the root
 test prints "true" "[exit 0]" for `manifests: [{"name": "root"}]` and "false" "[exit 1]" for an empty
@@ -930,6 +1248,176 @@ order}; re-running the job replaces them` (§6.4). A name refusal lists its own 
   module of our account outside the root manifest, which `luarocks install` from luarocks.org does
   not see (previous point). A re-run stores that rockspec again (updated in place, §6.4) and fails the
   same way, uploading no rock, until the name question is settled by hand.
+
+#### 5.6.5 rocks (Makefile task, S19)
+
+Owner: the `rocks` task of `Makefile.toml` (`@duckscript`). Every message is printed with `echo`,
+then `exit 1`, so cargo make fails the task (`probes/237-rocks-task-lookup.txt`: each message, then
+"[cargo-make] ERROR - Error while running duckscript: … Exit with error code: 1", "[exit 1]"). Same
+shape as native-load (§5.6.1): the task's name, the program in backticks, what to install or set.
+
+Before it builds anything, in this order, the first failure stops the task:
+
+| Check | Message |
+|---|---|
+| luarocks: `AIRSL_LUAROCKS` (default `luarocks`), `which` answers empty | `` rocks: `{program}` was not found; install LuaRocks or set AIRSL_LUAROCKS to its path `` |
+| Lua 5.4: `AIRSL_LUA54` (default `lua5.4`), as native-load | `` rocks: `{program}` was not found; install Lua 5.4 or set AIRSL_LUA54 to its interpreter `` |
+| LuaJIT: `AIRSL_LUAJIT` (default `luajit`), as native-load | `` rocks: `{program}` was not found; install LuaJIT or set AIRSL_LUAJIT to its interpreter `` |
+| `airsstack`, then `airsstack-luajit`: no file matches `crates/airsl-lua/rockspecs/<package>-[0-9]*-1.rockspec` | `` rocks: no `{package}-<version>-1.rockspec` in `crates/airsl-lua/rockspecs` `` |
+| more than one file matches | `` rocks: {n} files match `{package}-<version>-1.rockspec` in `crates/airsl-lua/rockspecs` ({paths, comma-separated, as the glob returns them: `\`-separated on Windows}); docs-check allows one per package `` |
+
+`{program}` is the variable's value or the default, as typed. "Not found" is duckscript's `which`
+answering empty, for a bare name and for a path alike (`probes/237-rocks-task-lookup.txt`: "which
+nope-luarocks -> []" and "which /no/such/luarocks -> []", each followed by the message; "which
+/opt/homebrew/bin/luarocks -> [/opt/homebrew/bin/luarocks]"; the interpreters as
+`probes/233-native-load-task-form.txt`). `<version>` is the matched file's base name without the
+leading `<package>-` and the trailing `-1.rockspec` (11 characters), cut with duckscript's `length`,
+`calc` and `substring` (probe 237: "airsstack: rockspec …/airsstack-0.2.0-1.rockspec version [0.2.0]",
+"airsstack-luajit: rockspec …/airsstack-luajit-0.2.0-1.rockspec version [0.2.0]").
+
+Why the pattern is anchored on a digit: the old `<package>-*-1.rockspec` matches the LuaJIT
+rockspec for `airsstack` (probe 237 control: "old airsstack-*-1.rockspec -> 2: …/airsstack-0.2.0-1.rockspec
+…/airsstack-luajit-0.2.0-1.rockspec"), and the version read from the second would be `luajit-0.2.0`.
+After `airsstack-` the LuaJIT name continues with `l`, never a digit. Checked examples (probe 237):
+probe 235's two real rockspecs → one match each, both `0.2.0`; a leftover `airsstack-0.1.0-1.rockspec`
+beside them → "rocks: 2 files match `airsstack-<version>-1.rockspec` … (…/airsstack-0.1.0-1.rockspec,
+…/airsstack-0.2.0-1.rockspec); docs-check allows one per package"; an empty directory, and a directory
+holding only `airsstack.rockspec`, `airsstack-0.2.0.rockspec` and `airsstack-luajit-0.2.0.rockspec` →
+"rocks: no `airsstack-<version>-1.rockspec` in …". The task is outside `dod`, so it can meet a tree
+docs-check would refuse; it then refuses rather than pick a file. It does not compare `<version>`
+with the workspace version: docs-check owns that (§5.6.3).
+
+The same lookups, with the interpreter rows added in this order, ran under cargo-make 0.37.24 on
+ubuntu-latest, macos-latest and windows-latest from a tree holding `crates/airsl-lua/rockspecs`, the
+task's own relative directory (`probes/243-ci-rocks-task-lookup.txt`): every message of the table,
+each followed by "Exit with error code: 1" and "Build Failed.", and "version [0.2.0]" for both
+packages when all is found. No runner image ships luarocks, Lua 5.4 or LuaJIT ("which luarocks ->
+[]", "which lua5.4 -> []", "which luajit -> []" on all three). On Windows the glob answers the `/`
+pattern with `\`-separated paths, so there the many-match message reads "(crates\airsl-lua\rockspecs\airsstack-0.1.0-1.rockspec,
+crates\airsl-lua\rockspecs\airsstack-0.2.0-1.rockspec)" while "in `crates/airsl-lua/rockspecs`" keeps
+the `/` the task wrote; `basename` and the cut still give "version [0.2.0]". `which` on Windows finds
+an absolute path with or without `.exe` and one written with `/` ("which
+C:\Users\runneradmin\.cargo\bin\cargo-make -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe]"), and a
+bare name on `PATH`; a missing `C:\no\such\luarocks.exe` answers empty and prints the message.
+
+After these checks: luarocks' and cargo's own output and the task fails on a non-zero exit
+(`exec --fail-on-error`, as native-load); `check.lua`'s failures as §5.6.2. One message of the
+task's own follows the checks (S26): duckscript's `cd` answers empty, prints nothing and leaves the
+working directory where it was when it cannot change into a directory (`probes/247-rocks-task-cwd.txt`
+(d): "cd to a missing directory answered []", "cwd after it [<F>]", "Build Done"), so the task tests
+each `cd`'s answer and, when it is empty, prints `` rocks: could not change into `{dir}` ``, `{dir}`
+being the absolute directory it tried (`<root>/target/rocks/dist` or `<root>`), and exits 1 (probe
+247 (e): "rocks: could not change into `<F>/no/such/dir`", "Exit with error code: 1", "[exit 1]").
+The `cd`, its empty answer and this check behave the same under cargo-make 0.37.24 on ubuntu-latest,
+macos-latest and windows-latest (`probes/252-ci-rocks-task-cwd.txt`). On Windows `pwd` answers a
+`\`-separated `<root>`, so `{dir}` shows both separators, as the task joins them: "rocks: could not
+change into `D:\a\airsl\airsl\work\F/no/such/dir`" (probe 252); the `cd` into such a mixed
+`<root>/target/rocks/dist` takes ("airsstack: pack cwd [D:\a\airsl\airsl\work\F\target\rocks\dist]").
+
+#### 5.6.6 `build-rocks.yml` (S20)
+
+Owner: the first job of `build-rocks.yml`, `version`, on `ubuntu-latest`. Its steps are
+`actions/checkout@v5` (the form `.github/workflows/ci.yml:42` uses and probe 242's `version` job ran),
+then a bash step with `set -euo pipefail` that reads the plan input (`env: PLAN: ${{ inputs.plan }}`,
+the form of `probes/220-publish-downloads-build-artifacts.txt`:57) with one `jq -r -s` program (S25),
+pasted from `probes/246-release-plan-types/app-version.sh`, where it ran:
+
+```bash
+read=$(jq -r -s '
+  def word: {"null": "null", "boolean": "a boolean", "number": "a number", "string": "a string",
+             "array": "an array", "object": "an object"}[type];
+  if length == 0 then "none"
+  elif length > 1 then "many \(length)"
+  else .[0]
+    | if type != "object" then "type the top level is \(word), not an object"
+      elif .releases == null then "none"
+      elif (.releases | type) != "array" then "type releases is \(.releases | word), not an array"
+      else .releases
+        | ([to_entries[] | select(.value | type != "object")] | first) as $bad
+        | if $bad != null then "type releases[\($bad.key)] is \($bad.value | word), not an object"
+          else [.[] | select(.app_name == "airsl-cli")]
+            | if length != 1 then "none"
+              elif (.[0].app_version | type) != "string" then "type the airsl-cli release'"'"'s app_version is \(.[0].app_version | word), not a string"
+              elif .[0].app_version == "" then "type the airsl-cli release'"'"'s app_version is an empty string"
+              else "version \(.[0].app_version)" end
+          end
+      end
+  end' <<<"$PLAN") || { code=$?; echo "build-rocks: could not read the release plan: jq exit status $code"; exit 1; }
+case $read in
+  none) echo "build-rocks: the release plan names no single airsl-cli release"; exit 1 ;;
+  "many "*) echo "build-rocks: the release plan holds ${read#many } JSON values, not one"; exit 1 ;;
+  "type "*) echo "build-rocks: in the release plan, ${read#type }"; exit 1 ;;
+esac
+```
+
+Then the version-shape test, the file test over the checkout, and the `$GITHUB_OUTPUT` line. Every
+message is printed by that step, which then exits 1; no leg starts, because each leg
+`needs: version`.
+
+| Check | Message |
+|---|---|
+| jq exits non-zero: the plan is not JSON (a text that does not parse, or a valid text followed by one that does not) | `build-rocks: could not read the release plan: jq exit status {code}` (jq's own error line above it) |
+| the plan holds `{n}` ≥ 2 JSON texts | `build-rocks: the release plan holds {n} JSON values, not one` |
+| a JSON value of the wrong type, or an empty `app_version` | `build-rocks: in the release plan, {where} is {what}`, where `{where} is {what}` is one of `the top level is {type}, not an object` (`{type}` one of `null`, `a boolean`, `a number`, `a string`, `an array`); `releases is {type}, not an array` (`a boolean`, `a number`, `a string`, `an object`); `releases[{i}] is {type}, not an object` (`{i}` the zero-based index of the first such entry; `{type}` one of `null`, `a boolean`, `a number`, `a string`, `an array`); `the airsl-cli release's app_version is {type}, not a string` (`null`, a missing key included, `a boolean`, `a number`, `an array`, `an object`); `the airsl-cli release's app_version is an empty string` |
+| no `airsl-cli` release, or more than one: an empty plan, `releases` missing, `null` or `[]`, no entry whose `app_name` is the string `airsl-cli` (an `app_name` of another type included), or two such entries | `build-rocks: the release plan names no single airsl-cli release` |
+| the version is not `^[0-9]+\.[0-9]+\.[0-9]+$` | `build-rocks: the release plan's airsl-cli version {version} is not <major>.<minor>.<patch>` |
+| a rockspec `crates/airsl-lua/rockspecs/<package>-<version>-1.rockspec` of the checkout is not a file (`airsstack` first) | `build-rocks: {file} is missing` |
+
+The step writes `version=<version>` to `$GITHUB_OUTPUT`; the legs name both rockspecs exactly from
+`needs.version.outputs.version`, so no leg globs and the Windows leg's `cmd` needs no pattern. The
+mechanism is the one the release workflow already uses for the plan (`.github/workflows/airsl-cli-release.yml:51-52`
+`outputs: val: ${{ steps.plan.outputs.manifest }}`, read as `needs.plan.outputs.val` at `:233`).
+Checked examples of the round-1 read, `jq -r '[.releases[]? | select(.app_name == "airsl-cli") | .app_version] | if length == 1 then .[0] else "" end'`
+(`probes/236-release-version-source.txt` (c), `236-release-version-source/app-version.sh`
+without the file check): the tag plan and the pull-request plan both give "version=0.2.0" (dist puts
+`{"app_name":"airsl-cli","app_version":"0.2.0"}` in both, probe 236 (a)); a plan that also lists
+`airsl` still gives "version=0.2.0"; `{"releases":[]}`, `{}`, an empty plan, and two `airsl-cli`
+releases print the no-single-release message; `0.2` prints the version-shape message; `not json`
+prints jq's parse error and "jq exit status 5". The file test, run on probe 235's tree (probe 236 (e),
+`files.sh`): version `0.2.0` finds both rockspecs, "[exit 0]"; `0.3.0` prints "build-rocks:
+crates/airsl-lua/rockspecs/airsstack-0.3.0-1.rockspec is missing" "[exit 1]". All of these round-1 cases printed the
+same lines under the runners' bash and jq (`probes/242-ci-release-version-snippets.txt`; the job's
+ubuntu-26.04: bash 5.3.9, jq 1.8.1). The job itself, with the round-1 read, ran on ubuntu-latest with the
+plan handed on as a job output: "found crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec",
+"found crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec", "wrote version=0.2.0"; legs on
+the three runners named both rockspecs from `needs.version.outputs.version`, in bash and, on Windows,
+in `cmd` ("found crates\airsl-lua\rockspecs\airsstack-0.2.0-1.rockspec; pack airsstack 0.2.0-1"; same probe).
+
+The `jq -r -s` read of S25 prints what the round-1 read printed for each of the plans above
+(`probes/246-release-plan-types.txt`, bash 3.2.57 and jq 1.7.1), and for the new shapes:
+`{"releases":5}` "build-rocks: in the release plan, releases is a number, not an array";
+`{"releases":[5]}` "build-rocks: in the release plan, releases[0] is a number, not an object";
+`{"releases":[{…airsl-cli…},null]}` "releases[1] is null, not an object"; an `airsl-cli` release
+with `app_version` `5`, `null` or none "build-rocks: in the release plan, the airsl-cli release's
+app_version is a number, not a string" / "is null, not a string"; `""` "build-rocks: in the release
+plan, the airsl-cli release's app_version is an empty string"; `{"releases":null}` and an `app_name`
+of `5` the no-single-release message; the plans `[1]`, `5`, `"x"`, `null`, `false` "build-rocks: in
+the release plan, the top level is an array, not an object", then "is a number", "is a string",
+"is null", "is a boolean"; `{} {}` "build-rocks: the release plan
+holds 2 JSON values, not one". Every one of these cases prints the same lines under ubuntu-26.04's
+bash 5.3.9 and jq 1.8.1, the `version` job's runner, and under the macOS and Windows runners'
+(`probes/250-ci-release-plan-types.txt`).
+
+One more build-rocks message is owned by `crates/airsl-lua/ci/manylinux.sh`, which the two Linux legs
+run (S26, §9.4): any number of arguments other than three prints
+`manylinux.sh: expected 3 arguments (checkout directory, output directory, version), got {n}` and
+exits 1 (`probes/248-manylinux-args.txt`: "got 0", "got 2", "got 4", each "[exit 1]"; the same lines
+under the manylinux2014 image's bash 4.2.46, `probes/253-ci-manylinux-args.txt`, where the §9.4
+invocation without `"$VERSION"` prints "got 2", "[exit 1]").
+
+#### 5.6.7 Generic shapes of the gate and release messages
+
+| Shape | Where | Message |
+|---|---|---|
+| required (absent) | docs-check: a current rockspec missing, a rockspec line missing, a member with no `[package]` or no `version`; the root's `[workspace.package].version`; rocks: a tool or a rockspec missing; publish: the key, the tag, a file; build-rocks: the `airsl-cli` release, a rockspec | §5.6.3 "has no", "declares no `{key} = "…"` line", "has no `[package]` table", "declares no version", "has no string `version`"; §5.6.5 rows 1–4; §5.6.4 "is empty", "names no tag", "is missing"; §5.6.6 "names no single airsl-cli release" and "is missing" |
+| wrong type | docs-check: a member `version` that is not a string or `{ workspace = true }` (type named), a root version that is not a string, a current rockspec that is not a regular file; publish: a plan that is not an object, a tag that is not a string (type named); build-rocks: a plan that is not an object, `releases` not an array, a release not an object, an `app_version` not a string (type named) | §5.6.3 step 6 (members), "has no string `version`", "is not a regular file, so it cannot be a rockspec"; §5.6.4 "in the release plan, … is {type}, not …"; §5.6.6 the same shape (probe 246) |
+| empty | docs-check: `version = ""` is a string (step 5), an empty rockspecs directory (or one holding only hidden entries) gives two "has no" lines; rocks: an empty directory gives "no …"; publish: `""` or an empty plan is "names no tag"; build-rocks: an empty plan is "no single airsl-cli release", an empty `app_version` is "is an empty string" | as listed |
+| hidden entries | docs-check: a name starting with `.` in the rockspecs directory is skipped with no message | §5.6.3 (probe 245) |
+| malformed / unknown value | docs-check: a name that does not split, an unknown package, another version or revision, a line that disagrees with the file name, a manifest that is not valid TOML (`{toml error}`: toml's first line, `: `, its reason line; the first line alone when the error is one line); publish: a tag of another shape; build-rocks: a version of another shape | §5.6.3 (member step 1, probe 249); §5.6.4; §5.6.6 |
+| duplicate | rocks: two rockspecs for one package; build-rocks: two `airsl-cli` releases; publish and build-rocks: a plan of two or more JSON texts; docs-check: a leftover beside the current file is reported by name (a directory cannot hold two entries of one name) | §5.6.5 row 5; §5.6.6 "no single airsl-cli release" and "holds {n} JSON values"; §5.6.4 "holds {n} JSON values"; §5.6.3 steps 3–5 |
+| unknown key | not checked anywhere: rockspec lines are read as text by their key, and member manifests' other keys are cargo's | — |
+| I/O | docs-check: a file or the directory unreadable (a dangling symlink, content that is not UTF-8); rocks: luarocks or cargo failing, a `cd` that does not take; publish: curl transport; build-rocks: jq | §5.6.3 "could not be read/listed"; §5.6.5 last paragraph, "could not change into"; §5.6.4 transport; §5.6.6 row 1 |
+| wrong argument count | `ci/manylinux.sh` | §5.6.6 last paragraph |
 
 ## 6. Edge cases
 
@@ -1030,6 +1518,15 @@ Checked examples, std behaviour from `probes/204-std-trim-escape.txt` (columns: 
 | key invalid | HTTP refusal message with the server body | `probes/189-luarocks-org-names-api.txt`: `{"errors":["Invalid key"]}` "[http 401 application/json]" |
 | account requires two-factor for uploads | a key alone cannot upload: 403 `two_factor_required` | `probes/189-luarocks-org-names-api.txt` (api.moon:78-97); hence the prerequisite of §10.4 |
 | prerelease tag | dist skips custom publish jobs for prereleases | `probes/190-dist-rocks-global-job.txt`: "`if: ${{ !fromJson(needs.plan.outputs.val).announcement_is_prerelease \|\| fromJson(needs.plan.outputs.val).publish_prereleases }}`"; airsl versions have three numeric parts (`version.rs:43-50`) |
+| a version bump without renaming the rockspecs, seen by `build-rocks` on the pull request | the `version` job fails before any leg, naming the first rockspec it lacks; docs-check fails the same pull request's `dod` job | workspace `0.3.0` over `0.2.0` rockspecs → `build-rocks: crates/airsl-lua/rockspecs/airsstack-0.3.0-1.rockspec is missing` (`probes/236-release-version-source.txt` (e)) and §6.4 row 1 |
+| a rockspec absent from the tag's checkout at release | the publish job names it before any request; nothing is uploaded | `publish-rocks: src/crates/airsl-lua/rockspecs/airsstack-luajit-0.3.0-1.rockspec is missing; nothing was uploaded` (§5.6.4; the version comes from the tag, so the name exists without the file, S20) |
+| a tag the publish job cannot read a version from | refused before the download; nothing is uploaded. A tag of another name does not start the release workflow, and dist's plan step refuses an `airsl-cli-v` tag whose version does not parse or is not the package's | §5.6.4 tag rows; `probes/236-release-version-source.txt` (a), (b) |
+| `cargo make rocks` with a leftover rockspec beside the current one | the task refuses before any build, listing both; docs-check names the leftover | §5.6.5; `probes/237-rocks-task-lookup.txt` "rocks: 2 files match …" |
+| `cargo make rocks` with no luarocks or no interpreter | the task refuses before any build | §5.6.5; probe 237 "which nope-luarocks -> []" |
+| a `.DS_Store` (or any name starting with `.`) in the rockspecs directory | docs-check skips it with no message (S24) | §5.6.3; `probes/245-rockspecs-dir-entries.txt` `trace: skipped ".DS_Store" (hidden)` |
+| a directory, FIFO or symlink to a directory under a current rockspec's name | docs-check reports it as not a regular file and never opens it (S24) | §5.6.3; probe 245 "crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec: is not a regular file, so it cannot be a rockspec"; the same on the three runners, the directory and the symlink to a directory on Windows too (`probes/251-ci-rockspecs-entries-and-toml.txt`) |
+| a release plan of the wrong JSON type, or of two JSON texts | both jobs name the type or the count and stop before any download or leg (S25) | §5.6.4, §5.6.6; `probes/246-release-plan-types.txt`; the same lines under the runners' bash and jq, `probes/250-ci-release-plan-types.txt` |
+| the root or a member `Cargo.toml` is not valid TOML | docs-check prints one line: toml's position line, `: `, its reason line; an error with no position prints its reason alone; that input's other checks are skipped (S24) | §5.6.3 member step 1; `probes/249-toml-error-reason-line.txt`: "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 1, column 9: unclosed table, expected `]`" and, for a dotted key of 100 parts, "crates/airsl/Cargo.toml: is not valid TOML: recursion limit" |
 
 ## 7. The native module and the type file
 
@@ -1156,7 +1653,7 @@ which is why there are two packages.
 
 | Arch (luarocks name) | Runner | How | Proof |
 |---|---|---|---|
-| `linux-x86_64` | `ubuntu-latest` | `docker run quay.io/pypa/manylinux2014_x86_64` running `crates/airsl-lua/ci/manylinux.sh`: builds Lua 5.4.8, LuaJIT (pinned commit, §9.4) and luarocks 3.12.2 (against Lua 5.4) from checksummed sources, installs Rust 1.94, then for each package `luarocks [--lua-version 5.1 --lua-dir /opt/luajit] make`, `pack`, and a load check | `probes/162-y1-docker-manylinux-x86_64.txt`: "Packed: /tmp/pack-54/airsstack-0.0.0-1.linux-x86_64.rock", "(jit-via54) … Packed: …airsstack-luajit-0.0.0-1.linux-x86_64.rock", "max GLIBC: GLIBC_2.14"; script shape: `probes/160-ci-probe-src/ci/y1-manylinux.sh` |
+| `linux-x86_64` | `ubuntu-latest` | `docker run quay.io/pypa/manylinux2014_x86_64` running `crates/airsl-lua/ci/manylinux.sh /src /out <version>` (§9.4): builds Lua 5.4.8, LuaJIT (pinned commit, §9.4) and luarocks 3.12.2 (against Lua 5.4) from checksummed sources, installs Rust 1.94, then for each package `luarocks [--lua-version 5.1 --lua-dir /opt/luajit] make`, `pack`, and a load check | `probes/162-y1-docker-manylinux-x86_64.txt`: "Packed: /tmp/pack-54/airsstack-0.0.0-1.linux-x86_64.rock", "(jit-via54) … Packed: …airsstack-luajit-0.0.0-1.linux-x86_64.rock", "max GLIBC: GLIBC_2.14"; script shape: `probes/160-ci-probe-src/ci/y1-manylinux.sh` |
 | `linux-aarch64` | `ubuntu-24.04-arm` | the same with `manylinux2014_aarch64` | `probes/163-y1-docker-manylinux-aarch64.txt`: "…linux-aarch64.rock", "max GLIBC: GLIBC_2.17" |
 | `macosx-aarch64` | `macos-latest` | `brew install lua@5.4 luajit luarocks`; `--lua-version 5.4 --lua-dir $(brew --prefix lua@5.4)` and `--lua-version 5.1 --lua-dir $(brew --prefix luajit)` | `probes/165-y3-brew-macos-arm64.txt`: "Packed: …airsstack-0.0.0-1.macosx-aarch64.rock", "…airsstack-luajit-0.0.0-1.macosx-aarch64.rock" |
 | `macosx-x86_64` | `macos-26-intel` | the same as arm64 | `probes/166-y3-brew-macos-x86_64.txt`: "…macosx-x86_64.rock" for both |
@@ -1256,7 +1753,7 @@ stays (M11).
 - `a_package_line_that_disagrees_with_the_file_name_is_reported`
 - `a_version_line_that_disagrees_with_the_file_name_is_reported`
 - `a_tag_that_is_not_the_release_tag_is_reported`
-- `a_missing_line_is_reported`
+- `a_missing_line_is_reported` (each of `package`, `version`, `tag`, with its own key in the message)
 - `a_leftover_rockspec_of_another_version_is_reported`
 - `a_revision_other_than_one_is_reported`
 - `an_unknown_package_is_reported`
@@ -1265,6 +1762,20 @@ stays (M11).
 - `a_leftover_rockspec_gets_one_message_and_no_line_checks`
 - `a_workspace_version_that_is_missing_or_not_a_string_is_reported`
 - `an_unreadable_rockspec_is_reported`
+- `a_rockspec_name_that_does_not_split_is_reported` (`airsstack.rockspec`, `airsstack-0.2.0.rockspec`, `airsstack-luajit-0.2.0.rockspec`, an empty part, a revision that is not digits)
+- `the_luajit_rockspec_name_splits_as_package_airsstack_luajit`
+- `a_member_without_a_package_table_is_reported`
+- `a_member_without_a_version_is_reported`
+- `a_member_version_of_another_type_is_named_by_its_type`
+- `an_inline_workspace_table_counts_as_inheriting`
+- `a_member_that_is_not_valid_toml_shows_the_position_and_the_reason` (the problem is one line, ``… is not valid TOML: TOML parse error at line 1, column 9: unclosed table, expected `]` `` for `[package`, probe 249)
+- `a_toml_error_without_a_position_is_shown_alone` (a member whose `[package]` holds a dotted key of 100 parts: `… is not valid TOML: recursion limit`, no `: ` after it, probe 249)
+- `a_hidden_entry_is_skipped` (`.DS_Store`, `.gitkeep`, `.rockspec`, a hidden directory: no line; a directory holding only those gives the two "has no" lines)
+- `a_current_name_that_is_a_directory_is_not_a_regular_file` (every OS; one line, and no "has no" line for that package)
+- `a_current_name_that_is_a_fifo_is_reported_without_being_opened` (unix)
+- `a_symlink_to_a_rockspec_file_is_read` (unix)
+- `a_dangling_symlink_is_reported_as_unreadable` (unix)
+- `a_rockspec_that_is_not_utf8_is_reported_as_unreadable`
 
 `crates/docs-check/src/examples.rs`: the test that pins the inner command (`:473`) expects no
 `--all-features`.
@@ -1297,7 +1808,7 @@ then checks, in order, the rows of §5.6.2: `require` succeeds and returns a tab
 | clippy-fix | the clippy commands with `--fix` | — |
 | dod-crate | any crate but airsl-lua: today's five commands without `--all-features`; `airsl-lua`: clippy and doc per ABI, no `cargo test` or doctests (D3), then native-load | — |
 | native-load (new, part of test) | `script_runner = "@duckscript"`, as the repo's other multi-step tasks (`Makefile.toml:141`, `:333`). For `lua54`, then `luajit`: the interpreter is `AIRSL_LUA54` (default `lua5.4`) or `AIRSL_LUAJIT` (default `luajit`), looked up with `which`; empty → §5.6.1, task fails. `exec --fail-on-error cargo build -p airsl-lua --features <abi> --target-dir target/native-build`; `cp` the library (`target/native-build/debug/libairsstack.dylib` on macOS, `libairsstack.so` on Linux, `airsstack.dll` on Windows) to `target/native/<abi>/airsstack.so` (`airsstack.dll` on Windows); `exec --fail-on-error <interpreter> crates/airsl-lua/lua/check.lua target/native/<abi> <abi>`. The explicit `--target-dir` fixes the library's path whatever `CARGO_TARGET_DIR` or `build.target-dir` say, at the cost of a second target tree for the module builds | `probes/233-native-load-task-form.txt` (the task's form on macOS: `which` for a bare name and a path, `exec --fail-on-error`, `cp`; the `CARGO_TARGET_DIR=elsewhere` run left the library at "target/native-build/debug/libairsstack.dylib" and "ls: elsewhere: No such file or directory"); F12; `probes/140-lua-module-private-mod.txt` `nm -gU …/libairsstack.dylib`; `probes/20-rust-mlua-backend-source.txt` rust-mlua.lua:86-94 (`lib<name>.so`, `<name>.dll`). Not run on Linux or Windows (risk R12) |
-| rocks (new, outside `dod` like deny and examples; needs luarocks and network) | `@duckscript`. For each package: the rockspec is the one file matching `crates/airsl-lua/rockspecs/<package>-*-1.rockspec` (docs-check keeps exactly one per package at the workspace version, §5.6.3) and `<version>` is read from its name; `luarocks --lua-version 5.4` (or `5.1`), plus `--lua-dir` from `AIRSL_LUA54_DIR` / `AIRSL_LUAJIT_DIR` when set, `make --tree <root>/target/rocks/<abi> <rockspec>`; then, with cwd `target/rocks/dist` because `pack` writes into the working directory, the same `--lua-version`/`--lua-dir` with `--tree <root>/target/rocks/<abi> pack <package> <version>-1`; then `check.lua <root>/target/rocks/<abi>/lib/lua/5.4 lua54` (or `…/5.1 luajit`). `<root>` is the workspace root, absolute | `probes/146-rockspecs-make-server.txt` (make from the workspace root, both `[exit 0]`; `pack` with `--tree` run in another directory, :147 and :151, "Packed: …"); `probes/165-y3-brew-macos-arm64.txt` (`--lua-dir`) |
+| rocks (new, outside `dod` like deny and examples; needs luarocks and network) | `@duckscript`. First, before any build (S19, §5.6.5): `which` finds luarocks (`AIRSL_LUAROCKS`, default `luarocks`), the Lua 5.4 interpreter (`AIRSL_LUA54`, default `lua5.4`) and LuaJIT (`AIRSL_LUAJIT`, default `luajit`), and for `airsstack` then `airsstack-luajit` the rockspec is the one file matching `crates/airsl-lua/rockspecs/<package>-[0-9]*-1.rockspec`, `<version>` being its base name without `<package>-` and `-1.rockspec`; any failure prints its §5.6.5 message and fails the task. The task's first line is `root = pwd`: `<root>` is the directory the task starts in, absolute, the workspace root when `cargo make rocks` is run there like every task of the file (`probes/247-rocks-task-cwd.txt` (a): "start: pwd [<F>]"; run from a subdirectory with `--makefile ../Makefile.toml`, `pwd` is that subdirectory, (f), and the relative paths below are not found). It makes `<root>/target/rocks/dist` with `mkdir` once. Then for each package, from `<root>`: `<luarocks> --lua-version 5.4` (or `5.1`), plus `--lua-dir` from `AIRSL_LUA54_DIR` / `AIRSL_LUAJIT_DIR` when set, `make --tree <root>/target/rocks/<abi> <rockspec>` (the relative path the lookup found); then `cd <root>/target/rocks/dist`, because `pack` writes into the working directory, and the same `--lua-version`/`--lua-dir` with `--tree <root>/target/rocks/<abi> pack <package> <version>-1`; then `cd <root>`, and `<interpreter> crates/airsl-lua/lua/check.lua <root>/target/rocks/<abi>/lib/lua/5.4 lua54` (or `…/5.1 luajit`). Each command runs through `exec --fail-on-error`; each `cd`'s answer is tested and an empty one fails the task with `` rocks: could not change into `{dir}` `` (§5.6.5, S26). A `cd` holds for every `exec` after it in the task, across loop iterations, until the next `cd` (probe 247 (b): "airsstack: pack cwd [<F>/target/rocks/dist]", "airsstack: back at [<F>]", then the relative `crates/airsl-lua/lua/check.lua` and the second package's relative rockspec found, both rocks written in `target/rocks/dist`, "[exit 0]"); without the return, the relative `check.lua` path is looked up in `target/rocks/dist` and fails (control (c): "ls: crates/airsl-lua/lua/check.lua: No such file or directory", "[exit 1]") | `probes/237-rocks-task-lookup.txt` (the lookups, the pattern, the version cut, every message); `probes/243-ci-rocks-task-lookup.txt` (the same lookups, with the interpreters, under cargo-make 0.37.24 on ubuntu-latest, macos-latest and windows-latest); `probes/146-rockspecs-make-server.txt` (make from the workspace root, both `[exit 0]`; `pack` with `--tree` run in another directory, :147 and :151, "Packed: …"); `probes/165-y3-brew-macos-arm64.txt` (`--lua-dir`); `probes/233-native-load-task-form.txt` (`mkdir`, `exec --fail-on-error`); `probes/247-rocks-task-cwd.txt` (`root = pwd`, the `cd` into `target/rocks/dist` and back across two packages, the empty answer of a failed `cd` and the check on it, macOS); `probes/252-ci-rocks-task-cwd.txt` (the same Makefile, every case with the same outcome, under cargo-make 0.37.24 on ubuntu-latest, macos-latest and windows-latest; on Windows `<root>` is `\`-separated, and `cd ${root}/target/rocks/dist` takes). luarocks' `make` and `pack` and `check.lua` were not run in one task; the moves between their directories were, with stand-in commands (risk R14) |
 | examples, deny, book, publish-dry-run, install, fmt | unchanged | — |
 
 The Makefile comment that
@@ -1353,6 +1864,42 @@ the second (`probes/171-y5-gh-actions-lua-ubuntu-cold.txt`, after `luaVersion: l
 cached runs 168–170 alike).
 
 `build-rocks.yml` runs on every pull request and every release (`probes/190-dist-rocks-global-job.txt`).
+Its first job, `version` (S20, §5.6.6), reads `<version>` from the plan input, the `app_version` of
+the plan's one `airsl-cli` release, which dist writes for a pull request as for a tag
+(`probes/236-release-version-source.txt` (a): `{"app_name":"airsl-cli","app_version":"0.2.0"}` in
+both plans), checks that both rockspecs exist in the checkout, and outputs it (run on ubuntu-latest,
+with the legs reading the output in bash and in the Windows `cmd`,
+`probes/242-ci-release-version-snippets.txt`). Every leg `needs:
+version` and passes `crates/airsl-lua/rockspecs/<package>-<version>-1.rockspec`, named exactly, to
+`luarocks make`, and `<version>-1` to `luarocks pack`. No leg globs. Per leg:
+
+- **The two Linux legs** (S26): the step sets `VERSION: ${{ needs.version.outputs.version }}` in its
+  `env:` and runs
+  `docker run --rm -v "$PWD:/src:ro" -v "$RUNNER_TEMP/out:/out" <image> bash /src/crates/airsl-lua/ci/manylinux.sh /src /out "$VERSION"`,
+  `<image>` being the leg's manylinux2014 image (§8.4), the form of probe 162's run
+  (`probes/160-ci-probe-src/.github/workflows/probe-ci.yml:64`
+  `docker run --rm -v $PWD:/src:ro -v $RUNNER_TEMP/out:/out $I bash /src/ci/y1-manylinux.sh /src /out`)
+  with the version added as a third argument. `ci/manylinux.sh` takes exactly three arguments: the read-only checkout, the output
+  directory, and `<version>`. Probe 160's script took the first two (`y1-manylinux.sh:2` "$1 = repo
+  checkout (copied), $2 = output dir") and hard-coded each rockspec (`:44-45`
+  `RS=crates/airsl-lua/rockspecs/airsstack-0.0.0-1.rockspec`); `ci/manylinux.sh` builds that path from
+  `<version>` instead, relative to its copy of the checkout as probe 160's was (`:32` `cp -r "$SRC"
+  /tmp/repo; cd /tmp/repo`), and passes `<version>-1` to `pack`, for `airsstack` then
+  `airsstack-luajit` (`probes/248-manylinux-args.txt`:
+  "airsstack: luarocks make crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec; luarocks pack airsstack 0.2.0-1", the same for
+  `airsstack-luajit`). Any other number of arguments prints the §5.6.6 message and exits 1 before
+  anything is built. It does not re-check `<version>`'s shape or the rockspecs' presence: the
+  `version` job owns both (§5.6.6), on the same commit. The argument check ran under macOS's bash
+  3.2.57 and, with the same lines, inside `quay.io/pypa/manylinux2014_x86_64` (digest
+  `sha256:8a79ff36ce155d8f242dc8013d73c5e8bbe937defb15de7d7afb342c1ab537f4`, probe 162's) under its
+  "GNU bash, version 4.2.46(2)-release (x86_64-redhat-linux-gnu)", started by this very invocation
+  with `VERSION: 0.2.0` in the step's `env:` ("source /src, output /out", both package lines,
+  "[exit 0]"; `probes/253-ci-manylinux-args.txt`). The aarch64 image was not run.
+- **macOS legs**: bash steps naming the two rockspecs from `needs.version.outputs.version`, as
+  probe 242's legs did.
+- **The Windows leg**: in its `cmd`, the form of `probes/160-ci-probe-src/.github/workflows/probe-ci.yml:164`
+  `make --tree %RUNNER_TEMP%\t54 crates\airsl-lua\rockspecs\airsstack-0.0.0-1.rockspec`, with the
+  version from `needs.version.outputs.version`.
 Each of the five legs of §8.4 builds both packages, packs both binary rocks, loads each from its
 tree with `check.lua`, and uploads them as an artifact named `rocks-<arch>`. The name does not
 match dist's `artifacts-*`, so the rocks are not attached to the GitHub release
@@ -1442,20 +1989,34 @@ runner of `probes/220-publish-downloads-build-artifacts.txt` (ubuntu-26.04), who
 and `jq` (`probes/47-ci-lua-tooling/runner-images/Ubuntu2604-Readme.md`:78 "jq 1.8.1", :258 "curl").
 In order:
 
-1. Fail if `LUAROCKS_API_KEY` is the empty string (§5.6.4), before any download or request.
+1. Before any download or request: fail if `LUAROCKS_API_KEY` is the empty string; then read
+   `<version>` from the release tag (S20): the plan input arrives as `env: PLAN: ${{ inputs.plan }}`
+   (the publish job of `probes/220-publish-downloads-build-artifacts.txt` received it so, :298 `PLAN:
+   {"announcement_tag":"airsl-cli-v0.0.0",…}`; on the same runner image the build job's
+   `jq -r .announcement_tag <<<"$PLAN"` printed "airsl-cli-v0.0.0", :60), the `jq -r -s` read of
+   §5.6.4 (S25) takes the tag after checking the plan's JSON types, and bash's `[[ $tag =~ ^airsl-cli-v([0-9]+\.[0-9]+\.[0-9]+)$ ]]` takes `<version>`
+   from the group. Each failure prints its §5.6.4 message. For this repository's release tag the plan
+   holds `"announcement_tag":"airsl-cli-v0.2.0"`, and the read gives `0.2.0`
+   (`probes/236-release-version-source.txt` (a), (b); every case the same on this runner's bash 5.3.9
+   and jq 1.8.1, `probes/242-ci-release-version-snippets.txt`). The tag is the rockspecs' `source.tag` (§2.5),
+   so the version uploaded is the version the rockspecs build.
 2. Download the `rocks-*` artifacts of the run with `actions/download-artifact` (`pattern: rocks-*`,
-   `merge-multiple: true`): ten binary rocks. A publish job downloads a global job's artifacts in
+   `merge-multiple: true`, `path: rocks/`, as probe 220 downloaded into `path: dl-c/`): ten binary rocks. A publish job downloads a global job's artifacts in
    the same run (`probes/220-publish-downloads-build-artifacts.txt`:3 "(c)/(d) rocks-linux-x86_64 +
    rocks-windows-x86_64 …", :428 "outcomes: a=success b=success c=success d=success"). The name stays
    `rocks-<arch>`, not `artifacts-*`: `host` uploads every `artifacts-*` artifact to the GitHub release
    (same probe :4 "host's pattern artifacts-* also picked up artifacts-build-rocks, so its files would
    go to 'gh release create ... artifacts/*' -- rocks-* did not"), and attaching rocks is a non-goal.
-3. Check out the release tag for its two rockspecs (`crates/airsl-lua/rockspecs/`). `actions/checkout`
-   works under the publish job's token, which has no `contents` scope (same probe :277-278 "Metadata:
+3. Check out the release tag into `src/` (`path: src`, as probe 220 checked out into `path: co` after
+   its downloads, `220-publish-path-src/.github/workflows/publish-rocks.yml:66-71`) for its two
+   rockspecs (`src/crates/airsl-lua/rockspecs/`). `actions/checkout` works under the publish job's token, which has no `contents` scope (same probe :277-278 "Metadata:
    read" / "Packages: write", then :553 "checkout outcome=success"; the repository is public). No
    source rock is packed or uploaded (S12).
-4. Require all twelve files: per package the rockspec and the five
-   `<package>-<version>-1.<arch>.rock` of §8.4.
+4. Require all twelve files, named from `<version>`, in this order: for `airsstack`, then
+   `airsstack-luajit`, the rockspec `src/crates/airsl-lua/rockspecs/<package>-<version>-1.rockspec`,
+   then the five `rocks/<package>-<version>-1.<arch>.rock` in the §8.4 order (`linux-x86_64`,
+   `linux-aarch64`, `macosx-aarch64`, `macosx-x86_64`, `win32-x86_64`). The first missing file is named
+   (§5.6.4).
 5. Phase 1, the rockspecs (S15): for `airsstack`, then `airsstack-luajit`, `POST
    /api/1/<key>/upload` with `rockspec_file`; read `version.id`; check the root manifest (§5.6.4).
    If either check fails, the job stops here and no binary rock is uploaded for either package.
@@ -1508,12 +2069,12 @@ output run against the checkout before it lands, one fact in one chapter.
 | `book/src/ch09-01-three-layers.md` (`:22-25`) | airsl itself stays Lua 5.4; the native module also builds for LuaJIT, with the JSON difference |
 | `book/src/ch09-03-what-it-promises.md` (`:10`) | the limits hold inside airsl; stock Lua has none |
 | `crates/airsl/examples/values-and-json/main.rs` (`:63-64`), `README.md` (`:49-51`) | the `1.7e9` claim is replaced: LuaJIT prints `1700000000` like Lua 5.4 (`probes/149-luajit-json-number.txt`: "\"observed_at\":1700000000" under both); the real difference is a float such as `2^53`, encoded `9007199254740992` on LuaJIT and `9007199254740992.0` on 5.4. The README's `## Output` block does not change. |
-| `CHANGELOG.md` (`:7-9`), `crates/airsl/README.md` (`:101-102`), `crates/airsl-cli/README.md` (`:94-97`) | "versioned independently" becomes one shared version, and every release is a lockstep release of both crates tagged `airsl-v<version>` and `airsl-cli-v<version>` on one commit, never a library-only release (S16); the airsl-cli README's command table gains `--native`; the release's CHANGELOG entry has the `### Breaking` item of §2.5 |
+| `CHANGELOG.md` (`:7-9`), `crates/airsl/README.md` (`:101-102`), `crates/airsl-cli/README.md` (`:94-97`) | "versioned independently" becomes one shared version, and every release is a lockstep release of both crates tagged `airsl-v<version>` and `airsl-cli-v<version>` on one commit, never a library-only release (S16); the airsl-cli README's command table gains `--native`; `CHANGELOG.md` gains a `## Unreleased` section between the preamble (`:1-10`) and `## airsl 0.2.0 — airsl-cli 0.2.0 — 2026-11-25` (`:12`), holding `### Breaking` with the item of §2.5 (S23; the release renames the heading, §2.5) |
 | `README.md` (root) | the release step of S17 (no release checklist exists in the repository: `git ls-files \| xargs grep -li checklist` finds only an unrelated plan, `.claudestacks/sdlc/2026-08-29-windows-platform-support/plans/06-env-name-identity.md:140` "newtype checklist"; the maintainer list under `README.md` § Releases, `:81-93`, is the repository's release procedure): a new item, owned by the maintainer who pushes the `airsl-cli-v*` tag, says that after the first release whose `publish-rocks` job succeeds they run, against luarocks.org, `luarocks --lua-version 5.4 install --local airsstack <version>`, `luarocks --lua-version 5.1 install --local airsstack-luajit <version>` and `airsl lua setup --native` (macOS, Linux and, for the hint, Windows), paste the output into `book/src/ch01-05-stock-lua.md`'s output-less sections, and merge that as a `docs:` pull request |
-| `README.md` (root), continued | `:54-57` "What is in this repository": the crate table gains `airsl-lua` (the native module, shipped as LuaRocks rocks, not on crates.io); `:59-61`: building from source still needs a C compiler, and the native module also builds for LuaJIT; `:66` and `:72-74` Development: `cargo make dod` also needs `lua5.4` and `luajit` on `PATH` (or `AIRSL_LUA54`/`AIRSL_LUAJIT`), and a line for `cargo make rocks`; `:78-79` "Each crate is tagged on its own, … because the two are versioned independently" becomes one shared version with both tags pushed on the same commit and no library-only release (S16, §2.5); `:83-85` "An `airsl-cli-v*` tag starts the binary release …": it also builds the rocks before the GitHub Release and uploads them to luarocks.org after it (§10), and the maintainer list names `build-rocks.yml`, `publish-rocks.yml` and the `LUAROCKS_API_KEY` secret |
+| `README.md` (root), continued | `:54-57` "What is in this repository": the crate table gains `airsl-lua` (the native module, shipped as LuaRocks rocks, not on crates.io); `:59-61`: building from source still needs a C compiler, and the native module also builds for LuaJIT; `:66` and `:72-74` Development: `cargo make dod` also needs `lua5.4` and `luajit` on `PATH` (or `AIRSL_LUA54`/`AIRSL_LUAJIT`), and a line for `cargo make rocks`, naming what it also needs: luarocks on `PATH` or `AIRSL_LUAROCKS` (§5.6.5), and `AIRSL_LUA54_DIR`/`AIRSL_LUAJIT_DIR` when luarocks must be pointed at an interpreter's directory (§9.3); `:78-79` "Each crate is tagged on its own, … because the two are versioned independently" becomes one shared version with both tags pushed on the same commit and no library-only release (S16, §2.5); `:83-85` "An `airsl-cli-v*` tag starts the binary release …": it also builds the rocks before the GitHub Release and uploads them to luarocks.org after it (§10), and the maintainer list names `build-rocks.yml`, `publish-rocks.yml` and the `LUAROCKS_API_KEY` secret |
 | `Cargo.toml` comments (`:3`, `:15-20`) | members comment names airsl-lua as shipped through LuaRocks; the mlua comment says Lua, linking and `send` are now chosen by airsl's features |
 | `crates/airsl/src/lib.rs` | "Cargo features" section (§3.1) |
-| `CLAUDE.md` | "What this is" (`CLAUDE.md:7-10`, "Two published crates in one workspace … A third member"): a fourth member, `crates/airsl-lua`, unpublished on crates.io and shipped as rocks; build requirement (`:12-16`): `dod` also needs `lua5.4` and `luajit` (or `AIRSL_LUA54`/`AIRSL_LUAJIT`); Commands: native-load inside `test`, the `rocks` task, and that a `--workspace` command (an editor's check included) must `--exclude airsl-lua` while bare cargo commands work through `default-members` (F15); docs-check's list becomes five (`CLAUDE.md:37` "these four things") with the rockspec/version bullet; Architecture: the VM line's features (`CLAUDE.md:91` "`lua54,vendored,serialize,send`" becomes airsl's default feature set), `modules::stdlib()` bullet (`:122-123`, "A new module is registered there": in `standalone()`, unless it exists only inside airsl like `ext`), `Engine` bullet (`:134`, "`Engine` is `Send + Sync`": with the default `send` feature), `airsl-lua`, `ModuleSet::open`, the `lua/` folder of airsl-cli. The docs-check lone-name guard reads code spans of `CLAUDE.md`: `luaopen_airsstack` and `cargo_extra_args` appear in no `.rs` or `Cargo.toml` at HEAD (`grep -rn 'luaopen_airsstack\|cargo_extra_args' crates Cargo.toml` exits 1, while the same search for `luaopen_` finds `crates/airsl/src/require/disposition.rs`), and `cargo_extra_args` will live only in the rockspecs; `CLAUDE.md` writes such a name in prose, not in a code span, unless the implementation puts it in a `.rs` file (for example `entry.rs`'s `//!`) |
+| `CLAUDE.md` | "What this is" (`CLAUDE.md:7-10`, "Two published crates in one workspace … A third member"): a fourth member, `crates/airsl-lua`, unpublished on crates.io and shipped as rocks; build requirement (`:12-16`): `dod` also needs `lua5.4` and `luajit` (or `AIRSL_LUA54`/`AIRSL_LUAJIT`); Commands: native-load inside `test`, the `rocks` task with its variables (`AIRSL_LUAROCKS`, `AIRSL_LUA54_DIR`, `AIRSL_LUAJIT_DIR`, beside the interpreters' two), and that a `--workspace` command (an editor's check included) must `--exclude airsl-lua` while bare cargo commands work through `default-members` (F15); docs-check's list becomes five (`CLAUDE.md:37` "these four things") with the rockspec/version bullet; Architecture: the VM line's features (`CLAUDE.md:91` "`lua54,vendored,serialize,send`" becomes airsl's default feature set), `modules::stdlib()` bullet (`:122-123`, "A new module is registered there": in `standalone()`, unless it exists only inside airsl like `ext`), `Engine` bullet (`:134`, "`Engine` is `Send + Sync`": with the default `send` feature), `airsl-lua`, `ModuleSet::open`, the `lua/` folder of airsl-cli. The docs-check lone-name guard reads code spans of `CLAUDE.md`: `luaopen_airsstack` and `cargo_extra_args` appear in no `.rs` or `Cargo.toml` at HEAD (`grep -rn 'luaopen_airsstack\|cargo_extra_args' crates Cargo.toml` exits 1, while the same search for `luaopen_` finds `crates/airsl/src/require/disposition.rs`), and `cargo_extra_args` will live only in the rockspecs; `CLAUDE.md` writes such a name in prose, not in a code span, unless the implementation puts it in a `.rs` file (for example `entry.rs`'s `//!`) |
 | `book/src/appendix-03-presets.md`, `book/src/ch03-05-presets.md` | unchanged: they describe airsl, which stays Lua 5.4 with `utf8` |
 
 ## 12. Risks
@@ -1554,6 +2115,29 @@ output run against the checkout before it lands, one fact in one chapter.
   paths of the MSVC-built interpreters, the path form probe 233 proved for `which`.
 - **R13** (accepted, S18) — `copy_directories` with a nested, `/`-separated path was run on macOS only (probe 235);
   its first Linux and Windows runs are the `build-rocks.yml` legs of the pull request that adds it.
+- **R14** (drafted 2026-11-26; pending the author) — The amendments S19, S20, S24, S25 and S26 are proven in parts.
+  Proven on the ubuntu-latest, macos-latest and windows-latest runners: the round-1 release-job
+  snippets (the publish job's tag read, every §5.6.4 tag message; the `version` job's `app_version`
+  read, file test and every §5.6.6 message) give the local output under ubuntu-26.04's bash 5.3.9
+  and jq 1.8.1, and under the macOS and Windows runners' bash and jq; the `version` job ran on
+  ubuntu-latest and the legs on all three read its output, in `cmd` on Windows
+  (`probes/242-ci-release-version-snippets.txt`); the `rocks` task's lookups and every §5.6.5
+  message under cargo-make 0.37.24 (`probes/243-ci-rocks-task-lookup.txt`); the rewritten plan
+  reads of S25, every case of probe 246 with its lines (`probes/250-ci-release-plan-types.txt`);
+  docs-check's file-type rule and the toml reason line of S24, built with rustc 1.94.1, the FIFO
+  cases on Linux and macOS and real symlinks on all three (`probes/251-ci-rockspecs-entries-and-toml.txt`);
+  the `rocks` task's moves between `<root>` and `target/rocks/dist` and the check on a failed `cd`
+  (`probes/252-ci-rocks-task-cwd.txt`). Proven inside `quay.io/pypa/manylinux2014_x86_64` by
+  `docker run` on ubuntu-latest: `ci/manylinux.sh`'s argument check, started by §9.4's invocation
+  (`probes/253-ci-manylinux-args.txt`).
+  Still unproven: luarocks' `make` and `pack` and `check.lua` run as one task, on any OS (the
+  `cd` moves ran with stand-in commands); the rewritten plan read inside the `version` job (it ran
+  as a script under the runner's bash and jq; the job's form ran with the round-1 read, probe 242);
+  `ci/manylinux.sh` in the aarch64 image; the `version` job inside `build-rocks.yml` as a reusable
+  workflow called by dist's release workflow with `inputs.plan` (the probe handed a saved plan on as
+  a job output; probe 220 ran `inputs.plan` as `env: PLAN` on its own); the publish job's tag read
+  on a plan from a real tag push (`dist host` needs a token and was not run), whose first chance is
+  the roadmap's release.
 
 ## 13. Claim ledger: every probe this spec relies on
 
@@ -1628,6 +2212,24 @@ output run against the checkout before it lands, one fact in one chapter.
 | `probes/232-default-members.txt` | F15: `default-members` |
 | `probes/233-native-load-task-form.txt` | §9.3 native-load form, §5.6.1 messages |
 | `probes/234-publish-jq-checks.txt` | §5.6.4 jq tests |
+| `probes/236-release-version-source.txt` | S20: dist's plan carries `announcement_tag` `airsl-cli-v0.2.0` on the tag and `app_version` `0.2.0` on a pull request and a tag; dist refuses a tag whose version is not the package's or does not parse; the publish job's tag read and its three messages; build-rocks' `app_version` read, its messages and its file test; no tag ends in a newline |
+| `probes/237-rocks-task-lookup.txt` | S19, §5.6.5, §9.3: the old glob matches both rockspecs; the anchored pattern finds one per package; `<version>` cut from the name; the leftover, empty and malformed directories; `which` for luarocks; every rocks message and exit 1 |
+| `probes/238-member-version-shapes.txt` | S21, §5.6.3 member manifests: how toml 1.2.2 reads each shape of `[package] version`, the dotted and inline forms equal, `type_str()` names |
+| `probes/239-rockspec-name-split.txt` | S22, §5.6.3 split rule and examples in std Rust; luarocks' `path.parse_name` on the same names; `luarocks lint` refusing names that do not split |
+| `probes/240-keep-a-changelog-1.1.0.txt` | S23, §2.5: Keep a Changelog 1.1.0's `Unreleased` section; the CHANGELOG's heading style and that it has no Unreleased section |
+| `probes/241-publish-rocks-message-endings.txt` | §5.6.4: the unreadable-plan message ends "; nothing was uploaded" like the other two tag messages; probe 236 (b)'s tag read re-run with it, every other case unchanged |
+| `probes/242-ci-release-version-snippets.txt` | R14, §5.6.4, §5.6.6, §10.3, §1 versions: the tag read, the `app_version` read and the file test give probe 241's and 236's output under the runners' bash and jq (ubuntu-26.04 bash 5.3.9, jq 1.8.1; macOS bash 3.2.57, jq 1.8.2; Windows Git Bash 5.3.15, jq 1.8.2); the `version` job, with its round-1 read (before S25), on ubuntu-latest; the legs read its output in bash and `cmd` |
+| `probes/243-ci-rocks-task-lookup.txt` | R14, §5.6.5, §9.3: the rocks task's lookups and every message under cargo-make 0.37.24 on ubuntu-latest, macos-latest and windows-latest; Windows: `\`-separated glob paths, `which` with and without `.exe`, `/` paths, a bare name; no runner ships luarocks, Lua 5.4 or LuaJIT |
+| `probes/244-toml-error-first-line.txt` | S24, §5.6.3 member step 1 and the inputs block: toml 1.2.2's error `Display` is five lines; its first line is `TOML parse error at line {l}, column {c}` for six kinds of invalid manifest (its first-line cut is replaced by form B; the six kinds are rerun in probe 249 with the same `Display`) |
+| `probes/245-rockspecs-dir-entries.txt` | S24, §5.6.3 split rule and "Directory edges", §9.1: hidden entries skipped with no message; a directory, a FIFO (never opened) and a symlink to a directory under a current name get "is not a regular file, so it cannot be a rockspec"; a symlink to a file is read; a dangling symlink and non-UTF-8 content get "could not be read" with the io error's text; hidden-only directory gives the two "has no" lines; `read_to_string` alone on a directory gives IsADirectory (macOS; Linux and Windows in probe 251) |
+| `probes/246-release-plan-types.txt` | S25, §5.6.4, §5.6.6, §5.6.7, §10.3: the `jq -r -s` reads of both jobs; every round-1 case unchanged except `{"announcement_tag":5}`; the wrong-type, empty `app_version` and several-JSON-texts messages; bash 3.2.57 and jq 1.7.1 (the runners' bash and jq in probe 250) |
+| `probes/247-rocks-task-cwd.txt` | S26, §5.6.5, §9.3, R14: `root = pwd`; duckscript's `cd` holds for later `exec` commands across loop iterations and back; without the return the relative `check.lua` path fails; a failed `cd` answers empty and stays put; the check and its message; cargo-make 0.37.24 on macOS (the three runners in probe 252) |
+| `probes/248-manylinux-args.txt` | S26, §5.6.6, §8.4, §9.4: `ci/manylinux.sh`'s three arguments, the rockspec paths and `pack` arguments built from `<version>`, the wrong-count message; bash 3.2.57 (the manylinux2014 image's bash in probe 253) |
+| `probes/249-toml-error-reason-line.txt` | S24, §5.6.3 member step 1 and the inputs block, §5.6.7, §6.4, §9.1, §1.3: form B's `{toml error}` (first line, `: `, the last non-empty line after it; the first line alone for a one-line `Display`) over fifteen invalid manifests under toml 1.2.2 with the workspace's `Cargo.lock` versions (toml_parser 1.1.6, toml_datetime 1.1.3); every reason one non-empty line; the position-less "recursion limit" for a dotted key of 100 parts; the CRLF excerpt line |
+| `probes/250-ci-release-plan-types.txt` | R14, S25, §1.3, §5.6.4, §5.6.6, §6.4: probe 246's reads print its 169 lines under ubuntu-26.04 bash 5.3.9 / jq 1.8.1, macOS bash 3.2.57 / jq 1.8.2 and Windows Git Bash 5.3.15 / jq 1.8.2; run URL, the branch's deletion |
+| `probes/251-ci-rockspecs-entries-and-toml.txt` | R14, S24, §1.3, §5.6.3, §6.4: probe 245's rule gives its lines on ubuntu-latest and macos-latest; on windows-latest the same outcomes over real symlinks, Windows' text for the dangling symlink, `PermissionDenied` for `read_to_string` on a directory; probe 249's 31 lines on all three; rustc 1.94.1 |
+| `probes/252-ci-rocks-task-cwd.txt` | R14, S26, §1.3, §5.6.5, §9.3: probe 247's cases with the same outcomes under cargo-make 0.37.24 on the three runners; on Windows a `\`-separated `<root>` and a mixed-separator `{dir}` in the `cd` message |
+| `probes/253-ci-manylinux-args.txt` | R14, S26, §1.3, §5.6.6, §9.4: probe 248's lines inside `quay.io/pypa/manylinux2014_x86_64` (digest `sha256:8a79ff36…`, bash 4.2.46); §9.4's `docker run` with `VERSION` from `env:` reaches the script with three arguments |
 
 ## 14. Non-goals
 

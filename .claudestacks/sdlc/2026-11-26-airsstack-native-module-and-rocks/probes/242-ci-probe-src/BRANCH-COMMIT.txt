@@ -1,0 +1,1 @@
+9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c ci(probe): throwaway probe of the rock jobs' version reads and the rocks task lookups

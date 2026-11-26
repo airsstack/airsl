@@ -1,0 +1,3 @@
+# Probe files only: bash on the Windows runner (Git Bash) cannot read CRLF scripts, and the Rust and TOML sources
+# must be the bytes that ran locally.
+* text=auto eol=lf

@@ -1,0 +1,183 @@
+# Throwaway CI probe 2 (spec 2026-11-26-airsstack-native-module-and-rocks, R14): the round-2 additions run so far only on
+# macOS -- probe 246's rewritten `jq -r -s` plan reads, probe 245's file-type check and probe 249's toml reason line, probe
+# 247's duckscript `cd` -- on the three GitHub-hosted runners, and probe 248's manylinux.sh argument check inside the
+# manylinux2014 image.
+name: probe-ci-rocks-2
+on:
+  push:
+    branches: [probe-ci-rocks-2]
+permissions:
+  contents: read
+
+jobs:
+  # Probe 246's tag.sh (publish-rocks) and app-version.sh (build-rocks), every case of its run.sh, under each runner's bash
+  # and jq (Git Bash on Windows).
+  plan-reads:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - name: tool versions
+        run: |
+          echo "\$ bash --version | head -1; jq --version; command -v bash jq"
+          bash --version | head -1; jq --version; command -v bash jq
+      - name: probe 246 run.sh
+        run: |
+          echo "\$ bash run.sh 246-release-plan-types"
+          bash probe/246/run.sh probe/246
+
+  # Probe 245's entries.rs and control.rs and probe 249's crate, built on each runner with the repository's toolchain
+  # channel (rust-toolchain.toml beside each, 1.94).
+  rust:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_BUILD_JOBS: 2
+    steps:
+      - uses: actions/checkout@v5
+      - name: tool versions
+        working-directory: probe/245
+        run: |
+          echo "\$ rustup show active-toolchain; rustc --version; cargo --version   (in probe/245 and probe/249)"
+          rustup show active-toolchain; rustc --version; cargo --version
+          cd ../249 && rustup show active-toolchain && rustc --version && cargo --version
+      - name: build entries and control
+        working-directory: probe/245
+        run: |
+          set +e   # each command's exit is printed, as in the local probes
+          EXE=; [ "$RUNNER_OS" = Windows ] && EXE=.exe
+          echo "\$ rustc --edition 2024 entries.rs -o entries$EXE && rustc --edition 2024 control.rs -o control$EXE"
+          rustc --edition 2024 entries.rs -o "entries$EXE" && rustc --edition 2024 control.rs -o "control$EXE"; echo "[exit $?]"
+      - name: build the fixtures (unix, fixtures.sh)
+        if: runner.os != 'Windows'
+        run: |
+          set +e   # each command's exit is printed, as in the local probes
+          echo "\$ bash fixtures.sh <F>"
+          bash probe/245/fixtures.sh "$RUNNER_TEMP/F"; echo "[exit $?]"
+      - name: build the fixtures (Windows, fixtures_windows.rs)
+        if: runner.os == 'Windows'
+        working-directory: probe/245
+        run: |
+          set +e   # each command's exit is printed, as in the local probes
+          echo "\$ rustc --edition 2024 fixtures_windows.rs -o fixtures_windows.exe && fixtures_windows <F>"
+          rustc --edition 2024 fixtures_windows.rs -o fixtures_windows.exe && ./fixtures_windows.exe "$RUNNER_TEMP/F"; echo "[exit $?]"
+      - name: list the fixtures
+        run: |
+          for d in A B C D; do echo "\$ ls -la <F>/$d"; ls -la "$RUNNER_TEMP/F/$d"; done
+      - name: entries and control
+        working-directory: probe/245
+        run: |
+          set +e   # each command's exit is printed, as in the local probes
+          EXE=; [ "$RUNNER_OS" = Windows ] && EXE=.exe
+          for d in A B C D; do echo "\$ entries <F>/$d"; "./entries$EXE" "$RUNNER_TEMP/F/$d" 2>&1; echo "[exit $?]"; done
+          echo "\$ control <F>/A/airsstack-0.2.0-1.rockspec   (a directory)"
+          "./control$EXE" "$RUNNER_TEMP/F/A/airsstack-0.2.0-1.rockspec" 2>&1; echo "[exit $?]"
+      - name: probe 249 (toml reason line)
+        working-directory: probe/249
+        run: |
+          set +e   # each command's exit is printed, as in the local probes
+          echo "\$ cargo run --locked --quiet"
+          cargo run --locked --quiet 2>&1; echo "[exit $?]"
+          echo "\$ cargo tree --locked"
+          cargo tree --locked 2>&1
+
+  # Probe 247's Makefile under cargo-make 0.37.24 on each runner. The tasks' `exec ls` and `exec touch` are stand-ins for
+  # luarocks and check.lua; the steps run under bash so Git's ls and touch are on PATH on Windows.
+  cargo-make:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install cargo-make
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-make@0.37.24
+      - name: tool versions and the fixture
+        run: |
+          set +e   # each command's exit is printed, as in the local probes
+          echo "\$ cargo make --version; command -v cargo-make ls touch"
+          cargo make --version; command -v cargo-make ls touch
+          echo "\$ bash fixture.sh work/F Makefile.toml"
+          bash probe/247/fixture.sh work/F probe/247/Makefile.toml; echo "[exit $?]"
+      - name: "case cd_probe: cargo make cd-probe in work/F"
+        id: cd_probe
+        continue-on-error: true
+        working-directory: work/F
+        run: cargo make cd-probe
+      - name: "case cd_control: cargo make cd-control in work/F"
+        id: cd_control
+        continue-on-error: true
+        working-directory: work/F
+        run: cargo make cd-control
+      - name: "case cd_missing: cargo make cd-missing in work/F"
+        id: cd_missing
+        continue-on-error: true
+        working-directory: work/F
+        run: cargo make cd-missing
+      - name: "case subdir: cargo make --makefile ../Makefile.toml cd-probe in work/F/crates"
+        id: subdir
+        continue-on-error: true
+        working-directory: work/F/crates
+        run: cargo make --makefile ../Makefile.toml cd-probe
+      - name: "case cd_checked: cargo make cd-checked in work/F"
+        id: cd_checked
+        continue-on-error: true
+        working-directory: work/F
+        run: cargo make cd-checked
+      - name: outcomes
+        run: |
+          echo "cd_probe: ${{ steps.cd_probe.outcome }}"
+          echo "cd_control: ${{ steps.cd_control.outcome }}"
+          echo "cd_missing: ${{ steps.cd_missing.outcome }}"
+          echo "subdir: ${{ steps.subdir.outcome }}"
+          echo "cd_checked: ${{ steps.cd_checked.outcome }}"
+          echo "\$ ls work/F/target/rocks/dist"; ls work/F/target/rocks/dist
+
+  # Probe 248's argument check in the image spec §8.4 names, by docker run on the host (a job-level `container:` cannot run
+  # node actions there). First probe 248's run.sh, then the spec's own invocation (§9.4) with VERSION from the step env.
+  manylinux:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE: quay.io/pypa/manylinux2014_x86_64
+    steps:
+      - uses: actions/checkout@v5
+      - name: image and versions
+        run: |
+          docker --version
+          docker pull "$IMAGE"
+          docker image inspect --format '{{index .RepoDigests 0}}' "$IMAGE"
+          echo "\$ docker run --rm \$IMAGE bash --version | head -1"
+          docker run --rm "$IMAGE" bash --version | head -1
+      - name: probe 248 run.sh in the container
+        run: |
+          set +e   # each command's exit is printed, as in the local probes
+          echo "\$ docker run --rm -v \"\$PWD/probe/248:/p:ro\" \$IMAGE bash /p/run.sh /p"
+          docker run --rm -v "$PWD/probe/248:/p:ro" "$IMAGE" bash /p/run.sh /p; echo "[exit $?]"
+      - name: the spec's invocation
+        env:
+          VERSION: 0.2.0
+        run: |
+          set +e   # each command's exit is printed, as in the local probes
+          mkdir -p "$RUNNER_TEMP/out"
+          echo "\$ docker run --rm -v \"\$PWD:/src:ro\" -v \"\$RUNNER_TEMP/out:/out\" \$IMAGE bash /src/crates/airsl-lua/ci/manylinux.sh /src /out \"\$VERSION\""
+          docker run --rm -v "$PWD:/src:ro" -v "$RUNNER_TEMP/out:/out" "$IMAGE" bash /src/crates/airsl-lua/ci/manylinux.sh /src /out "$VERSION"; echo "[exit $?]"
+          echo "\$ (the same without \$VERSION)"
+          docker run --rm -v "$PWD:/src:ro" -v "$RUNNER_TEMP/out:/out" "$IMAGE" bash /src/crates/airsl-lua/ci/manylinux.sh /src /out; echo "[exit $?]"

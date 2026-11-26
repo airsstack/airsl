@@ -1,0 +1,97 @@
+# Probe 247 — duckscript's `cd` inside one cargo-make task: entering target/rocks/dist for `pack` and returning to the root
+question: spec review round 2, finding R6 (spec §9.3 rocks row, R14): the rocks task runs `luarocks make` with a relative rockspec
+  path from the workspace root, `pack` with cwd target/rocks/dist, then `<interpreter> crates/airsl-lua/lua/check.lua …` (a
+  relative path) and the next package's `make`. (a) Does `root = pwd` at the task's start give the root, absolute? (b) Does
+  `cd <dir>` change the directory for the `exec` commands after it, and does `cd ${root}` bring them back, across two loop
+  iterations? (c) Control: without the return, is the relative check.lua path looked up in target/rocks/dist? (d) What does `cd`
+  answer for a directory that does not exist, and where does the task stand after it? (e) The check the task makes on that answer,
+  and its message. (f) What `pwd` gives when cargo make is invoked from a subdirectory with --makefile.
+versions: cargo-make 0.37.24 (repo min_version 0.37.0, Makefile.toml:27); macOS 26.3.1 arm64. Not run on Linux or Windows.
+  luarocks is not run: `exec ls <relative path>` stands for `luarocks make <relative rockspec>` and for check.lua, `exec touch` in
+  target/rocks/dist for `pack` writing its rock into the working directory.
+setup: 247-rocks-task-cwd/Makefile.toml (tasks cd-probe, cd-control, cd-missing, cd-checked; cd-checked was added after the first
+  four ran, and its run is the last below), fixture.sh (the tree <F>, in the scratchpad, deleted). A bare path line in the output
+  is printed by duckscript's own `pwd` or `cd`. `echo` ends each line with a space, as in probe 237.
+date: 2026-11-26
+--- raw output ---
+$ cargo make --version
+cargo-make 0.37.24
+$ cd <F> && cargo make cd-probe
+[cargo-make] INFO - cargo make 0.37.24
+[cargo-make] INFO - 
+[cargo-make] INFO - Build File: Makefile.toml
+[cargo-make] INFO - Task: cd-probe
+[cargo-make] INFO - Profile: development
+[cargo-make] INFO - Running Task: cd-probe
+<F>
+start: pwd [<F>] 
+CARGO_MAKE_WORKING_DIRECTORY [<F>] 
+crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec
+<F>/target/rocks/dist
+airsstack: pack cwd [<F>/target/rocks/dist] 
+<F>
+airsstack: back at [<F>] 
+crates/airsl-lua/lua/check.lua
+crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec
+<F>/target/rocks/dist
+airsstack-luajit: pack cwd [<F>/target/rocks/dist] 
+<F>
+airsstack-luajit: back at [<F>] 
+crates/airsl-lua/lua/check.lua
+airsstack-0.2.0-1.probe.rock
+airsstack-luajit-0.2.0-1.probe.rock
+[cargo-make] INFO - Build Done in 0.86 seconds.
+[exit 0]
+$ cd <F> && cargo make cd-control
+[cargo-make] INFO - cargo make 0.37.24
+[cargo-make] INFO - 
+[cargo-make] INFO - Build File: Makefile.toml
+[cargo-make] INFO - Task: cd-control
+[cargo-make] INFO - Profile: development
+[cargo-make] INFO - Running Task: cd-control
+<F>
+<F>/target/rocks/dist
+control: cwd [<F>/target/rocks/dist] 
+ls: crates/airsl-lua/lua/check.lua: No such file or directory
+[cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 8 - Error while executing command, exit code: 1
+[cargo-make] WARN - Build Failed.
+[exit 1]
+$ cd <F> && cargo make cd-missing
+[cargo-make] INFO - cargo make 0.37.24
+[cargo-make] INFO - 
+[cargo-make] INFO - Build File: Makefile.toml
+[cargo-make] INFO - Task: cd-missing
+[cargo-make] INFO - Profile: development
+[cargo-make] INFO - Running Task: cd-missing
+<F>
+cd to a missing directory answered [] 
+<F>
+cwd after it [<F>] 
+[cargo-make] INFO - Build Done in 0.45 seconds.
+[exit 0]
+$ cd <F>/crates && cargo make --makefile ../Makefile.toml cd-probe   (invoked from a subdirectory)
+[cargo-make] INFO - cargo make 0.37.24
+[cargo-make] INFO - 
+[cargo-make] INFO - Build File: ../Makefile.toml
+[cargo-make] INFO - Task: cd-probe
+[cargo-make] INFO - Profile: development
+[cargo-make] INFO - Running Task: cd-probe
+<F>/crates
+start: pwd [<F>/crates] 
+CARGO_MAKE_WORKING_DIRECTORY [<F>/crates] 
+ls: crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec: No such file or directory
+[cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 10 - Error while executing command, exit code: 1
+[cargo-make] WARN - Build Failed.
+[exit 1]
+$ cd <F> && cargo make cd-checked
+[cargo-make] INFO - cargo make 0.37.24
+[cargo-make] INFO - 
+[cargo-make] INFO - Build File: Makefile.toml
+[cargo-make] INFO - Task: cd-checked
+[cargo-make] INFO - Profile: development
+[cargo-make] INFO - Running Task: cd-checked
+<F>
+rocks: could not change into `<F>/no/such/dir` 
+[cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 8 - Exit with error code: 1
+[cargo-make] WARN - Build Failed.
+[exit 1]
