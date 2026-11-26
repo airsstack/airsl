@@ -233,7 +233,7 @@ fn protect_string_metatable(lua: &mlua::Lua) -> Result<()> {
         .map_err(fail)
 }
 
-/// Creates the root table and installs every module into it.
+/// Creates the root table, installs every module into it and registers it for `require`.
 ///
 /// Every module is told the policy it is being installed under, so a module that guards an
 /// operation reads its authority from the same place [`crate::Engine::policy`] reports it from.
@@ -255,6 +255,8 @@ fn install_modules(
         module.install(lua, &table, &context)?;
         root.set(module.name().as_str(), table).map_err(fail)?;
     }
+    // Before the global is set, because setting it moves `root`.
+    crate::require::root::register(lua, root_table, &root, policy.language())?;
     lua.globals().set(root_table.as_str(), root).map_err(fail)?;
     Ok(())
 }

@@ -42,7 +42,7 @@ mod error;
 mod failure_policy;
 mod instruction_budget;
 mod paths;
-mod require_loader;
+mod require;
 mod script;
 #[cfg(test)]
 mod test_support;

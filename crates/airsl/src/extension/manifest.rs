@@ -295,7 +295,7 @@ fn validate_entry(entry: &str, dir: &Path) -> Result<PathBuf> {
         return Err(invalid(format!("`{entry}` is not a file")));
     }
     // `relative`, not `resolved`, is what this function returns: it was never canonicalised, only
-    // checked, so unlike `require_loader::resolve` and `loaded::recheck_entry` there is nothing
+    // checked, so unlike `require::loader::resolve` and `loaded::recheck_entry` there is nothing
     // verbatim in it to strip.
     Ok(relative)
 }

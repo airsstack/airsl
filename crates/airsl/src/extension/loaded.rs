@@ -383,6 +383,42 @@ mod tests {
     }
 
     #[test]
+    fn an_extension_requires_its_host_s_root_by_name() {
+        let dir = fixture(
+            "mine",
+            "",
+            r#"
+            local at_load = require("myapp")
+            myapp.ext.on("ping", function()
+                return {
+                    at_load = rawequal(at_load, myapp),
+                    at_dispatch = rawequal(require("myapp"), myapp),
+                }
+            end)
+            "#,
+        );
+        let ceiling = Ceiling::new(Policy::confined()).unwrap();
+        let events = events(&["ping"]);
+        let variables = Variables::none();
+        let approver = ManifestApprover;
+        let root = RootTable::new("myapp").unwrap();
+
+        let ext = Extension::load(
+            dir.path(),
+            context(&ceiling, &events, &variables, &approver, &root),
+        )
+        .unwrap();
+
+        let result = ext
+            .call(&EventName::new("ping").unwrap(), &json!({}))
+            .unwrap();
+        assert_eq!(
+            result,
+            Some(json!({ "at_load": true, "at_dispatch": true }))
+        );
+    }
+
+    #[test]
     fn an_event_with_no_handler_answers_none() {
         let dir = fixture("echo", "", ECHO);
         let ceiling = Ceiling::new(Policy::confined()).unwrap();
