@@ -71,7 +71,7 @@ A few settings on the builder are worth knowing:
 |---|---|
 | `.approver(a)` | uses your own approver instead of `ManifestApprover` |
 | `.variables([("NAME", "value")])` | supplies values for `$NAME` in manifests |
-| `.root_table(RootTable::new("myapp")?)` | names the global extensions see |
+| `.root_table(RootTable::new("myapp")?)` | names the global extensions see, and the name `require` answers with that table |
 | `.modules(factory)` | chooses the modules each extension gets, including your own from [chapter 7](ch07-00-your-own-module.md) |
 
 Some things are deliberately left to you. Grants are fixed for the life of a loaded extension; to

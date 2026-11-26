@@ -76,9 +76,9 @@ not this example's to choose, and every `## Output` block here has to reproduce 
 - **The `require` root is per evaluation.** `set_require` decides from the *script's* directory
   (`Engine::set_require` in `src/engine.rs`), so `alpha/main.lua` and `beta/main.lua` each resolve
   `require('lib')` against their own root on the same engine. A confined script built from source
-  has no directory and so gets no `require` at all.
+  has no directory and so gets a `require` that answers only the root table.
 - **The `require` module cache is not.** The table of loaded modules is created once and kept
-  (`RequireLoader::install` in `src/require_loader.rs`), keyed by canonical absolute path, so it
+  (`RequireLoader::install` in `src/require/loader.rs`), keyed by canonical absolute path, so it
   stays correct across roots. Three evaluations of a script requiring a counting module answer
   `1, 1, 1`, which is what Lua's own `package.loaded` does. This used to be the other way round —
   the cache was rebuilt per evaluation and answered `1, 2, 3` — so cached state was discarded while

@@ -5,13 +5,15 @@
 //! searches `package.path` — the process's working directory and its installation prefixes — and
 //! can open anything on the machine. On `confined` it gets a Rust function that resolves under the
 //! directory the script was read from, has no `package` table to widen, and refuses a name that
-//! could describe a parent. On `pure` the global is a function that refuses every call until the
-//! `require` host access is granted, and then it is the confined one. Several functions behind one
-//! name is not something a single-file example can show.
+//! could describe a parent. On `pure` the global is a function that refuses every call except the
+//! root table's name until the `require` host access is granted, and then it is the confined one. A
+//! script with no directory gets a fourth, which answers only the root table's name. Several
+//! functions behind one name is not something a single-file example can show.
 //!
 //! Responsibilities: the confined `require` — resolution through `<stem>.lua` and
 //! `<stem>/init.lua`, the module cache and how long it lives, the three ways a target is refused,
-//! and the four-way answer to which `require` a script gets at all.
+//! and the four-way answer to which `require` a script gets at all: refusing, confined, Lua's own
+//! and root-only.
 //!
 //! Non-responsibilities: the rest of the policy. A preset decides grants and ceilings too, and
 //! [`policy-presets`](../policy-presets/) is where those are read.
@@ -23,14 +25,19 @@ use airsl::{Engine, FsGrant, GrantSet, HostAccess, Policy, Script};
 
 /// A confined script the engine has no directory for, because it never came from one.
 ///
-/// [`Script::from_source`] records no root, and the disposition for a restricted surface without
-/// one is to clear the global: there is nothing to confine a loader to, and a loader that fell
-/// back to the working directory would resolve differently depending on where the host was
-/// started. Inline because the point is precisely that this script is not a file.
-const FROM_MEMORY: &str = r#"print(string.format(
-  "%-12s require=%-8s and no directory that could give it one",
+/// [`Script::from_source`] records no root, and the disposition for a restricted surface that
+/// grants `require` but has no root is a `require` that answers only the root table: there is
+/// nothing to confine a loader to, and a loader that fell back to the working directory would
+/// resolve differently depending on where the host was started. The script prints whether
+/// `require("airsstack")` is the global and the first line of what `require("lib")` raises, so no
+/// traceback reaches the output. Inline because the point is precisely that this script is not a
+/// file.
+const FROM_MEMORY: &str = r#"local _, err = pcall(require, "lib")
+print(string.format(
+  '%-12s require("airsstack") is the global: %s; require("lib"): %s',
   "memory",
-  require == nil and "absent" or "present"
+  tostring(require("airsstack") == airsstack),
+  string.match(tostring(err), "^[^\n]*")
 ))"#;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -53,12 +60,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     // single global whose meaning the surface and the grants change rather than merely withhold.
     // `pure` is given `stdout` and nothing else, because the script writes its row through `stdio`;
     // the last row adds `require` to that, which is the whole difference between a `require` that
-    // refuses every call and the confined loader.
+    // refuses every call but the root's and the confined loader.
     let which = Script::from_file(dir.join("which_require.lua"))?.with_name("which_require.lua")?;
     let stdout_only = || GrantSet::sealed().with_access(HostAccess::Stdout);
     for (heading, label, policy) in [
         (
-            "\n-- one name, three functions",
+            "\n-- one name, four functions",
             "trusted",
             Policy::trusted(),
         ),
@@ -74,8 +81,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         probe.eval(&which.clone().with_args([label, heading]))?;
     }
 
-    // The same surface as the middle row above, and still no `require`. The loader is confined to
-    // the directory the script was read from, and this one was never read from a directory at all.
+    // The same surface as the middle row above, and a `require` that answers only the root table.
+    // The loader is confined to the directory the script was read from, and this one was never
+    // read from a directory at all.
     engine.eval(&Script::from_source(FROM_MEMORY, "memory")?)?;
 
     Ok(())

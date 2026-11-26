@@ -8,9 +8,11 @@ loader, which searches `package.path` — the process's working directory and it
 prefixes — and can open anything on the machine. `confined` replaces it with a Rust function that
 resolves under the directory the script was read from, has no `package` table to configure, and
 refuses a name that could describe a parent. `pure` gets a different function: one that refuses
-every call until the `require` host access is granted, after which it is the confined loader. To a
-script that only checks whether the global is there, all three answer "yes", which is where
-[policy-presets](../policy-presets/) has to stop. This is where they are pulled apart.
+every call except the root table's name until the `require` host access is granted, after which it
+is the confined loader. A script with no directory gets a fourth, which answers only the root
+table's name. To a script that only checks whether the global is there, all of them answer "yes",
+which is where [policy-presets](../policy-presets/) has to stop. This is where they are pulled
+apart.
 
 The project is a real one rather than a fixture. `app.lua` requires `lib` and `lib.text`,
 `lib/init.lua` requires `lib.text` as well, and `ring` requires itself the long way round.
@@ -62,12 +64,12 @@ require("../secrets"): invalid require target `../secrets`: must contain only AS
 require("missing"): module `missing` not found under `<project>`
 require("ring"): lua error in ring: lua error in ring.link: module `ring` requires itself, directly or indirectly, under `<project>`
 
--- one name, three functions
-trusted      require=native   package=yes searchers=3  require("../secrets"): searched for it as a path
-confined     require=confined package=no  searchers=0  require("../secrets"): refused, the name is unrepresentable
-pure         require=refused  package=no  searchers=0  require("../secrets"): refused, require is not granted
-pure+require require=confined package=no  searchers=0  require("../secrets"): refused, the name is unrepresentable
-memory       require=absent   and no directory that could give it one
+-- one name, four functions
+trusted      require=native   root=yes package=yes searchers=3  require("../secrets"): searched for it as a path
+confined     require=confined root=yes package=no  searchers=0  require("../secrets"): refused, the name is unrepresentable
+pure         require=refused  root=yes package=no  searchers=0  require("../secrets"): refused, require is not granted
+pure+require require=confined root=yes package=no  searchers=0  require("../secrets"): refused, the name is unrepresentable
+memory       require("airsstack") is the global: true; require("lib"): module `lib` cannot be loaded: the script has no directory to load modules from
 ```
 
 `<project>` is substituted by `app.lua` itself, from the directory the host hands it. Every line
@@ -79,26 +81,30 @@ Rust would be the one line in the block that had not been through it.
 ## What it demonstrates
 
 - **Several different functions behind one name.** `RequireDisposition::decide` in
-  `src/require_loader.rs` answers with four values rather than two: on the `Full` surface it keeps
-  the loader `package` installed (`Native`); below `Full`, a grant set without the `require` member
-  gets a `require` that refuses every call (`Refused`); one with it gets the confined loader when
-  the script has a root (`Confined`); and with it but no root the global is cleared (`Absent`). The
-  four rows print three functions, because `pure+require` and `confined` share the confined loader,
-  and the `memory` row prints no function at all. The `trusted` row is the native loader —
-  `package` is present, its searcher list is there to append to, and `require("../secrets")` is a
-  path it goes off and looks for. The `confined` row has no `package` at all, so there is nothing
-  to configure and no way to widen where it looks. The `pure` row is the refusing function: it
-  fails before it looks at the name, so the script learns that `require` is not granted rather than
-  anything about the target. The `pure+require` row is the same preset with the one member added,
-  and it reads exactly like `confined`.
+  `src/require/disposition.rs` answers with four values rather than two: on the `Full` surface it
+  keeps the loader `package` installed (`Native`); below `Full`, a grant set without the `require`
+  member gets a `require` that refuses every call except the root table's (`Refused`); one with it
+  gets the confined loader when the script has a root (`Confined`); and with it but no root it gets
+  a `require` that answers only the root table's name (`RootOnly`). The five rows print four
+  functions, because `pure+require` and `confined` share the confined loader. The `trusted` row is
+  the native loader — `package` is present, its searcher list is there to append to, and
+  `require("../secrets")` is a path it goes off and looks for. The `confined` row has no `package`
+  at all, so there is nothing to configure and no way to widen where it looks. The `pure` row is
+  the refusing function: every name but the root table's gets the same refusal, so the script
+  learns that `require` is not granted rather than anything about the target. The `pure+require`
+  row is the same preset with the one member added, and it reads exactly like `confined`. All four
+  rows read `root=yes`: `require("airsstack")` returns the global table whichever function
+  answers.
 
 - **The root is inferred, not configured.** `Script::from_file` takes it from the file's parent
   directory (`Script::from_file` in `src/script.rs`), and a bare filename roots at `.` rather than
   at nothing (`require_root` in the same file) — otherwise `app.lua` and `./app.lua` would name the
-  same file and only one of them would get a `require`. `Script::from_source` records no root at all, which is why the last line of the output reads `require=absent` under the
-  very policy the `confined` row above it uses: there was no directory to confine a loader to, and
-  falling back to the working directory would have made the same script resolve differently
-  depending on where the host was started.
+  same file and only one of them would get a directory to resolve against. `Script::from_source`
+  records no root at all, which is why the last line of the output prints a `require` that gives
+  up on `lib` under the very policy the `confined` row above it uses: there was no directory to
+  confine a loader to, and falling back to the working directory would have made the same script
+  resolve differently depending on where the host was started. It still answers
+  `require("airsstack")`, which needs no directory.
 
 - **`require("../secrets")` is refused at the name, before any path exists.** `RequireTarget::new`
   accepts only ASCII letters, digits, `_`, `-` and `.` and rejects any empty dot-separated component
@@ -117,7 +123,7 @@ Rust would be the one line in the block that had not been through it.
   does.
 
 - **A module body runs once, and the cache outlives the evaluation.** The cache lives in the
-  registry under a single key (`LOADED_KEY` in `src/require_loader.rs`), is created once and kept
+  registry under a single key (`LOADED_KEY` in `src/require/loader.rs`), is created once and kept
   rather than rebuilt per evaluation (`RequireLoader::install`), and is keyed by the canonical path
   the target resolved to (`load`). `lib/text.lua` is required twice — by
   `lib/init.lua`, then by `app.lua` — and appends its name to `BODIES_RUN` whenever its body runs.
@@ -151,7 +157,7 @@ when the candidate is not underneath. `Path::starts_with` matches whole componen
 characters, so a sibling directory whose name merely begins with the root's — `app-extra` beside
 `app` — is not a match. The crate's own tests cover both
 (`a_symlink_out_of_the_root_is_refused` and
-`a_sibling_directory_sharing_a_name_prefix_is_not_inside_the_root` in `src/require_loader.rs`).
+`a_sibling_directory_sharing_a_name_prefix_is_not_inside_the_root` in `src/require/loader.rs`).
 
 ## See also
 
@@ -162,4 +168,4 @@ characters, so a sibling directory whose name merely begins with the root's — 
 - [One Engine, Many Scripts](https://airsstack.github.io/airsl/ch06-04-reuse.html) — what an engine keeps between
   evaluations, the `require` cache included.
 - [hello-eval](../hello-eval/) — `Script::from_source`, the constructor that leaves a script with
-  no root and therefore no `require`.
+  no root and therefore a `require` that answers only the root table.

@@ -61,17 +61,18 @@ pure     surface=minimal grants=none memory=16777216 bytes instructions=10000000
 ### `require=yes` on all three rows means three different functions
 
 Every row reports a `require`, and they are not the same one.
-`RequireDisposition::decide` (in `src/require_loader.rs`) is the four-way answer: `Full` keeps
+`RequireDisposition::decide` (in `src/require/disposition.rs`) is the four-way answer: `Full` keeps
 Lua's own loader, which resolves through `package.path` and can reach anywhere on the filesystem.
 Below `Full` the answer follows the `require` host access. `confined` holds it and a script read
 from a file gets a Rust function confined to the script's own directory, with no `package` table to
 configure and no way to widen it. `pure` does not hold it, so its `require` is a function that
-refuses every call with `require denied:` and a message naming what was granted. A script built from
-source has no directory to confine a loader to, so a policy that holds the access still gives it no
-`require` at all. `probe.lua` can only see that the global is non-`nil`, so this is the one place
-the output understates a difference rather than showing it —
-[`multi-file-project`](../multi-file-project/) runs the same `require("../secrets")` under four
-policies and prints three different kinds of answer.
+refuses every call except `require("airsstack")` with `require denied:` and a message naming what
+was granted. A script built from source has no directory to confine a loader to, so a policy that
+holds the access still gives it a `require` that answers only the root table. `probe.lua` can only
+see that the global is non-`nil`, so this is the one place the output understates a difference
+rather than showing it — [`multi-file-project`](../multi-file-project/) runs
+`require("../secrets")` under four policies, and `require("lib")` from a script built from source,
+and prints four different kinds of answer.
 
 The match in `decide` is exhaustive, so a new surface cannot acquire an answer by default.
 

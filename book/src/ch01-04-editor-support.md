@@ -60,6 +60,29 @@ typo.lua:1:29 [Warning] Undefined field `encod`. (undefined-field)
 Diagnosis complete, 1 problems found
 ```
 
+A script can also take the modules from `require("airsstack")`, which returns the same table as the
+global. The language server follows it the same way. Change `typo.lua` to this, and it reports the
+misspelled field on the local:
+
+```lua
+local airsstack = require("airsstack")
+local text = airsstack.json.encod({ name = "airsl" })
+print(text)
+```
+
+```console
+$ lua-language-server --check . --checklevel=Information
+Initializing ...
+typo.lua:2:29 [Warning] Undefined field `encod`. (undefined-field)
+    local text = airsstack.json.encod({ name = "airsl" })
+                                ^^^^^
+>>>>>>>>>>>>>>>>>>>> 3/3 [Found 1 problems in 1 files]
+Diagnosis complete, 1 problems found
+```
+
+Completion works from the same type. For the form itself, see
+[Requiring the modules by name](ch02-00-first-project.md#requiring-the-modules-by-name).
+
 ## What it writes
 
 Setup writes two things:

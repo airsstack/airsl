@@ -143,9 +143,9 @@ still organise modules into subfolders: `require("lib.markdown")` loads `lib/mar
 
 `require` is a permission of its own: the `require` member of
 [host access](ch03-01-nothing-by-default.md). `confined`, the preset `airsl run` starts from, holds
-it, which is why this example needs no flag. Under `pure` the call is refused until
-`--allow-access require` gives it back. What granting it reveals about your folders is covered in
-[what `airsl` promises](ch09-03-what-it-promises.md).
+it, which is why this example needs no flag. Under `pure` every call except `require("airsstack")`
+is refused until `--allow-access require` gives it back. What granting it reveals about your
+folders is covered in [what `airsl` promises](ch09-03-what-it-promises.md).
 
 ## What a module receives
 
@@ -192,6 +192,29 @@ $ airsl run toc.lua
 # Shopping
 ## Hardware
 ```
+
+## Requiring the modules by name
+
+The `airsstack` global is not the only way to reach the modules. `require("airsstack")` returns the
+same table, so you can bind it to a local:
+
+```lua
+-- local_name.lua
+local airsstack = require("airsstack")
+
+print(airsstack.json.encode({ ok = true }))
+print(airsstack == _G.airsstack)
+```
+
+```console
+$ airsl run local_name.lua
+{"ok":true}
+true
+```
+
+`require("airsstack")` works under every preset, including `pure`, where every other `require` call
+is refused until the `require` member is granted. A file named `airsstack.lua` beside the script is never loaded by
+that name.
 
 ## Testing it
 
@@ -240,6 +263,7 @@ they run with no permission at all.
 - `--allow-read DIR` grants a place, not a general permission.
 - `require` loads modules from the script's own folder and nowhere else, and needs the `require`
   member of host access, which `confined` holds.
+- `require("airsstack")` returns the same table as the global, under every preset.
 - Code that does no I/O needs no permission, which makes it easy to test. Keep the I/O at the edges.
 
 The next chapter looks at every kind of permission a script can be given.
