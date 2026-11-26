@@ -51,8 +51,10 @@ Two details follow from keeping a script repeatable. `math.random` gives the sam
 fresh run, and `math.randomseed()` with no seed is refused, because that form reads the clock.
 `math.randomseed(42)` with a seed works.
 
-`require` is there, but it refuses every call until you grant the `require` member. With the member,
-it loads files from the script's own folder, just as it does under `confined`.
+`require` is there, but it refuses every call except `require("airsstack")` until you grant the
+`require` member. With the member, it loads files from the script's own folder, just as it does
+under `confined`. [Requiring the modules by name](ch02-00-first-project.md#requiring-the-modules-by-name)
+explains the one call that always works.
 
 Use `pure` to evaluate something that should be a pure calculation, such as a configuration file
 written in Lua, or an expression a user typed in. What it promises, and the three things it does not
@@ -68,7 +70,7 @@ control, are in [chapter 9](ch09-03-what-it-promises.md#what-pure-guarantees).
 | `math.random` | different each run | different each run | the same each run |
 | `math.randomseed()` with no seed | yes | yes | refused |
 | Host access | all | all | none |
-| `require` | Lua's own | script's folder only | refused; with the `require` member, script's folder only |
+| `require` | Lua's own | script's folder only | refuses all but `require("airsstack")`; with the `require` member, script's folder only |
 | `airsstack` modules | unrestricted | only what is granted | only what is granted |
 | Memory limit | none | 64 MiB | 16 MiB |
 | Instruction limit | none | 100 million | 10 million |

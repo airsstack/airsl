@@ -1,0 +1,95 @@
+LuaLS: 3.19.2
+== control  (root airsstack, type file edit: none, user airsstack.lua: no)
+type file line 1: ---@meta   last line: function airsstack.ext.granted() end
+--- main.lua
+     1	local a = require("airsstack")
+     2	print(a.json.nope)
+     3	print(airsstack.json.nope)
+     4	print(a.json.encode)
+     5	local b = require("airsstack")
+     6	print(b.json.nope)
+$ lua-language-server --check . --checklevel=Information
+main.lua:3:22 [Warning] Undefined field `nope`. (undefined-field)
+Diagnosis complete, 1 problems found
+== return  (root airsstack, type file edit: return, user airsstack.lua: no)
+type file line 1: ---@meta   last line: return airsstack
+--- main.lua
+     1	local a = require("airsstack")
+     2	print(a.json.nope)
+     3	print(airsstack.json.nope)
+     4	print(a.json.encode)
+     5	local b = require("airsstack")
+     6	print(b.json.nope)
+$ lua-language-server --check . --checklevel=Information
+main.lua:2:14 [Warning] Undefined field `nope`. (undefined-field)
+main.lua:3:22 [Warning] Undefined field `nope`. (undefined-field)
+main.lua:6:14 [Warning] Undefined field `nope`. (undefined-field)
+Diagnosis complete, 3 problems found
+== named  (root airsstack, type file edit: named, user airsstack.lua: no)
+type file line 1: ---@meta airsstack   last line: return airsstack
+--- main.lua
+     1	local a = require("airsstack")
+     2	print(a.json.nope)
+     3	print(airsstack.json.nope)
+     4	print(a.json.encode)
+     5	local b = require("airsstack")
+     6	print(b.json.nope)
+$ lua-language-server --check . --checklevel=Information
+main.lua:2:14 [Warning] Undefined field `nope`. (undefined-field)
+main.lua:3:22 [Warning] Undefined field `nope`. (undefined-field)
+main.lua:6:14 [Warning] Undefined field `nope`. (undefined-field)
+Diagnosis complete, 3 problems found
+== return_user  (root airsstack, type file edit: return, user airsstack.lua: yes)
+type file line 1: ---@meta   last line: return airsstack
+--- main.lua
+     1	local a = require("airsstack")
+     2	print(a.json.nope)
+     3	print(airsstack.json.nope)
+     4	print(a.json.encode)
+     5	local b = require("airsstack")
+     6	print(b.json.nope)
+$ lua-language-server --check . --checklevel=Information
+main.lua:2:14 [Warning] Undefined field `nope`. (undefined-field)
+main.lua:3:22 [Warning] Undefined field `nope`. (undefined-field)
+main.lua:6:14 [Warning] Undefined field `nope`. (undefined-field)
+Diagnosis complete, 3 problems found
+== named_user  (root airsstack, type file edit: named, user airsstack.lua: yes)
+type file line 1: ---@meta airsstack   last line: return airsstack
+--- main.lua
+     1	local a = require("airsstack")
+     2	print(a.json.nope)
+     3	print(airsstack.json.nope)
+     4	print(a.json.encode)
+     5	local b = require("airsstack")
+     6	print(b.json.nope)
+$ lua-language-server --check . --checklevel=Information
+main.lua:2:14 [Warning] Undefined field `nope`. (undefined-field)
+main.lua:3:22 [Warning] Undefined field `nope`. (undefined-field)
+main.lua:6:14 [Warning] Undefined field `nope`. (undefined-field)
+Diagnosis complete, 3 problems found
+== host_return  (root agentstacks, type file edit: return, user agentstacks.lua: no)
+type file line 1: ---@meta   last line: return agentstacks
+--- main.lua
+     1	local a = require("agentstacks")
+     2	print(a.json.nope)
+     3	print(agentstacks.json.nope)
+     4	print(a.json.encode)
+     5	local b = require("airsstack")
+     6	print(b.json.nope)
+$ lua-language-server --check . --checklevel=Information
+main.lua:2:14 [Warning] Undefined field `nope`. (undefined-field)
+main.lua:3:24 [Warning] Undefined field `nope`. (undefined-field)
+Diagnosis complete, 2 problems found
+== host_named  (root agentstacks, type file edit: named, user agentstacks.lua: no)
+type file line 1: ---@meta agentstacks   last line: return agentstacks
+--- main.lua
+     1	local a = require("agentstacks")
+     2	print(a.json.nope)
+     3	print(agentstacks.json.nope)
+     4	print(a.json.encode)
+     5	local b = require("airsstack")
+     6	print(b.json.nope)
+$ lua-language-server --check . --checklevel=Information
+main.lua:2:14 [Warning] Undefined field `nope`. (undefined-field)
+main.lua:3:24 [Warning] Undefined field `nope`. (undefined-field)
+Diagnosis complete, 2 problems found

@@ -1,0 +1,22 @@
+[package]
+name        = "docs-check"
+description = "Test-only guards that keep the shipped prose true to the shipped code; never published"
+version     = "0.0.0"
+# Nothing here is for a user: the crate is only its tests. `publish = false` keeps it out of
+# `cargo publish`, and it has no binary, so `dist` finds nothing to release in it either.
+publish     = false
+
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+homepage.workspace     = true
+authors.workspace      = true
+
+[lints]
+workspace = true
+
+# Dev-only because the modules that use them are compiled for tests only.
+[dev-dependencies]
+walkdir  = { workspace = true }
+tempfile = { workspace = true }

@@ -303,9 +303,10 @@ pub enum Error {
 
     /// A script called `require` while the policy does not grant it.
     ///
-    /// Distinct from [`Error::RequireEscape`], which refuses a `require` that is granted but names
-    /// a file outside the allowed root: here the call is refused before any module name is looked
-    /// at.
+    /// Raised for every name except the root table's, which is answered whether or not `require` is
+    /// granted. Distinct from [`Error::RequireEscape`], which refuses a `require` that is granted
+    /// but names a file outside the allowed root: here the call is refused before any module is
+    /// looked up.
     #[error("require denied: {detail}")]
     RequireDenied {
         /// What was refused and which grant would allow it.
@@ -387,6 +388,17 @@ pub enum Error {
         module: String,
         /// The directory that was searched.
         root: String,
+    },
+
+    /// A script with no directory called `require` for a name that is not the root table's.
+    ///
+    /// A script built from source has nowhere to look for sibling modules, so `require` answers
+    /// only the root table's name and refuses everything else with this. Distinct from
+    /// [`Error::RequireNotFound`], which means a directory was searched and held no such module.
+    #[error("module `{module}` cannot be loaded: the script has no directory to load modules from")]
+    RequireNoDirectory {
+        /// The requested module name.
+        module: String,
     },
 }
 
@@ -499,6 +511,17 @@ mod tests {
         assert_eq!(
             err.to_string(),
             "module `../secrets` resolves outside the script directory `/scripts`"
+        );
+    }
+
+    #[test]
+    fn require_no_directory_names_the_module() {
+        let err = Error::RequireNoDirectory {
+            module: "lib".into(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "module `lib` cannot be loaded: the script has no directory to load modules from"
         );
     }
 

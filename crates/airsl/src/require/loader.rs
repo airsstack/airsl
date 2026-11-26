@@ -4,18 +4,26 @@
 //! `require`, `package` and chunk loaders are all absent, so there is nothing to constrain — this
 //! installs a Rust function that resolves, checks containment, and loads, with the VM never
 //! holding a path or a file. Where the grant set does not hold [`HostAccess::Require`] it installs
-//! a function that refuses instead.
+//! a function that refuses every name but the root table's instead.
+//!
+//! Its own module because installing and running a `require` is the part that touches the VM and
+//! the filesystem, where [`super::RequireDisposition`] only chooses between outcomes.
 //!
 //! Responsibilities:
 //!
-//! - [`RequireDisposition`], which of the four possible `require` globals a script should get.
 //! - [`RequireLoader`], which installs the confined `require` for one script root, installs the
-//!   `require` that refuses, and removes the global.
+//!   `require` that refuses every name but the root table's, and installs the `require` that
+//!   answers only the root.
 //! - Resolution, containment, caching and cycle detection.
 //! - Running a module: read as an expression first, then called with its name and path, the two
 //!   arguments Lua's own `require` passes.
 //!
-//! Non-responsibilities: applying the disposition. [`crate::Engine`] holds the state and does that.
+//! Non-responsibilities: choosing which `require` a script gets, which is
+//! [`super::RequireDisposition`], and applying that choice, which [`crate::Engine`] does because it
+//! holds the state.
+//!
+//! [`LanguageSurface::Full`]: crate::sandbox::LanguageSurface::Full
+//! [`HostAccess::Require`]: crate::sandbox::HostAccess::Require
 #![expect(
     clippy::redundant_pub_crate,
     reason = "explicit pub(crate) documents the crate-wide visibility intent at each item"
@@ -28,8 +36,8 @@ use mlua::Value;
 use crate::error::{Error, Result};
 use crate::paths::containment::is_within;
 use crate::paths::rules::native::{strip_verbatim, to_script_string};
-use crate::sandbox::{GrantSet, HostAccess, LanguageSurface};
-use crate::types::RequireTarget;
+use crate::require::root;
+use crate::types::{RequireTarget, RootTable};
 
 /// Registry key the table of already-loaded modules is stored under.
 const LOADED_KEY: &str = "airsl.require.loaded";
@@ -37,76 +45,28 @@ const LOADED_KEY: &str = "airsl.require.loaded";
 /// The global a script calls.
 const REQUIRE: &str = "require";
 
-/// Which `require` a script should be given, before an engine goes and installs it.
-///
-/// [`LanguageSurface::Full`] keeps Lua's own loader whatever the grant or the root. Below it, the
-/// `require` grant decides: not granted gives a function that refuses every call; granted with a
-/// directory to resolve against gives the confined loader; granted with no directory gives no
-/// `require` at all.
-///
-/// An enum rather than a predicate because those are four different outcomes, and "should this
-/// script get a *confined* `require`" would fold three of them onto one `false`. A refusing
-/// function, a missing one and Lua's own loader each tell the script something different, and the
-/// engine has to act differently for each.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum RequireDisposition<'a> {
-    /// Leave Lua's own `require` exactly as `luaopen_package` installed it.
-    Native,
-
-    /// Install a `require` resolving under this directory and nowhere else.
-    Confined(&'a Path),
-
-    /// Install a `require` that refuses every call, because the grant set does not hold the
-    /// `require` member.
-    Refused,
-
-    /// Clear `require`. The member is granted but the script has no directory to resolve against.
-    Absent,
-}
-
-impl<'a> RequireDisposition<'a> {
-    /// The disposition for a script with `root`, running on `surface` under `grants`.
-    ///
-    /// `Full` keeps Lua's own, which resolves through `package.path` and is deliberately left
-    /// alone — a first-party script may depend on it, and the surface documents `require` as part
-    /// of what it grants — whatever the grant set holds. Below `Full` the answer follows the
-    /// [`HostAccess::Require`] member: without it the script gets a `require` that refuses; with
-    /// it the script gets the confined loader, but only where there is a directory to confine it
-    /// to, so a script built from source gets none.
-    ///
-    /// The match is exhaustive on purpose. A fourth surface should not be able to acquire a
-    /// default here by falling into a wildcard; it should fail to compile until someone decides.
-    pub(crate) const fn decide(
-        surface: LanguageSurface,
-        root: Option<&'a Path>,
-        grants: &GrantSet,
-    ) -> Self {
-        match surface {
-            LanguageSurface::Full => Self::Native,
-            LanguageSurface::Restricted | LanguageSurface::Minimal => {
-                match (grants.allows(HostAccess::Require), root) {
-                    (false, _) => Self::Refused,
-                    (true, Some(root)) => Self::Confined(root),
-                    (true, None) => Self::Absent,
-                }
-            }
-        }
-    }
-}
-
 /// Installs a `require` confined to one directory.
 #[derive(Debug, Clone)]
 pub(crate) struct RequireLoader {
-    root: PathBuf,
+    dir: PathBuf,
+    root: RootTable,
 }
 
 impl RequireLoader {
-    /// A loader confined to `root`.
-    pub(crate) fn new(root: impl Into<PathBuf>) -> Self {
-        Self { root: root.into() }
+    /// A loader confined to `dir`, answering the engine's own `root` table by name before it looks
+    /// for a file.
+    pub(crate) fn new(dir: impl Into<PathBuf>, root: RootTable) -> Self {
+        Self {
+            dir: dir.into(),
+            root,
+        }
     }
 
     /// Installs `require` into the globals table.
+    ///
+    /// The argument is converted to a Lua string first, so `nil`, a table or no argument at all
+    /// raise the conversion error. A string equal to the root's name returns the root table; any
+    /// other is validated and resolved under the directory.
     ///
     /// # Errors
     ///
@@ -130,39 +90,50 @@ impl RequireLoader {
                 .map_err(fail)?;
         }
 
+        let dir = self.dir.clone();
         let root = self.root.clone();
         let require = lua
             .create_function(move |lua, target: mlua::LuaString| {
+                if let Some(table) = root::answer(lua, &root, &target.as_bytes())? {
+                    return Ok(Value::Table(table));
+                }
                 let target = RequireTarget::new(target.to_str()?.to_owned())?;
                 // Lua's own `require` also returns the module's path as a second value; this one
                 // returns only the module. A second value spills into a multi-value position (the
                 // last field of a table constructor, the last argument of a call) and breaks a
                 // script that relies on one result. A module reads its own path from `...` instead.
-                load(lua, &root, &target).map_err(mlua::Error::from)
+                load(lua, &dir, &target).map_err(mlua::Error::from)
             })
             .map_err(fail)?;
 
         lua.globals().set(REQUIRE, require).map_err(fail)
     }
 
-    /// Installs a `require` that refuses every call with [`Error::RequireDenied`] carrying `detail`.
+    /// Installs a `require` that answers the root table by name and refuses every other call with
+    /// [`Error::RequireDenied`] carrying `detail`.
     ///
-    /// The function takes whatever arguments it is given and looks at none of them, so a call with
-    /// no argument or a table is refused the same way as a call with a name. The module cache is
-    /// not touched: it is unreachable without a loader to consult it.
+    /// The first argument is read without being converted, so a call with no argument, a table or
+    /// a number is refused the same way as a call with another name; only a Lua string equal to
+    /// the root's name is answered. The module cache is not touched: it is unreachable without a
+    /// loader to consult it.
     ///
     /// # Errors
     ///
     /// Returns [`Error::EngineSetup`] when the function cannot be created or installed.
-    pub(crate) fn install_refusal(lua: &mlua::Lua, detail: String) -> Result<()> {
+    pub(crate) fn install_refusal(lua: &mlua::Lua, root: RootTable, detail: String) -> Result<()> {
         let fail = |source: mlua::Error| Error::EngineSetup {
             stage: "refusing require",
             source: Box::new(source),
         };
 
         let refusal = lua
-            .create_function(move |_, _: mlua::MultiValue| {
-                Err::<(), _>(mlua::Error::from(Error::RequireDenied {
+            .create_function(move |lua, args: mlua::MultiValue| {
+                if let Some(Value::String(requested)) = args.front()
+                    && let Some(table) = root::answer(lua, &root, &requested.as_bytes())?
+                {
+                    return Ok(Value::Table(table));
+                }
+                Err(mlua::Error::from(Error::RequireDenied {
                     detail: detail.clone(),
                 }))
             })
@@ -171,22 +142,38 @@ impl RequireLoader {
         lua.globals().set(REQUIRE, refusal).map_err(fail)
     }
 
-    /// Removes `require`, for a script that has nothing to resolve against.
+    /// Installs a `require` for a script that has nothing to resolve against: it answers the root
+    /// table's name and refuses every other module with [`Error::RequireNoDirectory`].
     ///
-    /// The cache is left in place. It is unreachable without `require` to consult it, and keeping
-    /// it means an engine that alternates between scripts from source and scripts on disk does not
-    /// re-run the modules the latter share.
+    /// The argument is converted and validated exactly as [`RequireLoader::install`] does, so a
+    /// non-string raises the same conversion error and a malformed name the same
+    /// [`Error::InvalidName`]; only a well-formed name that would have been looked up on disk is
+    /// refused here instead. The module cache is not touched, and keeping it means an engine that
+    /// alternates between scripts from source and scripts on disk does not re-run the modules the
+    /// latter share.
     ///
     /// # Errors
     ///
-    /// Returns [`Error::EngineSetup`] when the global cannot be cleared.
-    pub(crate) fn remove(lua: &mlua::Lua) -> Result<()> {
-        lua.globals()
-            .set(REQUIRE, Value::Nil)
-            .map_err(|source| Error::EngineSetup {
-                stage: "confined require",
-                source: Box::new(source),
+    /// Returns [`Error::EngineSetup`] when the function cannot be created or installed.
+    pub(crate) fn install_root_only(lua: &mlua::Lua, root: RootTable) -> Result<()> {
+        let fail = |source: mlua::Error| Error::EngineSetup {
+            stage: "root-only require",
+            source: Box::new(source),
+        };
+
+        let require = lua
+            .create_function(move |lua, target: mlua::LuaString| {
+                if let Some(table) = root::answer(lua, &root, &target.as_bytes())? {
+                    return Ok(Value::Table(table));
+                }
+                let target = RequireTarget::new(target.to_str()?.to_owned())?;
+                Err(mlua::Error::from(Error::RequireNoDirectory {
+                    module: target.to_string(),
+                }))
             })
+            .map_err(fail)?;
+
+        lua.globals().set(REQUIRE, require).map_err(fail)
     }
 }
 
@@ -324,10 +311,9 @@ mod tests {
         reason = "tests unwrap known-valid fixtures; a panic is the intended failure signal"
     )]
 
-    use super::RequireDisposition;
     use crate::paths::rules::native::{strip_verbatim, to_script_string};
-    use crate::sandbox::{GrantSet, HostAccess, LanguageSurface};
-    use crate::types::RequireTarget;
+    use crate::sandbox::{GrantSet, HostAccess};
+    use crate::types::{RequireTarget, RootTable};
     use crate::{Engine, Policy, Script};
     use mlua::Value;
     use std::io::Write as _;
@@ -347,61 +333,10 @@ mod tests {
     }
 
     #[test]
-    fn a_granted_require_is_confined_on_restricted_and_minimal() {
-        let root = Path::new("/scripts");
-        for surface in [LanguageSurface::Restricted, LanguageSurface::Minimal] {
-            assert_eq!(
-                RequireDisposition::decide(surface, Some(root), &GrantSet::declared()),
-                RequireDisposition::Confined(root),
-                "{surface}"
-            );
-        }
-    }
-
-    #[test]
-    fn the_full_surface_keeps_lua_s_own_require_whether_or_not_the_script_has_a_root() {
-        // `Full` keeps Lua's own `require` whatever the `require` grant and the script's root say:
-        // the confined loader and the refusing stub both belong only to the surfaces below it.
-        for grants in [GrantSet::sealed(), GrantSet::declared()] {
-            for root in [None, Some(Path::new("/scripts"))] {
-                assert_eq!(
-                    RequireDisposition::decide(LanguageSurface::Full, root, &grants),
-                    RequireDisposition::Native,
-                    "{root:?}"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn a_script_with_no_root_has_nothing_to_resolve_against_and_gets_no_require() {
-        for surface in [LanguageSurface::Restricted, LanguageSurface::Minimal] {
-            assert_eq!(
-                RequireDisposition::decide(surface, None, &GrantSet::declared()),
-                RequireDisposition::Absent,
-                "{surface}"
-            );
-        }
-    }
-
-    #[test]
-    fn an_ungranted_require_is_refused_on_restricted_and_minimal() {
-        for surface in [LanguageSurface::Restricted, LanguageSurface::Minimal] {
-            for root in [None, Some(Path::new("/scripts"))] {
-                assert_eq!(
-                    RequireDisposition::decide(surface, root, &GrantSet::sealed()),
-                    RequireDisposition::Refused,
-                    "{surface} {root:?}"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn the_refusing_require_ignores_its_argument() {
+    fn the_refusing_require_refuses_every_name_but_the_root() {
         let engine = Engine::builder().policy(Policy::pure()).build().unwrap();
         let dir = tempfile::tempdir().unwrap();
-        for call in ["require()", "require({})", "require('x')"] {
+        for call in ["require()", "require({})", "require('x')", "require(1)"] {
             write(dir.path(), "main.lua", &format!("return {call}"));
             let script = Script::from_file(dir.path().join("main.lua")).unwrap();
             let err = engine.eval(&script).unwrap_err();
@@ -417,6 +352,174 @@ mod tests {
                     .contains("require denied: `require` is not granted — no access is granted"),
                 "{call}: {err}"
             );
+        }
+
+        write(
+            dir.path(),
+            "main.lua",
+            "return rawequal(require('airsstack'), airsstack)",
+        );
+        let script = Script::from_file(dir.path().join("main.lua")).unwrap();
+        assert!(engine.eval_to::<bool>(&script).unwrap());
+    }
+
+    #[test]
+    fn a_confined_require_answers_the_root_before_looking_for_a_file() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "airsstack.lua", "BESIDE_RAN = true return {}");
+        write(
+            dir.path(),
+            "airsstack/init.lua",
+            "FOLDER_RAN = true return {}",
+        );
+        write(
+            dir.path(),
+            "main.lua",
+            "return tostring(rawequal(require('airsstack'), airsstack)) .. '|' \
+             .. tostring(BESIDE_RAN) .. '|' .. tostring(FOLDER_RAN)",
+        );
+        assert_eq!(run_entry(dir.path(), "main.lua").unwrap(), "true|nil|nil");
+    }
+
+    /// One script under each of the three installers that answer the root: a file under
+    /// `confined` (the directory loader), a source under `pure` (the refusal) and a source under
+    /// `confined` (the root-only `require`). Returns the string each evaluates to.
+    fn under_each_installer(source: &str) -> [(&'static str, String); 3] {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "main.lua", source);
+        let confined = Engine::builder()
+            .policy(Policy::confined())
+            .build()
+            .unwrap();
+        let pure = Engine::builder().policy(Policy::pure()).build().unwrap();
+        let from_source = |engine: &Engine| {
+            engine
+                .eval_to::<String>(&Script::from_source(source, "probe").unwrap())
+                .unwrap()
+        };
+        [
+            (
+                "Confined",
+                confined
+                    .eval_to::<String>(&Script::from_file(dir.path().join("main.lua")).unwrap())
+                    .unwrap(),
+            ),
+            ("Refused", from_source(&pure)),
+            ("RootOnly", from_source(&confined)),
+        ]
+    }
+
+    #[test]
+    fn the_root_only_require_answers_the_root_and_refuses_other_names_for_want_of_a_directory() {
+        let engine = Engine::builder()
+            .policy(Policy::confined())
+            .build()
+            .unwrap();
+        let script = |source: &str| Script::from_source(source, "probe").unwrap();
+
+        assert!(
+            engine
+                .eval_to::<bool>(&script("return rawequal(require('airsstack'), airsstack)"))
+                .unwrap()
+        );
+
+        for (call, module) in [("require('lib')", "lib"), ("require(1)", "1")] {
+            let err = engine.eval(&script(&format!("return {call}"))).unwrap_err();
+            assert!(
+                matches!(
+                    crate::test_support::raised(&err),
+                    Some(crate::Error::RequireNoDirectory { .. })
+                ),
+                "{call}: {err}"
+            );
+            assert!(
+                err.to_string().contains(&format!(
+                    "module `{module}` cannot be loaded: the script has no directory to load modules from"
+                )),
+                "{call}: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_root_only_require_names_its_stage_when_the_state_cannot_hold_it() {
+        let lua = mlua::Lua::new();
+        // Collect twice so nothing reclaimable is left, then cap the state at exactly what it
+        // uses: the installer's first allocation has no headroom and must be refused. Filling the
+        // state up to a margin instead would pass or fail with the margin, because whether the
+        // installer's allocations still fit depends on how the filler happened to land.
+        lua.gc_collect().unwrap();
+        lua.gc_collect().unwrap();
+        lua.set_memory_limit(lua.used_memory()).unwrap();
+
+        let err = super::RequireLoader::install_root_only(&lua, RootTable::default()).unwrap_err();
+
+        assert!(
+            matches!(
+                err,
+                crate::Error::EngineSetup {
+                    stage: "root-only require",
+                    ..
+                }
+            ),
+            "{err}"
+        );
+        assert!(
+            err.to_string()
+                .contains("cannot configure the Lua state (root-only require)"),
+            "{err}"
+        );
+    }
+
+    /// The message a failed `require` raised, without the traceback, whose last frame names the
+    /// script and so differs between a file and a source.
+    fn message_of(raised: &str) -> &str {
+        raised
+            .split_once("\nstack traceback:")
+            .map_or(raised, |(message, _)| message)
+    }
+
+    #[test]
+    fn the_root_only_require_rejects_an_invalid_target_as_the_confined_one_does() {
+        let found = under_each_installer("return tostring(select(2, pcall(require, '../x')))");
+        let [(_, confined), _, (_, root_only)] = found;
+        assert!(confined.contains("require target"), "{confined}");
+        assert!(
+            message_of(&confined).contains("require target"),
+            "{confined}"
+        );
+        assert_eq!(message_of(&root_only), message_of(&confined));
+    }
+
+    #[test]
+    fn the_root_only_require_rejects_a_non_string_as_the_confined_one_does() {
+        for call in [
+            "pcall(require)",
+            "pcall(require, nil)",
+            "pcall(require, {})",
+        ] {
+            let found = under_each_installer(&format!("return tostring(select(2, {call}))"));
+            let [(_, confined), _, (_, root_only)] = found;
+            assert!(!message_of(&confined).is_empty(), "{call}");
+            assert_eq!(message_of(&root_only), message_of(&confined), "{call}");
+        }
+    }
+
+    #[test]
+    fn a_root_require_returns_exactly_one_value() {
+        for (label, found) in
+            under_each_installer("return tostring(select('#', require('airsstack')))")
+        {
+            assert_eq!(found, "1", "{label}");
+        }
+    }
+
+    #[test]
+    fn a_root_require_ignores_arguments_after_the_first() {
+        for (label, found) in
+            under_each_installer("return tostring(rawequal(require('airsstack', 'x'), airsstack))")
+        {
+            assert_eq!(found, "true", "{label}");
         }
     }
 

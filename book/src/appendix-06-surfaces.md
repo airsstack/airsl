@@ -75,8 +75,10 @@ utf8: char charpattern codepoint codes len offset
 Two entries in the `minimal` listing are not Lua's own:
 
 - `require` is present, but only as a stub. Unless you grant the `require` kind of host access,
-  `pure` puts a function there that refuses every call with `require denied`. Grant it, and
-  `require` loads files from the script's folder, as it does under `confined`.
+  `pure` puts a function there that refuses every call except `require("airsstack")` with
+  `require denied`. Grant it, and `require` loads files from the script's folder, as it does under
+  `confined`. See
+  [Requiring the modules by name](ch02-00-first-project.md#requiring-the-modules-by-name).
 - `math.randomseed` is airsl's own wrapper around Lua's. `pure` starts every engine with the
   generator seeded, so `math.random` repeats from run to run. The wrapper refuses a call with no
   argument, because that form seeds from the clock; `math.randomseed(42)` works as usual.

@@ -81,7 +81,13 @@ RUSTDOCFLAGS = "-D warnings"
 
 [tasks.test]
 category = "Gate"
-description = "Unit, integration, example and bench targets"
+description = "Unit, integration, example and bench targets, plus the prose guards in docs-check"
+# The shipped prose is checked here rather than in a task of its own: the guards are ordinary
+# tests in `crates/docs-check`, so this one command carries them on every OS in the CI matrix,
+# with no shell script to port and no sixth gate step to keep in sync with the guideline's five.
+# They read the whole repository, not one crate, so `dod-crate airsl` and `dod-crate airsl-cli`
+# do not run them; `dod` and `dod-crate docs-check` do. What they assert is listed in that crate's
+# module docs and in CLAUDE.md.
 command = "cargo"
 args = ["test", "--workspace", "--all-targets", "--all-features"]
 
@@ -97,24 +103,29 @@ args = ["test", "--workspace", "--all-features", "--doc"]
 
 [tasks.examples]
 category = "Examples"
-description = "Run every example end to end, check its README shows the real output, and compile every shipped .lua"
+description = "Run every example end to end, check the book appendix's output, and compile and test every shipped .lua"
 # Deliberately not a dependency of `dod`, for the reason `deny` is not: the
 # Definition of Done is five commands, and this is a sixth. It also does things
-# the five do not — spawns `sh`, writes into a temp dir — so it answers to the
-# machine as well as to the working tree.
+# the five do not — runs each example with the invoking shell's stdin, runs the
+# book appendix's script under each preset, and runs `airsl check` and
+# `airsl test` over every shipped `.lua` — so it answers to the invoking shell
+# as well as to the working tree.
 #
-# `--all-targets` in the gate already *compiles* every example. Only this task
-# runs them, which is the difference between "it builds" and "it works".
+# What each example prints is not compared here. The gate's `docs-check` tests
+# run every example and require its README's `## Output` block to equal the
+# output exactly, which is the stricter check, and it lives in one place. A
+# `docs-check` test also fails if a call to `assert_documented` below names
+# anything but the appendix, so the comparison cannot drift back into the
+# per-example loop. What this task adds is what the gate does not do: it runs
+# each example with the stdin of the invoking shell (the gate's child gets
+# none), it runs the book appendix's script under each preset, and it compiles
+# and tests every shipped `.lua`.
 #
-# Running is half of the claim. Each example's README prints what the example
-# writes, and a transcript nobody re-checks drifts from the program the day a
-# message is reworded. So the task also captures each example's stdout and fails
-# unless that exact text sits inside the example's README.md. The comparison is
-# containment rather than equality because the README wraps the output in prose
-# and a fence, and it is exact because a looser match would pass the very drift
-# it exists to catch. Both sides have CRLF folded to LF first: a Windows
-# checkout may convert the README's line endings, and the example's output
-# should not have to know.
+# The appendix half keeps the containment rule. The appendix wraps the output
+# in prose and a fence, so equality would not fit, and a looser match than
+# containment would pass the very drift it exists to catch. Both sides have
+# CRLF folded to LF first: a Windows checkout may convert the line endings of
+# the file, and the program's output should not have to know.
 #
 # Discovery is by directory rather than a hand-kept list: an example that is
 # added but not listed would silently never run, which is the failure mode a
@@ -125,6 +136,8 @@ description = "Run every example end to end, check its README shows the real out
 # a skip is printed and named rather than the directory simply vanishing from
 # the log; a newly added example with no marker runs everywhere and fails
 # loudly wherever it cannot, which is the property this whole scheme protects.
+# An example marked `no-output` has no README block to compare, and since
+# nothing is compared here it needs no special case: it runs like the rest.
 script_runner = "@duckscript"
 script = '''
 # Returns whether `${2}` (what `${1}` printed) appears verbatim in the file
@@ -169,18 +182,13 @@ for dir in ${dirs}
             echo --- ${name} SKIPPED on Windows: ${reason}
         else
             echo --- ${name}
-            # Capturing the output is what lets it be compared, and it also
-            # means a failing example's stderr is held back — so it is printed
-            # here, before the exit status is judged.
+            # Capturing the output holds a failing example's stderr back, so
+            # it is printed here, before the exit status is judged.
             ran = exec cargo run -q -p airsl --example ${name}
             echo ${ran.stdout}
             if not eq ${ran.code} 0
                 echo ${ran.stderr}
                 trigger_error "example ${name} exited with status ${ran.code}"
-            end
-            documented = assert_documented "example ${name}" ${ran.stdout} ${dir}/README.md
-            if not ${documented}
-                drifted = calc ${drifted} + 1
             end
         end
     end
@@ -360,7 +368,9 @@ args = [
 category = "Development"
 description = "The gate scoped to one crate: cargo make dod-crate airsl"
 # While developing a single-crate change, `-p <crate>` replaces `--workspace`.
-# Cross-crate changes and pre-release runs use the unscoped `dod`.
+# Cross-crate changes and pre-release runs use the unscoped `dod`. The prose
+# guards live in the `docs-check` crate, so only `dod` and
+# `dod-crate docs-check` run them.
 #
 # `airsl-cli` ships no `[lib]` target — every public item lives in `airsl` —
 # so `cargo test -p airsl-cli --doc` has nothing to doctest and fails outright

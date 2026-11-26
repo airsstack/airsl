@@ -58,7 +58,8 @@ only your own.
 
 **`RootTable::new("myapp")` renamed the global.** Scripts now write `myapp.notes.add` and
 `myapp.json.encode`, instead of `airsstack.…`. Your users are writing scripts for *your* program, so
-the global should carry your program's name.
+the global should carry your program's name. Scripts can also write `require("myapp")` to get the same
+table.
 
 ## A module that asks permission
 

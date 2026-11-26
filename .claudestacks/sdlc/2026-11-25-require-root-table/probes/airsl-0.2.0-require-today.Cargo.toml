@@ -1,0 +1,11 @@
+[package]
+name = "probe-today"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+airsl = { path = "/Users/hiraq/.herdr/worktrees/airsl/lua-ecosystem-2/crates/airsl" }
+tempfile = "3"
+
+[workspace]

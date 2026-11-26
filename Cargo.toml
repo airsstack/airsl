@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
-members  = ["crates/airsl", "crates/airsl-cli"]
+# `docs-check` is unpublished and test-only; the other two are the crates.io releases.
+members  = ["crates/airsl", "crates/airsl-cli", "crates/docs-check"]
 
 [workspace.package]
 edition       = "2024"

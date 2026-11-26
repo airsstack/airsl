@@ -29,8 +29,9 @@ pub struct Script {
 impl Script {
     /// Builds a script from source text held in memory.
     ///
-    /// The result has no root, so `require` is unavailable to it. Use [`Script::from_file`] for a
-    /// script that loads siblings.
+    /// The result has no root, so its `require` answers only the root table's name and refuses
+    /// every other module. Use [`Script::from_file`], or [`Script::with_root`], for a script that
+    /// loads siblings.
     ///
     /// # Errors
     ///

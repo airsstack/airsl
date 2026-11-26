@@ -14,7 +14,7 @@
 | `math.random` | different each run | different each run | the same each run |
 | `math.randomseed()` with no seed | yes | yes | refused |
 | Host access | all seven members | all seven members | none |
-| `require` | Lua's own | the script's folder only | refused; with the `require` member, the script's folder only |
+| [`require`](ch02-00-first-project.md#requiring-the-modules-by-name) | Lua's own | the script's folder only | refuses all but `require("airsstack")`; with the `require` member, the script's folder only |
 | `airsstack` modules | all, unrestricted | all, only what is granted | all, only what is granted |
 | Memory limit | none | 64 MiB | 16 MiB |
 | Instruction limit | none | 100 million | 10 million |

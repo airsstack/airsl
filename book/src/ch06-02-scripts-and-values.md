@@ -48,12 +48,17 @@ A script loaded with `Script::from_file` knows which folder it lives in, so it c
 modules next to it, as you saw in [chapter 2](ch02-00-first-project.md).
 
 `require` needs the `require` member of host access. `Policy::confined()` holds it. `Policy::pure()`
-does not, so a `pure` script that calls `require` is refused until the policy gives it back;
-[Granting](ch06-03-granting.md) shows how. What granting it reveals about the script's folder is
+does not, so a `pure` script's `require` is refused, except `require("airsstack")`, until the policy
+gives it back; [Granting](ch06-03-granting.md) shows how. What granting it reveals about the script's folder is
 covered in [what `airsl` promises](ch09-03-what-it-promises.md).
 
-A script built with `Script::from_source` has no folder, so it cannot `require` anything. If it needs
-to, give it one with `.with_root(dir)`.
+A script built with `Script::from_source` has no folder. Under a policy that grants `require` below
+`trusted`, such as `confined`, its `require` answers only `require("airsstack")`, as described in
+[Requiring the modules by name](ch02-00-first-project.md#requiring-the-modules-by-name). Any other
+name, `require("lib")` for example, fails with
+``module `lib` cannot be loaded: the script has no directory to load modules from``. Under `trusted`
+it keeps Lua's own `require`, and under `pure` other names are refused as above. To give it a folder,
+use `.with_root(dir)`.
 
 ## Getting structured data back
 

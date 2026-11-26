@@ -1,0 +1,90 @@
+rustc 1.94.1 (e408947bf 2026-03-25), airsl path dependency at checkout 4620389, macOS
+airsl 0.2.0 (path dependency, checkout 4620389)
+trusted  file   no user file   root=airsstack              | err module 'airsstack' not found:
+	no field package.preload['airsstack']
+	no file '<dir>/airsstack.lua'
+	no file '/usr/local/share/lua/5.4/airsstack.lua'
+	no file '/usr/local/share/lua/5.4/airsstack/init.lua'
+	no file '/usr/local/lib/lua/5.4/airsstack.lua'
+	no file '/usr/local/lib/lua/5.4/airsstack/init.lua'
+	no file './airsstack.lua'
+	no file './airsstack/init.lua'
+	
+	can't load C modules in safe mode
+trusted  file   user airsstack.lua                         | ok table (not the root table) from_user_file
+confined file   no user file   root=airsstack              | err module `airsstack` not found under `<dir>`
+stack traceback:
+	[C]: in function 'require'
+	[C]: in function 'pcall'
+	.../8w/4ccj7cw90nx4d32s72tqf5nw0000gn/T/.tmp4FT8GE/main.lua:4: in main chunk
+
+confined file   user airsstack.lua                         | ok table (not the root table) from_user_file
+pure     file   user airsstack.lua                         | err require denied: `require` is not granted — no access is granted
+stack traceback:
+	[C]: in function 'require'
+	[C]: in function 'pcall'
+	.../8w/4ccj7cw90nx4d32s72tqf5nw0000gn/T/.tmpaUiTLz/main.lua:4: in main chunk
+
+pure+req file   user airsstack.lua                         | ok table (not the root table) from_user_file
+trusted  source root=airsstack                             | err module 'airsstack' not found:
+	no field package.preload['airsstack']
+	no file '/usr/local/share/lua/5.4/airsstack.lua'
+	no file '/usr/local/share/lua/5.4/airsstack/init.lua'
+	no file '/usr/local/lib/lua/5.4/airsstack.lua'
+	no file '/usr/local/lib/lua/5.4/airsstack/init.lua'
+	no file './airsstack.lua'
+	no file './airsstack/init.lua'
+	
+	can't load C modules in safe mode
+confined source root=airsstack                             | err attempt to call a nil value
+pure     source root=airsstack                             | err require denied: `require` is not granted — no access is granted
+stack traceback:
+	[C]: in function 'require'
+	[C]: in function 'pcall'
+	main:3: in main chunk
+
+pure+req source root=airsstack                             | err attempt to call a nil value
+trusted  file   no user file   root=agentstacks            | err module 'agentstacks' not found:
+	no field package.preload['agentstacks']
+	no file '<dir>/agentstacks.lua'
+	no file '/usr/local/share/lua/5.4/agentstacks.lua'
+	no file '/usr/local/share/lua/5.4/agentstacks/init.lua'
+	no file '/usr/local/lib/lua/5.4/agentstacks.lua'
+	no file '/usr/local/lib/lua/5.4/agentstacks/init.lua'
+	no file './agentstacks.lua'
+	no file './agentstacks/init.lua'
+	
+	can't load C modules in safe mode
+trusted  file   user agentstacks.lua                       | ok table (not the root table) from_user_file
+confined file   no user file   root=agentstacks            | err module `agentstacks` not found under `<dir>`
+stack traceback:
+	[C]: in function 'require'
+	[C]: in function 'pcall'
+	.../8w/4ccj7cw90nx4d32s72tqf5nw0000gn/T/.tmpxSr7FY/main.lua:4: in main chunk
+
+confined file   user agentstacks.lua                       | ok table (not the root table) from_user_file
+pure     file   user agentstacks.lua                       | err require denied: `require` is not granted — no access is granted
+stack traceback:
+	[C]: in function 'require'
+	[C]: in function 'pcall'
+	.../8w/4ccj7cw90nx4d32s72tqf5nw0000gn/T/.tmpukwGyF/main.lua:4: in main chunk
+
+pure+req file   user agentstacks.lua                       | ok table (not the root table) from_user_file
+trusted  source root=agentstacks                           | err module 'agentstacks' not found:
+	no field package.preload['agentstacks']
+	no file '/usr/local/share/lua/5.4/agentstacks.lua'
+	no file '/usr/local/share/lua/5.4/agentstacks/init.lua'
+	no file '/usr/local/lib/lua/5.4/agentstacks.lua'
+	no file '/usr/local/lib/lua/5.4/agentstacks/init.lua'
+	no file './agentstacks.lua'
+	no file './agentstacks/init.lua'
+	
+	can't load C modules in safe mode
+confined source root=agentstacks                           | err attempt to call a nil value
+pure     source root=agentstacks                           | err require denied: `require` is not granted — no access is granted
+stack traceback:
+	[C]: in function 'require'
+	[C]: in function 'pcall'
+	main:3: in main chunk
+
+pure+req source root=agentstacks                           | err attempt to call a nil value

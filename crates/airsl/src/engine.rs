@@ -25,7 +25,7 @@ use crate::instruction_budget::{BudgetExhausted, InstructionBudget};
 use crate::modules::ModuleSet;
 use crate::modules::access;
 use crate::modules::ext::HANDLERS_KEY;
-use crate::require_loader::{RequireDisposition, RequireLoader};
+use crate::require::{RequireDisposition, RequireLoader};
 use crate::sandbox::{HostAccess, Policy};
 use crate::script::Script;
 use crate::types::{EventName, ModuleName, RootTable};
@@ -274,8 +274,8 @@ impl Engine {
     ///
     /// Per evaluation because the directory it resolves against belongs to the script, not to the
     /// engine. Below the full surface, a policy that does not grant `require` gets one that refuses
-    /// every call, and a script built from source under a granting policy has no directory
-    /// and so gets no `require` at all.
+    /// every call but the root table's, and a script built from source under a granting policy has
+    /// no directory and so gets a `require` that answers only the root table.
     ///
     /// The table of already-loaded modules outlives this call: it is keyed by canonical absolute
     /// path, so it stays correct across roots, and discarding it would make every evaluation
@@ -287,12 +287,17 @@ impl Engine {
             // sitting in the globals table is the one `package` brought with it when the state was
             // opened, and it is part of what this surface promises.
             RequireDisposition::Native => Ok(()),
-            RequireDisposition::Confined(root) => RequireLoader::new(root).install(&self.lua),
+            RequireDisposition::Confined(dir) => {
+                RequireLoader::new(dir, self.root.clone()).install(&self.lua)
+            }
             RequireDisposition::Refused => RequireLoader::install_refusal(
                 &self.lua,
+                self.root.clone(),
                 access::detail(grants, HostAccess::Require),
             ),
-            RequireDisposition::Absent => RequireLoader::remove(&self.lua),
+            RequireDisposition::RootOnly => {
+                RequireLoader::install_root_only(&self.lua, self.root.clone())
+            }
         }
     }
 
@@ -745,12 +750,195 @@ mod tests {
     }
 
     #[test]
-    fn a_script_from_source_has_no_require_at_all() {
+    fn a_script_from_source_requires_the_root_and_nothing_else() {
+        let engine = engine();
         assert_eq!(
-            engine()
+            engine
                 .eval_to::<String>(&script("return type(require)"))
                 .unwrap(),
-            "nil"
+            "function"
+        );
+        assert!(
+            engine
+                .eval_to::<bool>(&script("return rawequal(require('airsstack'), airsstack)"))
+                .unwrap()
+        );
+        let err = engine.eval(&script("return require('lib')")).unwrap_err();
+        assert!(
+            matches!(
+                crate::test_support::raised(&err),
+                Some(Error::RequireNoDirectory { .. })
+            ),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn require_returns_the_root_table_under_every_preset() {
+        for (label, policy) in [
+            ("trusted", Policy::trusted()),
+            ("confined", Policy::confined()),
+            ("pure", Policy::pure()),
+            ("pure with require", pure_with_require()),
+        ] {
+            let engine = Engine::builder().policy(policy).build().unwrap();
+            let source = "return rawequal(require('airsstack'), airsstack)";
+            let dir = tempfile::tempdir().unwrap();
+            assert!(
+                engine.eval_to::<bool>(&main_in(&dir, source)).unwrap(),
+                "{label} from a file"
+            );
+            assert!(
+                engine.eval_to::<bool>(&script(source)).unwrap(),
+                "{label} from source"
+            );
+        }
+    }
+
+    /// A folder holding `airsstack.lua`, which sets `USER_FILE_RAN` and returns `{ user = true }`.
+    /// `pure` with only the `require` member granted.
+    fn pure_with_require() -> Policy {
+        Policy::pure()
+            .with_grants(GrantSet::sealed().with_access(crate::sandbox::HostAccess::Require))
+    }
+
+    fn folder_with_a_user_file_named_after_the_root() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("airsstack.lua"),
+            "USER_FILE_RAN = true return { user = true }",
+        )
+        .unwrap();
+        dir
+    }
+
+    fn package_path_on(dir: &tempfile::TempDir) -> String {
+        format!(
+            "package.path = '{}/?.lua'\n",
+            dir.path().to_str().unwrap().replace('\\', "/")
+        )
+    }
+
+    #[test]
+    fn a_trusted_script_that_clears_package_loaded_gets_lua_s_own_lookup() {
+        let dir = folder_with_a_user_file_named_after_the_root();
+        let engine = Engine::builder().policy(Policy::trusted()).build().unwrap();
+        let source = format!(
+            "{}package.loaded.airsstack = nil\nreturn tostring(require('airsstack').user)",
+            package_path_on(&dir)
+        );
+        assert_eq!(engine.eval_to::<String>(&script(&source)).unwrap(), "true");
+    }
+
+    #[test]
+    fn a_trusted_script_that_replaces_package_loaded_gets_its_replacement() {
+        let engine = Engine::builder().policy(Policy::trusted()).build().unwrap();
+        let source = "local mine = { mine = true }\n\
+                      package.loaded.airsstack = mine\n\
+                      return tostring(require('airsstack') == mine)";
+        assert_eq!(engine.eval_to::<String>(&script(source)).unwrap(), "true");
+    }
+
+    #[test]
+    fn a_trusted_require_of_the_root_ignores_a_second_argument() {
+        let engine = Engine::builder().policy(Policy::trusted()).build().unwrap();
+        let source = "return select('#', require('airsstack', 'x')) .. '|' \
+                      .. tostring(rawequal(require('airsstack', 'x'), airsstack))";
+        assert_eq!(engine.eval_to::<String>(&script(source)).unwrap(), "1|true");
+    }
+
+    /// Writes `main.lua` into `dir` and returns the script for it.
+    fn main_in(dir: &tempfile::TempDir, source: &str) -> Script {
+        let path = dir.path().join("main.lua");
+        std::fs::write(&path, source).unwrap();
+        Script::from_file(&path).unwrap()
+    }
+
+    #[test]
+    fn a_custom_root_is_required_by_its_own_name_and_the_default_name_is_ordinary() {
+        let engine = Engine::builder()
+            .policy(Policy::confined())
+            .root_table(RootTable::new("agentstacks").unwrap())
+            .build()
+            .unwrap();
+        let dir = tempfile::tempdir().unwrap();
+
+        let by_name = main_in(&dir, "return rawequal(require('agentstacks'), agentstacks)");
+        assert!(engine.eval_to::<bool>(&by_name).unwrap());
+
+        let default_name = main_in(&dir, "return require('airsstack')");
+        let err = engine.eval(&default_name).unwrap_err();
+        assert!(
+            matches!(
+                crate::test_support::raised(&err),
+                Some(Error::RequireNotFound { .. })
+            ),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn a_user_file_named_after_the_root_is_never_loaded_by_require() {
+        // Only the trusted surface has a `package` to point at the folder; below it the loader
+        // never consults `package.path`.
+        for (label, policy, points_package_at_folder) in [
+            ("trusted", Policy::trusted(), true),
+            ("confined", Policy::confined(), false),
+            ("pure with require", pure_with_require(), false),
+        ] {
+            let dir = folder_with_a_user_file_named_after_the_root();
+            let engine = Engine::builder().policy(policy).build().unwrap();
+            let prelude = if points_package_at_folder {
+                package_path_on(&dir)
+            } else {
+                String::new()
+            };
+            let source = format!(
+                "{prelude}return tostring(rawequal(require('airsstack'), airsstack)) .. '|' \
+                 .. tostring(USER_FILE_RAN)"
+            );
+            let script = main_in(&dir, &source);
+            assert_eq!(
+                engine.eval_to::<String>(&script).unwrap(),
+                "true|nil",
+                "{label}"
+            );
+        }
+    }
+
+    #[test]
+    fn require_returns_the_engine_s_table_after_the_global_is_replaced() {
+        for (label, policy) in [
+            ("trusted", Policy::trusted()),
+            ("confined", Policy::confined()),
+        ] {
+            let engine = Engine::builder().policy(policy).build().unwrap();
+            let dir = tempfile::tempdir().unwrap();
+            let script = main_in(
+                &dir,
+                "local original = airsstack\n\
+                 airsstack = {}\n\
+                 return rawequal(require('airsstack'), original)",
+            );
+            assert!(engine.eval_to::<bool>(&script).unwrap(), "{label}");
+        }
+    }
+
+    #[test]
+    fn a_dispatched_handler_requires_the_root() {
+        let engine = dispatching_engine(&["root"], Policy::confined());
+        let dir = tempfile::tempdir().unwrap();
+        let registering = main_in(
+            &dir,
+            "airsstack.ext.on('root', function()\n\
+             \treturn rawequal(require('airsstack'), airsstack)\n\
+             end)",
+        );
+        engine.eval(&registering).unwrap();
+
+        assert_eq!(
+            engine.dispatch(&event("root"), &json!(null)).unwrap(),
+            Some(json!(true))
         );
     }
 

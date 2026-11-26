@@ -1,0 +1,61 @@
+rustc 1.94.1 (e408947bf 2026-03-25), mlua 0.12.0 (lua54,vendored,serialize,send), macOS
+Lua 5.4
+a: package.loaded hit, user file on package.path     | values=1 root=true user=nil
+b: fresh load through Lua's require                  | values=1 (cached) first-call second value type=string
+b2: fresh load, count of values on first call        | values=2
+j: script clears package.loaded, then requires       | root=false user=true
+c1: Lua's require, missing module                    | module 'nope' not found:
+	no field package.preload['nope']
+	no file '/var/folders/8w/4ccj7cw90nx4d32s72tqf5nw0000gn/T/.tmp135dCa/nope.lua'
+	
+	can't load C modules in safe mode
+c2: Rust wrapper around it, missing module           | runtime error: module 'nope' not found:
+	no field package.preload['nope']
+	no file '/var/folders/8w/4ccj7cw90nx4d32s72tqf5nw0000gn/T/.tmp135dCa/nope.lua'
+	
+	can't load C modules in safe mode
+stack traceback:
+	[C]: in ?
+	[C]: in function 'require'
+	[C]: in function 'wrapped_require'
+	[C]: in function 'pcall'
+	src/main.rs:5:1: in main chunk
+stack traceback:
+	[C]: in function 'wrapped_require'
+	[C]: in function 'pcall'
+	src/main.rs:5:1: in main chunk
+
+c3: Rust wrapper, values from a fresh load           | values=2
+d: registry table after `airsstack = nil`            | same=true marker=root
+f: takes_string()                                    | false bad argument #1: error converting Lua nil to string (expected string or number)
+stack traceback:
+	[C]: in function 'takes_string'
+	[C]: in function 'pcall'
+	src/main.rs:5:1: in main chunk
+
+f: takes_string(nil)                                 | false bad argument #1: error converting Lua nil to string (expected string or number)
+stack traceback:
+	[C]: in function 'takes_string'
+	[C]: in function 'pcall'
+	src/main.rs:5:1: in main chunk
+
+f: takes_string(1)                                   | true 1
+f: takes_string(1.5)                                 | true 1.5
+f: takes_string({})                                  | false bad argument #1: error converting Lua table to string (expected string or number)
+stack traceback:
+	[C]: in function 'takes_string'
+	[C]: in function 'pcall'
+	src/main.rs:5:1: in main chunk
+
+f: takes_string('airsstack')                         | true airsstack
+f: takes_string('airsstack', 'x')                    | true airsstack
+g: require()                                         | false bad argument #1 to 'require' (string expected, got no value)
+g: require(nil)                                      | false bad argument #1 to 'require' (string expected, got nil)
+g: require(1)                                        | false module '1' not found:
+	no field package.preload['1']
+	no file '/var/folders/8w/4ccj7cw90nx4d32s72tqf5nw0000gn/T/.tmp135dCa/1.lua'
+	
+	can't load C modules in safe mode
+g: require({})                                       | false bad argument #1 to 'require' (string expected, got table)
+h: require('airsstack', 'x') on a package.loaded hit | values=1 root=true
+k: package.loaded.airsstack = {} then require        | mine=true

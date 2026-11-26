@@ -12,19 +12,18 @@
 local label, heading = arg[1] or "-", arg[2] or ""
 
 --- Whether calling `require` is refused for want of the `require` host access, as opposed to
---- failing for any reason of its own. The refusal is raised before the name is looked at, so any
---- target shows it.
+--- failing for any reason of its own. The refusal is raised for every name except the root table's,
+--- so any other target shows it, `../secrets` included.
 local function refused_outright()
   local ok, err = pcall(require, "../secrets")
   return not ok and string.find(tostring(err), "require denied:", 1, true) ~= nil
 end
 
---- Which of the four possible globals this surface provided: no global at all, one that refuses
---- every call, the confined loader, or Lua's own.
+--- Which `require` this surface provided: Lua's own, the one that refuses, or the confined loader.
+--- The fourth, which answers only the root table because the script has no directory, never
+--- reaches this file: a script read from a file always has one.
 local function flavour()
-  if require == nil then
-    return "absent"
-  elseif package ~= nil then
+  if package ~= nil then
     -- Lua's own loader is the only one that comes with a `package` table. Testing for it first
     -- keeps the probe call below from running a real `package.path` search on that row.
     return "native"
@@ -38,13 +37,10 @@ end
 
 --- How this surface answers a target that names a parent directory.
 ---
---- The three outcomes are not degrees of the same refusal. One refuses the call itself, whatever
---- the name; one rejects the name, so no path is ever built; the other builds a path and goes
---- looking.
+--- The three outcomes are not degrees of the same refusal. One refuses the call itself, for every
+--- name but the root table's; one rejects the name, so no path is ever built; the other builds a
+--- path and goes looking.
 local function parent_target()
-  if require == nil then
-    return "there is no require to call"
-  end
   local ok, err = pcall(require, "../secrets")
   if ok then
     return "loaded it"
@@ -58,6 +54,13 @@ end
 
 local configurable = package ~= nil
 
+--- Whether `require("airsstack")` returned the global table. Every `require` answers it, so this
+--- reads `yes` on all four rows, including the one that refuses everything else.
+local function answers_root()
+  local ok, root = pcall(require, "airsstack")
+  return ok and root == airsstack
+end
+
 -- `print` is not in every surface this runs under, so each line goes through `stdio`, which the
 -- host grants to every row. It adds no newline of its own.
 local function say(line)
@@ -69,9 +72,10 @@ if heading ~= "" then
 end
 
 say(string.format(
-  '%-12s require=%-8s package=%-3s searchers=%d  require("../secrets"): %s',
+  '%-12s require=%-8s root=%-3s package=%-3s searchers=%d  require("../secrets"): %s',
   label,
   flavour(),
+  answers_root() and "yes" or "no",
   configurable and "yes" or "no",
   configurable and #package.searchers or 0,
   parent_target()
