@@ -47,8 +47,9 @@ confidence-threshold = 0.8
 exceptions = []
 
 [licenses.private]
-# Both workspace members are published to crates.io under Apache-2.0, so their
+# The two published workspace members go to crates.io under Apache-2.0, so their
 # license text is a distribution question and is checked like any other crate.
+# The unpublished `docs-check` member inherits the same license and is checked too.
 ignore = false
 
 # ---------------------------------------------------------------------------

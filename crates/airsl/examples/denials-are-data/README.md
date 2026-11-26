@@ -48,11 +48,11 @@ which keeps the message identical on Linux and macOS. `<granted>` is substituted
 
 - **A module is always present, even ungranted.** All twelve are asserted to be tables under a
   policy that grants almost none of what they do. The roster comes from `modules::stdlib()`
-  (`src/modules/stdlib.rs:22`), which is the single list the engine, `airsl doctor` and the tests
-  all read.
+  (the `stdlib` function in `src/modules/stdlib.rs`), which is the single list the engine,
+  `airsl doctor` and the tests all read.
 - **Enforcement is per call, not per installation.** `HostModule::install` receives the policy
-  through `InstallContext` (`src/modules/registry.rs:33`) and captures what it needs into the
-  functions it creates — the check happens inside the host function, immediately before the
+  through `InstallContext` (defined in `src/modules/registry.rs`) and captures what it needs into
+  the functions it creates — the check happens inside the host function, immediately before the
   operation. That is why `fs` can be present, refuse `/`, and still serve a granted read in the
   same run.
 - **Some functions need no authority at all.** `path.join` and `json.encode` behave identically
@@ -61,12 +61,13 @@ which keeps the message identical on Linux and macOS. `<granted>` is substituted
   the exception within `path`: it reads the working directory, so it needs the `cwd` host access.
 - **Authority is borrowed, not invented.** `hash.hash_file` opens a file and `glob.walk` reads
   directories, so both answer to the *filesystem read* grant rather than getting an axis of their
-  own. They share `PathGuard` with `fs` — `src/modules/hash.rs:73` and `src/modules/glob.rs:89`,
-  against `src/modules/fs.rs:78`. `glob.match`, which is pure pattern arithmetic, needs nothing.
+  own. They share `PathGuard` with `fs`: each module's `install` builds its own guard, in
+  `src/modules/hash.rs` and `src/modules/glob.rs`, as `src/modules/fs.rs` does. `glob.match`,
+  which is pure pattern arithmetic, needs nothing.
 - **Every refusal is actionable.** Each message names the module, the operation, what was refused,
-  and what *was* granted — `Error::Denied` (`src/error.rs:217`). "Permission denied" without those
-  is indistinguishable from the operating system's own refusal, and sends whoever reads it looking
-  at file modes instead of at the policy.
+  and what *was* granted — `Error::Denied`, defined in `src/error.rs`. "Permission denied" without
+  those is indistinguishable from the operating system's own refusal, and sends whoever reads it
+  looking at file modes instead of at the policy.
 
 ## See also
 

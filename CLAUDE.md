@@ -4,9 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`airsl` embeds Lua 5.4 in Rust and lets the **host** decide what a script may reach. Two crates in
-one workspace: `crates/airsl` (the library) and `crates/airsl-cli` (the `airsl` binary — `run`,
-`test`, `check`, `doctor`, `ext doctor`/`ext fire`, `lua setup`).
+`airsl` embeds Lua 5.4 in Rust and lets the **host** decide what a script may reach. Two published
+crates in one workspace: `crates/airsl` (the library) and `crates/airsl-cli` (the `airsl` binary —
+`run`, `test`, `check`, `doctor`, `ext doctor`/`ext fire`, `lua setup`). A third member,
+`crates/docs-check`, is unpublished and holds only tests that keep the prose true to the code.
 
 Build requirement that is not negotiable: **a C compiler** (`mlua`'s `vendored` feature compiles
 Lua 5.4 from C source and links it statically — no system Lua, no `pkg-config`). On Linux and macOS
@@ -31,6 +32,36 @@ cargo make --list-all-steps
 Anything short of `cargo make dod` is iteration, not a green result. `-D warnings` in the clippy
 step promotes plain rustc warnings too, which is why there is no separate `cargo build` step, and
 doctests need their own run because `--all-targets` excludes them.
+
+The tests step also runs `crates/docs-check`, the unpublished member that guards the prose. It
+checks these four things and nothing else:
+
+- Each example README's `## Output` block equals what the example prints. An example with no block
+  must carry a `no-output` marker file holding the reason, and be named in `EXPECTED_NO_OUTPUT` in
+  `crates/docs-check/src/examples.rs`; an example with a `unix-only` marker file must be named in
+  `EXPECTED_UNIX_ONLY` there. The `examples` task of `Makefile.toml` may compare output with the
+  book appendix only, never with an example's README, which this check owns.
+- Every `.rs` path in a code span of `CLAUDE.md` or a README exists, and none carries a line-number
+  suffix (cite the symbol in prose instead). A path resolves against the citing document's own
+  crate; `CLAUDE.md` and the root README resolve from the repository root, so a path into a crate
+  there starts with `crates/<name>/`.
+- In `CLAUDE.md` alone, a module path in a code span (`require::loader`,
+  `extension::manifest::validate_entry`) names a module that exists in some workspace crate, and
+  the item after it, if any, is declared in that module's source (a `mod`, `fn`, `struct`, `enum`,
+  `union`, `trait`, `type`, `const`, `static` or `macro_rules!` item, or a `pub use` that
+  re-exports it), with comments and strings ignored, so prose that merely mentions the word does
+  not count. Associated items of an `impl` block and items inside a `#[cfg(test)]` module are not
+  read, so a method is cited through its type (`extension::loaded::Approved::recheck_entry`). A lone
+  snake-case name with an underscore appears somewhere in the `.rs` and `Cargo.toml` files outside
+  `crates/docs-check`, unless it is listed with its reason in `ANTI_EXAMPLES` in
+  `crates/docs-check/src/citations/module.rs` (for a name this file cites as what not to write).
+  Paths into `std`, a dependency or a workspace crate (`airsl::mlua`) and type paths
+  (`Policy::trusted()`) are not read.
+- Every book `{{#include}}`, `{{#rustdoc_include}}` or `{{#playground}}` directive of a chapter
+  points at a file that exists.
+
+It does not check that a cited symbol is in the cited file, that the book's prose is true, or
+anything else written in backticks. `cargo make dod-crate docs-check` runs it alone.
 
 Single test / narrower runs:
 
@@ -66,39 +97,50 @@ Three independent layers; collapsing them is the most common mistake. The book's
 
 `src/extension/` sits on top of those three layers: it reads a manifest, bounds the request with a
 host-supplied `Ceiling`, asks an `Approver`, and only then builds an ordinary `Engine` under the
-negotiated `Policy`. `ExtensionHost::load` (`extension/host.rs`) is the entry point a host calls;
-`Extension::approve` followed by `Approved::start` (`extension/loaded.rs`) is the type-state that
-proves a denial ran before any extension code does.
+negotiated `Policy`. `ExtensionHost::load` (`crates/airsl/src/extension/host.rs`) is the entry
+point a host calls; `Extension::approve` followed by `Approved::start`
+(`crates/airsl/src/extension/loaded.rs`) is the type-state that proves a denial ran before any
+extension code does.
 
 Key seams:
 
-- `Engine::dispatch` (`engine.rs`) is how a host invokes the handlers a script registered with
-  `ext.on`. Handlers live in a registry table written by `modules/ext.rs`; the engine records the
-  evaluating `ThreadId` so a handler that re-enters its own engine gets `Error::Reentrant`, never a
-  deadlock.
-- `Engine::builder()` is a **type-state builder** (`builder.rs`, `Missing`/`Present`): there is no
-  `build()` until `policy()` has been called, so a sandbox cannot be forgotten.
+- `Engine::dispatch` (`crates/airsl/src/engine.rs`) is how a host invokes the handlers a script
+  registered with `ext.on`. Handlers live in a registry table written by
+  `crates/airsl/src/modules/ext.rs`; the engine records the evaluating `ThreadId` so a handler that
+  re-enters its own engine gets `Error::Reentrant`, never a deadlock.
+- `Engine::builder()` is a **type-state builder** (`crates/airsl/src/builder.rs`,
+  `Missing`/`Present`): there is no `build()` until `policy()` has been called, so a sandbox cannot
+  be forgotten.
 - `HostModule::install(&mlua::Lua, &mlua::Table, &InstallContext)` is the extension seam, and
   `describe` beside it lists the module's Lua surface for editors and the drift check
   (`luals::verify`). `mlua` is re-exported as `airsl::mlua` deliberately — it is part of the
   contract, and a separately declared version produces type errors that never name the real cause.
   `InstallContext` carries the *engine's* policy, so what a module enforces and what `airsl doctor`
   reports cannot diverge.
-- `modules::stdlib()` (`src/modules/stdlib.rs`) is the single list of built-ins; the engine, the
-  doctor output, and tests all read it. A new module is registered there.
+- `modules::stdlib()` (`crates/airsl/src/modules/stdlib.rs`) is the single list of built-ins; the
+  engine, the doctor output, and tests all read it. A new module is registered there.
 - The filesystem containment rule is written in two places, each the only place for its half.
-  `modules/guard.rs` (`PathGuard::resolve`) turns a path a script wrote into the absolute,
-  symlink-free path an operation would actually touch. `paths/containment.rs` holds the root
-  comparison itself, shared by `sandbox/grants.rs`'s `FsGrant::allows_read`/`allows_write` (what
-  `PathGuard` consults) and, outside `fs`, by `require_loader`, `extension::manifest::validate_entry`
-  and `extension::loaded::recheck_entry`. Every `fs` call, plus `hash.hash_file` and `glob.walk`,
-  funnels through `PathGuard`.
-- `Engine` is `Send + Sync` and holds a lock spanning a whole evaluation (`engine.rs`) — `mlua`'s
-  per-operation locking was memory-safe but not correct across the four steps of an eval. A shared
-  engine avoids rebuilding state; it never buys parallelism.
+  `crates/airsl/src/modules/guard.rs` (`PathGuard::resolve`) turns a path a script wrote into the
+  absolute, symlink-free path an operation would actually touch.
+  `crates/airsl/src/paths/containment.rs` holds the root comparison itself, shared by
+  `crates/airsl/src/sandbox/grants.rs`'s `FsGrant::allows_read`/`allows_write` (what `PathGuard`
+  consults) and, outside `fs`, by `require::loader`, `extension::manifest::validate_entry` and
+  `extension::loaded::Approved::recheck_entry`. Every `fs` call, plus `hash.hash_file` and
+  `glob.walk`, funnels through `PathGuard`.
+- `require("<root>")` is answered by `require::root` before any other resolution, and through
+  `package.loaded` on `Full`.
+- `Engine` is `Send + Sync` and holds a lock spanning a whole evaluation
+  (`crates/airsl/src/engine.rs`) — `mlua`'s per-operation locking was memory-safe but not correct
+  across the four steps of an eval. A shared engine avoids rebuilding state; it never buys
+  parallelism.
 - Engine reuse is ~30× cheaper than rebuilding, so it is an API-shape decision. Per-evaluation:
   instruction counter, `arg` table, `require` root. Persisted across evaluations: the `require`
   module cache (keyed by canonical path), Lua globals a script wrote.
+
+`crates/docs-check` sits outside all of this. It has no runtime code and nothing depends on it; it
+is a workspace member of its own, never published and never in a release archive, because its
+checks read the whole repository (this file, every README, the book, the examples) and so belong
+to no one crate. The tests step runs it with everything else.
 
 ## Conventions
 

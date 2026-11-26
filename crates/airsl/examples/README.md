@@ -16,9 +16,16 @@ Run all of them, and compile every shipped `.lua`:
 cargo make examples
 ```
 
-That task is not part of `cargo make dod`. The gate compiles every example (`--all-targets`) but
-does not run one, which is the difference between "it builds" and "it works" — so CI runs
-`cargo make examples` as a separate step.
+The gate, `cargo make dod`, is what keeps the `## Output` blocks true: its tests include the
+`docs-check` crate, which runs each example and fails unless the block of its README is exactly what
+the example printed. Every example needs such a block, or a `no-output` marker file holding the
+reason and its name in the `EXPECTED_NO_OUTPUT` list of `crates/docs-check/src/examples.rs`. The
+same crate fails if a README or `CLAUDE.md` cites a `.rs` source path that does not exist, or cites
+one with a line number.
+
+`cargo make examples` is not part of the gate. CI runs it as a separate step, and it covers what the
+gate does not: it runs each example with the stdin of the invoking shell, checks the book appendix's
+transcripts, and compiles and tests every shipped `.lua`.
 
 ## The ladder
 
