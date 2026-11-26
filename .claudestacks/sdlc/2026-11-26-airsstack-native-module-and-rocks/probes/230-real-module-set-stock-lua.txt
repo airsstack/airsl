@@ -1,0 +1,100 @@
+# Probe 230 — the real eleven-module set (standalone()) loaded into stock Lua 5.4 and LuaJIT
+question: review finding 3 (spec §3.2/§9.2): built with the spec's feature table and public install API (ModuleSet::open, modules::standalone,
+  entry.rs as the one expression of §3.2), does require("airsstack") in a stock lua5.4 and a stock luajit return a table holding exactly
+  json, path, fs, env, proc, regex, hash, time, glob, stdio, hook (no ext), set no global, put the table in package.loaded, and run one
+  host-touching call per module with trusted authority? Control: each build in the other interpreter.
+versions: rustc 1.94.1 (e408947bf 2026-03-25), cargo 1.94.1 (29ea6fb6a 2026-03-24) (R/rust-toolchain.toml channel 1.94); mlua 0.12.0,
+  mlua_derive 0.12.0 (copy's Cargo.lock); /opt/homebrew/bin/lua5.4 = Lua 5.4.8; /opt/homebrew/bin/luajit = LuaJIT 2.1.1770848219; macOS 26.3.1 arm64.
+setup: S=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/fix-01;
+  S/repo = rsync of R at 9d054c4 (minus target/, .git, .claudestacks, book/book), then:
+  patch -p1 < 201-lockstep-manifests/{Cargo.toml,crates_airsl_Cargo.toml,crates_airsl-cli_Cargo.toml}.diff (spec §2.4, byte for byte);
+  patch -p1 < 140-lua-module-private-mod/crates_airsl_src_modules_registry.rs.diff (probe-only ModuleSet::open, the §2.6 shape);
+  patch -p1 < 143-luajit-stdlib-cfg/formA.diff (§3.1 language_surface arms);
+  230-real-module-set-stock-lua/crates_airsl_src_modules_{stdlib,mod}.rs.diff (probe-only standalone(); stdlib() = standalone() + Ext);
+  crates/airsl-lua/ from 230-real-module-set-stock-lua/crates/airsl-lua/ (Cargo.toml = 201's; build.rs and lib.rs = 140's;
+  entry.rs = Ok(airsl::modules::standalone()?.open(lua, &RootTable::default())?)).
+  The script is 230-real-module-set-stock-lua/run.lua (arg[1] = dir holding airsstack.so, arg[2] = an empty temp dir).
+commands: below, cwd S/repo for cargo and S for the rest; env CARGO_BUILD_JOBS=2 CARGO_TARGET_DIR=S/target; release profile of the root
+  Cargo.toml; each library copied to S/native/<abi>/airsstack.so (cp target/release/libairsstack.dylib). Builds ran one at a time.
+  Compiling/Checking lines of the cold build are elided (count given); everything else is raw. S is shown as <S> in the runs.
+note: an earlier draft of run.lua used table.pack (absent in LuaJIT: "attempt to call field 'pack' (a nil value)") and proc's
+  r.code (the field is r.status, crates/airsl/src/modules/proc.rs:173); both were fixed and every run below is of the kept run.lua.
+  Observed below, not explained by this probe: with stdout redirected to a file, under LuaJIT the stdio.write and hook output
+  (std::io::stdout, flushed: crates/airsl/src/modules/stdio.rs:119-126, hook.rs:187-197) lands before print() lines printed
+  earlier; under Lua 5.4 the lines stay in program order.
+date: 2026-11-26
+--- raw output ---
+$ cargo build -p airsl-lua --features lua54 --release
+     Locking 1 package to latest Rust 1.94 compatible version
+      Adding mlua_derive v0.12.0 (available: v0.12.2)
+    Finished `release` profile [optimized] target(s) in 50.82s
+[exit 0]
+(70 Compiling/Checking lines elided)
+$ cp target/release/libairsstack.dylib ../native/lua54/airsstack.so
+$ cargo build -p airsl-lua --features luajit --release
+    Finished `release` profile [optimized] target(s) in 26.83s
+[exit 0]
+(4 Compiling lines elided: mlua-sys airsl-lua mlua airsl )
+$ cp target/release/libairsstack.dylib ../native/luajit/airsstack.so
+$ nm -gU native/lua54/airsstack.so | grep luaopen
+0000000000076364 T _luaopen_airsstack
+$ nm -gU native/luajit/airsstack.so | grep luaopen
+0000000000074644 T _luaopen_airsstack
+$ /opt/homebrew/bin/lua5.4 -v
+Lua 5.4.8  Copyright (C) 1994-2025 Lua.org, PUC-Rio
+$ /opt/homebrew/bin/luajit -v
+LuaJIT 2.1.1770848219 -- Copyright (C) 2005-2026 Mike Pall. https://luajit.org/
+$ /opt/homebrew/bin/lua5.4 probe230/run.lua native/lua54 "$T" </dev/null   (the lua54 build in Lua 5.4; T = a fresh mktemp -d)
+interpreter:	Lua 5.4	no jit
+require ok:	true	table
+keys (11):	env:table fs:table glob:table hash:table hook:table json:table path:table proc:table regex:table stdio:table time:table
+ext:	nil
+global airsstack:	nil
+package.loaded is the table:	true
+json     ok   [2,2.0] | 1
+path     ok   a/b | probe.txt
+fs       ok   hello from fs | -- probe 2
+env      ok   set-by-env | string | nil
+proc     ok   0 | hi from proc\n | 
+regex    ok   true | ab,cd
+hash     ok   ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad | 41
+time     ok   integer | true | 1970-01-01T00:00:00Z
+glob     ok   true | probe.txt
+[stdio.write reached stdout]
+stdio    ok   false
+{"emitted":true}{"hookSpecificOutput":{"additionalContext":"probe","hookEventName":"PreToolUse"}}
+hook     ok   
+[exit 0]
+$ /opt/homebrew/bin/luajit probe230/run.lua native/luajit "$T" </dev/null   (the luajit build in LuaJIT; T = a fresh mktemp -d)
+[stdio.write reached stdout]
+{"emitted":true}{"hookSpecificOutput":{"additionalContext":"probe","hookEventName":"PreToolUse"}}interpreter:	Lua 5.1	LuaJIT 2.1.1770848219
+require ok:	true	table
+keys (11):	env:table fs:table glob:table hash:table hook:table json:table path:table proc:table regex:table stdio:table time:table
+ext:	nil
+global airsstack:	nil
+package.loaded is the table:	true
+json     ok   [2,2] | 1
+path     ok   a/b | probe.txt
+fs       ok   hello from fs | -- probe 2
+env      ok   set-by-env | string | nil
+proc     ok   0 | hi from proc\n | 
+regex    ok   true | ab,cd
+hash     ok   ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad | 41
+time     ok   number | true | 1970-01-01T00:00:00Z
+glob     ok   true | probe.txt
+stdio    ok   false
+
+hook     ok   
+[exit 0]
+$ /opt/homebrew/bin/lua5.4 probe230/run.lua native/luajit "$T" </dev/null   (control: the luajit build in Lua 5.4; T = a fresh mktemp -d)
+interpreter:	Lua 5.4	no jit
+require ok:	false	string
+error loading module 'airsstack' from file 'native/luajit/airsstack.so':
+	dlopen(native/luajit/airsstack.so, 0x0006): symbol not found in flat namespace '_lua_insert'
+[exit 1]
+$ /opt/homebrew/bin/luajit probe230/run.lua native/lua54 "$T" </dev/null   (control: the lua54 build in LuaJIT; T = a fresh mktemp -d)
+interpreter:	Lua 5.1	LuaJIT 2.1.1770848219
+require ok:	false	string
+error loading module 'airsstack' from file 'native/lua54/airsstack.so':
+	dlopen(native/lua54/airsstack.so, 0x0006): symbol not found in flat namespace '_luaL_tolstring'
+[exit 1]

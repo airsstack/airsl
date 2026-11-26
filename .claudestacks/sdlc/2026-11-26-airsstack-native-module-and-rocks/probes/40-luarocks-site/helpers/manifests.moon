@@ -1,0 +1,91 @@
+
+import insert from table
+db = require "lapis.db"
+
+persist = require "ext.luarocks.persist"
+
+import
+  Versions
+  Rocks
+  from require "models"
+
+import
+  parse_version
+  parse_dep
+  match_constraints
+  from require "ext.luarocks.deps"
+
+-- fills modules with versions and rocks
+preload_modules = (mods) ->
+  return mods unless next mods
+
+  mod_ids = db.list [mod.id for mod in *mods]
+
+  versions = Versions\select "where module_id in ? and not archived", mod_ids, {
+    fields: "id, module_id, version_name, lua_version, development"
+  }
+
+  if next versions
+    rocks = Rocks\select "
+      where version_id in (
+        select id from versions where module_id in ? and not archived
+      )
+    ", mod_ids, fields: "version_id, arch"
+
+    versions_by_id = {v.id, v for v in *versions}
+    for rock in *rocks
+      v = versions_by_id[rock.version_id]
+      if v.rocks
+        insert v.rocks, rock
+      else
+        v.rocks = { rock }
+
+  mods_by_id = {mod.id, mod for mod in *mods}
+  for v in *versions
+    m = mods_by_id[v.module_id]
+    if m.versions
+      insert m.versions, v
+    else
+      m.versions = { v }
+
+  mods
+
+-- build the manifest with no queries
+build_manifest = (modules, filter_version=nil, development=nil) ->
+  repository = {}
+
+  if filter_version
+    filter_version = parse_version filter_version
+
+  for mod in *modules
+    mod_tbl = {}
+
+    continue unless mod.versions
+    for version in *mod.versions
+      if development != nil
+        continue if version.development != development
+
+      if filter_version and version.lua_version
+        dep = parse_dep version.lua_version
+        continue unless dep
+        continue unless match_constraints filter_version, dep.constraints
+
+      arches = { {arch: "rockspec"} }
+      mod_tbl[version.version_name] = arches
+
+      continue unless version.rocks
+      for {:arch} in *version.rocks
+        insert arches, {:arch}
+
+    if next mod_tbl
+      repository[mod.name] = mod_tbl
+
+  { :repository, commands: {}, modules: {} }
+
+serve_lua_table = (tab) =>
+  @res.headers["Content-type"] = "text/x-lua"
+
+  layout: false, persist.save_from_table_to_string tab
+
+
+{ :build_manifest, :preload_modules, :serve_lua_table }

@@ -1,0 +1,64 @@
+Question B7: version selection against a local server holding airsstack 0.0.1-1 and 0.0.2-1 (src + macosx-aarch64): 'airsstack 0.0.1' (no revision), 'airsstack 0.0.1-1', 'airsstack 9.9.9', an unknown revision; unreachable server message + exit code.
+Versions: luarocks 3.12.2 (/opt/homebrew/bin/luarocks, runs on Lua 5.4), Lua 5.4.8 (/opt/homebrew/bin/lua5.4), LuaJIT 2.1.1770848219 (/opt/homebrew/opt/luajit), cargo 1.94.1 / rustc 1.94.1, mlua =0.12.0 (mlua-sys 0.11.0), luarocks-build-rust-mlua 0.2.7-1, macOS Darwin 25.3.0 arm64 (arch macosx-aarch64).
+Date: 2026-11-26. Probe agent B.
+S = /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B (scratch; deleted after recording). Raw output below is unedited; paths appear in full.
+Server: $S/server from 24. cwd = $S. (A first run was discarded: zsh did not word-split the query variable, so luarocks received one argument 'airsstack 0.0.1'; this file is the rerun with ${=q}.)
+
+## cargo hidden (env PATH=/usr/bin:/bin:/opt/homebrew/bin), so only binary rocks can install; server has airsstack 0.0.1-1 and 0.0.2-1 (src + macosx-aarch64)
+$ env PATH=... luarocks install --only-server=$S/server --tree $S/tree-v7-1 airsstack 0.0.1
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server/airsstack-0.0.1-1.macosx-aarch64.rock
+
+airsstack 0.0.1-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack 0.0.1-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-v7-1 (license: MIT)
+
+exit=0
+$ env PATH=... luarocks install --only-server=$S/server --tree $S/tree-v7-2 airsstack 0.0.1-1
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server/airsstack-0.0.1-1.macosx-aarch64.rock
+
+airsstack 0.0.1-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack 0.0.1-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-v7-2 (license: MIT)
+
+exit=0
+$ env PATH=... luarocks install --only-server=$S/server --tree $S/tree-v7-3 airsstack 9.9.9
+
+Error: No results matching query were found for Lua 5.4.
+To check if it is available for other Lua versions, use --check-lua-versions.
+exit=1
+$ env PATH=... luarocks install --only-server=$S/server --tree $S/tree-v7-4 airsstack 0.0.2-9
+
+Error: No results matching query were found for Lua 5.4.
+To check if it is available for other Lua versions, use --check-lua-versions.
+exit=1
+$ env PATH=... luarocks install --only-server=$S/server --tree $S/tree-v7-5 airsstack
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server/airsstack-0.0.2-1.macosx-aarch64.rock
+
+airsstack 0.0.2-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack 0.0.2-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-v7-5 (license: MIT)
+
+exit=0
+$ luarocks install --only-server=http://127.0.0.1:9 --tree $S/tree-v7-unreach airsstack
+Warning: Failed searching manifest: Failed downloading http://127.0.0.1:9/manifest-5.4 - failed downloading http://127.0.0.1:9/manifest-5.4
+
+Error: No results matching query were found for Lua 5.4.
+To check if it is available for other Lua versions, use --check-lua-versions.
+exit=1
+$ luarocks install --only-server=http://127.0.0.1:9 --tree $S/tree-v7-unreach airsstack 0.0.1
+Warning: Failed searching manifest: Failed downloading http://127.0.0.1:9/manifest-5.4 - failed downloading http://127.0.0.1:9/manifest-5.4
+
+Error: No results matching query were found for Lua 5.4.
+To check if it is available for other Lua versions, use --check-lua-versions.
+exit=1
+$ luarocks install --only-server=$S/no-such-dir --tree $S/tree-v7-nodir airsstack
+Warning: Failed searching manifest: Failed loading manifest for /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/no-such-dir: /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/no-such-dir/manifest-5.4: No such file or directory
+
+Error: No results matching query were found for Lua 5.4.
+To check if it is available for other Lua versions, use --check-lua-versions.
+exit=1
+
+=== findings
+- 'airsstack 0.0.1' (no revision) -> installs airsstack-0.0.1-1.macosx-aarch64.rock, exit 0. 'airsstack 0.0.1-1' -> same, exit 0. No version -> newest (0.0.2-1).
+- 'airsstack 9.9.9' and 'airsstack 0.0.2-9' -> 'Error: No results matching query were found for Lua 5.4.' + 'To check if it is available for other Lua versions, use --check-lua-versions.' exit 1.
+- Unreachable server (http://127.0.0.1:9) -> 'Warning: Failed searching manifest: Failed downloading http://127.0.0.1:9/manifest-5.4 - failed downloading http://127.0.0.1:9/manifest-5.4' then the SAME 'No results matching query' error, exit 1. Missing local dir -> 'Warning: Failed searching manifest: Failed loading manifest for <dir>: <dir>/manifest-5.4: No such file or directory' + same error, exit 1. Network failure and 'version not published' share exit code 1 and the error line; only the Warning line differs.

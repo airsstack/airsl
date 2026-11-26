@@ -1,0 +1,184 @@
+Question B3: configure luarocks for LuaJIT without touching global config; build and install airsstack-luajit (dependencies = { "lua == 5.1" }) with luarocks make; require under luajit; which mlua feature the backend picked.
+Versions: luarocks 3.12.2 (/opt/homebrew/bin/luarocks, runs on Lua 5.4), Lua 5.4.8 (/opt/homebrew/bin/lua5.4), LuaJIT 2.1.1770848219 (/opt/homebrew/opt/luajit), cargo 1.94.1 / rustc 1.94.1, mlua =0.12.0 (mlua-sys 0.11.0), luarocks-build-rust-mlua 0.2.7-1, macOS Darwin 25.3.0 arm64 (arch macosx-aarch64).
+Date: 2026-11-26. Probe agent B.
+S = /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B (scratch; deleted after recording). Raw output below is unedited; paths appear in full.
+Sources: 21-toy-workspace/airsstack-luajit-0.0.1-1.rockspec (same as airsstack with package = "airsstack-luajit", "lua == 5.1", cargo_extra_args --package airsstack-native); 22-luajit-make/luarocks-luajit-config.lua (env-config alternative).
+Make output piped through grep -v '^   Compiling\|Downloaded\|Downloading\|Blocking'. At this run the rockspec source.url was git+https://example.invalid/airsstack (make does not fetch).
+
+=== BUILD + REQUIRE
+$ luarocks --lua-version 5.1 --lua-dir /opt/homebrew/opt/luajit make --tree $S/tree-jit airsstack-luajit-0.0.1-1.rockspec   (cwd=$S/ws)
+Missing dependencies for airsstack-luajit 0.0.1-1:
+   luarocks-build-rust-mlua (not installed)
+
+airsstack-luajit 0.0.1-1 depends on luarocks-build-rust-mlua (not installed)
+Installing https://luarocks.org/luarocks-build-rust-mlua-0.2.7-1.src.rock
+
+
+No existing manifest. Attempting to rebuild...
+CARGO-WRAPPER cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/ws args=build --release --package airsstack-native --target-dir=target --features luajit
+    Finished `release` profile [optimized] target(s) in 10.50s
+luarocks-build-rust-mlua 0.2.7-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-jit (license: MIT)
+
+
+airsstack-luajit 0.0.1-1 depends on lua 5.1 (5.1-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack-luajit 0.0.1-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-jit (license: MIT)
+
+Missing dependencies for airsstack-luajit 0.0.1-1:
+   lua 5.1 (not installed)
+exit=0
+$ eval "$(luarocks --lua-version 5.1 --lua-dir $LJ --tree $S/tree-jit path)"; luajit -e ...
+table	42	true	nil	LuaJIT 2.1.1770848219
+exit=0
+$ find tree-jit -name "airsstack*"
+tree-jit/lib/luarocks/rocks-5.1/airsstack-luajit
+tree-jit/lib/lua/5.1/airsstack.so
+tree-jit/lib/luarocks/rocks-5.1/airsstack-luajit/0.0.1-1/airsstack-luajit-0.0.1-1.rockspec
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-jit/lib/lua/5.1/airsstack.so:
+	/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/ws/target/release/deps/libairsstack.dylib (compatibility version 0.0.0, current version 0.0.0)
+	/usr/lib/libiconv.2.dylib (compatibility version 7.0.0, current version 7.0.0)
+	/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1345.100.2)
+
+=== after-the-fact state: show / list / tree layout
+$ luarocks --lua-version 5.1 --lua-dir $LJ --tree $S/tree-jit show airsstack-luajit
+
+airsstack-luajit 0.0.1-1 - Toy probe of the airsstack native module
+
+License:      	MIT
+Installed in: 	/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-jit
+
+Modules:
+	airsstack (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-jit/lib/lua/5.1/airsstack.so)
+
+Has build dependency on:
+	luarocks-build-rust-mlua (missing)
+
+Depends on:
+	lua 5.1 (using 5.1-1)
+
+exit=0
+$ cd $S; find tree-jit -maxdepth 4 | sort
+tree-jit
+tree-jit/lib
+tree-jit/lib/lua
+tree-jit/lib/lua/5.1
+tree-jit/lib/lua/5.1/airsstack.so
+tree-jit/lib/luarocks
+tree-jit/lib/luarocks/rocks-5.1
+tree-jit/lib/luarocks/rocks-5.1/airsstack-luajit
+tree-jit/lib/luarocks/rocks-5.1/manifest
+tree-jit/lib/luarocks/rocks-5.4
+tree-jit/lib/luarocks/rocks-5.4/luarocks-build-rust-mlua
+tree-jit/lib/luarocks/rocks-5.4/manifest
+tree-jit/share
+tree-jit/share/lua
+tree-jit/share/lua/5.4
+tree-jit/share/lua/5.4/luarocks
+
+=== CONFIG ALTERNATIVES (no global/user config touched)
+$ LUAROCKS_CONFIG=$S/luarocks-luajit-config.lua luarocks config lua_version
+5.1
+exit=0
+$ LUAROCKS_CONFIG=$S/luarocks-luajit-config.lua luarocks config variables.LUA
+/opt/homebrew/opt/luajit/bin/luajit
+exit=0
+$ LUAROCKS_CONFIG=$S/luarocks-luajit-config.lua luarocks config arch
+macosx-aarch64
+exit=0
+$ LUAROCKS_CONFIG=$S/luarocks-luajit-config.lua luarocks --lua-version 5.1 config lua_version
+5.1
+exit=0
+$ LUAROCKS_CONFIG=$S/luarocks-luajit-config.lua luarocks --lua-version 5.1 config variables.LUA
+/opt/homebrew/opt/luajit/bin/luajit
+exit=0
+$ luarocks --lua-version 5.1 config variables.LUA   (no --lua-dir, no config file)
+/opt/homebrew/bin/luajit
+exit=0
+$ luarocks --lua-version 5.1 config lua_version
+5.1
+exit=0
+$ luarocks --lua-version 5.1 config | grep -n "luajit_version\|LUA_INCDIR\|LUA_DIR\|LUA ="
+4:   luajit_version = "2.1.1770848219",
+5:   luajit_version_checked = true
+11:config_files = {
+147:   LUA = "/opt/homebrew/bin/luajit",
+150:   LUA_DIR = "/opt/homebrew",
+151:   LUA_INCDIR = "/opt/homebrew/include/luajit-2.1",
+152:   LUA_INCDIR_OK = "ok",
+$ LUAROCKS_CONFIG=$S/luarocks-luajit-config.lua luarocks config | grep ...
+4:   luajit_version = "2.1.1770848219",
+5:   luajit_version_checked = true
+151:   LUA = "/opt/homebrew/opt/luajit/bin/luajit",
+154:   LUA_DIR = "/opt/homebrew/opt/luajit",
+155:   LUA_INCDIR = "/opt/homebrew/opt/luajit/include/luajit-2.1",
+156:   LUA_INCDIR_OK = "ok",
+
+=== luarocks source: build dependencies are installed for the Lua that RUNS luarocks, not the target Lua
+--- 29-luarocks-3.12.2-src/build.lua:124-158
+29-luarocks-3.12.2-src/build.lua:124:    if not opts.build_only_deps then
+29-luarocks-3.12.2-src/build.lua:125:       if next(rockspec.build_dependencies) then
+29-luarocks-3.12.2-src/build.lua:126: 
+29-luarocks-3.12.2-src/build.lua:127:          local user_lua_version = cfg.lua_version
+29-luarocks-3.12.2-src/build.lua:128:          local running_lua_version = _VERSION:sub(5)
+29-luarocks-3.12.2-src/build.lua:129: 
+29-luarocks-3.12.2-src/build.lua:130:          if running_lua_version ~= user_lua_version then
+29-luarocks-3.12.2-src/build.lua:131: 
+29-luarocks-3.12.2-src/build.lua:132: 
+29-luarocks-3.12.2-src/build.lua:133: 
+29-luarocks-3.12.2-src/build.lua:134: 
+29-luarocks-3.12.2-src/build.lua:135: 
+29-luarocks-3.12.2-src/build.lua:136: 
+29-luarocks-3.12.2-src/build.lua:137:             cfg.lua_version = running_lua_version
+29-luarocks-3.12.2-src/build.lua:138:             cfg.lua_modules_path = cfg.lua_modules_path:gsub(user_lua_version:gsub("%.", "%%."), running_lua_version)
+29-luarocks-3.12.2-src/build.lua:139:             cfg.lib_modules_path = cfg.lib_modules_path:gsub(user_lua_version:gsub("%.", "%%."), running_lua_version)
+29-luarocks-3.12.2-src/build.lua:140:             cfg.rocks_subdir = cfg.rocks_subdir:gsub(user_lua_version:gsub("%.", "%%."), running_lua_version)
+29-luarocks-3.12.2-src/build.lua:141:             path.use_tree(cfg.root_dir)
+29-luarocks-3.12.2-src/build.lua:142:          end
+29-luarocks-3.12.2-src/build.lua:143: 
+29-luarocks-3.12.2-src/build.lua:144:          local _ok, err, errcode = deps.fulfill_dependencies(rockspec, "build_dependencies", "all", opts.verify, deplock_dir)
+29-luarocks-3.12.2-src/build.lua:145: 
+29-luarocks-3.12.2-src/build.lua:146:          path.add_to_package_paths(cfg.root_dir)
+29-luarocks-3.12.2-src/build.lua:147: 
+29-luarocks-3.12.2-src/build.lua:148:          if running_lua_version ~= user_lua_version then
+29-luarocks-3.12.2-src/build.lua:149: 
+29-luarocks-3.12.2-src/build.lua:150:             cfg.lua_version = user_lua_version
+29-luarocks-3.12.2-src/build.lua:151:             cfg.lua_modules_path = cfg.lua_modules_path:gsub(running_lua_version:gsub("%.", "%%."), user_lua_version)
+29-luarocks-3.12.2-src/build.lua:152:             cfg.lib_modules_path = cfg.lib_modules_path:gsub(running_lua_version:gsub("%.", "%%."), user_lua_version)
+29-luarocks-3.12.2-src/build.lua:153:             cfg.rocks_subdir = cfg.rocks_subdir:gsub(running_lua_version:gsub("%.", "%%."), user_lua_version)
+29-luarocks-3.12.2-src/build.lua:154:             path.use_tree(cfg.root_dir)
+29-luarocks-3.12.2-src/build.lua:155:          end
+29-luarocks-3.12.2-src/build.lua:156: 
+29-luarocks-3.12.2-src/build.lua:157:          if err then
+29-luarocks-3.12.2-src/build.lua:158:             return nil, err, errcode
+
+=== luarocks source: LuaJIT detection used by the backend (util.get_luajit_version)
+--- 29-luarocks-3.12.2-src/util.lua:435-455
+29-luarocks-3.12.2-src/util.lua:435:    function util.get_luajit_version()
+29-luarocks-3.12.2-src/util.lua:436:       if cfg.cache.luajit_version_checked then
+29-luarocks-3.12.2-src/util.lua:437:          return cfg.cache.luajit_version
+29-luarocks-3.12.2-src/util.lua:438:       end
+29-luarocks-3.12.2-src/util.lua:439:       cfg.cache.luajit_version_checked = true
+29-luarocks-3.12.2-src/util.lua:440: 
+29-luarocks-3.12.2-src/util.lua:441:       if not cfg.variables.LUA then
+29-luarocks-3.12.2-src/util.lua:442:          return nil
+29-luarocks-3.12.2-src/util.lua:443:       end
+29-luarocks-3.12.2-src/util.lua:444: 
+29-luarocks-3.12.2-src/util.lua:445:       local ljv
+29-luarocks-3.12.2-src/util.lua:446:       if cfg.lua_version == "5.1" then
+29-luarocks-3.12.2-src/util.lua:447: 
+29-luarocks-3.12.2-src/util.lua:448:          ljv = util.popen_read(Q(cfg.variables.LUA) .. ' -e "io.write(tostring(jit and jit.version:gsub([[^%S+ (%S+).*]], [[%1]])))"')
+29-luarocks-3.12.2-src/util.lua:449:          if ljv == "nil" then
+29-luarocks-3.12.2-src/util.lua:450:             ljv = nil
+29-luarocks-3.12.2-src/util.lua:451:          end
+29-luarocks-3.12.2-src/util.lua:452:       end
+29-luarocks-3.12.2-src/util.lua:453:       cfg.cache.luajit_version = ljv
+29-luarocks-3.12.2-src/util.lua:454:       return ljv
+29-luarocks-3.12.2-src/util.lua:455:    end
+
+=== findings
+- Works without touching global config: per-invocation flags '--lua-version 5.1 --lua-dir $(brew --prefix luajit)' (LUA=/opt/homebrew/opt/luajit/bin/luajit, LUA_INCDIR=.../include/luajit-2.1). Also works: LUAROCKS_CONFIG=<file> holding lua_version = "5.1" + variables (22-luajit-make/luarocks-luajit-config.lua), and even plain '--lua-version 5.1' (finds /opt/homebrew/bin/luajit because the 5.1 search list includes 'luajit' after lua5.1 variants, util.lua find_lua_bindir).
+- Backend picked 'luajit': CARGO-WRAPPER args=build --release --package airsstack-native --target-dir=target --features luajit.
+- luajit -e require -> 'table 42 true nil LuaJIT 2.1.1770848219' (module loads, jit feature compiled in, no global).
+- Installed .so at lib/lua/5.1/airsstack.so; rock dir rocks-5.1/airsstack-luajit. Package name airsstack-luajit with module airsstack works (B9).
+- SURPRISE: luarocks-build-rust-mlua was installed under rocks-5.4 + share/lua/5.4 of the same tree (build.lua:128-143 swaps cfg.lua_version to _VERSION of the running interpreter, 5.4). Afterwards 'show' lists it as '(missing)' for 5.1.
+- SURPRISE: make ends with a spurious 'Missing dependencies for airsstack-luajit 0.0.1-1: lua 5.1 (not installed)' although exit=0 and the module works. Likely the rocks_provided cache (util.lua get_rocks_provided caches when called without a rockspec) is filled while cfg.lua_version is temporarily 5.4 during the build-deps phase; cosmetic but visible to users.

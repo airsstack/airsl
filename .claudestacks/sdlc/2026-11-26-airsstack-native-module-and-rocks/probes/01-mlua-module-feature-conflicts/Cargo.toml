@@ -1,0 +1,18 @@
+[package]
+name = "a1-feature-conflicts"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+mlua = { version = "=0.12.0" }
+
+[features]
+module_vendored = ["mlua/lua54", "mlua/module", "mlua/vendored"]
+module_send = ["mlua/lua54", "mlua/module", "mlua/send"]
+lua54_luajit_module = ["mlua/lua54", "mlua/luajit", "mlua/module"]
+
+[workspace]

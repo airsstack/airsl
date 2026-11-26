@@ -1,0 +1,29 @@
+# Probe 200 — what `luarocks path` prints for the --native success hint, with and without --lua-version 5.1
+# Question: does `luarocks --lua-version 5.1 path` (no --lua-dir, no --tree) print the 5.1 user tree (~/.luarocks/{share,lib}/lua/5.1),
+#   so the LuaJIT hint can be `eval "$(luarocks --lua-version 5.1 path)"`? And the default / --lua-version 5.4 forms for comparison.
+# Versions: /opt/homebrew/bin/luarocks 3.12.2 (Homebrew), Lua 5.4.8  Copyright (C) 1994-2025 Lua.org, PUC-Rio, LuaJIT 2.1.1770848219; macOS 26.3.1 arm64
+# Setup: HOME is a fresh empty dir (<S>/p200/home, <S> = the session scratchpad); PATH=/opt/homebrew/bin:/usr/bin:/bin; cwd=/tmp. No install, no network.
+# Date: 2026-11-26
+--- raw output ---
+$ HOME=<S>/p200/home luarocks path
+export LUA_PATH='/opt/homebrew/Cellar/luarocks/3.12.2/share/lua/5.4/?.lua;/opt/homebrew/share/lua/5.4/?.lua;/opt/homebrew/share/lua/5.4/?/init.lua;/opt/homebrew/lib/lua/5.4/?.lua;/opt/homebrew/lib/lua/5.4/?/init.lua;./?.lua;./?/init.lua;<S>/p200/home/.luarocks/share/lua/5.4/?.lua;<S>/p200/home/.luarocks/share/lua/5.4/?/init.lua'
+export LUA_CPATH='/opt/homebrew/lib/lua/5.4/?.so;/opt/homebrew/lib/lua/5.4/loadall.so;./?.so;<S>/p200/home/.luarocks/lib/lua/5.4/?.so'
+export PATH='<S>/p200/home/.luarocks/bin:/opt/homebrew/bin:/usr/bin:/bin'
+[exit 0]
+
+$ HOME=<S>/p200/home luarocks --lua-version 5.4 path
+export LUA_PATH='/opt/homebrew/Cellar/luarocks/3.12.2/share/lua/5.4/?.lua;/opt/homebrew/share/lua/5.4/?.lua;/opt/homebrew/share/lua/5.4/?/init.lua;/opt/homebrew/lib/lua/5.4/?.lua;/opt/homebrew/lib/lua/5.4/?/init.lua;./?.lua;./?/init.lua;<S>/p200/home/.luarocks/share/lua/5.4/?.lua;<S>/p200/home/.luarocks/share/lua/5.4/?/init.lua'
+export LUA_CPATH='/opt/homebrew/lib/lua/5.4/?.so;/opt/homebrew/lib/lua/5.4/loadall.so;./?.so;<S>/p200/home/.luarocks/lib/lua/5.4/?.so'
+export PATH='<S>/p200/home/.luarocks/bin:/opt/homebrew/bin:/usr/bin:/bin'
+[exit 0]
+
+$ HOME=<S>/p200/home luarocks --lua-version 5.1 path
+export LUA_PATH='/opt/homebrew/Cellar/luarocks/3.12.2/share/lua/5.1/?.lua;/opt/homebrew/share/lua/5.1/?.lua;/opt/homebrew/share/lua/5.1/?/init.lua;/opt/homebrew/lib/lua/5.1/?.lua;/opt/homebrew/lib/lua/5.1/?/init.lua;./?.lua;./?/init.lua;<S>/p200/home/.luarocks/share/lua/5.1/?.lua;<S>/p200/home/.luarocks/share/lua/5.1/?/init.lua'
+export LUA_CPATH='/opt/homebrew/lib/lua/5.1/?.so;/opt/homebrew/lib/lua/5.1/loadall.so;./?.so;<S>/p200/home/.luarocks/lib/lua/5.1/?.so'
+export PATH='<S>/p200/home/.luarocks/bin:/opt/homebrew/bin:/usr/bin:/bin'
+[exit 0]
+
+$ HOME=<S>/p200/home luarocks --lua-version 5.1 config lua_version
+5.1
+[exit 0]
+

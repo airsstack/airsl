@@ -1,0 +1,164 @@
+# Probe 187 — `luarocks init` project around the working directory vs `install --local`
+Question (P7): inside (and below) a `luarocks init` project, which tree does `install --local` use, and what does
+`config lua_version` print inside a project initialised with `--lua-version 5.1`?
+Versions: luarocks 3.12.2 (Homebrew), Lua 5.4.8, LuaJIT 2.1.1770848219 on PATH, macOS 26.3.1 arm64. HOME=S/probes-M/home-p7 (fake).
+Server S/probes-M/server (probe 181). S=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad
+Source (/opt/homebrew/Cellar/luarocks/3.12.2/share/lua/5.4/luarocks/cmd.lua): :100-135 process_tree_args — `elseif args["local"]`
+(user tree) is tested before `elseif args.project_tree` / `elseif project_dir` (lua_modules), so --local wins; :271-290 the project's
+.luarocks/default-lua-version.lua is read before the home and system ones, so a 5.1 project makes plain `config lua_version` print 5.1.
+(`config root_dir` printed nothing: not a key `config` prints; kept as run.)
+Each `$ ...` line shows its cwd relative to S/probes-M, then combined stdout+stderr and `[exit N]`.
+Date: 2026-11-26T07:21Z
+
+=== (1) project initialised with the default Lua (5.4)
+$ luarocks init proj54   (cwd=p7/proj54)
+
+Initializing project 'proj54' for Lua 5.4 ...
+---------------------------------------------
+
+
+Wrote template at /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/p7/proj54/proj54-dev-1.rockspec -- you should now edit and finish it.
+
+Adding entries to .gitignore ...
+Preparing ./.luarocks/ ...
+Wrote .luarocks/config-5.4.lua
+Preparing ./lua_modules/ ...
+Preparing luarocks ...
+Preparing lua for version 5.4...
+[exit 0]
+
+$ find . -maxdepth 2 -not -path ./lua_modules/*   (cwd=p7/proj54)
+.
+./proj54-dev-1.rockspec
+./luarocks
+./lua
+./sub
+./lua_modules
+./.gitignore
+./.luarocks
+./.luarocks/default-lua-version.lua
+./.luarocks/config-5.4.lua
+[exit 0]
+
+$ cat .luarocks/config-5.4.lua   (cwd=p7/proj54)
+variables = {
+   LUA = "/opt/homebrew/opt/lua/bin/lua5.4",
+   LUA_BINDIR = "/opt/homebrew/opt/lua/bin",
+   LUA_DIR = "/opt/homebrew/opt/lua",
+   LUA_INCDIR = "/opt/homebrew/opt/lua/include/lua5.4"
+}
+[exit 0]
+
+$ luarocks config lua_version   (cwd=p7/proj54)
+5.4
+[exit 0]
+
+$ luarocks install --local --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server airsstack 0.0.2   (cwd=p7/proj54)
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server/airsstack-0.0.2-1.macosx-aarch64.rock
+
+airsstack 0.0.2-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack 0.0.2-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p7/.luarocks (license: Apache-2.0)
+
+[exit 0]
+
+$ luarocks install --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server airsstack 0.0.1   (cwd=p7/proj54)
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server/airsstack-0.0.1-2.macosx-aarch64.rock
+
+airsstack 0.0.1-2 depends on lua 5.4 (5.4-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack 0.0.1-2 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/p7/proj54/lua_modules (license: Apache-2.0)
+
+[exit 0]
+
+$ luarocks list --porcelain   (cwd=p7/proj54)
+airsstack	0.0.2-1	installed	/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p7/.luarocks/lib/luarocks/rocks-5.4
+airsstack	0.0.1-2	installed	/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/p7/proj54/lua_modules/lib/luarocks/rocks-5.4
+[exit 0]
+
+$ luarocks config lua_version   (cwd=p7/proj54/sub)
+5.4
+[exit 0]
+
+$ luarocks config root_dir   (cwd=p7/proj54/sub)
+[exit 0]
+
+$ luarocks --local config root_dir   (cwd=p7/proj54/sub)
+[exit 0]
+
+$ luarocks install --local --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server --force airsstack 0.0.2   (cwd=p7/proj54/sub)
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server/airsstack-0.0.2-1.macosx-aarch64.rock
+
+airsstack 0.0.2-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+airsstack 0.0.2-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p7/.luarocks (license: Apache-2.0)
+
+[exit 0]
+
+$ find /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p7/.luarocks ./lua_modules -name *.so   (cwd=p7/proj54)
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p7/.luarocks/lib/lua/5.4/airsstack.so
+./lua_modules/lib/lua/5.4/airsstack.so
+[exit 0]
+
+=== (2) project initialised with --lua-version 5.1
+$ luarocks init --lua-version 5.1 proj51   (cwd=p7/proj51)
+
+Initializing project 'proj51' for Lua 5.1 ...
+---------------------------------------------
+
+
+Wrote template at /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/p7/proj51/proj51-dev-1.rockspec -- you should now edit and finish it.
+
+Adding entries to .gitignore ...
+Preparing ./.luarocks/ ...
+Wrote .luarocks/config-5.1.lua
+Preparing ./lua_modules/ ...
+Preparing luarocks ...
+Preparing lua for version 5.1...
+[exit 0]
+
+$ find . -maxdepth 2 -not -path ./lua_modules/*   (cwd=p7/proj51)
+.
+./proj51-dev-1.rockspec
+./luarocks
+./lua
+./sub
+./lua_modules
+./.gitignore
+./.luarocks
+./.luarocks/default-lua-version.lua
+./.luarocks/config-5.1.lua
+[exit 0]
+
+$ cat .luarocks/default-lua-version.lua   (cwd=p7/proj51)
+return "5.1"
+[exit 0]
+
+$ luarocks config lua_version   (cwd=p7/proj51)
+5.1
+[exit 0]
+
+$ luarocks --lua-version 5.4 config lua_version   (cwd=p7/proj51)
+5.4
+[exit 0]
+
+$ luarocks config lua_version   (cwd=p7/proj51/sub)
+5.1
+[exit 0]
+
+$ luarocks config variables.LUA   (cwd=p7/proj51/sub)
+/opt/homebrew/bin/luajit
+[exit 0]
+
+$ luarocks --lua-version 5.4 install --local --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server airsstack 0.0.2   (cwd=p7/proj51/sub)
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server/airsstack-0.0.2-1.macosx-aarch64.rock
+airsstack 0.0.2-1 is already installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p7/.luarocks
+Use --force to reinstall.
+[exit 0]
+
+$ luarocks --lua-version 5.4 --local config root_dir   (cwd=p7/proj51/sub)
+[exit 0]
+
+$ luarocks config lua_version   (cwd=p7)
+5.4
+[exit 0]
+

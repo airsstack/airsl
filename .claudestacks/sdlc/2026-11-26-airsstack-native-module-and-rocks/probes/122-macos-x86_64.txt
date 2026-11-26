@@ -1,0 +1,610 @@
+# Probe 122 — macOS x86_64: native build on an Intel runner, cross-build from arm64, and load
+# Question: on GitHub's Intel macOS runner, does the toy build for x86_64-apple-darwin (lua54 / luajit) and load
+#   under brew lua@5.4 / luajit and under Lua 5.4.8 / LuaJIT v2.1 built from source? What platform load command
+#   does the dylib carry? Does a module cross-built on macos-latest (arm64) with --target x86_64-apple-darwin
+#   load on the Intel runner?
+# Runner label source: actions/runner-images README at commit e015a08e7601a17f5d9a2938136537aab0f66b6c
+#   (saved as 120-x86-probe-src/runner-images-README-e015a08.md), row "macOS 26 | x64 |
+#   macos-latest-large, macos-26-intel, macos-26-large"; macos-26-intel is the standard (non-larger) label used here.
+# Answer: HOLDS. rustc 1.94.1. All four dylibs: "Mach-O 64-bit dynamically linked shared library x86_64";
+#   no LC_BUILD_VERSION (grep exit=1), instead "cmd LC_VERSION_MIN_MACOSX / version 10.12 / sdk 26.5".
+#   brew bottles exist for Intel: lua@5.4 5.4.8 (sonoma bottle, keg-only), luajit 2.1.1787165859.
+#   native-lua54, native-luajit, cross-lua54, cross-luajit each print require("airsstack").ok = true under
+#   both interpreters of their flavour (8/8 loads).
+# Jobs: mac-cross id 139738939268 (macos-latest, arm64, ImageOS=macos26 ImageVersion=20261117.0516.1);
+#       mac-intel id 139739339446 (macos-26-intel, Intel i7-8700B, macOS 26.6.1, ImageVersion=20260824.0517.1)
+Run: https://github.com/airsstack/airsl/actions/runs/45769647202 (run 2 of 2 on throwaway branch probe/x86-rocks-2026-11-26, since deleted; run 1 = 45769208286 gave the same results but its mac-inspect step grepped only LC_BUILD_VERSION, which printed nothing)
+Fetched with: gh run view -R airsstack/airsl --job <id> --log   Date: 2026-11-26
+Sources: 120-x86-probe-src/ (workflow .github/workflows/probe-x86.yml, toy crate mlua =0.12.0, ci/*.sh, ci/probe.lua)
+# ---- raw log of job mac-cross follows, byte for byte ----
+mac-cross	Set up job	﻿2026-11-26T06:39:06.8181870Z Current runner version: '2.338.2'
+mac-cross	Set up job	2026-11-26T06:39:06.8207660Z ##[group]Runner Image Provisioner
+mac-cross	Set up job	2026-11-26T06:39:06.8208380Z Hosted Compute Agent
+mac-cross	Set up job	2026-11-26T06:39:06.8210220Z Version: 20261111.635
+mac-cross	Set up job	2026-11-26T06:39:06.8210850Z Commit: b8a594ea514ff44cadb5342986c68b1eac6e22ed
+mac-cross	Set up job	2026-11-26T06:39:06.8211680Z Build Date: 2026-11-11T01:49:01Z
+mac-cross	Set up job	2026-11-26T06:39:06.8212210Z Worker ID: {46486719-df64-42d0-9ffa-88078eb61cfc}
+mac-cross	Set up job	2026-11-26T06:39:06.8212670Z Region: westus
+mac-cross	Set up job	2026-11-26T06:39:06.8213020Z Cloud: MacCloud
+mac-cross	Set up job	2026-11-26T06:39:06.8213440Z ##[endgroup]
+mac-cross	Set up job	2026-11-26T06:39:06.8214710Z ##[group]Operating System
+mac-cross	Set up job	2026-11-26T06:39:06.8215190Z macOS
+mac-cross	Set up job	2026-11-26T06:39:06.8215520Z 26.7.2
+mac-cross	Set up job	2026-11-26T06:39:06.8215840Z 25G332
+mac-cross	Set up job	2026-11-26T06:39:06.8216180Z ##[endgroup]
+mac-cross	Set up job	2026-11-26T06:39:06.8216570Z ##[group]Runner Image
+mac-cross	Set up job	2026-11-26T06:39:06.8218320Z Image: macos-26-arm64
+mac-cross	Set up job	2026-11-26T06:39:06.8219440Z Version: 20261117.0516.1
+mac-cross	Set up job	2026-11-26T06:39:06.8221470Z Included Software: https://github.com/actions/runner-images/blob/macos-26-arm64/20261117.0516/images/macos/macos-26-arm64-Readme.md
+mac-cross	Set up job	2026-11-26T06:39:06.8224970Z Image Release: https://github.com/actions/runner-images/releases/tag/macos-26-arm64%2F20261117.0516
+mac-cross	Set up job	2026-11-26T06:39:06.8225750Z ##[endgroup]
+mac-cross	Set up job	2026-11-26T06:39:06.8226550Z ##[group]GITHUB_TOKEN Permissions
+mac-cross	Set up job	2026-11-26T06:39:06.8229230Z Contents: read
+mac-cross	Set up job	2026-11-26T06:39:06.8230580Z Metadata: read
+mac-cross	Set up job	2026-11-26T06:39:06.8231210Z ##[endgroup]
+mac-cross	Set up job	2026-11-26T06:39:06.8233600Z Secret source: Actions
+mac-cross	Set up job	2026-11-26T06:39:06.8234250Z Cache mode: write
+mac-cross	Set up job	2026-11-26T06:39:06.8234720Z Prepare workflow directory
+mac-cross	Set up job	2026-11-26T06:39:06.9129060Z Prepare all required actions
+mac-cross	Set up job	2026-11-26T06:39:06.9231220Z Getting action download info
+mac-cross	Set up job	2026-11-26T06:39:07.4397400Z Download action repository 'actions/checkout@v6' (SHA:d23441a48e516b6c34aea4fa41551a30e30af803)
+mac-cross	Set up job	2026-11-26T06:39:08.3691690Z Download action repository 'actions/upload-artifact@v7' (SHA:cf430e030ddbb5b0abf93d22962f4752f3646cd9)
+mac-cross	Set up job	2026-11-26T06:39:08.6873020Z Complete job name: mac-cross
+mac-cross	Run actions/checkout@v6	﻿2026-11-26T06:39:08.8280050Z ##[group]Run actions/checkout@v6
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:08.8284840Z with:
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:08.8286490Z   repository: airsstack/airsl
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:08.8305140Z   token: ***
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:08.8307810Z   ssh-strict: true
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:08.8310130Z   ssh-user: git
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:08.8311800Z   persist-credentials: true
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:08.8314390Z   clean: true
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:08.8316000Z   sparse-checkout-cone-mode: true
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:08.8317820Z   fetch-depth: 1
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:08.8319370Z   fetch-tags: false
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:08.8323480Z   show-progress: true
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:08.8324710Z   lfs: false
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:08.8325380Z   submodules: false
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:08.8326070Z   set-safe-directory: true
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:08.8326850Z   allow-unsafe-pr-checkout: false
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:08.8328820Z ##[endgroup]
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.7478680Z Syncing repository: airsstack/airsl
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.7480580Z ##[group]Getting Git version info
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.7480980Z Working directory is '/Users/runner/work/airsl/airsl'
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.7481920Z [command]/opt/homebrew/bin/git version
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8141290Z git version 2.56.1
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8162190Z ##[endgroup]
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8171450Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/282c6738-7bd9-4cbc-9f49-6a564571e70d/.gitconfig'
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8177930Z Temporarily overriding HOME='/Users/runner/work/_temp/282c6738-7bd9-4cbc-9f49-6a564571e70d' before making global git config changes
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8179560Z Adding repository directory to the temporary git global config as a safe directory
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8182720Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/airsl/airsl
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8364960Z Deleting the contents of '/Users/runner/work/airsl/airsl'
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8371430Z ##[group]Determining repository object format
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8376570Z ##[endgroup]
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8423610Z ##[group]Initializing the repository
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8526570Z [command]/opt/homebrew/bin/git init /Users/runner/work/airsl/airsl
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8801950Z hint: Using 'master' as the name for the initial branch. This default branch name
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8802900Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8803820Z hint: to use in all of your new repositories, which will suppress this warning,
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8804400Z hint: call:
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8804730Z hint:
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8805140Z hint: 	git config --global init.defaultBranch <name>
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8805700Z hint:
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8806080Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8807270Z hint: 'development'. The just-created branch can be renamed via this command:
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8808030Z hint:
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8808250Z hint: 	git branch -m <name>
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8808980Z hint:
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8809760Z hint: Disable this message with "git config set advice.defaultBranchName false"
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8810590Z Initialized empty Git repository in /Users/runner/work/airsl/airsl/.git/
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8821910Z [command]/opt/homebrew/bin/git remote add origin https://github.com/airsstack/airsl
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.8953090Z ##[endgroup]
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.9055800Z ##[group]Disabling automatic garbage collection
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.9158640Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.9370990Z ##[endgroup]
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.9375150Z ##[group]Setting up auth
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.9376010Z Removing SSH command configuration
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.9376730Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:09.9380220Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:10.1876510Z Removing HTTP extra header
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:10.1887290Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:10.2263050Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:10.4476810Z Removing includeIf entries pointing to credentials config files
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:10.4531600Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:10.4697590Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:10.8694410Z [command]/opt/homebrew/bin/git config --file /Users/runner/work/_temp/git-credentials-22493b75-162b-4b4e-a2e1-8a13bd069cce.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:10.9197420Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/Users/runner/work/airsl/airsl/.git.path /Users/runner/work/_temp/git-credentials-22493b75-162b-4b4e-a2e1-8a13bd069cce.config
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:10.9507000Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/Users/runner/work/airsl/airsl/.git/worktrees/*.path /Users/runner/work/_temp/git-credentials-22493b75-162b-4b4e-a2e1-8a13bd069cce.config
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:10.9817070Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-22493b75-162b-4b4e-a2e1-8a13bd069cce.config
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:11.0017320Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-22493b75-162b-4b4e-a2e1-8a13bd069cce.config
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:11.0083760Z ##[endgroup]
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:11.0085650Z ##[group]Fetching the repository
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:11.0086830Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +4ab5690fdf269392b0e548f2e5e4c8f2f22b487b:refs/remotes/origin/probe/x86-rocks-2026-11-26
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:11.4340670Z From https://github.com/airsstack/airsl
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:11.4342570Z  * [new ref]         4ab5690fdf269392b0e548f2e5e4c8f2f22b487b -> origin/probe/x86-rocks-2026-11-26
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:11.4354220Z [command]/opt/homebrew/bin/git branch --list --remote origin/probe/x86-rocks-2026-11-26
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:11.4511890Z   origin/probe/x86-rocks-2026-11-26
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:11.4537400Z [command]/opt/homebrew/bin/git rev-parse refs/remotes/origin/probe/x86-rocks-2026-11-26
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:11.4681970Z 4ab5690fdf269392b0e548f2e5e4c8f2f22b487b
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:11.4826000Z ##[endgroup]
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:11.4829620Z ##[group]Determining the checkout info
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:11.4831750Z ##[endgroup]
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:11.4833310Z [command]/opt/homebrew/bin/git sparse-checkout disable
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:11.4955330Z [command]/opt/homebrew/bin/git config --local --unset-all extensions.worktreeConfig
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:11.5060620Z ##[group]Checking out the ref
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:11.5067630Z [command]/opt/homebrew/bin/git checkout --progress --force -B probe/x86-rocks-2026-11-26 refs/remotes/origin/probe/x86-rocks-2026-11-26
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:11.5291080Z Switched to a new branch 'probe/x86-rocks-2026-11-26'
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:11.5311920Z branch 'probe/x86-rocks-2026-11-26' set up to track 'origin/probe/x86-rocks-2026-11-26'.
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:11.5381890Z ##[endgroup]
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:11.5420980Z [command]/opt/homebrew/bin/git log -1 --format=%H
+mac-cross	Run actions/checkout@v6	2026-11-26T06:39:11.5563940Z 4ab5690fdf269392b0e548f2e5e4c8f2f22b487b
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	﻿2026-11-26T06:39:11.6166480Z ##[group]Run echo "ImageOS=$ImageOS ImageVersion=$ImageVersion"; uname -m; sw_vers
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:11.6167260Z ^[[36;1mecho "ImageOS=$ImageOS ImageVersion=$ImageVersion"; uname -m; sw_vers^[[0m
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:11.6167830Z ^[[36;1mrustup toolchain install 1.94 --profile minimal --target x86_64-apple-darwin^[[0m
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:11.6168220Z ^[[36;1mrustc +1.94 -V; cargo +1.94 -V^[[0m
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:11.6168610Z ^[[36;1mmkdir -p cross^[[0m
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:11.6168890Z ^[[36;1mfor f in lua54 luajit; do^[[0m
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:11.6169550Z ^[[36;1m  cargo +1.94 build --locked --release --target x86_64-apple-darwin --features $f >/tmp/b.log 2>&1; echo "build $f exit=$?"; tail -3 /tmp/b.log^[[0m
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:11.6170360Z ^[[36;1m  cp target/x86_64-apple-darwin/release/libairsstack.dylib cross/cross-$f.dylib^[[0m
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:11.6170920Z ^[[36;1m  bash ci/mac-inspect.sh cross/cross-$f.dylib^[[0m
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:11.6171240Z ^[[36;1mdone^[[0m
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:11.6257490Z shell: /bin/bash --noprofile --norc {0}
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:11.6258250Z ##[endgroup]
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:11.7026700Z ImageOS=macos26 ImageVersion=20261117.0516.1
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:11.7055370Z arm64
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:11.7345380Z ProductName:		macOS
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:11.7346900Z ProductVersion:		26.7.2
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:11.7347580Z BuildVersion:		25G332
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:11.8704750Z info: syncing channel updates for 1.94-aarch64-apple-darwin
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:12.0945400Z info: latest update on 2026-03-26 for version 1.94.1 (e408947bf 2026-03-25)
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:12.0969040Z info: downloading 4 components
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:24.3071490Z 
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:24.5956440Z   1.94-aarch64-apple-darwin installed - rustc 1.94.1 (e408947bf 2026-03-25)
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:24.5960180Z info: self-update is disabled for this build of rustup
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:24.5960580Z 
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:24.6011320Z info: any updates to rustup will need to be fetched with your system package manager
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:24.7157790Z rustc 1.94.1 (e408947bf 2026-03-25)
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:24.8759790Z cargo 1.94.1 (29ea6fb6a 2026-03-24)
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:49.4050570Z build lua54 exit=0
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:49.4170180Z    Compiling mlua_derive v0.12.0
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:49.4171760Z    Compiling mlua v0.12.0
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:49.4173580Z     Finished `release` profile [optimized] target(s) in 24.44s
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:49.4659800Z == cross/cross-lua54.dylib
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:49.4767710Z cross/cross-lua54.dylib: Mach-O 64-bit dynamically linked shared library x86_64
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:49.4780320Z -- otool -l | grep -A4 LC_BUILD_VERSION:
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:50.6022780Z (grep exit=1)
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:50.6025320Z -- otool -l | grep -A3 LC_VERSION_MIN_MACOSX:
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:50.6312300Z       cmd LC_VERSION_MIN_MACOSX
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:50.6312780Z   cmdsize 16
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:50.6313190Z   version 10.12
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:50.6313750Z       sdk 26.5
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:50.6316700Z (grep exit=0)
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:57.3597300Z build luajit exit=0
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:57.3620940Z    Compiling airsstack v0.0.0 (/Users/runner/work/airsl/airsl)
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:57.3626570Z    Compiling mlua v0.12.0
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:57.3641030Z     Finished `release` profile [optimized] target(s) in 6.66s
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:57.3865000Z == cross/cross-luajit.dylib
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:57.3943620Z cross/cross-luajit.dylib: Mach-O 64-bit dynamically linked shared library x86_64
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:57.3956080Z -- otool -l | grep -A4 LC_BUILD_VERSION:
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:57.4189010Z (grep exit=1)
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:57.4198900Z -- otool -l | grep -A3 LC_VERSION_MIN_MACOSX:
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:57.4423680Z       cmd LC_VERSION_MIN_MACOSX
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:57.4424460Z   cmdsize 16
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:57.4425030Z   version 10.12
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:57.4425480Z       sdk 26.5
+mac-cross	(b-cross) build x86_64-apple-darwin on arm64	2026-11-26T06:39:57.4428520Z (grep exit=0)
+mac-cross	Run actions/upload-artifact@v7	﻿2026-11-26T06:39:57.4674400Z ##[group]Run actions/upload-artifact@v7
+mac-cross	Run actions/upload-artifact@v7	2026-11-26T06:39:57.4674840Z with:
+mac-cross	Run actions/upload-artifact@v7	2026-11-26T06:39:57.4675030Z   name: cross
+mac-cross	Run actions/upload-artifact@v7	2026-11-26T06:39:57.4675310Z   path: cross/
+mac-cross	Run actions/upload-artifact@v7	2026-11-26T06:39:57.4675530Z   if-no-files-found: warn
+mac-cross	Run actions/upload-artifact@v7	2026-11-26T06:39:57.4675810Z   compression-level: 6
+mac-cross	Run actions/upload-artifact@v7	2026-11-26T06:39:57.4676030Z   overwrite: false
+mac-cross	Run actions/upload-artifact@v7	2026-11-26T06:39:57.4676300Z   include-hidden-files: false
+mac-cross	Run actions/upload-artifact@v7	2026-11-26T06:39:57.4676570Z   archive: true
+mac-cross	Run actions/upload-artifact@v7	2026-11-26T06:39:57.4676870Z ##[endgroup]
+mac-cross	Run actions/upload-artifact@v7	2026-11-26T06:39:58.0050320Z With the provided path, there will be 2 files uploaded
+mac-cross	Run actions/upload-artifact@v7	2026-11-26T06:39:58.0062840Z Artifact name is valid!
+mac-cross	Run actions/upload-artifact@v7	2026-11-26T06:39:58.0063960Z Root directory input is valid!
+mac-cross	Run actions/upload-artifact@v7	2026-11-26T06:39:58.4415300Z Uploading artifact: cross.zip
+mac-cross	Run actions/upload-artifact@v7	2026-11-26T06:39:58.4438320Z Beginning upload of artifact content to blob storage
+mac-cross	Run actions/upload-artifact@v7	2026-11-26T06:39:59.2627280Z Uploaded bytes 557963
+mac-cross	Run actions/upload-artifact@v7	2026-11-26T06:39:59.3536000Z Finished uploading artifact content to blob storage!
+mac-cross	Run actions/upload-artifact@v7	2026-11-26T06:39:59.3537670Z SHA256 digest of uploaded artifact is 69ef2a42bf75d7ad8c09e38fa2dceaa745cfd59c809d711cd5df3efa4dd1570f
+mac-cross	Run actions/upload-artifact@v7	2026-11-26T06:39:59.3539240Z Finalizing artifact upload
+mac-cross	Run actions/upload-artifact@v7	2026-11-26T06:39:59.9076050Z Artifact cross successfully finalized. Artifact ID 15092893682
+mac-cross	Run actions/upload-artifact@v7	2026-11-26T06:39:59.9076960Z Artifact cross has been successfully uploaded! Final size is 557963 bytes. Artifact ID is 15092893682
+mac-cross	Run actions/upload-artifact@v7	2026-11-26T06:39:59.9086540Z Artifact download URL: https://github.com/airsstack/airsl/actions/runs/45769647202/artifacts/15092893682
+mac-cross	Post Run actions/checkout@v6	﻿2026-11-26T06:39:59.9469760Z Post job cleanup.
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.1512280Z [command]/opt/homebrew/bin/git version
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.1875000Z git version 2.56.1
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.1970340Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/ab51e9ce-45c2-4c65-aa91-1616983dcbbf/.gitconfig'
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.1994030Z Temporarily overriding HOME='/Users/runner/work/_temp/ab51e9ce-45c2-4c65-aa91-1616983dcbbf' before making global git config changes
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.1995070Z Adding repository directory to the temporary git global config as a safe directory
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.1999650Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/airsl/airsl
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.2231940Z Removing SSH command configuration
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.2245900Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.2578600Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.4912890Z Removing HTTP extra header
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.4922960Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.5090810Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.6866000Z Removing includeIf entries pointing to credentials config files
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.6872620Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.6969870Z includeif.gitdir:/Users/runner/work/airsl/airsl/.git.path
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.6971110Z includeif.gitdir:/Users/runner/work/airsl/airsl/.git/worktrees/*.path
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.6972010Z includeif.gitdir:/github/workspace/.git.path
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.6972870Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.6976300Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/Users/runner/work/airsl/airsl/.git.path
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.7054610Z /Users/runner/work/_temp/git-credentials-22493b75-162b-4b4e-a2e1-8a13bd069cce.config
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.7066670Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/Users/runner/work/airsl/airsl/.git.path /Users/runner/work/_temp/git-credentials-22493b75-162b-4b4e-a2e1-8a13bd069cce.config
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.7232300Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/Users/runner/work/airsl/airsl/.git/worktrees/*.path
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.7374710Z /Users/runner/work/_temp/git-credentials-22493b75-162b-4b4e-a2e1-8a13bd069cce.config
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.7394970Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/Users/runner/work/airsl/airsl/.git/worktrees/*.path /Users/runner/work/_temp/git-credentials-22493b75-162b-4b4e-a2e1-8a13bd069cce.config
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.7550570Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.7647770Z /github/runner_temp/git-credentials-22493b75-162b-4b4e-a2e1-8a13bd069cce.config
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.7657010Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-22493b75-162b-4b4e-a2e1-8a13bd069cce.config
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.7749340Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.7865450Z /github/runner_temp/git-credentials-22493b75-162b-4b4e-a2e1-8a13bd069cce.config
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.7878310Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-22493b75-162b-4b4e-a2e1-8a13bd069cce.config
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.7997670Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+mac-cross	Post Run actions/checkout@v6	2026-11-26T06:40:00.9496930Z Removing credentials config '/Users/runner/work/_temp/git-credentials-22493b75-162b-4b4e-a2e1-8a13bd069cce.config'
+mac-cross	Complete job	﻿2026-11-26T06:40:00.9672020Z Cleaning up orphan processes
+# ---- raw log of job mac-intel follows, byte for byte ----
+mac-intel	Set up job	﻿2026-11-26T06:40:13.6229460Z Current runner version: '2.338.2'
+mac-intel	Set up job	2026-11-26T06:40:13.6268610Z ##[group]Runner Image Provisioner
+mac-intel	Set up job	2026-11-26T06:40:13.6269820Z Hosted Compute Agent
+mac-intel	Set up job	2026-11-26T06:40:13.6270610Z Version: 20260819.586
+mac-intel	Set up job	2026-11-26T06:40:13.6271570Z Commit: 3cc4a88dfa507ef76119ad1bb3eccc6378bb2b76
+mac-intel	Set up job	2026-11-26T06:40:13.6272690Z Build Date: 2026-08-18T23:20:18Z
+mac-intel	Set up job	2026-11-26T06:40:13.6273870Z Worker ID: {87762d7e-da14-425b-bf0e-0afa56cffb2d}
+mac-intel	Set up job	2026-11-26T06:40:13.6274940Z Azure Region: westus
+mac-intel	Set up job	2026-11-26T06:40:13.6275720Z ##[endgroup]
+mac-intel	Set up job	2026-11-26T06:40:13.6278100Z ##[group]Operating System
+mac-intel	Set up job	2026-11-26T06:40:13.6278950Z macOS
+mac-intel	Set up job	2026-11-26T06:40:13.6279610Z 26.6.1
+mac-intel	Set up job	2026-11-26T06:40:13.6280280Z 25G76
+mac-intel	Set up job	2026-11-26T06:40:13.6280960Z ##[endgroup]
+mac-intel	Set up job	2026-11-26T06:40:13.6281680Z ##[group]Runner Image
+mac-intel	Set up job	2026-11-26T06:40:13.6282460Z Image: macos-26
+mac-intel	Set up job	2026-11-26T06:40:13.6283210Z Version: 20260824.0517.1
+mac-intel	Set up job	2026-11-26T06:40:13.6284930Z Included Software: https://github.com/actions/runner-images/blob/macos-26/20260824.0517/images/macos/macos-26-Readme.md
+mac-intel	Set up job	2026-11-26T06:40:13.6287570Z Image Release: https://github.com/actions/runner-images/releases/tag/macos-26%2F20260824.0517
+mac-intel	Set up job	2026-11-26T06:40:13.6289250Z ##[endgroup]
+mac-intel	Set up job	2026-11-26T06:40:13.6291050Z ##[group]GITHUB_TOKEN Permissions
+mac-intel	Set up job	2026-11-26T06:40:13.6293560Z Contents: read
+mac-intel	Set up job	2026-11-26T06:40:13.6294480Z Metadata: read
+mac-intel	Set up job	2026-11-26T06:40:13.6295310Z ##[endgroup]
+mac-intel	Set up job	2026-11-26T06:40:13.6298180Z Secret source: Actions
+mac-intel	Set up job	2026-11-26T06:40:13.6299440Z Cache mode: write
+mac-intel	Set up job	2026-11-26T06:40:13.6300370Z Prepare workflow directory
+mac-intel	Set up job	2026-11-26T06:40:13.7049230Z Prepare all required actions
+mac-intel	Set up job	2026-11-26T06:40:13.7173450Z Getting action download info
+mac-intel	Set up job	2026-11-26T06:40:14.2011080Z Download action repository 'actions/checkout@v6' (SHA:d23441a48e516b6c34aea4fa41551a30e30af803)
+mac-intel	Set up job	2026-11-26T06:40:15.8800860Z Download action repository 'actions/download-artifact@v8' (SHA:9000827ccba6bdab643e8b6fd33ac0654aef8333)
+mac-intel	Set up job	2026-11-26T06:40:18.2239380Z Complete job name: mac-intel
+mac-intel	Run actions/checkout@v6	﻿2026-11-26T06:40:18.5784900Z ##[group]Run actions/checkout@v6
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:18.5787230Z with:
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:18.5788170Z   repository: airsstack/airsl
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:18.5795660Z   token: ***
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:18.5796450Z   ssh-strict: true
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:18.5797310Z   ssh-user: git
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:18.5798130Z   persist-credentials: true
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:18.5798990Z   clean: true
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:18.5799760Z   sparse-checkout-cone-mode: true
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:18.5800680Z   fetch-depth: 1
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:18.5801430Z   fetch-tags: false
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:18.5802200Z   show-progress: true
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:18.5803000Z   lfs: false
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:18.5803760Z   submodules: false
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:18.5804670Z   set-safe-directory: true
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:18.5805600Z   allow-unsafe-pr-checkout: false
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:18.5807180Z env:
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:18.5807950Z   HOMEBREW_NO_AUTO_UPDATE: 1
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:18.5808840Z   HOMEBREW_NO_INSTALL_CLEANUP: 1
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:18.5809870Z ##[endgroup]
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.5342590Z Syncing repository: airsstack/airsl
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.5347540Z ##[group]Getting Git version info
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.5351970Z Working directory is '/Users/runner/work/airsl/airsl'
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.5355170Z [command]/usr/local/bin/git version
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.6316720Z git version 2.55.0
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.6409150Z ##[endgroup]
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.6445040Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/e6f05172-3a20-4564-8290-90ec9de34ef4/.gitconfig'
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.6467440Z Temporarily overriding HOME='/Users/runner/work/_temp/e6f05172-3a20-4564-8290-90ec9de34ef4' before making global git config changes
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.6472310Z Adding repository directory to the temporary git global config as a safe directory
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.6476130Z [command]/usr/local/bin/git config --global --add safe.directory /Users/runner/work/airsl/airsl
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.6906880Z Deleting the contents of '/Users/runner/work/airsl/airsl'
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.6932290Z ##[group]Determining repository object format
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.6961620Z ##[endgroup]
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.6976810Z ##[group]Initializing the repository
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.6986840Z [command]/usr/local/bin/git init /Users/runner/work/airsl/airsl
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.7962090Z hint: Using 'master' as the name for the initial branch. This default branch name
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.7968290Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.7973290Z hint: to use in all of your new repositories, which will suppress this warning,
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.7977400Z hint: call:
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.7980760Z hint:
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.7983880Z hint: 	git config --global init.defaultBranch <name>
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.7987490Z hint:
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.7990740Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.7997700Z hint: 'development'. The just-created branch can be renamed via this command:
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.8005220Z hint:
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.8007930Z hint: 	git branch -m <name>
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.8010780Z hint:
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.8015070Z hint: Disable this message with "git config set advice.defaultBranchName false"
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.8022000Z Initialized empty Git repository in /Users/runner/work/airsl/airsl/.git/
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.8030740Z [command]/usr/local/bin/git remote add origin https://github.com/airsstack/airsl
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.8551150Z ##[endgroup]
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.8581460Z ##[group]Disabling automatic garbage collection
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.8587630Z [command]/usr/local/bin/git config --local gc.auto 0
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.9011580Z ##[endgroup]
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.9015260Z ##[group]Setting up auth
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.9017990Z Removing SSH command configuration
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.9022740Z [command]/usr/local/bin/git config --local --name-only --get-regexp core\.sshCommand
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:22.9466000Z [command]/usr/local/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:24.6667930Z Removing HTTP extra header
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:24.6677410Z [command]/usr/local/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:24.7228530Z [command]/usr/local/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:26.0650780Z Removing includeIf entries pointing to credentials config files
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:26.0686750Z [command]/usr/local/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:26.1282230Z [command]/usr/local/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:27.2848190Z [command]/usr/local/bin/git config --file /Users/runner/work/_temp/git-credentials-36ff6e4a-4fb6-4721-8f84-bd492890e2d5.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:27.3726140Z [command]/usr/local/bin/git config --local includeIf.gitdir:/Users/runner/work/airsl/airsl/.git.path /Users/runner/work/_temp/git-credentials-36ff6e4a-4fb6-4721-8f84-bd492890e2d5.config
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:27.4397370Z [command]/usr/local/bin/git config --local includeIf.gitdir:/Users/runner/work/airsl/airsl/.git/worktrees/*.path /Users/runner/work/_temp/git-credentials-36ff6e4a-4fb6-4721-8f84-bd492890e2d5.config
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:27.4608950Z [command]/usr/local/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-36ff6e4a-4fb6-4721-8f84-bd492890e2d5.config
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:27.5466980Z [command]/usr/local/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-36ff6e4a-4fb6-4721-8f84-bd492890e2d5.config
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:27.5621550Z ##[endgroup]
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:27.5661810Z ##[group]Fetching the repository
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:27.5743850Z [command]/usr/local/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +4ab5690fdf269392b0e548f2e5e4c8f2f22b487b:refs/remotes/origin/probe/x86-rocks-2026-11-26
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:28.6624180Z From https://github.com/airsstack/airsl
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:28.6627450Z  * [new ref]         4ab5690fdf269392b0e548f2e5e4c8f2f22b487b -> origin/probe/x86-rocks-2026-11-26
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:28.6648160Z [command]/usr/local/bin/git branch --list --remote origin/probe/x86-rocks-2026-11-26
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:28.7332320Z   origin/probe/x86-rocks-2026-11-26
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:28.7353190Z [command]/usr/local/bin/git rev-parse refs/remotes/origin/probe/x86-rocks-2026-11-26
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:28.8449340Z 4ab5690fdf269392b0e548f2e5e4c8f2f22b487b
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:28.8472670Z ##[endgroup]
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:28.8480290Z ##[group]Determining the checkout info
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:28.8486570Z ##[endgroup]
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:28.8517060Z [command]/usr/local/bin/git sparse-checkout disable
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:28.9226940Z [command]/usr/local/bin/git config --local --unset-all extensions.worktreeConfig
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:28.9570180Z ##[group]Checking out the ref
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:28.9576160Z [command]/usr/local/bin/git checkout --progress --force -B probe/x86-rocks-2026-11-26 refs/remotes/origin/probe/x86-rocks-2026-11-26
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:29.0313860Z Switched to a new branch 'probe/x86-rocks-2026-11-26'
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:29.0385560Z branch 'probe/x86-rocks-2026-11-26' set up to track 'origin/probe/x86-rocks-2026-11-26'.
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:29.0511350Z ##[endgroup]
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:29.0761090Z [command]/usr/local/bin/git log -1 --format=%H
+mac-intel	Run actions/checkout@v6	2026-11-26T06:40:29.1190840Z 4ab5690fdf269392b0e548f2e5e4c8f2f22b487b
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	﻿2026-11-26T06:40:29.1993840Z ##[group]Run echo "ImageOS=$ImageOS ImageVersion=$ImageVersion"; uname -m; sw_vers; sysctl -n machdep.cpu.brand_string
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:29.1998580Z ^[[36;1mecho "ImageOS=$ImageOS ImageVersion=$ImageVersion"; uname -m; sw_vers; sysctl -n machdep.cpu.brand_string^[[0m
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:29.2001070Z ^[[36;1mrustup toolchain install 1.94 --profile minimal --target x86_64-apple-darwin^[[0m
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:29.2002790Z ^[[36;1mrustc +1.94 -V; cargo +1.94 -V^[[0m
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:29.2004320Z ^[[36;1mmkdir -p native^[[0m
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:29.2005990Z ^[[36;1mfor f in lua54 luajit; do^[[0m
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:29.2008840Z ^[[36;1m  cargo +1.94 build --locked --release --target x86_64-apple-darwin --features $f >/tmp/b.log 2>&1; echo "build $f exit=$?"; tail -3 /tmp/b.log^[[0m
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:29.2012690Z ^[[36;1m  cp target/x86_64-apple-darwin/release/libairsstack.dylib native/native-$f.dylib^[[0m
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:29.2015160Z ^[[36;1m  bash ci/mac-inspect.sh native/native-$f.dylib^[[0m
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:29.2016500Z ^[[36;1mdone^[[0m
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:29.2208970Z shell: /bin/bash --noprofile --norc {0}
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:29.2210550Z env:
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:29.2211980Z   HOMEBREW_NO_AUTO_UPDATE: 1
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:29.2213560Z   HOMEBREW_NO_INSTALL_CLEANUP: 1
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:29.2214370Z ##[endgroup]
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:29.3150230Z ImageOS=macos26 ImageVersion=20260824.0517.1
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:29.3180300Z x86_64
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:29.3744390Z ProductName:		macOS
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:29.3752900Z ProductVersion:		26.6.1
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:29.3759040Z BuildVersion:		25G76
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:29.3814850Z Intel(R) Core(TM) i7-8700B CPU @ 3.20GHz
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:29.5188960Z info: syncing channel updates for 1.94-x86_64-apple-darwin
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:30.0578200Z info: latest update on 2026-03-26 for version 1.94.1 (e408947bf 2026-03-25)
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:30.0580380Z info: downloading 3 components
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:54.2290480Z 
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:54.2788440Z info: self-update is disabled for this build of rustup
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:54.2801710Z   1.94-x86_64-apple-darwin installed - rustc 1.94.1 (e408947bf 2026-03-25)
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:54.2804240Z info: any updates to rustup will need to be fetched with your system package manager
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:54.2805420Z 
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:54.4770500Z rustc 1.94.1 (e408947bf 2026-03-25)
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:40:54.5422470Z cargo 1.94.1 (29ea6fb6a 2026-03-24)
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:41:50.7263100Z build lua54 exit=0
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:41:50.7692650Z    Compiling mlua_derive v0.12.0
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:41:50.7696070Z    Compiling mlua v0.12.0
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:41:50.7698410Z     Finished `release` profile [optimized] target(s) in 56.08s
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:41:50.7889010Z == native/native-lua54.dylib
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:41:50.8093970Z native/native-lua54.dylib: Mach-O 64-bit dynamically linked shared library x86_64
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:41:50.8100290Z -- otool -l | grep -A4 LC_BUILD_VERSION:
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:41:54.0811300Z (grep exit=1)
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:41:54.0814450Z -- otool -l | grep -A3 LC_VERSION_MIN_MACOSX:
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:41:54.1349760Z       cmd LC_VERSION_MIN_MACOSX
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:41:54.1366300Z   cmdsize 16
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:41:54.1392720Z   version 10.12
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:41:54.1400290Z       sdk 26.5
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:41:54.1432450Z (grep exit=0)
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:42:13.5113200Z build luajit exit=0
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:42:13.5166760Z    Compiling airsstack v0.0.0 (/Users/runner/work/airsl/airsl)
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:42:13.5168090Z    Compiling mlua v0.12.0
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:42:13.5169140Z     Finished `release` profile [optimized] target(s) in 19.23s
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:42:13.5846610Z == native/native-luajit.dylib
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:42:13.5934190Z native/native-luajit.dylib: Mach-O 64-bit dynamically linked shared library x86_64
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:42:13.5938090Z -- otool -l | grep -A4 LC_BUILD_VERSION:
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:42:13.6318830Z (grep exit=1)
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:42:13.6320360Z -- otool -l | grep -A3 LC_VERSION_MIN_MACOSX:
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:42:13.6750070Z       cmd LC_VERSION_MIN_MACOSX
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:42:13.6752030Z   cmdsize 16
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:42:13.6752960Z   version 10.12
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:42:13.6753860Z       sdk 26.5
+mac-intel	(b1) runner and native build for x86_64-apple-darwin	2026-11-26T06:42:13.6754690Z (grep exit=0)
+mac-intel	Run actions/download-artifact@v8	﻿2026-11-26T06:42:13.7035390Z ##[group]Run actions/download-artifact@v8
+mac-intel	Run actions/download-artifact@v8	2026-11-26T06:42:13.7036280Z with:
+mac-intel	Run actions/download-artifact@v8	2026-11-26T06:42:13.7036900Z   name: cross
+mac-intel	Run actions/download-artifact@v8	2026-11-26T06:42:13.7037550Z   path: cross/
+mac-intel	Run actions/download-artifact@v8	2026-11-26T06:42:13.7038220Z   merge-multiple: false
+mac-intel	Run actions/download-artifact@v8	2026-11-26T06:42:13.7038980Z   repository: airsstack/airsl
+mac-intel	Run actions/download-artifact@v8	2026-11-26T06:42:13.7039720Z   run-id: 45769647202
+mac-intel	Run actions/download-artifact@v8	2026-11-26T06:42:13.7040530Z   skip-decompress: false
+mac-intel	Run actions/download-artifact@v8	2026-11-26T06:42:13.7041260Z   digest-mismatch: error
+mac-intel	Run actions/download-artifact@v8	2026-11-26T06:42:13.7041850Z env:
+mac-intel	Run actions/download-artifact@v8	2026-11-26T06:42:13.7042430Z   HOMEBREW_NO_AUTO_UPDATE: 1
+mac-intel	Run actions/download-artifact@v8	2026-11-26T06:42:13.7043450Z   HOMEBREW_NO_INSTALL_CLEANUP: 1
+mac-intel	Run actions/download-artifact@v8	2026-11-26T06:42:13.7044120Z ##[endgroup]
+mac-intel	Run actions/download-artifact@v8	2026-11-26T06:42:14.7547730Z Downloading single artifact
+mac-intel	Run actions/download-artifact@v8	2026-11-26T06:42:15.0641060Z Preparing to download the following artifacts:
+mac-intel	Run actions/download-artifact@v8	2026-11-26T06:42:15.0645830Z - cross (ID: 15092893682, Size: 557963, Expected Digest: sha256:69ef2a42bf75d7ad8c09e38fa2dceaa745cfd59c809d711cd5df3efa4dd1570f)
+mac-intel	Run actions/download-artifact@v8	2026-11-26T06:42:15.5970650Z Redirecting to blob download url: https://productionresultssa12.blob.core.windows.net/actions-results/5c650830-5b4b-80a9-bf6c-d1be45cf7904/workflow-job-run-17d45dd1-9270-563b-8a8d-a7a100211399/artifacts/b3986952b145da5f0e4bd416f3b948e9864b57895675886c1deb83c16a9beadc.zip
+mac-intel	Run actions/download-artifact@v8	2026-11-26T06:42:15.5978740Z Starting download of artifact to: /Users/runner/work/airsl/airsl/cross
+mac-intel	Run actions/download-artifact@v8	2026-11-26T06:42:15.9525690Z (node:36449) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+mac-intel	Run actions/download-artifact@v8	2026-11-26T06:42:15.9528330Z (Use `node --trace-deprecation ...` to show where the warning was created)
+mac-intel	Run actions/download-artifact@v8	2026-11-26T06:42:16.4240670Z SHA256 digest of downloaded artifact is 69ef2a42bf75d7ad8c09e38fa2dceaa745cfd59c809d711cd5df3efa4dd1570f
+mac-intel	Run actions/download-artifact@v8	2026-11-26T06:42:16.4242800Z Artifact download completed successfully.
+mac-intel	Run actions/download-artifact@v8	2026-11-26T06:42:16.4243900Z Total of 1 artifact(s) downloaded
+mac-intel	Run actions/download-artifact@v8	2026-11-26T06:42:16.4257800Z Download artifact has finished successfully
+mac-intel	(b2) brew lua@5.4 + luajit	﻿2026-11-26T06:42:16.4511390Z ##[group]Run brew --version | head -1
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:16.4512300Z ^[[36;1mbrew --version | head -1^[[0m
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:16.4513380Z ^[[36;1mbrew info lua@5.4 luajit 2>&1 | grep -E '^(==>|lua|luajit|Bottle|From)' | head -12^[[0m
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:16.4514950Z ^[[36;1mbrew install lua@5.4 luajit 2>&1 | tail -15; echo "brew install exit=${PIPESTATUS[0]}"^[[0m
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:16.4517260Z ^[[36;1mls $(brew --prefix lua@5.4)/bin $(brew --prefix luajit)/bin 2>&1^[[0m
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:16.5570140Z shell: /bin/bash --noprofile --norc {0}
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:16.5571240Z env:
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:16.5571930Z   HOMEBREW_NO_AUTO_UPDATE: 1
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:16.5572710Z   HOMEBREW_NO_INSTALL_CLEANUP: 1
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:16.5573670Z ##[endgroup]
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:16.7801690Z Homebrew 6.0.18
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:16.9590330Z /usr/local/Homebrew/Library/Homebrew/cmd/--version.sh: line 29: echo: write error: Broken pipe
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:17.0755660Z /usr/local/Homebrew/Library/Homebrew/cmd/--version.sh: line 34: echo: write error: Broken pipe
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:22.5642650Z From: ^[[4mhttps://github.com/Homebrew/homebrew-core/blob/HEAD/Formula/l/lua@5.4.rb^[[24m
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:22.5645680Z lua@5.4 is keg-only, which means it was not symlinked into /usr/local,
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:22.5648100Z From: ^[[4mhttps://github.com/Homebrew/homebrew-core/blob/HEAD/Formula/l/luajit.rb^[[24m
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.4808410Z ^[[32m==>^[[0m ^[[1mFetching downloads for: ^[[32mlua@5.4^[[39m and ^[[32mluajit^[[39m^[[0m
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.4811540Z ✔︎ Bottle lua@5.4 (5.4.8)
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.4812810Z ✔︎ Bottle luajit (2.1.1787165859)
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.4814550Z ^[[34m==>^[[0m ^[[1mPouring lua@5.4--5.4.8.sonoma.bottle.tar.gz^[[0m
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.4816630Z ^[[34m==>^[[0m ^[[1mCaveats^[[0m
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.4817720Z You may also want luarocks:
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.4819650Z   brew install luarocks
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.4821090Z ^[[34m==>^[[0m ^[[1mSummary^[[0m
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.4822930Z 🍺  /usr/local/Cellar/lua@5.4/5.4.8: 30 files, 669.8KB
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.4824830Z ^[[34m==>^[[0m ^[[1mPouring luajit--2.1.1787165859.sonoma.bottle.tar.gz^[[0m
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.4827130Z 🍺  /usr/local/Cellar/luajit/2.1.1787165859: 56 files, 2MB
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.4828660Z ^[[32m==>^[[0m ^[[1mCaveats^[[0m
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.4829980Z ^[[34m==>^[[0m ^[[1mlua@5.4^[[0m
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.4831230Z You may also want luarocks:
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.4832310Z   brew install luarocks
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.4833590Z brew install exit=0
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.6368800Z /usr/local/opt/lua@5.4/bin:
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.6371090Z lua
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.6373090Z lua-5.4
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.6377680Z lua5.4
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.6379720Z luac
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.6382080Z luac-5.4
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.6383910Z luac5.4
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.6385130Z 
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.6386520Z /usr/local/opt/luajit/bin:
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.6387850Z luajit
+mac-intel	(b2) brew lua@5.4 + luajit	2026-11-26T06:42:28.6388980Z luajit-2.1.1787165859
+mac-intel	(b3) Lua 5.4.8 + LuaJIT v2.1 from source	﻿2026-11-26T06:42:28.6499360Z ##[group]Run bash ci/mac-lua-src.sh $RUNNER_TEMP/luasrc
+mac-intel	(b3) Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:42:28.6500520Z ^[[36;1mbash ci/mac-lua-src.sh $RUNNER_TEMP/luasrc^[[0m
+mac-intel	(b3) Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:42:28.6604170Z shell: /bin/bash --noprofile --norc {0}
+mac-intel	(b3) Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:42:28.6605340Z env:
+mac-intel	(b3) Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:42:28.6606180Z   HOMEBREW_NO_AUTO_UPDATE: 1
+mac-intel	(b3) Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:42:28.6607520Z   HOMEBREW_NO_INSTALL_CLEANUP: 1
+mac-intel	(b3) Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:42:28.6608500Z ##[endgroup]
+mac-intel	(b3) Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:42:30.3420900Z lua-5.4.8.tar.gz sha256: 4f18ddae154e793e46eeab727c59ef1c0c0c2b744e7b94219710d76f530629ae
+mac-intel	(b3) Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:42:51.5997280Z LuaJIT v2.1 branch tarball sha256: 5a42b310a4fc9ff2c93ae0f5405931e2eefea2ea6c8e79cb39fe1b3fdf2d21d7
+mac-intel	(b3) Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:43:28.9877750Z Lua 5.4.8  Copyright (C) 1994-2025 Lua.org, PUC-Rio
+mac-intel	(b3) Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:43:29.0011490Z LuaJIT 2.1.1795119671 -- Copyright (C) 2005-2026 Mike Pall. https://luajit.org/
+mac-intel	(b3) Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:43:29.0128880Z /Users/runner/work/_temp/luasrc/lua-5.4.8/src/lua: Mach-O 64-bit executable x86_64
+mac-intel	(b3) Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:43:29.0131150Z /Users/runner/work/_temp/luasrc/lj/src/luajit:     Mach-O 64-bit executable x86_64
+mac-intel	(b4) load every build under every interpreter of its flavour	﻿2026-11-26T06:43:29.0241830Z ##[group]Run B54=$(brew --prefix lua@5.4 2>/dev/null)/bin/lua; [ -x "$B54" ] || B54=$(brew --prefix lua@5.4 2>/dev/null)/bin/lua5.4
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.0244200Z ^[[36;1mB54=$(brew --prefix lua@5.4 2>/dev/null)/bin/lua; [ -x "$B54" ] || B54=$(brew --prefix lua@5.4 2>/dev/null)/bin/lua5.4^[[0m
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.0245850Z ^[[36;1mBJ=$(brew --prefix luajit 2>/dev/null)/bin/luajit^[[0m
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.0247080Z ^[[36;1mS54=$RUNNER_TEMP/luasrc/lua-5.4.8/src/lua; SJ=$RUNNER_TEMP/luasrc/lj/src/luajit^[[0m
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.0249860Z ^[[36;1mls -la native cross^[[0m
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.0250940Z ^[[36;1mfor d in native/*.dylib cross/*.dylib; do^[[0m
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.0252220Z ^[[36;1m  [ -f "$d" ] || { echo "missing $d"; continue; }^[[0m
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.0253740Z ^[[36;1m  n=$(basename $d .dylib); mkdir -p m/$n; cp $d m/$n/airsstack.so^[[0m
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.0255370Z ^[[36;1m  case $n in *-lua54) IS="$B54 $S54";; *) IS="$BJ $SJ";; esac^[[0m
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.0256710Z ^[[36;1m  for I in $IS; do^[[0m
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.0257800Z ^[[36;1m    echo "-- $n via $I"^[[0m
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.0259450Z ^[[36;1m    if [ -x "$I" ]; then $I ci/probe.lua m/$n 2>&1; echo "exit=$?"; else echo "interpreter not present"; fi^[[0m
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.0260800Z ^[[36;1m  done^[[0m
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.0261340Z ^[[36;1mdone^[[0m
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.0398440Z shell: /bin/bash --noprofile --norc {0}
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.0399220Z env:
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.0399770Z   HOMEBREW_NO_AUTO_UPDATE: 1
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.0400460Z   HOMEBREW_NO_INSTALL_CLEANUP: 1
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.0401130Z ##[endgroup]
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.2100190Z cross:
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.2103910Z total 2464
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.2107130Z drwxr-xr-x   4 runner  staff     128 Nov 26 06:42 .
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.2108850Z drwxr-xr-x  13 runner  staff     416 Nov 26 06:42 ..
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.2110700Z -rw-r--r--   1 runner  staff  623204 Nov 26 06:42 cross-lua54.dylib
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.2112900Z -rw-r--r--   1 runner  staff  633012 Nov 26 06:42 cross-luajit.dylib
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.2114180Z 
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.2114620Z native:
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.2115400Z total 2464
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.2116270Z drwxr-xr-x   4 runner  staff     128 Nov 26 06:42 .
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.2117580Z drwxr-xr-x  13 runner  staff     416 Nov 26 06:42 ..
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.2119090Z -rwxr-xr-x   1 runner  staff  623204 Nov 26 06:41 native-lua54.dylib
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.2120810Z -rwxr-xr-x   1 runner  staff  633036 Nov 26 06:42 native-luajit.dylib
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.2369880Z -- native-lua54 via /usr/local/opt/lua@5.4/bin/lua
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.2470130Z host: Lua 5.4
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.2539390Z require("airsstack").ok = true  json = [2,2.0]
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.2544900Z exit=0
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.2546410Z -- native-lua54 via /Users/runner/work/_temp/luasrc/lua-5.4.8/src/lua
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.2635510Z host: Lua 5.4
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.2650840Z require("airsstack").ok = true  json = [2,2.0]
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.2654210Z exit=0
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.2878060Z -- native-luajit via /usr/local/opt/luajit/bin/luajit
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.3130250Z host: Lua 5.1 / LuaJIT 2.1.1787165859
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.3206860Z require("airsstack").ok = true  json = [2,2]
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.3227670Z exit=0
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.3231640Z -- native-luajit via /Users/runner/work/_temp/luasrc/lj/src/luajit
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.3235850Z host: Lua 5.1 / LuaJIT 2.1.1795119671
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.3240410Z require("airsstack").ok = true  json = [2,2]
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.3243010Z exit=0
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.3462740Z -- cross-lua54 via /usr/local/opt/lua@5.4/bin/lua
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.3721660Z host: Lua 5.4
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.3724640Z require("airsstack").ok = true  json = [2,2.0]
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.3731250Z exit=0
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.3737620Z -- cross-lua54 via /Users/runner/work/_temp/luasrc/lua-5.4.8/src/lua
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.3755680Z host: Lua 5.4
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.3766650Z require("airsstack").ok = true  json = [2,2.0]
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.3770620Z exit=0
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.3980330Z -- cross-luajit via /usr/local/opt/luajit/bin/luajit
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.4124780Z host: Lua 5.1 / LuaJIT 2.1.1787165859
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.4127380Z require("airsstack").ok = true  json = [2,2]
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.4128540Z exit=0
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.4130300Z -- cross-luajit via /Users/runner/work/_temp/luasrc/lj/src/luajit
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.4224610Z host: Lua 5.1 / LuaJIT 2.1.1795119671
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.4225910Z require("airsstack").ok = true  json = [2,2]
+mac-intel	(b4) load every build under every interpreter of its flavour	2026-11-26T06:43:29.4227830Z exit=0
+mac-intel	Post Run actions/checkout@v6	﻿2026-11-26T06:43:29.4570630Z Post job cleanup.
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:29.6991200Z [command]/usr/local/bin/git version
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:29.7184430Z git version 2.55.0
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:29.7272740Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/adb30daa-2300-456b-a641-8b4878907264/.gitconfig'
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:29.7302720Z Temporarily overriding HOME='/Users/runner/work/_temp/adb30daa-2300-456b-a641-8b4878907264' before making global git config changes
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:29.7305710Z Adding repository directory to the temporary git global config as a safe directory
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:29.7315320Z [command]/usr/local/bin/git config --global --add safe.directory /Users/runner/work/airsl/airsl
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:29.7564170Z Removing SSH command configuration
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:29.7579390Z [command]/usr/local/bin/git config --local --name-only --get-regexp core\.sshCommand
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:29.7787100Z [command]/usr/local/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:30.1863110Z Removing HTTP extra header
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:30.1878470Z [command]/usr/local/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:30.2170250Z [command]/usr/local/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:30.4038410Z Removing includeIf entries pointing to credentials config files
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:30.4054740Z [command]/usr/local/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:30.4240800Z includeif.gitdir:/Users/runner/work/airsl/airsl/.git.path
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:30.4245640Z includeif.gitdir:/Users/runner/work/airsl/airsl/.git/worktrees/*.path
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:30.4248410Z includeif.gitdir:/github/workspace/.git.path
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:30.4250830Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:30.4264060Z [command]/usr/local/bin/git config --local --get-all includeif.gitdir:/Users/runner/work/airsl/airsl/.git.path
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:30.4426960Z /Users/runner/work/_temp/git-credentials-36ff6e4a-4fb6-4721-8f84-bd492890e2d5.config
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:30.4455180Z [command]/usr/local/bin/git config --local --unset includeif.gitdir:/Users/runner/work/airsl/airsl/.git.path /Users/runner/work/_temp/git-credentials-36ff6e4a-4fb6-4721-8f84-bd492890e2d5.config
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:30.4667320Z [command]/usr/local/bin/git config --local --get-all includeif.gitdir:/Users/runner/work/airsl/airsl/.git/worktrees/*.path
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:30.4828360Z /Users/runner/work/_temp/git-credentials-36ff6e4a-4fb6-4721-8f84-bd492890e2d5.config
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:30.4848270Z [command]/usr/local/bin/git config --local --unset includeif.gitdir:/Users/runner/work/airsl/airsl/.git/worktrees/*.path /Users/runner/work/_temp/git-credentials-36ff6e4a-4fb6-4721-8f84-bd492890e2d5.config
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:30.5049610Z [command]/usr/local/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:30.5215120Z /github/runner_temp/git-credentials-36ff6e4a-4fb6-4721-8f84-bd492890e2d5.config
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:30.5237760Z [command]/usr/local/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-36ff6e4a-4fb6-4721-8f84-bd492890e2d5.config
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:30.5445140Z [command]/usr/local/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:30.5609140Z /github/runner_temp/git-credentials-36ff6e4a-4fb6-4721-8f84-bd492890e2d5.config
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:30.5631590Z [command]/usr/local/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-36ff6e4a-4fb6-4721-8f84-bd492890e2d5.config
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:30.5797800Z [command]/usr/local/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+mac-intel	Post Run actions/checkout@v6	2026-11-26T06:43:30.8153000Z Removing credentials config '/Users/runner/work/_temp/git-credentials-36ff6e4a-4fb6-4721-8f84-bd492890e2d5.config'
+mac-intel	Complete job	﻿2026-11-26T06:43:30.8431870Z Cleaning up orphan processes

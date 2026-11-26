@@ -1,0 +1,3 @@
+64c02e9 probe: Y1 LuaJIT variants (backend in luarocks tree; 5.4-hosted luarocks)
+536c21b probe: isolate luarocks path per ABI; apt luarocks retries and cargo fallback
+bc89982 probe: CI toolchains for binary rocks (throwaway)

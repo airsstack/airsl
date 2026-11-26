@@ -1,0 +1,64 @@
+question: draft 7.2 #16: crates/airsl/examples/values-and-json/main.rs comment lines 63-64 ('Lua 5.4's integer subtype survives the round trip. On 5.1 or LuaJIT this would read / `1.7e9`, which is why the crate pins 5.4.'). What does LuaJIT actually print for that example's record (observed_at = 1700000000) through airsl's Json module (convert::to_json) in the toy module, vs Lua 5.4? Script: 149-luajit-json-number/encode.lua.
+commands: each `$ ...` line below, run in the stated cwd, followed by its raw output and `[exit N]`
+versions: rustc 1.94.1 (e408947bf 2026-03-25), cargo 1.94.1 (29ea6fb6a 2026-03-24) via R/rust-toolchain.toml channel 1.94; mlua 0.12.0, mlua-sys 0.11.0, mlua_derive 0.12.0, syn 2.0.119 (copy's Cargo.lock); cargo-deny 0.20.2; cargo-dist 0.33.1; luarocks 3.12.2 (/opt/homebrew/bin/luarocks, runs on Lua 5.4); Lua 5.4.8 (/opt/homebrew/bin/lua5.4); LuaJIT 2.1.1770848219 (/opt/homebrew/opt/luajit); luarocks-build-rust-mlua 0.2.7-1; macOS 26.3.1 arm64
+setup: S=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad; copy = S/probes-L/repo = rsync of R at 9d054c4 (minus target/, .git, .claudestacks, book/book), with the draft's feature table applied: root mlua features ["serialize"], members += crates/airsl-lua; crates/airsl [features] default=[lua54,vendored,send], lua54/luajit/vendored/send/module -> mlua/*; crates/airsl-lua cdylib (lib name airsstack, airsl path dep default-features=false + module, features lua54/luajit, build.rs dynamic_lookup, lib.rs `mod entry;`, entry.rs #[mlua::lua_module]); probe-only `ModuleSet::open` added to crates/airsl/src/modules/registry.rs so the toy installs airsl's real Json module. Sources and diffs: 140-lua-module-private-mod/. Env: CARGO_BUILD_JOBS=2, CARGO_TARGET_DIR=S/probes-L/target (luarocks' backend passes --target-dir=target, i.e. S/probes-L/repo/target). Every command ran under zsh `setopt pipefail`, so [exit N] is the pipeline's real status.
+date: 2026-11-26 (probe agent L)
+--- raw output ---
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/crates/airsl/examples/values-and-json/main.rs:64:    // `1.7e9`, which is why the crate pins 5.4.
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/crates/airsl/examples/values-and-json/main.rs:65:    assert!(compact.contains(r#""observed_at":1700000000"#), "{compact}");
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/crates/airsl/examples/values-and-json/README.md:19:compact: {"count":3,"meta":{},"name":"widget","observed_at":1700000000,"tags":["beta","alpha"]}
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/crates/airsl/examples/values-and-json/README.md:25:  "observed_at": 1700000000,
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/crates/airsl/examples/values-and-json/README.md:31:decoded back: name=widget observed_at=1700000000 tags=2
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/crates/airsl/examples/values-and-json/README.md:49:- **Lua 5.4's integers survive the round trip.** `observed_at` stays `1700000000` rather than
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/crates/airsl/examples/values-and-json/README.md:50:  becoming `1.7e9`. Only Lua 5.3+ distinguishes integers from floats, which is why the crate pins
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/crates/airsl/examples/values-and-json/encode.lua:11:  -- timestamp that silently became a float would encode as `1.7e9` and stop being a timestamp.
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/crates/airsl/examples/values-and-json/encode.lua:12:  observed_at = 1700000000,
+
+$ luajit -e 'package.cpath="/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/target/debug/lib?.dylib;"..package.cpath' /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/q16-encode.lua   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L)
+Lua 5.1	LuaJIT 2.1.1770848219
+compact: {"count":3,"meta":{},"name":"widget","observed_at":1700000000,"tags":["beta","alpha"]}
+pretty:
+{
+  "count": 3,
+  "meta": {},
+  "name": "widget",
+  "observed_at": 1700000000,
+  "tags": [
+    "beta",
+    "alpha"
+  ]
+}
+
+observed_at via tostring: 1700000000
+2^53 + 0.0 => {"v":9007199254740992}
+1.5 => {"v":1.5}
+1e300 => {"v":1e+300}
+decode back, math.type: n/a (no math.type) value 1700000000
+[exit 0]
+
+$ cargo build -p airsl-lua --features lua54 2>&1 | tail -1   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.94s
+[exit 0]
+
+$ lua5.4 -e 'package.cpath="/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/target/debug/lib?.dylib;"..package.cpath' /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/q16-encode.lua   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L)
+Lua 5.4	
+compact: {"count":3,"meta":{},"name":"widget","observed_at":1700000000,"tags":["beta","alpha"]}
+pretty:
+{
+  "count": 3,
+  "meta": {},
+  "name": "widget",
+  "observed_at": 1700000000,
+  "tags": [
+    "beta",
+    "alpha"
+  ]
+}
+
+observed_at via tostring: 1700000000
+2^53 + 0.0 => {"v":9007199254740992.0}
+1.5 => {"v":1.5}
+1e300 => {"v":1e+300}
+decode back, math.type: integer value 1700000000
+[exit 0]
+

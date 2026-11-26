@@ -1,0 +1,36 @@
+question: Follow-up to A3(h)/A4: can an inline #[test] that opens mlua::Lua::new() in a module-mode (lua54, no vendored) crate link and run on macOS, with build.rs emitting rustc-cdylib-link-arg (cdylib only) and then rustc-link-arg (all targets)?
+commands: cargo test --features lua54, twice (build.rs sed between runs). First run: output piped through grep -v that drops 'Compiling' lines and the per-symbol Undefined-symbol listing lines (the full listing has the same shape as 05 (h2)); second run: only 'Compiling' lines dropped. Source in 10-module-unit-test-link/ is the final state (rustc-link-arg).
+tools: rustc 1.94.1 (e408947bf 2026-03-25); cargo 1.94.1 (29ea6fb6a 2026-03-24); mlua =0.12.0, mlua-sys 0.11.0; Lua 5.4.8  Copyright (C) 1994-2025 Lua.org, PUC-Rio; LuaJIT 2.1.1770848219 -- Copyright (C) 2005-2026 Mike Pall. https://luajit.org/; macOS 26.3.1 arm64
+date: 2026-11-26T06:18:27Z
+--- raw output ---
+=== build.rs emits rustc-cdylib-link-arg only (as in 06)
+$ cargo test --features lua54
+error: linking with `cc` failed: exit status: 1
+  |
+  = note:  "cc" "/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a10-module-test-link/target/debug/deps/rustcCCbU85/symbols.o" "<86 object files omitted>" "/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a10-module-test-link/target/debug/deps/{libserde_json-9c5f0d3f17664908,libitoa-0058ccfeb46374f7,libzmij-616818dc6d449fb1}.rlib" "<sysroot>/lib/rustlib/aarch64-apple-darwin/lib/{libtest-*,libgetopts-*,librustc_std_workspace_std-*}.rlib" "/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a10-module-test-link/target/debug/deps/{libmlua-fc18228524a411b9,libserde_value-b1893ae1344492f6,libordered_float-30bca2ada556090d,liberased_serde-6608098d5991eed8,libtypeid-9ca72dbc2bc29bad,libmlua_sys-3b03a31633ceb300,libparking_lot-22d0bc07b3df14f0,libparking_lot_core-497d4c058b56efb4,liblibc-b80384a1ab117ef3,libcfg_if-5961dbb60a675de3,libsmallvec-aa3cc8c1979c1d9b,liblock_api-09bde01970e5f4cf,libscopeguard-f94d8dfeb1965bc2,librustc_hash-1922c5269cc5adcc,libeither-feecadaa681b2985,libnum_traits-f8dad4a23597e346,libbstr-a5da50c4948538a8,libmemchr-2fd701f973603a9e,libserde-35160d02ae911a5b,libserde_core-14624f5dc6e1e8ed}.rlib" "<sysroot>/lib/rustlib/aarch64-apple-darwin/lib/{libstd-*,libpanic_unwind-*,libobject-*,libmemchr-*,libaddr2line-*,libgimli-*,libcfg_if-*,librustc_demangle-*,libstd_detect-*,libhashbrown-*,librustc_std_workspace_alloc-*,libminiz_oxide-*,libadler2-*,libunwind-*,liblibc-*,librustc_std_workspace_core-*,liballoc-*,libcore-*,libcompiler_builtins-*}.rlib" "-liconv" "-lSystem" "-lc" "-lm" "-arch" "arm64" "-mmacosx-version-min=11.0.0" "-o" "/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a10-module-test-link/target/debug/deps/airsstack_probe-d2f43c978b5b7fd1" "-Wl,-dead_strip" "-nodefaultlibs"
+  = note: some arguments are omitted. use `--verbose` to show all linker arguments
+  = note: Undefined symbols for architecture arm64:
+          ld: symbol(s) not found for architecture arm64
+          clang: error: linker command failed with exit code 1 (use -v to see invocation)
+          
+
+error: could not compile `airsstack-probe` (lib test) due to 1 previous error
+exit=101
+=== build.rs changed to rustc-link-arg (every target, test binaries included):
+//! On macOS the Lua C API symbols are resolved from the interpreter that loads the module.
+
+fn main() {
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
+        println!("cargo:rustc-link-arg=-undefined");
+        println!("cargo:rustc-link-arg=dynamic_lookup");
+    }
+}
+$ cargo test --features lua54
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.80s
+     Running unittests src/lib.rs (target/debug/deps/airsstack_probe-d2f43c978b5b7fd1)
+dyld[50888]: symbol not found in flat namespace '_luaopen_base'
+error: test failed, to rerun pass `--lib`
+
+Caused by:
+  process didn't exit successfully: `/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a10-module-test-link/target/debug/deps/airsstack_probe-d2f43c978b5b7fd1` (signal: 6, SIGABRT: process abort signal)
+exit=101

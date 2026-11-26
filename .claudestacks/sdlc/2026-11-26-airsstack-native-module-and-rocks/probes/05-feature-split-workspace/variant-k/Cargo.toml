@@ -1,0 +1,20 @@
+[package]
+name    = "native"
+version = "0.0.0"
+edition.workspace      = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Variant (k): no direct mlua dependency; module mode comes through hostlib.
+hostlib = { path = "../hostlib", default-features = false, features = ["module"] }
+
+[features]
+lua54  = ["hostlib/lua54"]
+luajit = ["hostlib/luajit"]

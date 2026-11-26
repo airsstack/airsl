@@ -1,0 +1,146 @@
+Q: D1 — glibc floor of the mlua =0.12.0 module-mode toy (lua54,module and luajit,module) on linux aarch64.
+   Built in quay.io/pypa/manylinux2014_aarch64 (glibc 2.17, rustc 1.94.1 via rustup) and in rust:1-bookworm (glibc 2.36, image rustc);
+   max GLIBC_ symbol version via objdump -T; each .so renamed airsstack.so and require()d in a glibc-2.17 container (Lua 5.4.7 / LuaJIT 2.1
+   built from source), debian:bullseye (glibc 2.31, apt lua5.4) and ubuntu:22.04 (glibc 2.35, apt lua5.4 + luajit).
+   Does rustc 1.94's documented glibc 2.17 minimum hold for the cdylib output?
+Date: 2026-11-26. Host: macOS arm64, OrbStack docker 29.8.2; all containers native linux/arm64, images pinned by platform digest (listed below).
+Toy source and scripts: probes/66-native-module-toy/ (Cargo.lock pins mlua 0.12.0, mlua-sys 0.11.0, mlua_derive 0.12.0).
+Commands: probes/66-native-module-toy/scripts/pipeline.sh linux/arm64 arm64 quay.io/pypa/manylinux2014_aarch64 (step 1),
+  then, after the coordinator asked to stop parallel containers, scripts/resume-arm64.sh (steps 2-4, one container at a time,
+  --cpus 2 --memory 4g, CARGO_BUILD_JOBS=2), then a bullseye rerun of step 4 with load-in-apt.sh installing each interpreter
+  separately (bullseye-security 404'd on the luajit .debs, which made the first bullseye run print nothing).
+
+Rust's documented floor, probes/60-glibc-linux-aarch64/rust-1.94.1-platform-support.md (curl -sS -L https://raw.githubusercontent.com/rust-lang/rust/1.94.1/src/doc/rustc/src/platform-support.md):
+37:[`aarch64-unknown-linux-gnu`](platform-support/aarch64-unknown-linux-gnu.md) | ARM64 Linux (kernel 4.1+, glibc 2.17+)
+42:`x86_64-unknown-linux-gnu` | 64-bit Linux (kernel 3.2+, glibc 2.17+)
+
+Note: the empty 'undefined lua_ symbols' lines in step 1 come from an awk column bug in build-in.sh, fixed before step 2
+(the saved scripts/build-in.sh is the fixed one; step 3 reports 44 / 50 undefined lua* symbols for the manylinux builds).
+
+================ raw log: step 1 (pipeline.sh; stopped by the coordinator during step 2, which was rerun below)
+### date: 2026-11-26T06:16:09Z  host: Darwin arm64  docker: 29.8.2
+### image quay.io/pypa/manylinux2014_aarch64@sha256:382236bfd11d86894d9792a6fa5286190b8dd3d075a7032284e123c288711e4f : arch=arm64
+### image docker.io/library/rust:1-bookworm@sha256:b820ae3ce24753f523e6f50391196a3ef2474b4bc067f1ff80080a4b000c6961 : arch=arm64
+### image docker.io/library/debian:bullseye@sha256:32fc609441a9c8417b2bb5faa62a60afd6af19013e8e82fdeed5d08dc7ac1ad9 : arch=arm64
+### image docker.io/library/ubuntu:22.04@sha256:2926e8e6ef0b816e19849e33ccc728c72b921a428286e6595d52fa92c5716626 : arch=arm64
+
+### step 1: build in quay.io/pypa/manylinux2014_aarch64
+== ml-arm64 toolchain
+aarch64
+rustc 1.94.1 (e408947bf 2026-03-25)
+cargo 1.94.1 (29ea6fb6a 2026-03-24)
+cc (GCC) 10.2.1 20210130 (Red Hat 10.2.1-11)
+== ml-arm64 ldd --version
+ldd (GNU libc) 2.17
+== ml-arm64 build lua54: 50s
+== ml-arm64 build luajit: 10s
+== ml-arm64-lua54.so
+max GLIBC: GLIBC_2.17
+all GLIBC: GLIBC_2.17 
+NEEDED: libgcc_s.so.1 libpthread.so.0 libdl.so.2 libc.so.6 
+undefined lua_ symbols (first 3): 
+== ml-arm64-luajit.so
+max GLIBC: GLIBC_2.17
+all GLIBC: GLIBC_2.17 
+NEEDED: libgcc_s.so.1 libpthread.so.0 libdl.so.2 libc.so.6 
+undefined lua_ symbols (first 3): 
+### step 1 wall: 113s
+
+### step 2: build in rust:1-bookworm
+== bw-arm64 toolchain
+aarch64
+rustc 1.100.0 (0ef1bc386 2026-11-09)
+cargo 1.100.0 (3acc79c0c 2026-11-05)
+cc (Debian 12.2.0-14+deb12u1) 12.2.0
+== bw-arm64 ldd --version
+ldd (Debian GLIBC 2.36-9+deb12u14) 2.36
+
+================ raw log: steps 2-4 (resume-arm64.sh) + bullseye rerun
+### resumed 2026-11-26T06:19:24Z with: docker run --cpus 2 --memory 4g -e CARGO_BUILD_JOBS=2
+
+### step 2: build in rust:1-bookworm
+== bw-arm64 toolchain
+aarch64
+rustc 1.100.0 (0ef1bc386 2026-11-09)
+cargo 1.100.0 (3acc79c0c 2026-11-05)
+cc (Debian 12.2.0-14+deb12u1) 12.2.0
+== bw-arm64 ldd --version
+ldd (Debian GLIBC 2.36-9+deb12u14) 2.36
+== bw-arm64 build lua54: 7s
+== bw-arm64 build luajit: 2s
+== bw-arm64-lua54.so
+max GLIBC: GLIBC_2.34
+all GLIBC: GLIBC_2.17 GLIBC_2.18 GLIBC_2.28 GLIBC_2.30 GLIBC_2.33 GLIBC_2.34 
+NEEDED: libgcc_s.so.1 libc.so.6 
+undefined lua_ symbols (count, first 3): 44: luaL_checkstack luaL_ref luaL_tolstring
+== bw-arm64-luajit.so
+max GLIBC: GLIBC_2.34
+all GLIBC: GLIBC_2.17 GLIBC_2.18 GLIBC_2.28 GLIBC_2.30 GLIBC_2.33 GLIBC_2.34 
+NEEDED: libgcc_s.so.1 libc.so.6 
+undefined lua_ symbols (count, first 3): 50: luaL_callmeta luaL_error luaL_getmetafield
+### step 2 wall: 10s
+
+### step 3: load in manylinux2014_aarch64 (glibc 2.17) with Lua 5.4.7 / LuaJIT 2.1 built from source
+== loader glibc: ldd (GNU libc) 2.17
+aarch64
+lua-5.4.7.tar.gz sha256: 9fbf5e28ef86c69858f6d3d34eccc32e911c1a28b4120ff3e84aaa70cfbf1e30
+LuaJIT v2.1 branch tarball sha256: 5a42b310a4fc9ff2c93ae0f5405931e2eefea2ea6c8e79cb39fe1b3fdf2d21d7
+Lua 5.4.7  Copyright (C) 1994-2024 Lua.org, PUC-Rio
+LuaJIT 2.1.1795119671 -- Copyright (C) 2005-2026 Mike Pall. https://luajit.org/
+bw-arm64-lua54.so: undefined lua* symbols: 44
+bw-arm64-lua54 via lua -> /tmp/lua-5.4.7/src/lua: error loading module 'airsstack' from file '/m/bw-arm64-lua54/airsstack.so':
+	/lib64/libc.so.6: version `GLIBC_2.28' not found (required by /m/bw-arm64-lua54/airsstack.so)
+stack traceback:
+	[C]: in ?
+	[C]: in function 'require'
+	(command line):1: in main chunk
+	[C]: in ?
+(exit 1)
+ml-arm64-lua54.so: undefined lua* symbols: 44
+ml-arm64-lua54 via lua -> true
+bw-arm64-luajit.so: undefined lua* symbols: 50
+bw-arm64-luajit via luajit -> /tmp/lj/src/luajit: error loading module 'airsstack' from file '/m/bw-arm64-luajit/airsstack.so':
+	/lib64/libc.so.6: version `GLIBC_2.28' not found (required by /m/bw-arm64-luajit/airsstack.so)
+stack traceback:
+	[C]: at 0x0045ead0
+	[C]: in function 'require'
+	(command line):1: in main chunk
+	[C]: at 0x00404dc0
+(exit 1)
+ml-arm64-luajit.so: undefined lua* symbols: 50
+ml-arm64-luajit via luajit -> true
+
+### step 4: load in docker.io/library/debian:bullseye with apt lua5.4 / luajit
+
+### step 4: load in docker.io/library/ubuntu:22.04 with apt lua5.4 / luajit
+== loader: Ubuntu 22.04.5 LTS; ldd (Ubuntu GLIBC 2.35-0ubuntu3.18) 2.35
+aarch64
+libluajit-5.1-2:arm64	2.1.0~beta3+dfsg-6ubuntu0.1
+lua5.4	5.4.4-1
+luajit	2.1.0~beta3+dfsg-6ubuntu0.1
+Lua 5.4.4  Copyright (C) 1994-2022 Lua.org, PUC-Rio
+LuaJIT 2.1.0-beta3 -- Copyright (C) 2005-2017 Mike Pall. http://luajit.org/
+bw-arm64-lua54 via lua5.4 -> true
+ml-arm64-lua54 via lua5.4 -> true
+bw-arm64-luajit via luajit -> true
+ml-arm64-luajit via luajit -> true
+### done 2026-11-26T06:20:18Z
+
+### step 4 (rerun 2026-11-26T06:20:44Z, script now installs each interpreter separately): load in docker.io/library/debian:bullseye with apt lua5.4 / luajit
+apt-get install luajit FAILED: E: Failed to fetch http://deb.debian.org/debian-security/pool/updates/main/l/luajit/libluajit-5.1-common_2.1.0%7ebeta3%2bdfsg-5.3%2bdeb11u1_all.deb  404  Not Found [IP: 146.75.46.132 80]
+== loader: Debian GNU/Linux 11 (bullseye); ldd (Debian GLIBC 2.31-13+deb11u14) 2.31
+aarch64
+lua5.4	5.4.2-2
+Lua 5.4.2  Copyright (C) 1994-2020 Lua.org, PUC-Rio
+/s/load-in-apt.sh: 10: luajit: not found
+bw-arm64-lua54 via lua5.4 -> lua5.4: error loading module 'airsstack' from file '/m/bw-arm64-lua54/airsstack.so':
+	/lib/aarch64-linux-gnu/libc.so.6: version `GLIBC_2.34' not found (required by /m/bw-arm64-lua54/airsstack.so)
+stack traceback:
+	[C]: in ?
+	[C]: in function 'require'
+	(command line):1: in main chunk
+	[C]: in ?
+(exit 1)
+ml-arm64-lua54 via lua5.4 -> true
+bw-arm64-luajit: luajit not installed, skipped
+ml-arm64-luajit: luajit not installed, skipped

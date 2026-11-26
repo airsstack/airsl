@@ -1,0 +1,256 @@
+# Probe 121 — x86_64 Linux glibc floor of the mlua 0.12.0 module toy, and load across glibc
+# Question: built in quay.io/pypa/manylinux2014_x86_64 with rustup toolchain 1.94 (--features lua54 / luajit),
+#   what is the max GLIBC_ symbol, and does each .so (as airsstack.so) load under Lua 5.4.8 / LuaJIT v2.1
+#   built from source in manylinux2014 (glibc 2.17) and under apt lua5.4 / luajit in ubuntu:22.04?
+# Answer: HOLDS. rustc 1.94.1; max GLIBC: GLIBC_2.14 for both builds; every load prints
+#   require("airsstack").ok = true (json [2,2.0] on 5.4, [2,2] on LuaJIT).
+# Job: linux-glibc, id 139738939039, runner ubuntu-latest (ImageOS=ubuntu26 ImageVersion=20261116.202.1)
+Run: https://github.com/airsstack/airsl/actions/runs/45769647202 (run 2 of 2 on throwaway branch probe/x86-rocks-2026-11-26, since deleted; run 1 = 45769208286 gave the same results but its mac-inspect step grepped only LC_BUILD_VERSION, which printed nothing)
+Fetched with: gh run view -R airsstack/airsl --job <id> --log   Date: 2026-11-26
+Sources: 120-x86-probe-src/ (workflow .github/workflows/probe-x86.yml, toy crate mlua =0.12.0, ci/*.sh, ci/probe.lua)
+# ---- raw log follows, byte for byte ----
+linux-glibc	Set up job	﻿2026-11-26T06:39:02.8895368Z Current runner version: '2.338.2'
+linux-glibc	Set up job	2026-11-26T06:39:02.8935821Z ##[group]Runner Image Provisioner
+linux-glibc	Set up job	2026-11-26T06:39:02.8937379Z Hosted Compute Agent
+linux-glibc	Set up job	2026-11-26T06:39:02.8938547Z Version: 20261111.635
+linux-glibc	Set up job	2026-11-26T06:39:02.8939737Z Commit: b8a594ea514ff44cadb5342986c68b1eac6e22ed
+linux-glibc	Set up job	2026-11-26T06:39:02.8941280Z Build Date: 2026-11-11T01:49:01Z
+linux-glibc	Set up job	2026-11-26T06:39:02.8942630Z Worker ID: {65619d4e-537e-4271-b8e2-e14be127637a}
+linux-glibc	Set up job	2026-11-26T06:39:02.8943969Z Region: canadaeast
+linux-glibc	Set up job	2026-11-26T06:39:02.8945000Z Cloud: Azure
+linux-glibc	Set up job	2026-11-26T06:39:02.8945575Z ##[endgroup]
+linux-glibc	Set up job	2026-11-26T06:39:02.8947570Z ##[group]Operating System
+linux-glibc	Set up job	2026-11-26T06:39:02.8948299Z Ubuntu
+linux-glibc	Set up job	2026-11-26T06:39:02.8948825Z 26.04.1
+linux-glibc	Set up job	2026-11-26T06:39:02.8949440Z LTS
+linux-glibc	Set up job	2026-11-26T06:39:02.8949965Z ##[endgroup]
+linux-glibc	Set up job	2026-11-26T06:39:02.8950588Z ##[group]Runner Image
+linux-glibc	Set up job	2026-11-26T06:39:02.8951346Z Image: ubuntu-26.04
+linux-glibc	Set up job	2026-11-26T06:39:02.8951927Z Version: 20261116.202.1
+linux-glibc	Set up job	2026-11-26T06:39:02.8953577Z Included Software: https://github.com/actions/runner-images/blob/ubuntu26/20261116.202/images/ubuntu/Ubuntu2604-Readme.md
+linux-glibc	Set up job	2026-11-26T06:39:02.8955465Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261116.202
+linux-glibc	Set up job	2026-11-26T06:39:02.8956508Z ##[endgroup]
+linux-glibc	Set up job	2026-11-26T06:39:02.8957914Z ##[group]GITHUB_TOKEN Permissions
+linux-glibc	Set up job	2026-11-26T06:39:02.8960340Z Contents: read
+linux-glibc	Set up job	2026-11-26T06:39:02.8960980Z Metadata: read
+linux-glibc	Set up job	2026-11-26T06:39:02.8961674Z ##[endgroup]
+linux-glibc	Set up job	2026-11-26T06:39:02.8963726Z Secret source: Actions
+linux-glibc	Set up job	2026-11-26T06:39:02.8964784Z Cache mode: write
+linux-glibc	Set up job	2026-11-26T06:39:02.8965720Z Prepare workflow directory
+linux-glibc	Set up job	2026-11-26T06:39:02.9482755Z Prepare all required actions
+linux-glibc	Set up job	2026-11-26T06:39:02.9555263Z Getting action download info
+linux-glibc	Set up job	2026-11-26T06:39:03.1699873Z Download action repository 'actions/checkout@v6' (SHA:d23441a48e516b6c34aea4fa41551a30e30af803)
+linux-glibc	Set up job	2026-11-26T06:39:03.3568223Z Complete job name: linux-glibc
+linux-glibc	Run actions/checkout@v6	﻿2026-11-26T06:39:03.4555005Z ##[group]Run actions/checkout@v6
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.4555927Z with:
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.4556395Z   repository: airsstack/airsl
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.4560732Z   token: ***
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.4561194Z   ssh-strict: true
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.4561641Z   ssh-user: git
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.4562096Z   persist-credentials: true
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.4562587Z   clean: true
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.4563032Z   sparse-checkout-cone-mode: true
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.4563558Z   fetch-depth: 1
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.4563997Z   fetch-tags: false
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.4564438Z   show-progress: true
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.4564893Z   lfs: false
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.4565316Z   submodules: false
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.4565778Z   set-safe-directory: true
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.4566296Z   allow-unsafe-pr-checkout: false
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.4567256Z ##[endgroup]
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7506374Z Syncing repository: airsstack/airsl
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7509620Z ##[group]Getting Git version info
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7510966Z Working directory is '/home/runner/work/airsl/airsl'
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7513090Z [command]/usr/bin/git version
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7530423Z git version 2.56.1
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7558024Z ##[endgroup]
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7574676Z Temporarily overriding HOME='/home/runner/work/_temp/6f2451c7-8943-41a2-a165-c7246abda37b' before making global git config changes
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7577555Z Adding repository directory to the temporary git global config as a safe directory
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7580163Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/airsl/airsl
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7679768Z Deleting the contents of '/home/runner/work/airsl/airsl'
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7683492Z ##[group]Determining repository object format
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7686238Z ##[endgroup]
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7687709Z ##[group]Initializing the repository
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7691824Z [command]/usr/bin/git init /home/runner/work/airsl/airsl
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7804541Z hint: Using 'master' as the name for the initial branch. This default branch name
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7806502Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7808310Z hint: to use in all of your new repositories, which will suppress this warning,
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7810041Z hint: call:
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7811155Z hint:
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7812119Z hint: 	git config --global init.defaultBranch <name>
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7813284Z hint:
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7814403Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7816115Z hint: 'development'. The just-created branch can be renamed via this command:
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7818415Z hint:
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7819535Z hint: 	git branch -m <name>
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7820867Z hint:
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7822014Z hint: Disable this message with "git config set advice.defaultBranchName false"
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7824565Z Initialized empty Git repository in /home/runner/work/airsl/airsl/.git/
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7831245Z [command]/usr/bin/git remote add origin https://github.com/airsstack/airsl
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7891165Z ##[endgroup]
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7892153Z ##[group]Disabling automatic garbage collection
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7894519Z [command]/usr/bin/git config --local gc.auto 0
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7930935Z ##[endgroup]
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7932692Z ##[group]Setting up auth
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7934292Z Removing SSH command configuration
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7939355Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.7978684Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.8457373Z Removing HTTP extra header
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.8465795Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.8505193Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.8786296Z Removing includeIf entries pointing to credentials config files
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.8794450Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.8833094Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.9128287Z [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-fa005864-e8ea-47f6-b464-50023ebf90a0.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.9177435Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/airsl/airsl/.git.path /home/runner/work/_temp/git-credentials-fa005864-e8ea-47f6-b464-50023ebf90a0.config
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.9218235Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/airsl/airsl/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-fa005864-e8ea-47f6-b464-50023ebf90a0.config
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.9261676Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-fa005864-e8ea-47f6-b464-50023ebf90a0.config
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.9301280Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-fa005864-e8ea-47f6-b464-50023ebf90a0.config
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.9340947Z ##[endgroup]
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.9348528Z ##[group]Fetching the repository
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:03.9351658Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +4ab5690fdf269392b0e548f2e5e4c8f2f22b487b:refs/remotes/origin/probe/x86-rocks-2026-11-26
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:04.2296365Z From https://github.com/airsstack/airsl
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:04.2297951Z  * [new ref]         4ab5690fdf269392b0e548f2e5e4c8f2f22b487b -> origin/probe/x86-rocks-2026-11-26
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:04.2308372Z [command]/usr/bin/git branch --list --remote origin/probe/x86-rocks-2026-11-26
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:04.2334491Z   origin/probe/x86-rocks-2026-11-26
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:04.2343972Z [command]/usr/bin/git rev-parse refs/remotes/origin/probe/x86-rocks-2026-11-26
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:04.2367910Z 4ab5690fdf269392b0e548f2e5e4c8f2f22b487b
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:04.2373765Z ##[endgroup]
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:04.2374679Z ##[group]Determining the checkout info
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:04.2375820Z ##[endgroup]
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:04.2379499Z [command]/usr/bin/git sparse-checkout disable
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:04.2433959Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:04.2462941Z ##[group]Checking out the ref
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:04.2466265Z [command]/usr/bin/git checkout --progress --force -B probe/x86-rocks-2026-11-26 refs/remotes/origin/probe/x86-rocks-2026-11-26
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:04.2532889Z Switched to a new branch 'probe/x86-rocks-2026-11-26'
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:04.2540395Z branch 'probe/x86-rocks-2026-11-26' set up to track 'origin/probe/x86-rocks-2026-11-26'.
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:04.2545825Z ##[endgroup]
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:04.2590281Z [command]/usr/bin/git log -1 --format=%H
+linux-glibc	Run actions/checkout@v6	2026-11-26T06:39:04.2614407Z 4ab5690fdf269392b0e548f2e5e4c8f2f22b487b
+linux-glibc	runner image	﻿2026-11-26T06:39:04.2855346Z ##[group]Run echo "ImageOS=$ImageOS ImageVersion=$ImageVersion"; uname -a; docker version --format '{{.Server.Version}}'
+linux-glibc	runner image	2026-11-26T06:39:04.2857368Z ^[[36;1mecho "ImageOS=$ImageOS ImageVersion=$ImageVersion"; uname -a; docker version --format '{{.Server.Version}}'^[[0m
+linux-glibc	runner image	2026-11-26T06:39:04.2893896Z shell: /usr/bin/bash --noprofile --norc {0}
+linux-glibc	runner image	2026-11-26T06:39:04.2894566Z ##[endgroup]
+linux-glibc	runner image	2026-11-26T06:39:04.2975444Z ImageOS=ubuntu26 ImageVersion=20261116.202.1
+linux-glibc	runner image	2026-11-26T06:39:04.3001640Z Linux runnervm0hi8g 7.0.0-1020-azure #21-Ubuntu SMP PREEMPT Tue Oct 27 22:34:38 UTC 2026 x86_64 GNU/Linux
+linux-glibc	runner image	2026-11-26T06:39:04.4052175Z 29.4.2
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	﻿2026-11-26T06:39:04.4123802Z ##[group]Run mkdir -p $RUNNER_TEMP/out
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:04.4124570Z ^[[36;1mmkdir -p $RUNNER_TEMP/out^[[0m
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:04.4125274Z ^[[36;1mdocker pull -q quay.io/pypa/manylinux2014_x86_64^[[0m
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:04.4126419Z ^[[36;1mecho "image: $(docker image inspect --format '{{index .RepoDigests 0}}' quay.io/pypa/manylinux2014_x86_64)"^[[0m
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:04.4128238Z ^[[36;1mdocker run --rm -v $PWD:/toy:ro -v $RUNNER_TEMP/out:/out -v $PWD/ci:/s:ro quay.io/pypa/manylinux2014_x86_64 sh /s/build-in.sh^[[0m
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:04.4129422Z ^[[36;1mecho "docker exit=$?"; ls -la $RUNNER_TEMP/out^[[0m
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:04.4163288Z shell: /usr/bin/bash --noprofile --norc {0}
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:04.4163953Z ##[endgroup]
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:19.5739352Z quay.io/pypa/manylinux2014_x86_64:latest
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:19.6388751Z image: quay.io/pypa/manylinux2014_x86_64@sha256:8a79ff36ce155d8f242dc8013d73c5e8bbe937defb15de7d7afb342c1ab537f4
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:31.4193115Z == toolchain
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:31.4200165Z x86_64
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:31.4323655Z rustc 1.94.1 (e408947bf 2026-03-25)
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:31.4417971Z cargo 1.94.1 (29ea6fb6a 2026-03-24)
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:31.4447813Z cc (GCC) 10.2.1 20210130 (Red Hat 10.2.1-11)
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:31.4479702Z == ldd --version: ldd (GNU libc) 2.17
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:31.4563901Z == cargo build --locked --release --features lua54
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:42.8366067Z build lua54 exit=0
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:42.8376941Z    Compiling mlua_derive v0.12.0
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:42.8377405Z    Compiling mlua v0.12.0
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:42.8377840Z     Finished `release` profile [optimized] target(s) in 11.36s
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:42.8399562Z == cargo build --locked --release --features luajit
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:46.8677871Z build luajit exit=0
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:46.8687715Z    Compiling airsstack v0.0.0 (/work)
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:46.8688266Z    Compiling mlua v0.12.0
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:46.8688815Z     Finished `release` profile [optimized] target(s) in 4.01s
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:46.8737444Z == ml-lua54.so
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:46.8772432Z max GLIBC: GLIBC_2.14
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:46.8807933Z all GLIBC: GLIBC_2.2.5 GLIBC_2.3 GLIBC_2.3.4 GLIBC_2.14 
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:46.8841317Z NEEDED: libgcc_s.so.1 librt.so.1 libpthread.so.0 libc.so.6 ld-linux-x86-64.so.2 
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:46.8874967Z undefined lua* symbols: 49
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:46.8885853Z == ml-luajit.so
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:46.8920091Z max GLIBC: GLIBC_2.14
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:46.8953447Z all GLIBC: GLIBC_2.2.5 GLIBC_2.3 GLIBC_2.3.4 GLIBC_2.14 
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:46.8986144Z NEEDED: libgcc_s.so.1 librt.so.1 libpthread.so.0 libc.so.6 ld-linux-x86-64.so.2 
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:46.9018016Z undefined lua* symbols: 54
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:48.0479200Z docker exit=0
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:48.0520240Z total 1496
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:48.0521035Z drwxr-xr-x 2 runner runner   4096 Nov 26 06:39 .
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:48.0521826Z drwxr-xr-x 5 runner runner   4096 Nov 26 06:39 ..
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:48.0522457Z -rwxr-xr-x 1 root   root   754400 Nov 26 06:39 ml-lua54.so
+linux-glibc	(a1) build in manylinux2014_x86_64 with rustup 1.94	2026-11-26T06:39:48.0522998Z -rwxr-xr-x 1 root   root   765336 Nov 26 06:39 ml-luajit.so
+linux-glibc	(a2) load in manylinux2014_x86_64 (glibc 2.17), Lua 5.4.8 + LuaJIT v2.1 from source	﻿2026-11-26T06:39:48.0657426Z ##[group]Run docker run --rm -v $RUNNER_TEMP/out:/out:ro -v $PWD/ci:/s:ro quay.io/pypa/manylinux2014_x86_64 sh /s/load-in-src.sh
+linux-glibc	(a2) load in manylinux2014_x86_64 (glibc 2.17), Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:39:48.0658333Z ^[[36;1mdocker run --rm -v $RUNNER_TEMP/out:/out:ro -v $PWD/ci:/s:ro quay.io/pypa/manylinux2014_x86_64 sh /s/load-in-src.sh^[[0m
+linux-glibc	(a2) load in manylinux2014_x86_64 (glibc 2.17), Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:39:48.0658899Z ^[[36;1mecho "docker exit=$?"^[[0m
+linux-glibc	(a2) load in manylinux2014_x86_64 (glibc 2.17), Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:39:48.0692927Z shell: /usr/bin/bash --noprofile --norc {0}
+linux-glibc	(a2) load in manylinux2014_x86_64 (glibc 2.17), Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:39:48.0693239Z ##[endgroup]
+linux-glibc	(a2) load in manylinux2014_x86_64 (glibc 2.17), Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:39:48.2359197Z == loader: ldd (GNU libc) 2.17
+linux-glibc	(a2) load in manylinux2014_x86_64 (glibc 2.17), Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:39:48.2369814Z x86_64
+linux-glibc	(a2) load in manylinux2014_x86_64 (glibc 2.17), Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:39:49.6469164Z lua-5.4.8.tar.gz sha256: 4f18ddae154e793e46eeab727c59ef1c0c0c2b744e7b94219710d76f530629ae
+linux-glibc	(a2) load in manylinux2014_x86_64 (glibc 2.17), Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:39:55.8343450Z LuaJIT v2.1 branch tarball sha256: 5a42b310a4fc9ff2c93ae0f5405931e2eefea2ea6c8e79cb39fe1b3fdf2d21d7
+linux-glibc	(a2) load in manylinux2014_x86_64 (glibc 2.17), Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:40:23.6741821Z Lua 5.4.8  Copyright (C) 1994-2025 Lua.org, PUC-Rio
+linux-glibc	(a2) load in manylinux2014_x86_64 (glibc 2.17), Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:40:23.6756475Z LuaJIT 2.1.1795119671 -- Copyright (C) 2005-2026 Mike Pall. https://luajit.org/
+linux-glibc	(a2) load in manylinux2014_x86_64 (glibc 2.17), Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:40:23.6800382Z -- ml-lua54 via /tmp/lua-5.4.8/src/lua
+linux-glibc	(a2) load in manylinux2014_x86_64 (glibc 2.17), Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:40:23.6811388Z host: Lua 5.4
+linux-glibc	(a2) load in manylinux2014_x86_64 (glibc 2.17), Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:40:23.6817211Z require("airsstack").ok = true  json = [2,2.0]
+linux-glibc	(a2) load in manylinux2014_x86_64 (glibc 2.17), Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:40:23.6822473Z exit=0
+linux-glibc	(a2) load in manylinux2014_x86_64 (glibc 2.17), Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:40:23.6862231Z -- ml-luajit via /tmp/lj/src/luajit
+linux-glibc	(a2) load in manylinux2014_x86_64 (glibc 2.17), Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:40:23.6878540Z host: Lua 5.1 / LuaJIT 2.1.1795119671
+linux-glibc	(a2) load in manylinux2014_x86_64 (glibc 2.17), Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:40:23.6879238Z require("airsstack").ok = true  json = [2,2]
+linux-glibc	(a2) load in manylinux2014_x86_64 (glibc 2.17), Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:40:23.6880096Z exit=0
+linux-glibc	(a2) load in manylinux2014_x86_64 (glibc 2.17), Lua 5.4.8 + LuaJIT v2.1 from source	2026-11-26T06:40:23.8265175Z docker exit=0
+linux-glibc	(a3) load in ubuntu:22.04, apt lua5.4 + luajit	﻿2026-11-26T06:40:23.8299946Z ##[group]Run docker pull -q ubuntu:22.04
+linux-glibc	(a3) load in ubuntu:22.04, apt lua5.4 + luajit	2026-11-26T06:40:23.8300332Z ^[[36;1mdocker pull -q ubuntu:22.04^[[0m
+linux-glibc	(a3) load in ubuntu:22.04, apt lua5.4 + luajit	2026-11-26T06:40:23.8300768Z ^[[36;1mecho "image: $(docker image inspect --format '{{index .RepoDigests 0}}' ubuntu:22.04)"^[[0m
+linux-glibc	(a3) load in ubuntu:22.04, apt lua5.4 + luajit	2026-11-26T06:40:23.8301400Z ^[[36;1mdocker run --rm -v $RUNNER_TEMP/out:/out:ro -v $PWD/ci:/s:ro ubuntu:22.04 sh /s/load-in-apt.sh^[[0m
+linux-glibc	(a3) load in ubuntu:22.04, apt lua5.4 + luajit	2026-11-26T06:40:23.8301868Z ^[[36;1mecho "docker exit=$?"^[[0m
+linux-glibc	(a3) load in ubuntu:22.04, apt lua5.4 + luajit	2026-11-26T06:40:23.8334106Z shell: /usr/bin/bash --noprofile --norc {0}
+linux-glibc	(a3) load in ubuntu:22.04, apt lua5.4 + luajit	2026-11-26T06:40:23.8334415Z ##[endgroup]
+linux-glibc	(a3) load in ubuntu:22.04, apt lua5.4 + luajit	2026-11-26T06:40:25.2087188Z docker.io/library/ubuntu:22.04
+linux-glibc	(a3) load in ubuntu:22.04, apt lua5.4 + luajit	2026-11-26T06:40:25.2599227Z image: ubuntu@sha256:b000e69a50ff940390233025e7a337fb8469b509e2334fa4d018ac30f3e18cdb
+linux-glibc	(a3) load in ubuntu:22.04, apt lua5.4 + luajit	2026-11-26T06:43:28.0019781Z == loader: Ubuntu 22.04.5 LTS; ldd (Ubuntu GLIBC 2.35-0ubuntu3.18) 2.35
+linux-glibc	(a3) load in ubuntu:22.04, apt lua5.4 + luajit	2026-11-26T06:43:28.0025758Z x86_64
+linux-glibc	(a3) load in ubuntu:22.04, apt lua5.4 + luajit	2026-11-26T06:43:28.0047494Z libluajit-5.1-2:amd64	2.1.0~beta3+dfsg-6ubuntu0.1
+linux-glibc	(a3) load in ubuntu:22.04, apt lua5.4 + luajit	2026-11-26T06:43:28.0048275Z lua5.4	5.4.4-1
+linux-glibc	(a3) load in ubuntu:22.04, apt lua5.4 + luajit	2026-11-26T06:43:28.0048665Z luajit	2.1.0~beta3+dfsg-6ubuntu0.1
+linux-glibc	(a3) load in ubuntu:22.04, apt lua5.4 + luajit	2026-11-26T06:43:28.0059815Z Lua 5.4.4  Copyright (C) 1994-2022 Lua.org, PUC-Rio
+linux-glibc	(a3) load in ubuntu:22.04, apt lua5.4 + luajit	2026-11-26T06:43:28.0070226Z LuaJIT 2.1.0-beta3 -- Copyright (C) 2005-2017 Mike Pall. http://luajit.org/
+linux-glibc	(a3) load in ubuntu:22.04, apt lua5.4 + luajit	2026-11-26T06:43:28.0102280Z -- ml-lua54 via lua5.4
+linux-glibc	(a3) load in ubuntu:22.04, apt lua5.4 + luajit	2026-11-26T06:43:28.0111112Z host: Lua 5.4
+linux-glibc	(a3) load in ubuntu:22.04, apt lua5.4 + luajit	2026-11-26T06:43:28.0115910Z require("airsstack").ok = true  json = [2,2.0]
+linux-glibc	(a3) load in ubuntu:22.04, apt lua5.4 + luajit	2026-11-26T06:43:28.0119303Z exit=0
+linux-glibc	(a3) load in ubuntu:22.04, apt lua5.4 + luajit	2026-11-26T06:43:28.0148525Z -- ml-luajit via luajit
+linux-glibc	(a3) load in ubuntu:22.04, apt lua5.4 + luajit	2026-11-26T06:43:28.0159989Z host: Lua 5.1 / LuaJIT 2.1.0-beta3
+linux-glibc	(a3) load in ubuntu:22.04, apt lua5.4 + luajit	2026-11-26T06:43:28.0162380Z require("airsstack").ok = true  json = [2,2]
+linux-glibc	(a3) load in ubuntu:22.04, apt lua5.4 + luajit	2026-11-26T06:43:28.0162760Z exit=0
+linux-glibc	(a3) load in ubuntu:22.04, apt lua5.4 + luajit	2026-11-26T06:43:28.1267279Z docker exit=0
+linux-glibc	Post Run actions/checkout@v6	﻿2026-11-26T06:43:28.1386325Z Post job cleanup.
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.2246363Z [command]/usr/bin/git version
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.2293631Z git version 2.56.1
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.2341195Z Temporarily overriding HOME='/home/runner/work/_temp/3398bf4a-b274-49f9-b69b-df87e5c9de7b' before making global git config changes
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.2342578Z Adding repository directory to the temporary git global config as a safe directory
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.2346971Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/airsl/airsl
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.2384528Z Removing SSH command configuration
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.2392285Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.2432036Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.2767967Z Removing HTTP extra header
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.2774345Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.2812713Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.3136183Z Removing includeIf entries pointing to credentials config files
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.3144838Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.3175540Z includeif.gitdir:/home/runner/work/airsl/airsl/.git.path
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.3185090Z includeif.gitdir:/home/runner/work/airsl/airsl/.git/worktrees/*.path
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.3195123Z includeif.gitdir:/github/workspace/.git.path
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.3195936Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.3197910Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/airsl/airsl/.git.path
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.3213128Z /home/runner/work/_temp/git-credentials-fa005864-e8ea-47f6-b464-50023ebf90a0.config
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.3228753Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/airsl/airsl/.git.path /home/runner/work/_temp/git-credentials-fa005864-e8ea-47f6-b464-50023ebf90a0.config
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.3267808Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/airsl/airsl/.git/worktrees/*.path
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.3292313Z /home/runner/work/_temp/git-credentials-fa005864-e8ea-47f6-b464-50023ebf90a0.config
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.3302798Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/airsl/airsl/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-fa005864-e8ea-47f6-b464-50023ebf90a0.config
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.3337459Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.3362419Z /github/runner_temp/git-credentials-fa005864-e8ea-47f6-b464-50023ebf90a0.config
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.3374733Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-fa005864-e8ea-47f6-b464-50023ebf90a0.config
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.3412064Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.3435924Z /github/runner_temp/git-credentials-fa005864-e8ea-47f6-b464-50023ebf90a0.config
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.3476985Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-fa005864-e8ea-47f6-b464-50023ebf90a0.config
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.3519701Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+linux-glibc	Post Run actions/checkout@v6	2026-11-26T06:43:28.3792405Z Removing credentials config '/home/runner/work/_temp/git-credentials-fa005864-e8ea-47f6-b464-50023ebf90a0.config'
+linux-glibc	Complete job	﻿2026-11-26T06:43:28.3942408Z Cleaning up orphan processes

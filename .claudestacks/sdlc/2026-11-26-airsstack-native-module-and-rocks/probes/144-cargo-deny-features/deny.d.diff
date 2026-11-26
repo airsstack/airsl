@@ -1,0 +1,19 @@
+--- a/deny.toml
++++ b/deny.toml
+@@ -64,12 +64,15 @@
+ multiple-versions = "deny"
+ # No `version = "*"` dependencies. The root manifest pins every direct one.
+ wildcards = "deny"
++allow-wildcard-paths = true
+ highlight = "all"
+ workspace-default-features = "allow"
+ external-default-features = "allow"
+ allow = []
+ deny = []
+-skip = []
++skip = [
++    { crate = "syn@2", reason = "mlua_derive 0.12 (mlua `module` feature) is still on syn 2" },
++]
+ skip-tree = []
+ 
+ # ---------------------------------------------------------------------------

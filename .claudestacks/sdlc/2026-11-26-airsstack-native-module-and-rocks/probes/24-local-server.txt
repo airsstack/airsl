@@ -1,0 +1,527 @@
+Question B5: local rocks server holding rockspecs, src rocks and binary rocks of airsstack (0.0.1-1, 0.0.2-1) and airsstack-luajit (0.0.1-1): what luarocks-admin make_manifest puts in manifest-5.4 vs manifest-5.1; which rock install picks under 5.4 (binary or source); airsstack-luajit under LuaJIT; airsstack under LuaJIT (failure + exit code); source-rock build cwd.
+Versions: luarocks 3.12.2 (/opt/homebrew/bin/luarocks, runs on Lua 5.4), Lua 5.4.8 (/opt/homebrew/bin/lua5.4), LuaJIT 2.1.1770848219 (/opt/homebrew/opt/luajit), cargo 1.94.1 / rustc 1.94.1, mlua =0.12.0 (mlua-sys 0.11.0), luarocks-build-rust-mlua 0.2.7-1, macOS Darwin 25.3.0 arm64 (arch macosx-aarch64).
+Date: 2026-11-26. Probe agent B.
+S = /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B (scratch; deleted after recording). Raw output below is unedited; paths appear in full.
+Setup: $S/ws turned into a git repo (tags v0.0.1, v0.0.2 on one commit), rockspec source.url = git+file://$S/ws (21-toy-workspace/*.rockspec as saved). 0.0.2-1 binary built with 'PATH=$S/bin:$PATH luarocks make --keep --tree $S/tree-54 airsstack-0.0.2-1.rockspec'. Kept: 24-local-server/{manifest,manifest-5.4,manifest-5.1}.
+LJ = /opt/homebrew/opt/luajit. 'env PATH=...' = env PATH=/usr/bin:/bin:/opt/homebrew/bin (cargo hidden).
+
+=== SERVER
+$ luarocks pack airsstack 0.0.2-1 --tree $S/tree-54
+Packed: /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server/airsstack-0.0.2-1.macosx-aarch64.rock
+exit=0
+$ luarocks pack $S/ws/airsstack-0.0.1-1.rockspec
+Cloning into 'ws'...
+warning: --depth is ignored in local clones; use file:// instead.
+done.
+Note: switching to 'a3ae8659afcb5149ef8a6d9eb5f4680ad744ffd3'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+Packed: /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server/airsstack-0.0.1-1.src.rock
+exit=0
+$ luarocks pack $S/ws/airsstack-0.0.2-1.rockspec
+Cloning into 'ws'...
+warning: --depth is ignored in local clones; use file:// instead.
+done.
+Note: switching to 'a3ae8659afcb5149ef8a6d9eb5f4680ad744ffd3'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+Packed: /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server/airsstack-0.0.2-1.src.rock
+exit=0
+$ luarocks --lua-version 5.1 --lua-dir $LJ pack $S/ws/airsstack-luajit-0.0.1-1.rockspec
+Cloning into 'ws'...
+warning: --depth is ignored in local clones; use file:// instead.
+done.
+Note: switching to 'a3ae8659afcb5149ef8a6d9eb5f4680ad744ffd3'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+Packed: /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server/airsstack-luajit-0.0.1-1.src.rock
+exit=0
+$ ls -1
+airsstack-0.0.1-1.macosx-aarch64.rock
+airsstack-0.0.1-1.rockspec
+airsstack-0.0.1-1.src.rock
+airsstack-0.0.2-1.macosx-aarch64.rock
+airsstack-0.0.2-1.rockspec
+airsstack-0.0.2-1.src.rock
+airsstack-luajit-0.0.1-1.macosx-aarch64.rock
+airsstack-luajit-0.0.1-1.rockspec
+airsstack-luajit-0.0.1-1.src.rock
+$ unzip -l airsstack-0.0.1-1.src.rock
+Archive:  airsstack-0.0.1-1.src.rock
+  Length      Date    Time    Name
+---------  ---------- -----   ----
+      586  11-26-2026 13:17   airsstack-0.0.1-1.rockspec
+        0  11-26-2026 13:17   ws/
+       85  11-26-2026 13:17   ws/Cargo.toml
+        0  11-26-2026 13:17   ws/crates/
+        0  11-26-2026 13:17   ws/crates/core/
+       85  11-26-2026 13:17   ws/crates/core/Cargo.toml
+        0  11-26-2026 13:17   ws/crates/core/src/
+      176  11-26-2026 13:17   ws/crates/core/src/lib.rs
+        0  11-26-2026 13:17   ws/crates/host/
+      174  11-26-2026 13:17   ws/crates/host/Cargo.toml
+        0  11-26-2026 13:17   ws/crates/host/src/
+      203  11-26-2026 13:17   ws/crates/host/src/lib.rs
+        0  11-26-2026 13:17   ws/crates/native/
+      305  11-26-2026 13:17   ws/crates/native/Cargo.toml
+      216  11-26-2026 13:17   ws/crates/native/build.rs
+        0  11-26-2026 13:17   ws/crates/native/src/
+      293  11-26-2026 13:17   ws/crates/native/src/lib.rs
+      586  11-26-2026 13:17   ws/airsstack-0.0.1-1.rockspec
+     7717  11-26-2026 13:17   ws/Cargo.lock
+      593  11-26-2026 13:17   ws/airsstack-luajit-0.0.1-1.rockspec
+      586  11-26-2026 13:17   ws/airsstack-0.0.2-1.rockspec
+---------                     -------
+    11605                     21 files
+$ luarocks-admin make_manifest $S/server
+Making manifest for /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server
+Generating index.html for /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server
+exit=0
+$ ls -1 (after make_manifest)
+airsstack-0.0.1-1.macosx-aarch64.rock
+airsstack-0.0.1-1.rockspec
+airsstack-0.0.1-1.src.rock
+airsstack-0.0.2-1.macosx-aarch64.rock
+airsstack-0.0.2-1.rockspec
+airsstack-0.0.2-1.src.rock
+airsstack-luajit-0.0.1-1.macosx-aarch64.rock
+airsstack-luajit-0.0.1-1.rockspec
+airsstack-luajit-0.0.1-1.src.rock
+index.html
+manifest
+manifest-5.1
+manifest-5.2
+manifest-5.3
+manifest-5.4
+$ cat manifest
+commands = {}
+modules = {}
+repository = {
+   airsstack = {
+      ["0.0.1-1"] = {
+         {
+            arch = "macosx-aarch64"
+         },
+         {
+            arch = "rockspec"
+         },
+         {
+            arch = "src"
+         }
+      },
+      ["0.0.2-1"] = {
+         {
+            arch = "macosx-aarch64"
+         },
+         {
+            arch = "rockspec"
+         },
+         {
+            arch = "src"
+         }
+      }
+   },
+   ["airsstack-luajit"] = {
+      ["0.0.1-1"] = {
+         {
+            arch = "macosx-aarch64"
+         },
+         {
+            arch = "rockspec"
+         },
+         {
+            arch = "src"
+         }
+      }
+   }
+}
+$ cat manifest-5.4
+commands = {}
+modules = {}
+repository = {
+   airsstack = {
+      ["0.0.1-1"] = {
+         {
+            arch = "macosx-aarch64"
+         },
+         {
+            arch = "rockspec"
+         },
+         {
+            arch = "src"
+         }
+      },
+      ["0.0.2-1"] = {
+         {
+            arch = "macosx-aarch64"
+         },
+         {
+            arch = "rockspec"
+         },
+         {
+            arch = "src"
+         }
+      }
+   }
+}
+$ cat manifest-5.1
+commands = {}
+modules = {}
+repository = {
+   ["airsstack-luajit"] = {
+      ["0.0.1-1"] = {
+         {
+            arch = "macosx-aarch64"
+         },
+         {
+            arch = "rockspec"
+         },
+         {
+            arch = "src"
+         }
+      }
+   }
+}
+$ cat manifest-5.3
+commands = {}
+modules = {}
+repository = {}
+$ cat manifest-5.2
+commands = {}
+modules = {}
+repository = {}
+
+=== INSTALLS
+## cargo hidden: env PATH=/usr/bin:/bin:/opt/homebrew/bin (command -v cargo fails, see 23-binary-rocks.txt)
+$ env PATH=... luarocks install --only-server=$S/server --tree $S/tree-s54 airsstack
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server/airsstack-0.0.2-1.macosx-aarch64.rock
+
+airsstack 0.0.2-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack 0.0.2-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-s54 (license: MIT)
+
+exit=0
+$ env PATH=... luarocks --lua-version 5.1 --lua-dir $LJ install --only-server=$S/server --tree $S/tree-sjit airsstack-luajit
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server/airsstack-luajit-0.0.1-1.macosx-aarch64.rock
+
+airsstack-luajit 0.0.1-1 depends on lua 5.1 (5.1-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack-luajit 0.0.1-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-sjit (license: MIT)
+
+exit=0
+table	true
+require exit=0
+$ env PATH=... luarocks --lua-version 5.1 --lua-dir $LJ install --only-server=$S/server --tree $S/tree-sjit2 airsstack
+
+Error: No results matching query were found for Lua 5.1.
+To check if it is available for other Lua versions, use --check-lua-versions.
+exit=1
+$ (cargo visible) luarocks --lua-version 5.1 --lua-dir $LJ install --only-server=$S/server --tree $S/tree-sjit2 airsstack
+
+Error: No results matching query were found for Lua 5.1.
+To check if it is available for other Lua versions, use --check-lua-versions.
+exit=1
+$ luarocks install --only-server=$S/server --tree $S/tree-s54b airsstack-luajit   (Lua 5.4)
+
+Error: No results matching query were found for Lua 5.4.
+To check if it is available for other Lua versions, use --check-lua-versions.
+exit=1
+$ luarocks search --only-server=$S/server airsstack  (Lua 5.4)
+
+airsstack - Search results for Lua 5.4:
+=======================================
+
+
+Rockspecs and source rocks:
+---------------------------
+
+airsstack
+   0.0.2-1 (rockspec) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server
+   0.0.2-1 (src) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server
+   0.0.1-1 (rockspec) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server
+   0.0.1-1 (src) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server
+
+
+Binary and pure-Lua rocks:
+--------------------------
+
+airsstack
+   0.0.2-1 (macosx-aarch64) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server
+   0.0.1-1 (macosx-aarch64) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server
+
+exit=0
+$ luarocks --lua-version 5.1 --lua-dir $LJ search --only-server=$S/server airsstack
+
+airsstack - Search results for Lua 5.1:
+=======================================
+
+
+Rockspecs and source rocks:
+---------------------------
+
+airsstack-luajit
+   0.0.1-1 (rockspec) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server
+   0.0.1-1 (src) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server
+
+
+Binary and pure-Lua rocks:
+--------------------------
+
+airsstack-luajit
+   0.0.1-1 (macosx-aarch64) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server
+
+exit=0
+$ luarocks search --only-server=$S/server --all  (Lua 5.4)
+
+ - Search results for Lua 5.4:
+==============================
+
+
+Rockspecs and source rocks:
+---------------------------
+
+airsstack
+   0.0.2-1 (rockspec) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server
+   0.0.2-1 (src) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server
+   0.0.1-1 (rockspec) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server
+   0.0.1-1 (src) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server
+
+lua
+   5.4-1 (installed) - provided by VM or rocks_provided
+
+utf8
+   5.4-1 (installed) - provided by VM or rocks_provided
+
+
+Binary and pure-Lua rocks:
+--------------------------
+
+airsstack
+   0.0.2-1 (macosx-aarch64) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server
+   0.0.1-1 (macosx-aarch64) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server
+
+exit=0
+## source-rock install with cargo visible (cargo logged by a wrapper that prints cwd and args)
+$ env PATH=$S/bin:$PATH luarocks build --only-server=$S/server --tree $S/tree-src54 airsstack 0.0.1
+
+Error: Could not satisfy dependency luarocks-build-rust-mlua: No results matching query were found for Lua 5.4.
+Missing dependencies for airsstack 0.0.1-1:
+   luarocks-build-rust-mlua (not installed)
+
+airsstack 0.0.1-1 depends on luarocks-build-rust-mlua (not installed)
+exit=1
+$ env PATH=... (cargo hidden) luarocks build --only-server=$S/server --tree $S/tree-src54b airsstack 0.0.1
+
+Error: Could not satisfy dependency luarocks-build-rust-mlua: No results matching query were found for Lua 5.4.
+Missing dependencies for airsstack 0.0.1-1:
+   luarocks-build-rust-mlua (not installed)
+
+airsstack 0.0.1-1 depends on luarocks-build-rust-mlua (not installed)
+exit=1
+
+=== SOURCE ROCK BUILD (--server adds the local dir in front of luarocks.org so the build dependency resolves; first command's output piped through grep -v of cargo progress and git detached-HEAD advice lines)
+$ env PATH=$S/bin:$PATH luarocks build --server=$S/server --tree $S/tree-src54 airsstack 0.0.1
+Missing dependencies for airsstack 0.0.1-1:
+   luarocks-build-rust-mlua (not installed)
+airsstack 0.0.1-1 depends on luarocks-build-rust-mlua (not installed)
+Installing https://luarocks.org/luarocks-build-rust-mlua-0.2.7-1.src.rock
+No existing manifest. Attempting to rebuild...
+CARGO-WRAPPER cwd=/var/folders/8w/4ccj7cw90nx4d32s72tqf5nw0000gn/T/luarocks_airsstack-0.0.1-1-7553583/ws args=build --release --package airsstack-native --target-dir=target --features lua54
+    Finished `release` profile [optimized] target(s) in 14.26s
+luarocks-build-rust-mlua 0.2.7-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-src54 (license: MIT)
+airsstack 0.0.1-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+airsstack 0.0.1-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-src54 (license: MIT)
+exit=0
+table
+require exit=0
+$ env PATH=/usr/bin:/bin:/opt/homebrew/bin (cargo hidden) luarocks build --server=$S/server --tree $S/tree-src54b airsstack 0.0.1
+Missing dependencies for airsstack 0.0.1-1:
+   luarocks-build-rust-mlua (not installed)
+
+airsstack 0.0.1-1 depends on luarocks-build-rust-mlua (not installed)
+Installing https://luarocks.org/luarocks-build-rust-mlua-0.2.7-1.src.rock
+
+
+No existing manifest. Attempting to rebuild...
+
+Error: Build error: 'cargo' is not installed.
+This rock is written in Rust: make sure you have a Rust
+development environment installed and try again.
+luarocks-build-rust-mlua 0.2.7-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-src54b (license: MIT)
+
+
+airsstack 0.0.1-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+exit=1
+$ luarocks --lua-version 5.1 --lua-dir $LJ install --only-server=$S/server --tree $S/tree-sjit2 --check-lua-versions airsstack
+
+Error: No results matching query were found for Lua 5.1.
+airsstack supports only Lua 5.4 but not Lua 5.1.
+airsstack not found for Lua 5.1.
+Checking if available for other Lua versions...
+Checking for Lua 5.2...
+Checking for Lua 5.3...
+Checking for Lua 5.4...
+exit=1
+
+=== SERVER WITHOUT .rockspec FILES
+## server dir with ONLY binary rocks, no .rockspec files beside them
+$ ls -1 $S/server-norockspec
+airsstack-0.0.2-1.macosx-aarch64.rock
+airsstack-luajit-0.0.1-1.macosx-aarch64.rock
+$ luarocks-admin make_manifest $S/server-norockspec
+Making manifest for /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server-norockspec
+Generating index.html for /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server-norockspec
+exit=0
+$ cat manifest-5.1
+commands = {}
+modules = {}
+repository = {
+   airsstack = {
+      ["0.0.2-1"] = {
+         {
+            arch = "macosx-aarch64"
+         }
+      }
+   },
+   ["airsstack-luajit"] = {
+      ["0.0.1-1"] = {
+         {
+            arch = "macosx-aarch64"
+         }
+      }
+   }
+}
+$ cat manifest-5.4
+commands = {}
+modules = {}
+repository = {
+   airsstack = {
+      ["0.0.2-1"] = {
+         {
+            arch = "macosx-aarch64"
+         }
+      }
+   },
+   ["airsstack-luajit"] = {
+      ["0.0.1-1"] = {
+         {
+            arch = "macosx-aarch64"
+         }
+      }
+   }
+}
+$ luarocks --lua-version 5.1 --lua-dir $LJ install --only-server=$S/server-norockspec --tree $S/tree-nrs airsstack
+
+Error: Could not satisfy dependency lua 5.4: Rock lua 5.1-1 is already provided by VM or via 'rocks_provided' in the config file.
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server-norockspec/airsstack-0.0.2-1.macosx-aarch64.rock
+Missing dependencies for airsstack 0.0.2-1:
+   lua 5.4 (not installed)
+
+airsstack 0.0.2-1 depends on lua 5.4 (not installed)
+exit=1
+
+=== luarocks source: per-Lua manifests filter on the rockspec's 'lua' dependency, read from <pkg>-<ver>.rockspec beside the rocks
+--- 29-luarocks-3.12.2-src/manif/writer.lua:163-202
+29-luarocks-3.12.2-src/manif/writer.lua:163: local function filter_by_lua_version(manifest, lua_version_str, repodir, cache)
+29-luarocks-3.12.2-src/manif/writer.lua:164: 
+29-luarocks-3.12.2-src/manif/writer.lua:165:    cache = cache or {}
+29-luarocks-3.12.2-src/manif/writer.lua:166:    local lua_version = vers.parse_version(lua_version_str)
+29-luarocks-3.12.2-src/manif/writer.lua:167:    for pkg, versions in pairs(manifest.repository) do
+29-luarocks-3.12.2-src/manif/writer.lua:168:       local to_remove = {}
+29-luarocks-3.12.2-src/manif/writer.lua:169:       for version, repositories in pairs(versions) do
+29-luarocks-3.12.2-src/manif/writer.lua:170:          for _, repo in ipairs(repositories) do
+29-luarocks-3.12.2-src/manif/writer.lua:171:             if repo.arch == "rockspec" then
+29-luarocks-3.12.2-src/manif/writer.lua:172:                local pathname = dir.path(repodir, pkg .. "-" .. version .. ".rockspec")
+29-luarocks-3.12.2-src/manif/writer.lua:173:                local rockspec = cache[pathname]
+29-luarocks-3.12.2-src/manif/writer.lua:174:                local err
+29-luarocks-3.12.2-src/manif/writer.lua:175:                if not rockspec then
+29-luarocks-3.12.2-src/manif/writer.lua:176:                   rockspec, err = fetch.load_local_rockspec(pathname, true)
+29-luarocks-3.12.2-src/manif/writer.lua:177:                end
+29-luarocks-3.12.2-src/manif/writer.lua:178:                if rockspec then
+29-luarocks-3.12.2-src/manif/writer.lua:179:                   cache[pathname] = rockspec
+29-luarocks-3.12.2-src/manif/writer.lua:180:                   for _, dep in ipairs(rockspec.dependencies.queries) do
+29-luarocks-3.12.2-src/manif/writer.lua:181:                      if dep.name == "lua" then
+29-luarocks-3.12.2-src/manif/writer.lua:182:                         if not vers.match_constraints(lua_version, dep.constraints) then
+29-luarocks-3.12.2-src/manif/writer.lua:183:                            table.insert(to_remove, version)
+29-luarocks-3.12.2-src/manif/writer.lua:184:                         end
+29-luarocks-3.12.2-src/manif/writer.lua:185:                         break
+29-luarocks-3.12.2-src/manif/writer.lua:186:                      end
+29-luarocks-3.12.2-src/manif/writer.lua:187:                   end
+29-luarocks-3.12.2-src/manif/writer.lua:188:                else
+29-luarocks-3.12.2-src/manif/writer.lua:189:                   util.printerr("Error loading rockspec for " .. pkg .. " " .. version .. ": " .. err)
+29-luarocks-3.12.2-src/manif/writer.lua:190:                end
+29-luarocks-3.12.2-src/manif/writer.lua:191:             end
+29-luarocks-3.12.2-src/manif/writer.lua:192:          end
+29-luarocks-3.12.2-src/manif/writer.lua:193:       end
+29-luarocks-3.12.2-src/manif/writer.lua:194:       if next(to_remove) then
+29-luarocks-3.12.2-src/manif/writer.lua:195:          for _, incompat in ipairs(to_remove) do
+29-luarocks-3.12.2-src/manif/writer.lua:196:             versions[incompat] = nil
+29-luarocks-3.12.2-src/manif/writer.lua:197:          end
+29-luarocks-3.12.2-src/manif/writer.lua:198:          if not next(versions) then
+29-luarocks-3.12.2-src/manif/writer.lua:199:             manifest.repository[pkg] = nil
+29-luarocks-3.12.2-src/manif/writer.lua:200:          end
+29-luarocks-3.12.2-src/manif/writer.lua:201:       end
+29-luarocks-3.12.2-src/manif/writer.lua:202:    end
+--- 29-luarocks-3.12.2-src/manif/writer.lua:341-350
+29-luarocks-3.12.2-src/manif/writer.lua:341:    if remote then
+29-luarocks-3.12.2-src/manif/writer.lua:342:       local cache = {}
+29-luarocks-3.12.2-src/manif/writer.lua:343:       for luaver in util.lua_versions() do
+29-luarocks-3.12.2-src/manif/writer.lua:344:          local vmanifest = { repository = {}, modules = {}, commands = {} }
+29-luarocks-3.12.2-src/manif/writer.lua:345:          ok, err = store_results(results, vmanifest)
+29-luarocks-3.12.2-src/manif/writer.lua:346:          filter_by_lua_version(vmanifest, luaver, repo, cache)
+29-luarocks-3.12.2-src/manif/writer.lua:347:          if not cfg.no_manifest then
+29-luarocks-3.12.2-src/manif/writer.lua:348:             save_table(repo, "manifest-" .. luaver, vmanifest)
+29-luarocks-3.12.2-src/manif/writer.lua:349:          end
+29-luarocks-3.12.2-src/manif/writer.lua:350:       end
+
+=== findings
+- make_manifest writes manifest + manifest-5.1/5.2/5.3/5.4 (+ index.html). manifest-5.4 lists only airsstack (both versions: macosx-aarch64, rockspec, src); manifest-5.1 lists only airsstack-luajit; 5.2/5.3 empty; unversioned 'manifest' lists both.
+- The filter reads the rockspec FILE beside the rocks (writer.lua:172-181); with only binary rocks in the dir, every manifest-5.x lists both packages; install-time dependency check still refuses: 'Error: Could not satisfy dependency lua 5.4: Rock lua 5.1-1 is already provided by VM or via 'rocks_provided' in the config file.' exit 1.
+- 5.4 install of 'airsstack' (no version) picks the binary rock of the newest version: 'Installing $S/server/airsstack-0.0.2-1.macosx-aarch64.rock', no cargo needed.
+- LuaJIT install of airsstack-luajit picks 'airsstack-luajit-0.0.1-1.macosx-aarch64.rock', loads under luajit.
+- LuaJIT install of airsstack: 'Error: No results matching query were found for Lua 5.1.' + 'To check if it is available for other Lua versions, use --check-lua-versions.' exit 1. With --check-lua-versions: adds 'airsstack supports only Lua 5.4 but not Lua 5.1.' exit 1. Symmetric for airsstack-luajit under 5.4 ('...for Lua 5.4.').
+- Source rock: .src.rock = rockspec + the cloned dir 'ws/'. 'luarocks build' unpacks into a temp dir and cargo runs there: 'CARGO-WRAPPER cwd=/var/folders/.../luarocks_airsstack-0.0.1-1-7553583/ws'; target/ lives in that temp dir (gone afterwards: no cache between installs).
+- --only-server=<dir> excludes luarocks.org, so a source build cannot resolve luarocks-build-rust-mlua: 'Error: Could not satisfy dependency luarocks-build-rust-mlua: No results matching query were found for Lua 5.4.' exit 1.
+- Source build without cargo: the backend is fetched first, then 'Error: Build error: 'cargo' is not installed.' (+ the two backend lines) exit 1.

@@ -1,0 +1,12 @@
+name: publish-rocks (probe M stub)
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+jobs:
+  stub:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "publish-rocks stub"

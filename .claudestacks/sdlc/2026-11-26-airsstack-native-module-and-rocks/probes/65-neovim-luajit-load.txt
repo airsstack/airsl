@@ -1,0 +1,28 @@
+Q: D5 — does the LuaJIT toy module (mlua =0.12.0 luajit,module) load inside Neovim via nvim -l, and which LuaJIT does Neovim embed?
+Scripts: probes/66-native-module-toy/nvim/load.lua, load54.lua. Module dylibs from probe 62 (deleted after recording).
+
+### D5 Neovim probe  date: 2026-11-26T06:13:21Z; module built in d3 (RUSTUP_TOOLCHAIN=1.94, rustc 1.94.1, mlua =0.12.0 features luajit,module / lua54,module, aarch64-apple-darwin)
+$ nvim --version | head -3
+NVIM v0.11.6
+Build type: Release
+LuaJIT 2.1.1770848219
+$ nvim --headless -c 'lua print(jit and jit.version)' -c q
+LuaJIT 2.1.1770848219
+exit=0
+$ cat nvim/load.lua
+-- Prepends the LuaJIT toy build dir (given as arg[1]) to package.cpath and loads the module.
+package.cpath = arg[1] .. "/?.so;" .. package.cpath
+local m = require("airsstack")
+print("ok=" .. tostring(m.ok), "jit=" .. tostring(jit and jit.version), "_VERSION=" .. _VERSION)
+$ nvim -l nvim/load.lua mac-out/luajit
+ok=true jit=LuaJIT 2.1.1770848219 _VERSION=Lua 5.1
+exit=0
+$ cat nvim/load54.lua
+-- Same, but points at the Lua 5.4 build (expected to fail: Neovim embeds LuaJIT).
+package.cpath = arg[1] .. "/?.so;" .. package.cpath
+local ok, err = pcall(require, "airsstack")
+print("pcall ok=" .. tostring(ok), err)
+$ nvim -l nvim/load54.lua mac-out/lua54
+pcall ok=false error loading module 'airsstack' from file 'mac-out/lua54/airsstack.so':
+	dlopen(mac-out/lua54/airsstack.so, 0x0006): symbol not found in flat namespace '_luaL_tolstring'
+exit=0

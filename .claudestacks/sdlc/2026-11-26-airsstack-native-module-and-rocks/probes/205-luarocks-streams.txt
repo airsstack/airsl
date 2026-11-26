@@ -1,0 +1,25 @@
+# Probe 205 — which stream luarocks writes a config value and an error to
+# Question: airsl captures stdout of `luarocks config lua_version` and lets stderr through. Is the value on stdout only, and is
+#   luarocks' 'Error: ...' text on stderr only (so it shows above airsl's own line and never pollutes the parsed value)?
+# Versions: /opt/homebrew/bin/luarocks 3.12.2 (Homebrew); macOS 26.3.1 arm64. No network.
+# Date: 2026-11-26
+--- raw output (each stream captured to its own file, then printed with a label) ---
+$ luarocks config lua_version
+--- stdout:
+5.4
+--- stderr:
+--- exit: 0
+
+$ luarocks config no_such_key
+--- stdout:
+--- stderr:
+
+Error: Unknown entry no_such_key
+--- exit: 1
+
+$ luarocks --lua-version 5.1 config lua_version
+--- stdout:
+5.1
+--- stderr:
+--- exit: 0
+

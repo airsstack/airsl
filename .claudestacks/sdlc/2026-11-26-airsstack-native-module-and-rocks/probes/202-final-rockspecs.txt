@@ -1,0 +1,21 @@
+# Probe 202 — the final rockspec text parses and lints
+# Question: do the two rockspecs exactly as the spec shows them (202-final-rockspecs/, byte for byte: github source, tag airsl-cli-v0.2.0,
+#   version 0.2.0-1, real summaries) load and pass `luarocks lint`; and does luarocks refuse a file whose name disagrees with its
+#   version (the drift docs-check guards)? Differences from probe 146's rockspecs: source.url/tag, version, summary text only.
+# Versions: /opt/homebrew/bin/luarocks 3.12.2 (Homebrew, runs on Lua 5.4); macOS 26.3.1 arm64. No network use (lint reads the file only).
+# Setup: copies in <S>/p202 (<S> = session scratchpad); airsstack-0.3.0-1.rockspec is a copy of the 0.2.0-1 file under a wrong name.
+# Date: 2026-11-26
+--- raw output ---
+$ luarocks lint airsstack-0.2.0-1.rockspec
+[exit 0]
+
+$ luarocks lint airsstack-luajit-0.2.0-1.rockspec
+[exit 0]
+
+$ luarocks lint airsstack-0.3.0-1.rockspec
+
+Error: Failed loading rockspec: Inconsistency between rockspec filename (airsstack-0.3.0-1.rockspec) and its contents (airsstack-0.2.0-1.rockspec).
+[exit 1]
+
+$ luarocks --lua-version 5.4 lint airsstack-luajit-0.2.0-1.rockspec
+[exit 0]

@@ -1,0 +1,15 @@
+diff --git a/dist-workspace.toml b/dist-workspace.toml
+index a33e189..61cd4e1 100644
+--- a/dist-workspace.toml
++++ b/dist-workspace.toml
+@@ -33,6 +33,10 @@ global-artifacts-jobs = ["./airsl-cli-smoke"]
+ # gate in ci.yml never builds musl or this profile, so without this a change that
+ # breaks a release target would first fail on the release tag itself.
+ pr-run-mode = "upload"
++# probe L: build only the packages dist ships
++precise-builds = true
++# probe L: custom publish job
++publish-jobs = ["./publish-rocks"]
+ 
+ # dist's defaults name fixed images (macos-14, ubuntu-22.04, windows-2022). GitHub retires
+ # those, and the macos-14 retirement broke every release. The `-latest` labels move with GitHub

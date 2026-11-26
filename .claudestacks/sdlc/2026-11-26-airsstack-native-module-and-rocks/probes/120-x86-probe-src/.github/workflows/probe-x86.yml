@@ -1,0 +1,142 @@
+# Throwaway probe X (2026-11-26-airsstack-native-module-and-rocks): x86_64 Linux glibc floor,
+# Intel macOS build/load (native and cross-built from arm64), luarocks make + pack on Linux.
+name: probe-x86
+on:
+  push:
+    branches: [probe/x86-rocks-2026-11-26]
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash --noprofile --norc {0}
+
+jobs:
+  linux-glibc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: runner image
+        continue-on-error: true
+        run: echo "ImageOS=$ImageOS ImageVersion=$ImageVersion"; uname -a; docker version --format '{{.Server.Version}}'
+      - name: (a1) build in manylinux2014_x86_64 with rustup 1.94
+        continue-on-error: true
+        run: |
+          mkdir -p $RUNNER_TEMP/out
+          docker pull -q quay.io/pypa/manylinux2014_x86_64
+          echo "image: $(docker image inspect --format '{{index .RepoDigests 0}}' quay.io/pypa/manylinux2014_x86_64)"
+          docker run --rm -v $PWD:/toy:ro -v $RUNNER_TEMP/out:/out -v $PWD/ci:/s:ro quay.io/pypa/manylinux2014_x86_64 sh /s/build-in.sh
+          echo "docker exit=$?"; ls -la $RUNNER_TEMP/out
+      - name: (a2) load in manylinux2014_x86_64 (glibc 2.17), Lua 5.4.8 + LuaJIT v2.1 from source
+        continue-on-error: true
+        run: |
+          docker run --rm -v $RUNNER_TEMP/out:/out:ro -v $PWD/ci:/s:ro quay.io/pypa/manylinux2014_x86_64 sh /s/load-in-src.sh
+          echo "docker exit=$?"
+      - name: (a3) load in ubuntu:22.04, apt lua5.4 + luajit
+        continue-on-error: true
+        run: |
+          docker pull -q ubuntu:22.04
+          echo "image: $(docker image inspect --format '{{index .RepoDigests 0}}' ubuntu:22.04)"
+          docker run --rm -v $RUNNER_TEMP/out:/out:ro -v $PWD/ci:/s:ro ubuntu:22.04 sh /s/load-in-apt.sh
+          echo "docker exit=$?"
+
+  mac-cross:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: (b-cross) build x86_64-apple-darwin on arm64
+        continue-on-error: true
+        run: |
+          echo "ImageOS=$ImageOS ImageVersion=$ImageVersion"; uname -m; sw_vers
+          rustup toolchain install 1.94 --profile minimal --target x86_64-apple-darwin
+          rustc +1.94 -V; cargo +1.94 -V
+          mkdir -p cross
+          for f in lua54 luajit; do
+            cargo +1.94 build --locked --release --target x86_64-apple-darwin --features $f >/tmp/b.log 2>&1; echo "build $f exit=$?"; tail -3 /tmp/b.log
+            cp target/x86_64-apple-darwin/release/libairsstack.dylib cross/cross-$f.dylib
+            bash ci/mac-inspect.sh cross/cross-$f.dylib
+          done
+      - uses: actions/upload-artifact@v7
+        continue-on-error: true
+        with:
+          name: cross
+          path: cross/
+
+  mac-intel:
+    runs-on: macos-26-intel
+    needs: mac-cross
+    if: always()
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+      HOMEBREW_NO_INSTALL_CLEANUP: "1"
+    steps:
+      - uses: actions/checkout@v6
+      - name: (b1) runner and native build for x86_64-apple-darwin
+        continue-on-error: true
+        run: |
+          echo "ImageOS=$ImageOS ImageVersion=$ImageVersion"; uname -m; sw_vers; sysctl -n machdep.cpu.brand_string
+          rustup toolchain install 1.94 --profile minimal --target x86_64-apple-darwin
+          rustc +1.94 -V; cargo +1.94 -V
+          mkdir -p native
+          for f in lua54 luajit; do
+            cargo +1.94 build --locked --release --target x86_64-apple-darwin --features $f >/tmp/b.log 2>&1; echo "build $f exit=$?"; tail -3 /tmp/b.log
+            cp target/x86_64-apple-darwin/release/libairsstack.dylib native/native-$f.dylib
+            bash ci/mac-inspect.sh native/native-$f.dylib
+          done
+      - uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          name: cross
+          path: cross/
+      - name: (b2) brew lua@5.4 + luajit
+        continue-on-error: true
+        timeout-minutes: 15
+        run: |
+          brew --version | head -1
+          brew info lua@5.4 luajit 2>&1 | grep -E '^(==>|lua|luajit|Bottle|From)' | head -12
+          brew install lua@5.4 luajit 2>&1 | tail -15; echo "brew install exit=${PIPESTATUS[0]}"
+          ls $(brew --prefix lua@5.4)/bin $(brew --prefix luajit)/bin 2>&1
+      - name: (b3) Lua 5.4.8 + LuaJIT v2.1 from source
+        continue-on-error: true
+        run: bash ci/mac-lua-src.sh $RUNNER_TEMP/luasrc
+      - name: (b4) load every build under every interpreter of its flavour
+        continue-on-error: true
+        run: |
+          B54=$(brew --prefix lua@5.4 2>/dev/null)/bin/lua; [ -x "$B54" ] || B54=$(brew --prefix lua@5.4 2>/dev/null)/bin/lua5.4
+          BJ=$(brew --prefix luajit 2>/dev/null)/bin/luajit
+          S54=$RUNNER_TEMP/luasrc/lua-5.4.8/src/lua; SJ=$RUNNER_TEMP/luasrc/lj/src/luajit
+          ls -la native cross
+          for d in native/*.dylib cross/*.dylib; do
+            [ -f "$d" ] || { echo "missing $d"; continue; }
+            n=$(basename $d .dylib); mkdir -p m/$n; cp $d m/$n/airsstack.so
+            case $n in *-lua54) IS="$B54 $S54";; *) IS="$BJ $SJ";; esac
+            for I in $IS; do
+              echo "-- $n via $I"
+              if [ -x "$I" ]; then $I ci/probe.lua m/$n 2>&1; echo "exit=$?"; else echo "interpreter not present"; fi
+            done
+          done
+
+  linux-luarocks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: leafo/gh-actions-lua@v13
+        with:
+          luaVersion: "5.4"
+      - uses: leafo/gh-actions-luarocks@v6
+      - name: (d) luarocks make (rust-mlua) then luarocks pack
+        continue-on-error: true
+        run: |
+          echo "ImageOS=$ImageOS ImageVersion=$ImageVersion"; . /etc/os-release; echo "$PRETTY_NAME"
+          rustup toolchain install 1.94 --profile minimal; export RUSTUP_TOOLCHAIN=1.94
+          rustc -V; cargo -V; lua -v; luarocks --version | head -1
+          luarocks config arch; luarocks config lua_version
+          T=$RUNNER_TEMP/rtree
+          luarocks make --tree $T airsstack-0.0.0-1.rockspec 2>&1; echo "make exit=$?"
+          find $T -type f | sort
+          luarocks list --tree $T
+          eval "$(luarocks path --tree $T)"
+          lua -e 'local m = require("airsstack"); print("require(\"airsstack\").ok = " .. tostring(m.ok) .. "  json = " .. tostring(m.json))'; echo "require exit=$?"
+          mkdir -p $RUNNER_TEMP/pack; cd $RUNNER_TEMP/pack
+          luarocks pack --tree $T airsstack 2>&1; echo "pack exit=$?"
+          ls -la
+          for r in *.rock; do echo "== $r"; unzip -l "$r"; done

@@ -1,0 +1,613 @@
+# 43 dist 0.33.1: custom jobs, dist=false, precise-builds, cdylib packages; R's dist config
+Question: C2 (docs/source part). Source: github.com/axodotdev/cargo-dist tag v0.33.1
+Commands: curl -sS -L https://raw.githubusercontent.com/axodotdev/cargo-dist/v0.33.1/<path> -o 43-dist-0.33.1/<basename>
+  paths: book/src/ci/customizing.md book/src/reference/config.md book/src/workspaces/structure.md cargo-dist/templates/ci/github/release.yml.j2 cargo-dist/src/tasks.rs cargo-dist/src/build/cargo.rs
+Local tool: cargo-dist 0.33.1. Date: 2026-11-26. Quotes are grep -n of the kept copies / of R.
+
+## custom publish-jobs: reusable workflow called with input 'plan', secrets inherited
+--- customizing.md
+21:## Custom jobs
+22:
+23:> since 0.3.0 (publish-jobs) and 0.7.0 (other steps)
+24:
+25:dist's CI can be configured to call additional jobs on top of the ones it has builtin. Currently, we support adding extra jobs to the the following list of steps:
+26:
+27:* [`plan-jobs`][config-plan] (the beginning of the build process)
+28:* [`build-local-artifacts-jobs`][config-build-local]
+29:* [`build-global-artifacts-jobs`][config-build-global]
+30:* [`host-jobs`][config-host-jobs] (pre-publish)
+31:* [`publish-jobs`][config-publish-jobs]
+32:* [`post-announce-jobs`][config-post-announce] (after the release is created)
+33:
+34:Custom jobs have access to the plan, produced via the "plan" step. This is a JSON document containing information about the project, planned steps, and its outputs. It's the same format contained as the "dist-manifest.json" that will be included with your release. You can use this in your custom jobs to obtain information about what will be built. For more details on the format of this file, see the [schema reference][schema].
+35:
+36:To add a custom job, you need to follow two steps:
+37:
+38:1. Define the new job as a reusable workflow using the standard method defined by your CI system. For GitHub actions, see the documentation on [reusable workflows](https://docs.github.com/en/actions/using-workflows/reusing-workflows#creating-a-reusable-workflow).
+39:2. Add the name of your new workflow file to the appropriate array in your dist config, prefixed with a `./`. For example, if your job name is `.github/workflows/my-publish.yml`, you would write it like this:
+40:
+41:```toml
+42:publish-jobs = ["./my-publish"]
+43:```
+47:```yaml
+48:name: Greeter
+49:
+50:on:
+51:  # Defining workflow_call means that this workflow can be called from
+52:  # your main workflow job
+53:  workflow_call:
+54:    # dist exposes the plan from the plan step, as a JSON string,
+55:    # to your job if it needs it
+56:    inputs:
+57:      plan:
+58:        required: true
+59:        type: string
+60:
+61:jobs:
+62:  greeter:
+63:    runs-on: ubuntu-latest
+64:    # This is optional; it exposes the plan to your job as an environment variable
+65:    env:
+66:      PLAN: ${{ inputs.plan }}
+67:    steps:
+68:      - name: Step 1
+69:        run: |
+70:          echo "Hello!"
+71:          echo "Plan is: ${PLAN}"
+72:```
+73:
+74:Then, add the following to your `publish-jobs` array:
+75:
+76:```toml
+77:publish-jobs = ["./publish-greeter"]
+78:```
+79:
+80:Running `dist init` for your tool will update your GitHub Actions configuration to make use of the new reusable workflow during the publish step.
+--- release.yml.j2 (user publish jobs: need plan+host, run before announce, prerelease-gated)
+692:{{%- for job in user_publish_jobs %}}
+693:
+694:  custom-{{{ job.name|safe }}}:
+695:    needs:
+696:      - plan
+697:      - host
+698:    {{%- for job in host_jobs %}}
+699:      - custom-{{{ job.name|safe }}}
+700:    {{%- endfor %}}
+701:    if: ${{ !fromJson(needs.plan.outputs.val).announcement_is_prerelease || fromJson(needs.plan.outputs.val).publish_prereleases }}
+702:    uses: ./.github/workflows/{{{ job.name|safe }}}.yml
+703:    with:
+704:      plan: ${{ needs.plan.outputs.val }}
+705:    secrets: inherit
+706:    # publish jobs get escalated permissions
+707:    {{%- if job.permissions %}}
+708:    permissions:
+709:      {{%- for perm_name in job.permissions %}}
+710:      {{{ perm_name }}}: {{{ job.permissions[perm_name] }}}
+711:      {{%- endfor %}}
+712:    {{%- endif %}}
+713:{{%- endfor %}}
+721:  announce:
+722:    needs:
+723:      - plan
+724:      - host
+725:    {{%- if 'homebrew' in publish_jobs and tap %}}
+726:      - publish-homebrew-formula
+727:    {{%- endif %}}
+728:    {{%- if 'npm' in publish_jobs %}}
+729:      - publish-npm
+730:    {{%- endif %}}
+731:    {{%- for job in user_publish_jobs %}}
+732:      - custom-{{{ job.name|safe }}}
+733:    {{%- endfor %}}
+734:    {{%- for job in host_jobs %}}
+735:      - custom-{{{ job.name|safe }}}
+736:    {{%- endfor %}}
+737:    # use "always() && ..." to allow us to wait for all publish jobs while
+738:    # still allowing individual publish jobs to skip themselves (for prereleases).
+739:    # "host" however must run to completion, no skipping allowed!
+740:    if: ${{ always() && needs.host.result == 'success'
+741:    {{%- if 'homebrew' in publish_jobs and tap %}} && (needs.publish-homebrew-formula.result == 'skipped' || needs.publish-homebrew-formula.result == 'success') {{%- endif %}}
+742:    {{%- if 'npm' in publish_jobs %}} && (needs.publish-npm.result == 'skipped' || needs.publish-npm.result == 'success') {{%- endif %}}
+743:    {{%- for job in user_publish_jobs %}} && (needs.custom-{{{ job.name|safe }}}.result == 'skipped' || needs.custom-{{{ job.name|safe }}}.result == 'success') {{%- endfor %}}
+744:    {{{- " }}" | safe }}}
+--- config.md publish-jobs / permissions
+1511:Allows you to customize the permissions given to your custom CI jobs.
+1512:
+1513:By default all custom `publish-jobs` get `{ id-token = "write", packages = "write" }`.
+1514:If you override a publish job's permissions, the default permissions will be removed.
+1515:All other custom jobs default to no special permissions.
+1623:#### `publish-jobs`
+1624:
+1625:> <span style="float:right">since 0.2.0<br>[global-only][]</span>
+1626:> [📖 read the ci customization guide!][github-ci] \
+1627:> default = `[]`
+1628:>
+1629:> *in your dist-workspace.toml or dist.toml:*
+1630:> ```toml
+1631:> [dist]
+1632:> publish-jobs = ["homebrew", "npm", "./my-custom-job"]
+1633:> ```
+1634:
+1635:This setting determines which publish jobs to run. It accepts 3 kinds of value:
+1636:
+1637:* ["homebrew", for builtin homebrew publishes][homebrew-installer] (since 0.2.0)
+1638:* ["npm", for builtin npm publishes][npm-installer] (since 0.14.0)
+1639:* ["./my-custom-job" for custom jobs](../ci/customizing.md#custom-jobs) (since 0.3.0)
+## custom build/host jobs
+--- config.md
+1552:### custom ci jobs
+1553:
+1554:These settings all similarly extend [your dist GitHub CI][github-ci] with custom jobs to run at specific steps of the release process, which looks like:
+1555:
+1556:1. plan: check settings, decide what we're releasing
+1557:2. build-local: compile things for each platform
+1558:3. build-global: combine things and generate installers
+1559:4. host: upload files to hosting, make URLs live
+1560:5. publish: publish to package managers
+1561:6. announce: announce to the world that the release was a success
+1562:
+1563:#### `plan-jobs`
+1564:
+1565:> <span style="float:right">since 0.7.0<br>[global-only][]</span>
+1566:> [📖 read the ci customization guide!][github-ci] \
+1567:> default = `[]`
+1568:>
+1569:> *in your dist-workspace.toml or dist.toml:*
+1570:> ```toml
+1571:> [dist]
+1572:> plan-jobs = ["./my-job"]
+1573:> ```
+1574:
+1575:
+1576:This setting determines which custom jobs to run during the "plan" phase, which happens at the very start of the build.
+1577:
+1578:#### `local-artifacts-jobs`
+1579:
+1580:> <span style="float:right">since 0.7.0<br>[global-only][]</span>
+1581:> [📖 read the ci customization guide!][github-ci] \
+1582:> default = `[]`
+1583:>
+1584:> *in your dist-workspace.toml or dist.toml:*
+1585:> ```toml
+1586:> [dist]
+1587:> local-artifacts-jobs = ["./my-job"]
+1588:> ```
+1589:
+1590:This setting determines which custom jobs to run during the "build local artifacts" phase, during which binaries are built.
+1591:
+1592:
+1593:#### `global-artifacts-jobs`
+1594:
+1595:> <span style="float:right">since 0.7.0<br>[global-only][]</span>
+1596:> [📖 read the ci customization guide!][github-ci] \
+1597:> default = `[]`
+1598:>
+1599:> *in your dist-workspace.toml or dist.toml:*
+1600:> ```toml
+1601:> [dist]
+1602:> global-artifacts-jobs = ["./my-job"]
+1603:> ```
+1604:
+1605:This setting determines which custom jobs to run during the "build global artifacts" phase, during which installers are built.
+1606:
+1607:
+1608:#### `host-jobs`
+1609:
+1610:> <span style="float:right">since 0.7.0<br>[global-only][]</span>
+1611:> [📖 read the ci customization guide!][github-ci] \
+1612:> default = `[]`
+1613:>
+1614:> *in your dist-workspace.toml or dist.toml:*
+1615:> ```toml
+1616:> [dist]
+1617:> host-jobs = ["./my-job"]
+1618:> ```
+1619:
+1620:This setting determines which custom jobs to run during the "host" phase, during which dist decides whether to proceed with publishing the release.
+1641:#### `post-announce-jobs`
+1642:
+1643:> <span style="float:right">since 0.7.0<br>[global-only][]</span>
+1644:> [📖 read the ci customization guide!][github-ci] \
+1645:> default = `[]`
+1646:>
+1647:> *in your dist-workspace.toml or dist.toml:*
+1648:> ```toml
+1649:> [dist]
+1650:> post-announce-jobs = ["./my-job"]
+1651:> ```
+1652:
+1653:
+1654:This setting determines which custom jobs to run after the "announce" phase. "Announce" is the final phase during which dist schedules any jobs, so any custom jobs specified here are guaranteed to run after everything else.
+--- release.yml.j2 local/global artifacts custom jobs (with: plan)
+367:{{%- for job in local_artifacts_jobs %}}
+368:
+369:  custom-{{{ job.name|safe }}}:
+370:    needs:
+371:      - plan
+372:    {{%- for job in plan_jobs %}}
+373:      - custom-{{{ job.name|safe }}}
+374:    {{%- endfor %}}
+375:    if: ${{ needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload'
+376:    {{%- if dispatch_releases %}} || inputs.tag == 'dry-run' {{%- endif %}}
+377:    {{{- " }}" | safe }}}
+378:    uses: ./.github/workflows/{{{ job.name|safe }}}.yml
+379:    with:
+380:      plan: ${{ needs.plan.outputs.val }}
+381:    secrets: inherit
+478:{{%- for job in global_artifacts_jobs %}}
+479:
+480:  custom-{{{ job.name|safe }}}:
+481:    needs:
+482:      - plan
+483:    {{%- if build_local_artifacts %}}
+484:      - build-local-artifacts
+485:    {{%- endif %}}
+486:    {{%- for job in local_artifacts_jobs %}}
+487:      - custom-{{{ job.name|safe }}}
+488:    {{%- endfor %}}
+489:    uses: ./.github/workflows/{{{ job.name|safe }}}.yml
+490:    with:
+491:      plan: ${{ needs.plan.outputs.val }}
+492:    secrets: inherit
+--- config.md build-local-artifacts=false contract
+1345:`build-local-artifacts = false` disables the builtin CI jobs that would build your binaries and archives (and MSI installers). This allows a Sufficiently Motivated user to use custom `build-local-jobs` to completely replace dist's binary building with something like maturin.
+1346:
+1347:The requirements are simply that you need your custom actions to:
+1348:
+1349:* build archives (tarballs/zips) and checksums that the local CI was expected to produce
+1350:* use the github upload-artifacts action to upload all of those to an artifact named `artifacts`
+1351:
+## dist = false
+--- config.md
+181:## `dist`
+182:
+183:> <span style="float:right">since 0.3.0<br>[package-local][]</span>
+184:> [📖 read the guide for this feature!][distribute] \
+185:> default = `<none>` (infer it)
+186:>
+187:> *in your dist-workspace.toml or dist.toml:*
+188:> ```toml
+189:> [dist]
+190:> dist = true
+191:> ```
+192:
+193:Specifies whether dist [should distribute (build and publish) a package][distribute], overriding all other rules for deciding if a package is eligible.
+194:
+195:There are 3 major cases where you might use this:
+196:
+197:* `dist = false` on a package can be used to force dist to ignore it
+198:* `dist = true` on a package can be used to force dist to distribute it in spite of signals like Cargo's `publish = false` that would suggest otherwise.
+199:* `dist = false` on a whole workspace defaults all packages to do-not-distribute, forcing you to manually allow-list packages with `dist = true` (large monorepos often find this to be a better way of managing project distribution when most developers aren't release engineers).
+--- structure.md (publish=false inherited as dist=false; empty package not distable)
+99:By default we assume a package is distable, and then run through a set of criteria
+100:to try to disqualify it:
+101:
+102:* If the package is "empty", it's not distable
+103:	* By default, we check for whether the package defines binaries
+104:    * If you have enabled `cdylibs/cstaticlibs` we check for those as well
+105:* If the package has `dist=false` set, it's not distable
+106:  * For a cargo project, If dist isn't specified, the `publish` field in
+107:    `Cargo.toml` will be inherited, with a default value of `true`. Setting
+108:    `dist=true` can therefore be used to ignore `publish=false` in `Cargo.toml`.
+## precise-builds
+--- config.md
+652:#### `precise-builds`
+653:
+654:> <span style="float:right">since 0.1.0<br>[global-only][]</span>
+655:> [📖 read the Cargo project guide!][cargo-build-guide] \
+656:> default = `false`
+657:>
+658:> *in your dist-workspace.toml or dist.toml:*
+659:> ```toml
+660:> [dist]
+661:> precise-builds = true
+662:> ```
+663:
+664:Build only the required Cargo packages, and individually.
+665:
+666:[See "inferring precise-builds" for the default behaviour.](#inferring-precise-builds)
+667:
+668:By default when we need to build anything in your workspace, we try to build your entire workspace with `--workspace`. This setting tells dist to instead build each app individually.
+669:
+670:On balance, the Rust experts we've consulted with find building with --workspace to be a safer/better default, as it provides some of the benefits of a more manual [workspace-hack][], without the user needing to be aware that this is a thing.
+671:
+672:TL;DR: cargo prefers building one copy of each dependency in a build, so if two apps in your workspace depend on e.g. serde with different features, building with --workspace, will build serde once with the features unioned together. However if you build each package individually it will more precisely build two copies of serde with different feature sets.
+673:
+674:The downside of using --workspace is that if your workspace has lots of example/test crates, or if you release only parts of your workspace at a time, we build a lot of gunk that's not needed, and potentially bloat up your app with unnecessary features.
+675:
+676:If that downside is big enough for you, this setting is a good idea.
+677:
+678:[workspace-hack]: https://docs.rs/cargo-hakari/latest/cargo_hakari/about/index.html
+679:
+680:
+681:##### inferring precise-builds
+682:
+683:Although dist prefers `--workspace` builds ([precise-builds](#precise-builds) = `false`) for the reasons stated above, it *will* attempt to check if that's possible, and use `--package` builds if necessary (`precise-builds = true`).
+684:
+685:If you explicitly set `precise-builds = false` and we determine `--package` builds are required, dist will produce an error. `precise-builds = true` will never produce an error.
+686:
+687:Precise-builds are considered required when you use any of [features](#features), [all-features](#all-features), or [default-features](#default-features) *and* not all of the packages in your workspace have the same values set.
+688:
+689:So for instance if you have several packages in your workspace and only one sets `all-features = true`, then we will require precise-builds, and will pass `--all-features` to only the `cargo build` for that package.
+690:
+691:If we instead set `all-features = true` on the workspace, then we will just pass `--all-features` to `cargo build --workspace`.
+--- cargo.rs (non-precise build = one 'cargo build --workspace' per target)
+121:            if self.inner.precise_cargo_builds {
+122:                // `(target, package, features)` uniquely identifies a build we need to do,
+123:                // so group all the binaries under those buckets and add a build for each one
+124:                // (targets is handled by the loop we're in)
+125:                let mut builds_by_pkg_spec = SortedMap::new();
+126:                for bin_idx in binaries {
+127:                    let bin = self.binary(bin_idx);
+128:                    builds_by_pkg_spec
+129:                        .entry((bin.pkg_spec.clone(), bin.features.clone()))
+130:                        .or_insert(vec![])
+131:                        .push(bin_idx);
+132:                }
+133:                for ((pkg_spec, features), expected_binaries) in builds_by_pkg_spec {
+134:                    builds.push(BuildStep::Cargo(CargoBuildStep {
+135:                        target_triple: target_triple.clone(),
+136:                        package: CargoTargetPackages::Package(pkg_spec),
+137:                        features,
+138:                        rustflags: rustflags.clone(),
+139:                        profile: String::from(PROFILE_DIST),
+140:                        expected_binaries,
+141:                        working_dir: working_dir.clone(),
+142:                    }));
+143:                }
+144:            } else {
+145:                // If we think a workspace build is possible, every binary agrees on the features, so take an arbitrary one
+146:                let features = binaries
+147:                    .first()
+148:                    .map(|&idx| self.binary(idx).features.clone())
+149:                    .unwrap_or_default();
+150:                builds.push(BuildStep::Cargo(CargoBuildStep {
+151:                    target_triple: target_triple.clone(),
+152:                    package: CargoTargetPackages::Workspace,
+153:                    features,
+154:                    rustflags,
+155:                    profile: String::from(PROFILE_DIST),
+156:                    expected_binaries: binaries,
+157:                    working_dir: working_dir.clone(),
+158:                }));
+159:            }
+236:        CargoTargetPackages::Workspace => {
+237:            command.arg("--workspace");
+238:            eprintln!(" --workspace)");
+239:        }
+240:        CargoTargetPackages::Package(package) => {
+241:            command.arg("--package").arg(package);
+242:            eprintln!(" --package={})", package);
+--- tasks.rs (precise inferred only from feature mismatches between dist'd packages)
+1094:        // Only do workspace builds if all the packages agree with the workspace feature settings
+1095:        let requires_precise = packages_with_mismatched_features.len() > 1;
+1096:        let precise_cargo_builds = if let Some(precise_builds) = config.builds.cargo.precise_builds
+1097:        {
+1098:            if !precise_builds && requires_precise {
+1099:                return Err(DistError::PreciseImpossible {
+1100:                    packages: packages_with_mismatched_features,
+1101:                });
+1102:            }
+1103:            precise_builds
+1104:        } else {
+1105:            info!("force-enabling precise-builds to handle your build features");
+1106:            requires_precise
+1107:        };
+## lib-only / cdylib packages
+--- config.md package-libraries
+458:#### `package-libraries`
+459:
+460:> <span style="float:right">since 0.20.0<br>[package-local][]</span>
+461:> 🔧 this is an experimental feature! \
+462:> [📖 read the archives guide!](../artifacts/archives.md) \
+463:> default = `[]`
+464:>
+465:> *in your dist-workspace.toml or dist.toml:*
+466:> ```toml
+467:> [dist]
+468:> package-libraries = ["cdylib", "cstaticlib"]
+469:> ```
+470:
+471:Which kinds of [compiled libraries][] to include in [archives][]. By default only [binaries][] will be included in [archives][] and used to decide if a package should be [distributed][distribute]. This feature allows you to opt into bundling static and dynamic libraries that your package builds.
+472:
+473:When enabled, libraries will be included in your [archives][] alongside your binaries, but [installers][] will still ignore them. That can be changed using the [`install-libraries`](#install-libraries) setting.
+--- tasks.rs
+1421:        // If we're not packaging libraries here, avoid chaining them
+1422:        // into the list we're iterating over
+1423:        if config
+1424:            .artifacts
+1425:            .archives
+1426:            .package_libraries
+1427:            .contains(&LibraryStyle::CDynamic)
+1428:        {
+1429:            let all_dylibs = cdylibs
+1430:                .clone()
+1431:                .into_iter()
+1432:                .map(|(idx, l)| (idx, l, BinaryKind::DynamicLibrary));
+1433:            packageables = packageables.into_iter().chain(all_dylibs).collect();
+1434:        }
+2962:            // Don't bother with any of this without binaries
+2963:            // or C libraries
+2964:            // (releases a Rust library, nothing to Build)
+2965:            if info.executables.is_empty() && info.cdylibs.is_empty() && info.cstaticlibs.is_empty()
+2966:            {
+2967:                continue;
+2968:            }
+2969:
+2970:            // Tell the Release to include these binaries
+2971:            for binary in &info.executables {
+2972:                self.add_binary(release, info.package_idx, binary.to_owned());
+2973:            }
+2974:
+2975:            for lib in &info.cdylibs {
+2976:                self.add_library(release, info.package_idx, lib.to_owned());
+2977:            }
+2978:
+2979:            for lib in &info.cstaticlibs {
+2980:                self.add_static_library(release, info.package_idx, lib.to_owned());
+2981:            }
+
+## R/dist-workspace.toml
+1:[workspace]
+2:members = ["cargo:."]
+3:
+4:# Config for 'dist'
+5:[dist]
+6:# The preferred dist version to use in CI (Cargo.toml SemVer syntax)
+7:cargo-dist-version = "0.33.1"
+8:# CI backends to support
+9:ci = "github"
+10:# The installers to generate for each app
+11:installers = ["shell", "powershell"]
+12:# Target platforms to build apps for (Rust target-triple syntax)
+13:targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "aarch64-unknown-linux-musl", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl", "x86_64-pc-windows-msvc"]
+14:# Path that installers should place binaries in
+15:# Not CARGO_HOME: the prebuilt binary exists for engineers who have no Rust toolchain,
+16:# and a ~/.cargo/bin appearing on such a machine would be a surprise.
+17:install-path = "~/.local/bin"
+18:# Where to host releases
+19:hosting = "github"
+20:# Whether to install an updater program
+21:install-updater = false
+22:# Only `airsl-cli-v*` tags start a release. Each release also tags the library
+23:# (`airsl-v*`), which has no binary, and dist fails its plan step on such a tag.
+24:tag-namespace = "airsl-cli"
+25:# A checksum file can be swapped alongside the binary it describes; an attestation
+26:# ties each archive's digest to this repository, commit and workflow.
+27:github-attestations = true
+28:# dist builds and publishes but never runs what it built. This hook runs after
+29:# every archive is built and `host` waits for it, so an archive that fails its
+30:# smoke test is never published. See .github/workflows/airsl-cli-smoke.yml.
+31:global-artifacts-jobs = ["./airsl-cli-smoke"]
+32:# Pull requests build and smoke-test every archive too, publishing nothing. The
+33:# gate in ci.yml never builds musl or this profile, so without this a change that
+34:# breaks a release target would first fail on the release tag itself.
+35:pr-run-mode = "upload"
+36:
+37:# dist's defaults name fixed images (macos-14, ubuntu-22.04, windows-2022). GitHub retires
+38:# those, and the macos-14 retirement broke every release. The `-latest` labels move with GitHub
+39:# instead, and get runners when the fixed ones are starved.
+40:[dist.github-custom-runners]
+41:global = "ubuntu-latest"
+42:aarch64-apple-darwin = "macos-latest"
+43:x86_64-unknown-linux-musl = "ubuntu-latest"
+44:x86_64-pc-windows-msvc = "windows-latest"
+
+## R/.github/workflows/airsl-cli-release.yml (there is no release.yml; dist's workflow is airsl-cli-release.yml)
+41:on:
+42:  pull_request:
+43:  push:
+44:    tags:
+45:      - 'airsl-cli**[0-9]+.[0-9]+.[0-9]+*'
+78:      - id: plan
+79:        run: |
+80:          dist ${{ (!github.event.pull_request && format('host --steps=create --tag={0}', github.ref_name)) || 'plan' }} --output-format=json > plan-dist-manifest.json
+81:          echo "dist ran successfully"
+82:          cat plan-dist-manifest.json
+91:  build-local-artifacts:
+92:    name: build-local-artifacts (${{ join(matrix.targets, ', ') }})
+93:    # Let the initial task tell us to not run (currently very blunt)
+94:    needs:
+95:      - plan
+96:    if: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix.include != null && (needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload') }}
+109:      matrix: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix }}
+110:    runs-on: ${{ matrix.runner }}
+111:    container: ${{ matrix.container && matrix.container.image || null }}
+150:      - name: Build artifacts
+151:        run: |
+152:          # Actually do builds and make zips and whatnot
+153:          dist build ${{ needs.plan.outputs.tag-flag }} --print=linkage --output-format=json ${{ matrix.dist_args }} > dist-manifest.json
+154:          echo "dist ran successfully"
+206:          merge-multiple: true
+207:      - id: cargo-dist
+208:        shell: bash
+209:        run: |
+210:          dist build ${{ needs.plan.outputs.tag-flag }} --output-format=json "--artifacts=global" > dist-manifest.json
+211:          echo "dist ran successfully"
+227:  custom-airsl-cli-smoke:
+228:    needs:
+229:      - plan
+230:      - build-local-artifacts
+231:    uses: ./.github/workflows/airsl-cli-smoke.yml
+232:    with:
+233:      plan: ${{ needs.plan.outputs.val }}
+234:    secrets: inherit
+235:  # Determines if we should publish/announce
+236:  host:
+237:    needs:
+238:      - plan
+239:      - build-local-artifacts
+240:      - build-global-artifacts
+241:      - custom-airsl-cli-smoke
+242:    # Only run if we're "publishing", and only if plan, local and global didn't fail (skipped is fine)
+243:    if: ${{ always() && needs.plan.result == 'success' && needs.plan.outputs.publishing == 'true' && (needs.build-global-artifacts.result == 'skipped' || needs.build-global-artifacts.result == 'success') && (needs.custom-airsl-cli-smoke.result == 'skipped' || needs.custom-airsl-cli-smoke.result == 'success') && (needs.build-local-artifacts.result == 'skipped' || needs.build-local-artifacts.result == 'success') }}
+244:    env:
+245:      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+246:    runs-on: "ubuntu-latest"
+247:    outputs:
+260:      # Fetch artifacts from scratch-storage
+261:      - name: Fetch artifacts
+262:        uses: actions/download-artifact@v8
+263:        with:
+264:          pattern: artifacts-*
+265:          path: target/distrib/
+266:          merge-multiple: true
+267:      - id: host
+268:        shell: bash
+269:        run: |
+270:          dist host ${{ needs.plan.outputs.tag-flag }} --steps=upload --steps=release --output-format=json > dist-manifest.json
+271:          echo "artifacts uploaded and released successfully"
+280:      # Create a GitHub Release while uploading all files to it
+281:      - name: "Download GitHub Artifacts"
+282:        uses: actions/download-artifact@v8
+283:        with:
+284:          pattern: artifacts-*
+285:          path: artifacts
+286:          merge-multiple: true
+287:      - name: Cleanup
+288:        run: |
+289:          # Remove the granular manifests
+290:          rm -f artifacts/*-dist-manifest.json
+291:      - name: Create GitHub Release
+292:        env:
+293:          PRERELEASE_FLAG: "${{ fromJson(steps.host.outputs.manifest).announcement_is_prerelease && '--prerelease' || '' }}"
+294:          ANNOUNCEMENT_TITLE: "${{ fromJson(steps.host.outputs.manifest).announcement_title }}"
+295:          ANNOUNCEMENT_BODY: "${{ fromJson(steps.host.outputs.manifest).announcement_github_body }}"
+296:          RELEASE_COMMIT: "${{ github.sha }}"
+297:        run: |
+298:          # Write and read notes from a file to avoid quoting breaking things
+299:          echo "$ANNOUNCEMENT_BODY" > $RUNNER_TEMP/notes.txt
+300:
+301:          gh release create "${{ needs.plan.outputs.tag }}" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.txt" artifacts/*
+303:  announce:
+304:    needs:
+305:      - plan
+306:      - host
+307:    # use "always() && ..." to allow us to wait for all publish jobs while
+308:    # still allowing individual publish jobs to skip themselves (for prereleases).
+309:    # "host" however must run to completion, no skipping allowed!
+310:    if: ${{ always() && needs.host.result == 'success' }}
+311:    runs-on: "ubuntu-latest"
+--- R/.github/workflows/airsl-cli-smoke.yml (existing hand-written reusable workflow)
+1:name: Smoke
+2:
+3:# Runs every archive a release is about to publish, on the platform it was built for.
+4:#
+5:# Not triggered on its own: airsl-cli-release.yml calls it through dist's
+6:# `global-artifacts-jobs` hook, after every archive is built and before the
+7:# GitHub Release exists. dist makes `host` wait for this workflow to succeed, so
+8:# an archive that fails here is never published — and on a pull request in
+9:# `pr-run-mode = "upload"` the same checks run against the PR's own builds.
+10:#
+11:# This file is written by hand, unlike the release workflow, so `dist generate`
+12:# never touches it.
+13:on:
+14:  workflow_call:
+15:    inputs:
+16:      plan:
+17:        description: The dist manifest the release's plan step produced
+18:        required: true
+19:        type: string
+20:
+21:permissions:
+22:  contents: read

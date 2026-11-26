@@ -1,0 +1,104 @@
+# Throwaway probe Z (2026-11-26-airsstack-native-module-and-rocks): mirrors dist 0.33.1's wiring of a
+# global-artifacts job (build-rocks) and a publish job (publish-rocks) to see whether the publish
+# reusable workflow downloads the build reusable workflow's artifacts in the same run. No release, no upload.
+name: Release
+permissions:
+  "contents": "read"
+on:
+  push:
+    branches: [probe/publish-path-2026-11-26]
+
+jobs:
+  # dist's plan job: outputs the manifest as a JSON string in `val`.
+  plan:
+    runs-on: "ubuntu-latest"
+    outputs:
+      val: ${{ steps.plan.outputs.manifest }}
+      tag: "airsl-cli-v0.0.0"
+      publishing: "true"
+    steps:
+      - id: plan
+        run: |
+          echo '{"announcement_tag":"airsl-cli-v0.0.0","announcement_is_prerelease":false,"publish_prereleases":false,"artifacts":{}}' > plan-dist-manifest.json
+          echo "manifest=$(jq -c "." plan-dist-manifest.json)" >> "$GITHUB_OUTPUT"
+          cat plan-dist-manifest.json
+      - name: "Upload dist-manifest.json"
+        uses: actions/upload-artifact@v7
+        with:
+          name: artifacts-plan-dist-manifest
+          path: plan-dist-manifest.json
+
+  # Stand-in for dist's build-local-artifacts (one uploaded artifact, as dist names them).
+  build-local-artifacts:
+    needs:
+      - plan
+    runs-on: "ubuntu-latest"
+    steps:
+      - run: mkdir -p target/distrib && echo "archive stand-in" > target/distrib/airsl-cli-x86_64-unknown-linux-gnu.tar.xz
+      - name: "Upload artifacts"
+        uses: actions/upload-artifact@v7
+        with:
+          name: artifacts-build-local-x86_64-unknown-linux-gnu
+          path: target/distrib/
+
+  custom-build-rocks:
+    needs:
+      - plan
+      - build-local-artifacts
+    uses: ./.github/workflows/build-rocks.yml
+    with:
+      plan: ${{ needs.plan.outputs.val }}
+    secrets: inherit
+
+  # Determines if we should publish/announce
+  host:
+    needs:
+      - plan
+      - build-local-artifacts
+      - custom-build-rocks
+    if: ${{ always() && needs.plan.result == 'success' && needs.plan.outputs.publishing == 'true' && (needs.custom-build-rocks.result == 'skipped' || needs.custom-build-rocks.result == 'success') && (needs.build-local-artifacts.result == 'skipped' || needs.build-local-artifacts.result == 'success') }}
+    runs-on: "ubuntu-latest"
+    outputs:
+      val: ${{ steps.host.outputs.manifest }}
+    steps:
+      - name: Fetch artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: artifacts-*
+          path: target/distrib/
+          merge-multiple: true
+      - id: host
+        shell: bash
+        run: |
+          echo "--- host: target/distrib after pattern artifacts-* merge-multiple:"
+          find target/distrib -type f -exec sha256sum {} + | sort -k2
+          echo '{"announcement_is_prerelease":false,"host":"probe"}' > dist-manifest.json
+          echo "manifest=$(jq -c "." dist-manifest.json)" >> "$GITHUB_OUTPUT"
+      - name: "Upload dist-manifest.json"
+        uses: actions/upload-artifact@v7
+        with:
+          # Overwrite the previous copy
+          name: artifacts-dist-manifest
+          path: dist-manifest.json
+      - name: "Download GitHub Artifacts"
+        uses: actions/download-artifact@v8
+        with:
+          pattern: artifacts-*
+          path: artifacts
+          merge-multiple: true
+      - name: what `gh release create ... artifacts/*` would attach (not run)
+        run: ls -la artifacts
+
+  custom-publish-rocks:
+    needs:
+      - plan
+      - host
+    if: ${{ !fromJson(needs.plan.outputs.val).announcement_is_prerelease || fromJson(needs.plan.outputs.val).publish_prereleases }}
+    uses: ./.github/workflows/publish-rocks.yml
+    with:
+      plan: ${{ needs.plan.outputs.val }}
+    secrets: inherit
+    # publish jobs get escalated permissions
+    permissions:
+      "id-token": "write"
+      "packages": "write"

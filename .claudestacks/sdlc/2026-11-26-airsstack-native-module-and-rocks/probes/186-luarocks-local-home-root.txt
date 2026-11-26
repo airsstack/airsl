@@ -1,0 +1,363 @@
+# Probe 186 — `luarocks install --local` with HOME unset (macOS) and as root (Debian bookworm arm64 container)
+Question (P6): output + exit of `--local` installs (a) with HOME unset on macOS, (b) as root in a container; which source decides "root".
+(a) macOS: luarocks 3.12.2 (Homebrew), Lua 5.4.8, macOS 26.3.1 arm64; server S/probes-M/server (probe 181).
+    S=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad
+    Source (/opt/homebrew/Cellar/luarocks/3.12.2/share/lua/5.4/luarocks/): core/cfg.lua:725-726 `cfg.home = os.getenv("HOME") or ""`,
+    `cfg.home_tree = dir.path(cfg.home, ".luarocks")` (so HOME unset -> "/.luarocks"; empty HOME= -> the same).
+    The `path` output's PATH line was cut after its first entry by the probe author (the rest is the caller's own PATH).
+(b) container: docker.io/library/debian:bookworm, arm64 (native, no emulation), digest
+    sha256:1d04200c2ece1d4d75a2a6f8e11ebce7d86a2ae28b34bb2c9cbb3ee9f4953e75; `--cpus 2 --memory 2g`, one container at a time, run as root
+    (docker sets HOME=/root and leaves USER unset). apt: luarocks 3.8.0+dfsg1-1, lua5.4 5.4.4-3+deb12u1 (run 3 also liblua5.4-dev,
+    needed by `luarocks make` of a pure-Lua builtin rockspec in 3.8.0). NOTE: Debian's luarocks is 3.8.0, not 3.12.2.
+    Scripts: 186-luarocks-local-home-root/run.sh, run2.sh, run3.sh (mounted read-only at /probe; run 1 also mounts S/probes-M/server at /srv).
+    Source: Debian 3.8.0 /usr/share/lua/5.1/luarocks/cmd.lua:87-91 (refusal text, printed in run 1), fs/unix.lua:182-184
+    `return os.getenv("USER") == "root"` (printed in runs 2-3); exit 1 = cmd.lua:169-181 die() -> errorcodes.UNSPECIFIED.
+    luarocks 3.12.2 (Homebrew copy, same upstream file): cmd.lua:116-120 same refusal text; fs/unix/tools.lua:300-316
+    current_user() = $USER, else `whoami`, and is_superuser() = current_user() == "root"; fs/lua.lua:1095-1096 replaces it with
+    posix.geteuid() == 0 only when luaposix loads (fs/lua.lua:26, 1048). So 3.12.2 with USER unset still detects root via whoami;
+    3.8.0 does not (run 3 (a) installs into /root/.luarocks).
+Each `$ ...` line is followed by its combined stdout+stderr and `[exit N]`.
+Date: 2026-11-26T07:20Z
+
+=== (a) macOS, HOME unset / empty
+$ env -u HOME luarocks --lua-version 5.4 config home_tree
+.luarocks
+[exit 0]
+
+$ env -u HOME luarocks --lua-version 5.4 config lua_version
+5.4
+[exit 0]
+
+$ env -u HOME luarocks --lua-version 5.4 install --local --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server airsstack 0.0.2
+
+Error: /.luarocks/lib/luarocks/rocks-5.4 does not exist
+and your user does not have write permissions in /
+
+Please check your permissions.
+
+[exit 2]
+
+$ env -u HOME luarocks --lua-version 5.4 path
+export LUA_PATH='/opt/homebrew/Cellar/luarocks/3.12.2/share/lua/5.4/?.lua;/opt/homebrew/share/lua/5.4/?.lua;/opt/homebrew/share/lua/5.4/?/init.lua;/opt/homebrew/lib/lua/5.4/?.lua;/opt/homebrew/lib/lua/5.4/?/init.lua;./?.lua;./?/init.lua;/.luarocks/share/lua/5.4/?.lua;/.luarocks/share/lua/5.4/?/init.lua'
+export LUA_CPATH='/opt/homebrew/lib/lua/5.4/?.so;/opt/homebrew/lib/lua/5.4/loadall.so;./?.so;/.luarocks/lib/lua/5.4/?.so'
+export PATH='/.luarocks/bin:<the caller's PATH, elided by the probe author>'
+[exit 0]
+
+$ env HOME= luarocks --lua-version 5.4 install --local --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server airsstack 0.0.2
+
+Error: /.luarocks/lib/luarocks/rocks-5.4 does not exist
+and your user does not have write permissions in /
+
+Please check your permissions.
+
+[exit 2]
+
+$ env -u HOME luarocks --lua-version 5.4 install --tree /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/p6-tree --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server airsstack 0.0.2
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server/airsstack-0.0.2-1.macosx-aarch64.rock
+
+airsstack 0.0.2-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack 0.0.2-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/p6-tree (license: Apache-2.0)
+
+[exit 0]
+
+=== (b) run 1 (run.sh): macOS rock + rockspecs from probe 181 at /srv; no git in the image
+apt-get install exit: 0
+$ id -u
+0
+[exit 0]
+
+$ uname -m
+aarch64
+[exit 0]
+
+$ cat /etc/debian_version
+12.15
+[exit 0]
+
+$ dpkg-query -W -f ${Package} ${Version}
+ luarocks lua5.4
+lua5.4 5.4.4-3+deb12u1
+luarocks 3.8.0+dfsg1-1
+[exit 0]
+
+$ luarocks --version
+/usr/bin/luarocks 3.8.0
+LuaRocks main command-line interface
+
+[exit 0]
+
+$ lua5.4 -v
+Lua 5.4.4  Copyright (C) 1994-2022 Lua.org, PUC-Rio
+[exit 0]
+
+$ luarocks --lua-version 5.4 config lua_version
+5.4
+[exit 0]
+
+$ luarocks --lua-version 5.4 config arch
+linux-aarch64
+[exit 0]
+
+$ luarocks --lua-version 5.4 install --local --only-server=/srv airsstack 0.0.2
+
+Error: 'git' program not found. Make sure Git is installed and is available in your PATH (or you may want to edit the 'variables.GIT' value in file '/etc/luarocks/config-5.4.lua')
+Installing /srv/airsstack-0.0.2-1.rockspec
+[exit 1]
+
+$ luarocks --lua-version 5.4 install --local /srv/airsstack-0.0.2-1.macosx-aarch64.rock
+
+Error: Incompatible architecture macosx-aarch64
+[exit 1]
+
+$ luarocks --lua-version 5.4 install --tree /root/.luarocks --only-server=/srv airsstack 0.0.2
+
+Error: 'git' program not found. Make sure Git is installed and is available in your PATH (or you may want to edit the 'variables.GIT' value in file '/etc/luarocks/config-5.4.lua')
+Installing /srv/airsstack-0.0.2-1.rockspec
+[exit 1]
+
+$ luarocks --lua-version 5.4 install --tree /root/.luarocks /srv/airsstack-0.0.2-1.macosx-aarch64.rock
+
+Error: Incompatible architecture macosx-aarch64
+[exit 1]
+
+== /usr/share/lua/5.1/luarocks/cmd.lua
+86-         end
+87-      elseif args["local"] then
+88-         if fs.is_superuser() then
+89:            return nil, "The --local flag is meant for operating in a user's home directory.\n"..
+90-               "You are running as a superuser, which is intended for system-wide operation.\n"..
+91-               "To force using the superuser's home, use --tree explicitly."
+92-         else
+$ grep -n ^function cmd.run_command /usr/share/lua/5.1/luarocks/cmd.lua
+496:function cmd.run_command(description, commands, external_namespace, ...)
+[exit 0]
+
+169:local function die(message, exitcode)
+170-   assert(type(message) == "string", "bad error, expected string, got: " .. type(message))
+171-   assert(exitcode == nil or type(exitcode) == "number", "bad error, expected number, got: " .. type(exitcode) .. " - " .. tostring(exitcode))
+172-   util.printerr("\nError: "..message)
+173-
+174-   local ok, err = xpcall(util.run_scheduled_functions, error_handler)
+175-   if not ok then
+176-      util.printerr("\nError: "..err)
+177-      exitcode = cmd.errorcodes.CRASH
+178-   end
+179-
+180-   os.exit(exitcode or cmd.errorcodes.UNSPECIFIED)
+181-end
+
+=== (b) run 2 (run2.sh): no Lua headers
+apt-get install exit: 0
+$ dpkg-query -W -f ${Package} ${Version}
+ luarocks lua5.4
+lua5.4 5.4.4-3+deb12u1
+luarocks 3.8.0+dfsg1-1
+[exit 0]
+
+USER=<unset> HOME=/root id -u=0
+
+== /usr/share/lua/5.1/luarocks/fs/unix.lua
+182:function unix.is_superuser()
+183-   return os.getenv("USER") == "root"
+184-end
+185-
+
+$ luarocks --lua-version 5.4 make --pack-binary-rock airsstack-0.0.2-1.rockspec
+
+Error: Failed finding Lua header files. You may need to install them or configure LUA_INCDIR.
+[exit 1]
+
+$ ls /work
+airsstack-0.0.2-1.rockspec
+src
+[exit 0]
+
+=== (a) USER unset (docker default)
+$ luarocks --lua-version 5.4 install --local /work/airsstack-0.0.2-1.all.rock
+
+Error: Could not fetch rock file: File not found: /work/airsstack-0.0.2-1.all.rock
+[exit 1]
+
+$ luarocks --lua-version 5.4 list --local --porcelain
+[exit 0]
+
+=== (b) USER=root (as a login shell / sudo -i sets it)
+$ env USER=root luarocks --lua-version 5.4 install --local /work/airsstack-0.0.2-1.all.rock
+
+Error: The --local flag is meant for operating in a user's home directory.
+You are running as a superuser, which is intended for system-wide operation.
+To force using the superuser's home, use --tree explicitly.
+[exit 1]
+
+$ env USER=root luarocks --lua-version 5.4 config lua_version
+5.4
+[exit 0]
+
+$ env USER=root luarocks --lua-version 5.4 path --local
+
+Error: The --local flag is meant for operating in a user's home directory.
+You are running as a superuser, which is intended for system-wide operation.
+To force using the superuser's home, use --tree explicitly.
+[exit 1]
+
+$ env USER=root luarocks --lua-version 5.4 install --tree /root/.luarocks /work/airsstack-0.0.2-1.all.rock
+
+Error: Could not fetch rock file: File not found: /work/airsstack-0.0.2-1.all.rock
+[exit 1]
+
+=== (c) USER=nobody-name, as root
+$ env USER=alice luarocks --lua-version 5.4 install --local --force /work/airsstack-0.0.2-1.all.rock
+
+Error: Could not fetch rock file: File not found: /work/airsstack-0.0.2-1.all.rock
+[exit 1]
+
+
+=== (b) run 3 (run3.sh): + liblua5.4-dev
+apt-get install exit: 0
+$ dpkg-query -W -f ${Package} ${Version}
+ luarocks lua5.4 liblua5.4-dev liblua5.4-dev
+liblua5.4-dev 5.4.4-3+deb12u1
+lua5.4 5.4.4-3+deb12u1
+luarocks 3.8.0+dfsg1-1
+[exit 0]
+
+USER=<unset> HOME=/root id -u=0
+
+== /usr/share/lua/5.1/luarocks/fs/unix.lua
+182:function unix.is_superuser()
+183-   return os.getenv("USER") == "root"
+184-end
+185-
+
+$ luarocks --lua-version 5.4 make --pack-binary-rock airsstack-0.0.2-1.rockspec
+
+airsstack 0.0.2-1 depends on lua 5.4 (5.4-1 provided by VM)
+No existing manifest. Attempting to rebuild...
+airsstack 0.0.2-1 is now installed in /tmp/luarocks_luarocks-build-pack-airsstack-MuKNyz
+
+Packed: /work/airsstack-0.0.2-1.all.rock
+[exit 0]
+
+$ ls /work
+airsstack-0.0.2-1.all.rock
+airsstack-0.0.2-1.rockspec
+src
+[exit 0]
+
+=== (a) USER unset (docker default)
+$ luarocks --lua-version 5.4 install --local /work/airsstack-0.0.2-1.all.rock
+
+airsstack 0.0.2-1 depends on lua 5.4 (5.4-1 provided by VM)
+No existing manifest. Attempting to rebuild...
+airsstack 0.0.2-1 is now installed in /root/.luarocks
+
+[exit 0]
+
+$ luarocks --lua-version 5.4 list --local --porcelain
+airsstack	0.0.2-1	installed	/root/.luarocks/lib/luarocks/rocks-5.4
+[exit 0]
+
+=== (b) USER=root (as a login shell / sudo -i sets it)
+$ env USER=root luarocks --lua-version 5.4 install --local /work/airsstack-0.0.2-1.all.rock
+
+Error: The --local flag is meant for operating in a user's home directory.
+You are running as a superuser, which is intended for system-wide operation.
+To force using the superuser's home, use --tree explicitly.
+[exit 1]
+
+$ env USER=root luarocks --lua-version 5.4 config lua_version
+5.4
+[exit 0]
+
+$ env USER=root luarocks --lua-version 5.4 path --local
+
+Error: The --local flag is meant for operating in a user's home directory.
+You are running as a superuser, which is intended for system-wide operation.
+To force using the superuser's home, use --tree explicitly.
+[exit 1]
+
+$ env USER=root luarocks --lua-version 5.4 install --tree /root/.luarocks /work/airsstack-0.0.2-1.all.rock
+
+airsstack 0.0.2-1 depends on lua 5.4 (5.4-1 provided by VM)
+airsstack 0.0.2-1 is now installed in /root/.luarocks
+
+[exit 0]
+
+=== (c) USER=nobody-name, as root
+$ env USER=alice luarocks --lua-version 5.4 install --local --force /work/airsstack-0.0.2-1.all.rock
+
+airsstack 0.0.2-1 depends on lua 5.4 (5.4-1 provided by VM)
+airsstack 0.0.2-1 is now installed in /root/.luarocks
+
+[exit 0]
+
+
+=== (b) run 4 (run4.sh): luarocks 3.12.2 itself as root — the Homebrew 3.12.2 Lua sources mounted read-only at /lr, launched by
+186-luarocks-local-home-root/luarocks-3.12.2-launcher (the Homebrew launcher with paths rewritten to /lr and /etc/luarocks, shebang /usr/bin/lua5.4)
+under Debian's lua5.4 5.4.4; no luaposix, no zip in the image (so the pack step fails after the build; the --local refusal does not depend on it).
+apt-get install exit: 0
+USER=<unset> HOME=/root id -u=0 whoami=root
+
+$ luarocks --version
+/usr/local/bin/luarocks 3.12.2
+LuaRocks main command-line interface
+
+[exit 0]
+
+$ lua5.4 -e print(pcall(require, "posix"))
+false	module 'posix' not found:
+	no field package.preload['posix']
+	no file '/usr/local/share/lua/5.4/posix.lua'
+	no file '/usr/local/share/lua/5.4/posix/init.lua'
+	no file '/usr/local/lib/lua/5.4/posix.lua'
+	no file '/usr/local/lib/lua/5.4/posix/init.lua'
+	no file '/usr/share/lua/5.4/posix.lua'
+	no file '/usr/share/lua/5.4/posix/init.lua'
+	no file './posix.lua'
+	no file './posix/init.lua'
+	no file '/usr/local/lib/lua/5.4/posix.so'
+	no file '/usr/lib/aarch64-linux-gnu/lua/5.4/posix.so'
+	no file '/usr/lib/lua/5.4/posix.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './posix.so'
+[exit 0]
+
+$ luarocks --lua-version 5.4 make --pack-binary-rock airsstack-0.0.2-1.rockspec
+
+
+airsstack 0.0.2-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack 0.0.2-1 is now installed in /tmp/luarocks_luarocks-build-pack-airsstack-9108083
+
+
+Error: Failed packing /work/airsstack-0.0.2-1.all.rock - 'zip' program not found. Make sure zip is installed and is available in your PATH (or you may want to edit the 'variables.ZIP' value in file '/etc/luarocks/config-5.4.lua')
+[exit 1]
+
+=== (a) USER unset
+$ luarocks --lua-version 5.4 install --local /work/airsstack-0.0.2-1.all.rock
+
+Error: The --local flag is meant for operating in a user's home directory.
+You are running as a superuser, which is intended for system-wide operation.
+To force using the superuser's home, use --tree explicitly.
+[exit 1]
+
+=== (b) USER=root
+$ env USER=root luarocks --lua-version 5.4 install --local /work/airsstack-0.0.2-1.all.rock
+
+Error: The --local flag is meant for operating in a user's home directory.
+You are running as a superuser, which is intended for system-wide operation.
+To force using the superuser's home, use --tree explicitly.
+[exit 1]
+
+=== (c) USER=alice (still uid 0)
+$ env USER=alice luarocks --lua-version 5.4 install --local /work/airsstack-0.0.2-1.all.rock
+
+Error: Could not fetch rock file: File not found: /work/airsstack-0.0.2-1.all.rock
+[exit 1]
+
+$ luarocks --lua-version 5.4 install --tree /root/.luarocks /work/airsstack-0.0.2-1.all.rock
+
+Error: Could not fetch rock file: File not found: /work/airsstack-0.0.2-1.all.rock
+[exit 1]
+

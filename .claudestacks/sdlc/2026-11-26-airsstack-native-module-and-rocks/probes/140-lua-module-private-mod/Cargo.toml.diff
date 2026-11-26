@@ -1,0 +1,20 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1,7 +1,7 @@
+ [workspace]
+ resolver = "3"
+ # `docs-check` is unpublished and test-only; the other two are the crates.io releases.
+-members  = ["crates/airsl", "crates/airsl-cli", "crates/docs-check"]
++members  = ["crates/airsl", "crates/airsl-cli", "crates/docs-check", "crates/airsl-lua"]
+ 
+ [workspace.package]
+ edition       = "2024"
+@@ -18,7 +18,7 @@
+ # `serialize` bridges Lua values through serde.
+ # Lua 5.4 (not 5.1/LuaJIT) because only 5.3+ distinguishes integers from floats,
+ # which the JSON that host programs exchange with scripts depends on.
+-mlua       = { version = "0.12", features = ["lua54", "vendored", "serialize", "send"] }
++mlua       = { version = "0.12", features = ["serialize"] }
+ # Serialization
+ serde      = { version = "1.0.228", features = ["derive"] }
+ serde_json = "1.0.150"

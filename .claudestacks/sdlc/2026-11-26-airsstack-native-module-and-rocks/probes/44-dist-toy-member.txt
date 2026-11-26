@@ -1,0 +1,450 @@
+# 44 dist 0.33.1 with a toy cdylib member crates/airsl-lua in the workspace
+Question: C2 (run part) - do 'dist plan' / 'dist generate --check' change, and does 'dist build' still work, once a mlua-module cdylib joins the workspace?
+Setup: rsync -a --exclude target R/ S/repo-copy/ (R at 9d054c4 + uncommitted .claudestacks only).
+  Toy: 44-dist-toy-member/Cargo.toml (cdylib, publish=false, mlua =0.12.0 features [module, lua54]) + lib.rs (one #[mlua::lua_module] fn);
+  root Cargo.toml members gains "crates/airsl-lua" (44-dist-toy-member/workspace-Cargo.toml.diff).
+Versions: cargo-dist 0.33.1; cargo 1.94.1 (29ea6fb6a 2026-03-24); mlua 0.12.0 / mlua-sys 0.11.0 (Cargo.lock); host Darwin arm64.
+Date: 2026-11-26. Every block below is the raw output, byte for byte.
+
+=================== A. BASELINE (copy before the toy member)
+cargo-dist 0.33.1
+$ dist plan
+  note: Forcing needs_coherence=true, because pr-run-mode="upload" is set.
+        If this causes you problems, let us know here:
+          https://github.com/axodotdev/cargo-dist/issues/1554
+
+announcing v0.2.0
+  airsl-cli 0.2.0
+    source.tar.gz
+      [checksum] source.tar.gz.sha256
+    airsl-cli-installer.sh
+    airsl-cli-installer.ps1
+    sha256.sum
+    airsl-cli-aarch64-apple-darwin.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-aarch64-apple-darwin.tar.xz.sha256
+    airsl-cli-aarch64-unknown-linux-gnu.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-aarch64-unknown-linux-gnu.tar.xz.sha256
+    airsl-cli-aarch64-unknown-linux-musl.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-aarch64-unknown-linux-musl.tar.xz.sha256
+    airsl-cli-x86_64-apple-darwin.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-x86_64-apple-darwin.tar.xz.sha256
+    airsl-cli-x86_64-pc-windows-msvc.zip
+      [bin] airsl.exe
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-x86_64-pc-windows-msvc.zip.sha256
+    airsl-cli-x86_64-unknown-linux-gnu.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-x86_64-unknown-linux-gnu.tar.xz.sha256
+    airsl-cli-x86_64-unknown-linux-musl.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-x86_64-unknown-linux-musl.tar.xz.sha256
+
+exit=0
+$ dist generate --check
+exit=0
+
+=================== B. toy member, publish=false, no dist metadata (output identical to A apart from the header)
+### toy member added (publish = false, crate-type = ["cdylib"], no [package.metadata.dist])
+$ dist plan
+  note: Forcing needs_coherence=true, because pr-run-mode="upload" is set.
+        If this causes you problems, let us know here:
+          https://github.com/axodotdev/cargo-dist/issues/1554
+
+announcing v0.2.0
+  airsl-cli 0.2.0
+    source.tar.gz
+      [checksum] source.tar.gz.sha256
+    airsl-cli-installer.sh
+    airsl-cli-installer.ps1
+    sha256.sum
+    airsl-cli-aarch64-apple-darwin.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-aarch64-apple-darwin.tar.xz.sha256
+    airsl-cli-aarch64-unknown-linux-gnu.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-aarch64-unknown-linux-gnu.tar.xz.sha256
+    airsl-cli-aarch64-unknown-linux-musl.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-aarch64-unknown-linux-musl.tar.xz.sha256
+    airsl-cli-x86_64-apple-darwin.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-x86_64-apple-darwin.tar.xz.sha256
+    airsl-cli-x86_64-pc-windows-msvc.zip
+      [bin] airsl.exe
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-x86_64-pc-windows-msvc.zip.sha256
+    airsl-cli-x86_64-unknown-linux-gnu.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-x86_64-unknown-linux-gnu.tar.xz.sha256
+    airsl-cli-x86_64-unknown-linux-musl.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-x86_64-unknown-linux-musl.tar.xz.sha256
+
+exit=0
+$ dist generate --check
+exit=0
+
+=================== C. variants of the toy Cargo.toml
+### V1 publish=false + [package.metadata.dist] dist=false
+--- crates/airsl-lua/Cargo.toml
+[package]
+name         = "airsl-lua"
+version      = "0.2.0"
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+publish      = false
+description  = "probe: native Lua module"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+mlua = { version = "=0.12.0", features = ["module", "lua54"] }
+
+[package.metadata.dist]
+dist = false
+$ dist plan
+  note: Forcing needs_coherence=true, because pr-run-mode="upload" is set.
+        If this causes you problems, let us know here:
+          https://github.com/axodotdev/cargo-dist/issues/1554
+
+announcing v0.2.0
+  airsl-cli 0.2.0
+    source.tar.gz
+      [checksum] source.tar.gz.sha256
+    airsl-cli-installer.sh
+    airsl-cli-installer.ps1
+    sha256.sum
+    airsl-cli-aarch64-apple-darwin.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-aarch64-apple-darwin.tar.xz.sha256
+    airsl-cli-aarch64-unknown-linux-gnu.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-aarch64-unknown-linux-gnu.tar.xz.sha256
+    airsl-cli-aarch64-unknown-linux-musl.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-aarch64-unknown-linux-musl.tar.xz.sha256
+    airsl-cli-x86_64-apple-darwin.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-x86_64-apple-darwin.tar.xz.sha256
+    airsl-cli-x86_64-pc-windows-msvc.zip
+      [bin] airsl.exe
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-x86_64-pc-windows-msvc.zip.sha256
+    airsl-cli-x86_64-unknown-linux-gnu.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-x86_64-unknown-linux-gnu.tar.xz.sha256
+    airsl-cli-x86_64-unknown-linux-musl.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-x86_64-unknown-linux-musl.tar.xz.sha256
+
+exit=0
+$ dist generate --check
+exit=0
+
+### V2 publish removed (defaults true), no dist metadata
+--- crates/airsl-lua/Cargo.toml
+[package]
+name         = "airsl-lua"
+version      = "0.2.0"
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+description  = "probe: native Lua module"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+mlua = { version = "=0.12.0", features = ["module", "lua54"] }
+$ dist plan
+  note: Forcing needs_coherence=true, because pr-run-mode="upload" is set.
+        If this causes you problems, let us know here:
+          https://github.com/axodotdev/cargo-dist/issues/1554
+
+announcing v0.2.0
+  airsl-cli 0.2.0
+    source.tar.gz
+      [checksum] source.tar.gz.sha256
+    airsl-cli-installer.sh
+    airsl-cli-installer.ps1
+    sha256.sum
+    airsl-cli-aarch64-apple-darwin.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-aarch64-apple-darwin.tar.xz.sha256
+    airsl-cli-aarch64-unknown-linux-gnu.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-aarch64-unknown-linux-gnu.tar.xz.sha256
+    airsl-cli-aarch64-unknown-linux-musl.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-aarch64-unknown-linux-musl.tar.xz.sha256
+    airsl-cli-x86_64-apple-darwin.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-x86_64-apple-darwin.tar.xz.sha256
+    airsl-cli-x86_64-pc-windows-msvc.zip
+      [bin] airsl.exe
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-x86_64-pc-windows-msvc.zip.sha256
+    airsl-cli-x86_64-unknown-linux-gnu.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-x86_64-unknown-linux-gnu.tar.xz.sha256
+    airsl-cli-x86_64-unknown-linux-musl.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-x86_64-unknown-linux-musl.tar.xz.sha256
+
+exit=0
+$ dist generate --check
+exit=0
+
+### V3 publish removed + [package.metadata.dist] package-libraries=["cdylib"]
+--- crates/airsl-lua/Cargo.toml
+[package]
+name         = "airsl-lua"
+version      = "0.2.0"
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+description  = "probe: native Lua module"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+mlua = { version = "=0.12.0", features = ["module", "lua54"] }
+
+[package.metadata.dist]
+package-libraries = ["cdylib"]
+$ dist plan
+  × Installers were requested, but app contains no installable binaries
+  help: The only installable files are libraries, but `install-libraries` isn't enabled.
+
+exit=255
+$ dist generate --check
+  × Installers were requested, but app contains no installable binaries
+  help: The only installable files are libraries, but `install-libraries` isn't enabled.
+
+exit=255
+
+### V4 publish=false + dist=true + package-libraries=["cdylib"]
+--- crates/airsl-lua/Cargo.toml
+[package]
+name         = "airsl-lua"
+version      = "0.2.0"
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+publish      = false
+description  = "probe: native Lua module"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+mlua = { version = "=0.12.0", features = ["module", "lua54"] }
+
+[package.metadata.dist]
+dist = true
+package-libraries = ["cdylib"]
+$ dist plan
+  × Installers were requested, but app contains no installable binaries
+  help: The only installable files are libraries, but `install-libraries` isn't enabled.
+
+exit=255
+$ dist generate --check
+  × Installers were requested, but app contains no installable binaries
+  help: The only installable files are libraries, but `install-libraries` isn't enabled.
+
+exit=255
+
+(V1 and V2 plan/generate output identical to A: verified with diff.)
+
+=================== D. dist build, toy member present, dist-workspace.toml unchanged
+### toy member present (publish=false, no dist metadata); dist-workspace.toml unchanged (precise-builds unset)
+$ dist build --artifacts=local --target aarch64-apple-darwin
+building artifacts:
+  airsl-cli-aarch64-apple-darwin.tar.xz
+  airsl-cli-aarch64-apple-darwin.tar.xz.sha256
+
+building aarch64-apple-darwin target, using cargo profile dist --workspace)
+   Compiling libc v0.2.189
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.24
+   Compiling quote v1.0.47
+   Compiling serde_core v1.0.229
+   Compiling cfg-if v1.0.4
+   Compiling memchr v2.8.3
+   Compiling shlex v2.0.1
+   Compiling find-msvc-tools v0.1.11
+   Compiling cc v1.4.4
+   Compiling autocfg v1.5.1
+   Compiling typenum v1.20.1
+   Compiling serde v1.0.229
+   Compiling num-traits v0.2.19
+   Compiling hybrid-array v0.4.15
+   Compiling lua-src v550.1.1
+   Compiling typeid v1.0.3
+   Compiling parking_lot_core v0.9.12
+   Compiling pkg-config v0.3.34
+   Compiling which v8.0.5
+   Compiling luajit-src v210.7.2+b925b3e
+   Compiling mlua-sys v0.11.0
+error: `vendored`, `external` and `module` features are mutually exclusive
+  --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-sys-0.11.0/build/main_inner.rs:22:5
+   |
+22 |     compile_error!("`vendored`, `external` and `module` features are mutually exclusive");
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: could not compile `mlua-sys` (build script) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+  × failed to find bin airsl for path+file:///private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-
+  │ integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-C/repo-copy/crates/airsl-cli#0.2.0
+  help: did the above build fail?
+
+exit=255
+
+=================== E. dist build, toy has [package.metadata.dist] dist = false
+### toy member with [package.metadata.dist] dist = false; dist-workspace.toml unchanged
+$ dist build --artifacts=local --target aarch64-apple-darwin
+building artifacts:
+  airsl-cli-aarch64-apple-darwin.tar.xz
+  airsl-cli-aarch64-apple-darwin.tar.xz.sha256
+
+building aarch64-apple-darwin target, using cargo profile dist --workspace)
+   Compiling serde_core v1.0.229
+   Compiling quote v1.0.47
+   Compiling mlua-sys v0.11.0
+   Compiling scopeguard v1.2.0
+   Compiling num-traits v0.2.19
+   Compiling erased-serde v0.4.10
+   Compiling smallvec v1.15.2
+   Compiling typeid v1.0.3
+error: `vendored`, `external` and `module` features are mutually exclusive
+  --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-sys-0.11.0/build/main_inner.rs:22:5
+   |
+22 |     compile_error!("`vendored`, `external` and `module` features are mutually exclusive");
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: could not compile `mlua-sys` (build script) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+  × failed to find bin airsl for path+file:///private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-
+  │ integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-C/repo-copy/crates/airsl-cli#0.2.0
+  help: did the above build fail?
+
+exit=255
+
+=================== F. toy dist = false + dist-workspace.toml '[dist] precise-builds = true'
+### toy member with dist = false; dist-workspace.toml + precise-builds = true
+$ dist plan
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-x86_64-unknown-linux-musl.tar.xz.sha256
+
+$ dist generate --check
+exit=0
+$ dist build --artifacts=local --target aarch64-apple-darwin
+building artifacts:
+  airsl-cli-aarch64-apple-darwin.tar.xz
+  airsl-cli-aarch64-apple-darwin.tar.xz.sha256
+
+building aarch64-apple-darwin target, using cargo profile dist --package=airsl-cli)
+   Compiling proc-macro2 v1.0.107
+   Compiling crypto-common v0.2.2
+   Compiling mlua-sys v0.11.0
+   Compiling block-buffer v0.12.1
+   Compiling aho-corasick v1.1.5
+   Compiling getrandom v0.4.3
+   Compiling regex-syntax v0.8.11
+   Compiling utf8parse v0.2.2
+   Compiling rustix v1.1.4
+   Compiling const-oid v0.10.3
+   Compiling zmij v1.0.23
+   Compiling digest v0.11.3
+   Compiling erased-serde v0.4.10
+   Compiling quote v1.0.47
+   Compiling syn v3.0.3
+   Compiling regex-automata v0.4.18
+   Compiling parking_lot_core v0.9.12
+   Compiling lock_api v0.4.14
+   Compiling anstyle-parse v1.0.0
+   Compiling ordered-float v2.10.1
+   Compiling bstr v1.13.1
+   Compiling cpufeatures v0.3.1
+   Compiling errno v0.3.14
+   Compiling bitflags v2.13.1
+   Compiling winnow v1.0.5
+   Compiling thiserror v2.0.20
+   Compiling anstyle v1.0.14
+   Compiling anstyle-query v1.1.5
+   Compiling serde_json v1.0.151
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling colorchoice v1.0.5
+   Compiling anstream v1.0.0
+   Compiling toml_parser v1.1.6+spec-1.1.0
+   Compiling parking_lot v0.12.5
+   Compiling toml_datetime v1.1.3+spec-1.1.0
+   Compiling serde_spanned v1.1.3
+   Compiling either v1.18.0
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.20
+   Compiling same-file v1.0.6
+   Compiling jiff-core v0.1.0
+   Compiling heck v0.5.0
+   Compiling fastrand v2.5.0
+   Compiling strsim v0.11.1
+   Compiling clap_lex v1.1.0
+   Compiling log v0.4.33
+   Compiling once_cell v1.21.4
+   Compiling rustc-hash v2.1.3
+   Compiling itoa v1.0.18
+   Compiling tempfile v3.27.0
+   Compiling jiff v0.2.35
+   Compiling globset v0.4.20
+   Compiling clap_builder v4.6.6
+   Compiling clap_derive v4.6.4
+   Compiling serde v1.0.229
+   Compiling walkdir v2.5.0
+   Compiling toml v1.2.2+spec-1.1.0
+   Compiling regex v1.13.1
+   Compiling sha2 v0.11.1
+   Compiling serde-value v0.7.0
+   Compiling sha1 v0.11.0
+   Compiling mlua v0.12.0
+   Compiling clap v4.6.6
+   Compiling airsl v0.2.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-C/repo-copy/crates/airsl)
+   Compiling airsl-cli v0.2.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-C/repo-copy/crates/airsl-cli)
+    Finished `dist` profile [optimized] target(s) in 28.15s
+announcing v0.2.0
+  airsl-cli 0.2.0
+    /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-C/repo-copy/target/distrib/airsl-cli-aarch64-apple-darwin.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-C/repo-copy/target/distrib/airsl-cli-aarch64-apple-darwin.tar.xz.sha256
+exit=0

@@ -1,0 +1,13 @@
+--- a/deny.toml
++++ b/deny.toml
+@@ -69,7 +69,9 @@
+ external-default-features = "allow"
+ allow = []
+ deny = []
+-skip = []
++skip = [
++    { crate = "syn@2", reason = "mlua_derive 0.12 (mlua `module` feature) is still on syn 2" },
++]
+ skip-tree = []
+ 
+ # ---------------------------------------------------------------------------

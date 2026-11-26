@@ -1,0 +1,299 @@
+# 40 luarocks.org server (luarocks-site): manifest per Lua version, rock upload, duplicates, names
+Question: C1 (a)-(d). Source: github.com/luarocks/luarocks-site default branch 'master' at commit 7849c0a3f8bdc5613672e0e2e472ba44414fef34
+Commands: curl -sS -L https://raw.githubusercontent.com/luarocks/luarocks-site/7849c0a3f8bdc5613672e0e2e472ba44414fef34/<path> -o 40-luarocks-site/<path>
+Date: 2026-11-26. Files cited below are kept byte-for-byte under 40-luarocks-site/. Quotes are grep -n output of those files.
+
+## (a) Which per-Lua-version manifest a version appears in
+--- models/versions.moon (lua_version = the rockspec's first dependency whose name is 'lua', stored verbatim)
+8:get_lua_version = (spec) ->
+9:  return unless type(spec.dependencies) == "table"
+10:  import Dependencies from require "models"
+11:  for dep in *spec.dependencies
+12:    if Dependencies\parse_dependency(dep) == "lua"
+13:      return dep
+14:
+15:  nil
+94:      lua_version: get_lua_version spec
+111:  update_from_spec: (spec) =>
+112:    lua_version = get_lua_version spec
+113:
+114:    if lua_version != @lua_version
+115:      @update lua_version: lua_version or db.NULL
+116:
+117:    @update_dependencies spec
+--- helpers/manifests.moon (filter applied when serving manifest-X.Y; a version with NO lua dep is in every manifest)
+54:build_manifest = (modules, filter_version=nil, development=nil) ->
+55:  repository = {}
+56:
+57:  if filter_version
+58:    filter_version = parse_version filter_version
+64:    for version in *mod.versions
+65:      if development != nil
+66:        continue if version.development != development
+67:
+68:      if filter_version and version.lua_version
+69:        dep = parse_dep version.lua_version
+70:        continue unless dep
+71:        continue unless match_constraints filter_version, dep.constraints
+72:
+73:      arches = { {arch: "rockspec"} }
+74:      mod_tbl[version.version_name] = arches
+75:
+76:      continue unless version.rocks
+77:      for {:arch} in *version.rocks
+78:        insert arches, {:arch}
+--- applications/manifest.moon (routes + accepted versions)
+51:  if @params.a or @params.b
+52:    @params.version = "#{@params.a}.#{@params.b}"
+53:
+54:  params = assert_valid @params, types.params_shape {
+55:    {"format", types.nil + types.one_of {"json", "zip"}}
+56:    {"version", types.nil + types.one_of {"5.1", "5.2", "5.3", "5.4", "5.5"}}
+104:  manifest = build_manifest modules, @version, @development
+122:  [root_manifest: "/manifest(-:a.:b)(.:format)"]: zipable is_stable serve_manifest
+123:  [root_manifest_dev: "/dev/manifest(-:a.:b)(.:format)"]: zipable is_dev serve_manifest
+124:  [user_manifest: "/manifests/:user/manifest(-:a.:b)(.:format)"]: zipable serve_manifest
+125:  [sub_manifest: "/m/:manifest/manifest(-:a.:b)(.:format)"]: zipable is_stable serve_manifest
+126:  [sub_manifest_dev: "/m/:manifest/dev/manifest(-:a.:b)(.:format)"]: zipable is_dev serve_manifest
+(run of the server's own deps.lua: see 42-luarocks-site-manifest-filter.txt)
+
+## (b) Binary rock upload: routes, parameters, arch parsing/validation
+--- applications/api.moon
+77:tfa_gated = (fn) ->
+78:  =>
+79:    if @current_user\requires_tfa_for_uploads!
+80:      raw_token = @req.headers["x-tfa-token"] or @params.tfa_token
+81:      payload = raw_token and decode_with_secret raw_token
+82:      ok = payload and
+83:        payload.api_key == @key.key and
+84:        payload.user_id == @current_user.id and
+85:        payload.expires and payload.expires > os.time!
+86:
+87:      unless ok
+88:        return {
+89:          status: 403
+90:          json: {
+91:            errors: { "Two-factor authentication required" }
+92:            two_factor_required: true
+93:          }
+94:        }
+95:
+96:      @tfa_verified = true
+97:
+98:    fn @
+218:  "/api/1/:key/check_rockspec": api_request =>
+219:    assert_valid @params, {
+220:      { "package", exists: true, type: "string" }
+221:      { "version", exists: true, type: "string" }
+222:    }
+223:
+224:    module = Modules\find user_id: @current_user.id, name: @params.package\lower!
+225:    version = if module
+226:      Versions\find module_id: module.id, version_name: @params.version\lower!
+227:
+228:    json: { :module, :version }
+265:  "/api/1/:key/upload": api_request tfa_gated =>
+266:    module, version, is_new = handle_rockspec_upload @
+292:  "/api/1/:key/upload_rock/:version_id": api_request tfa_gated =>
+293:    assert_valid @params, {
+294:      {"version_id", is_integer: true}
+295:    }
+296:
+297:    @version = Versions\find(id: @params.version_id)
+298:
+299:    unless @version
+300:      return {
+301:        status: 404
+302:        json: { errors: {"invalid version"} }
+303:      }
+304:
+305:    @module = Modules\find id: @version.module_id
+306:    rock = assert_error handle_rock_upload @
+327:    json: { :rock, :module_url }
+--- helpers/uploaders.moon (arch from file name; only charset-validated, no allow-list)
+43:-- Set of characters that are allowed for module names, version names, and
+44:-- arches. Anything that will get rendered into a manifest file should be
+45:-- pass through here
+46:is_valid_manifest_string = (str) ->
+47:  return false unless str and type(str) == "string"
+48:  return false if str == ""
+49:  return false if #str > 255
+50:  str\match("^[a-zA-Z0-9%.%_%-]+$") != nil
+61:-- NOTE: this takes untrusted input, so be very strict about parsing
+62:-- prefer failing instead of fixing inputs
+63:parse_rock_fname = (module_name, fname) ->
+64:  version, arch = fname\match "^#{escape_pattern(module_name)}%-(.-)%.([^.]+)%.rock$"
+65:
+66:  unless version
+67:    return nil, "Filename must be in format `#{module_name}-VERSION.ARCH.rock`"
+68:
+69:  unless is_valid_manifest_string version
+70:    return nil, "Version contains invalid characters, only alphanumeric, period, underscore, and hyphen allowed"
+71:
+72:  unless is_valid_manifest_string arch
+73:    return nil, "Arch contains invalid characters, only alphanumeric, period, underscore, and hyphen allowed"
+74:
+75:  { :version, :arch }
+181:do_rock_upload = (user, mod, version, filename, rock_content) ->
+182:  rock_info, err = parse_rock_fname mod.name, filename
+183:  return nil, err unless rock_info
+184:
+185:  if rock_info.version != version.version_name
+186:    yield_error "Rock doesn't match version #{version.version_name}"
+187:
+188:  hashes = compute_hashes rock_content
+189:
+190:  key = "#{user.id}/#{filename}"
+191:  out = bucket\put_file_string key, rock_content, {
+192:    mimetype: "application/x-rock"
+193:  }
+194:
+195:  unless out == 200
+196:    return nil, "Failed to upload rock"
+197:
+198:  rock = Rocks\create {
+199:    :version, :hashes
+200:    arch: rock_info.arch
+201:    rock_key: key
+202:  }
+203:
+204:  if rock
+205:    mod\purge_manifests!
+206:  else
+207:    rock = Rocks\find {
+208:      version_id: version.id
+209:      arch: rock_info.arch
+210:    }
+211:
+212:    rock\update sha256: hashes.sha256, md5: hashes.md5, size: hashes.size
+213:    rock\increment_revision!
+214:
+215:  rock
+217:handle_rock_upload = =>
+218:  assert @module, "need module"
+219:  assert @version, "need version"
+220:
+221:  assert_editable @, @module
+222:
+223:  assert_valid @params, {
+224:    { "rock_file", file_exists: true }
+225:  }
+226:
+227:  file = @params.rock_file
+228:  assert_error do_rock_upload @current_user, @module,
+229:    @version, file.filename, file.content
+--- models/rocks.moon (one rock per (version, arch))
+27:-- CREATE UNIQUE INDEX rocks_rock_key_idx ON rocks USING btree (rock_key);
+28:-- CREATE UNIQUE INDEX rocks_version_id_arch_idx ON rocks USING btree (version_id, arch);
+38:  @create: (opts) =>
+39:    { :version, :arch, :rock_key, :hashes } = opts
+40:    safe_insert @, {
+41:      version_id: version.id
+42:      rock_fname: rock_key\match "/([^/]*)$"
+43:      sha256: hashes and hashes.sha256
+44:      md5: hashes and hashes.md5
+45:      size: hashes and hashes.size
+46:      :arch, :rock_key
+47:    }, {version_id: version.id, :arch }
+--- views/api_docs.moon
+2:  endpoints: {
+3:    {"Get-Tool-Version", "GET", "/api/tool_version"}
+4:    {"Get-API-Key-Status", "GET", "/api/1/:key/status"}
+5:    {"Check-Rockspec", "GET", "/api/1/:key/check_rockspec"}
+6:    {"Verify-TFA", "POST", "/api/1/:key/verify_tfa"}
+7:    {"Upload-Rockspec", "POST", "/api/1/:key/upload"}
+8:    {"Upload-Rock", "POST", "/api/1/:key/upload_rock/:version_id"}
+9:  }
+
+## (c) Duplicate version upload
+--- helpers/uploaders.moon: an existing (user, module, version) is UPDATED in place (revision++), not rejected
+136:  new_version = false
+137:
+138:  version = Versions\find module_id: mod.id, version_name: spec.version\lower!
+139:
+140:  if version
+141:    -- make sure file pointer is correct
+142:    unless version.rockspec_key == key
+143:      version\update rockspec_key: key
+144:    version\update_from_spec spec
+145:    version\update sha256: hashes.sha256, md5: hashes.md5, size: hashes.size
+146:    version\increment_revision!
+147:  else
+148:    version, err = Versions\create {
+149:      :mod, :spec, :hashes
+150:      rockspec_key: key
+151:    }
+152:    return nil, err unless version
+153:    new_version = true
+154:    mod\update current_version_id: version.id
+--- models/versions.moon (the rejection exists only in Versions:create, which do_rockspec_upload never reaches for an existing version)
+85:    version_name = spec.version\lower!
+86:
+87:    if @check_unique_constraint module_id: mod.id, version_name: version_name
+88:      return nil, "This version is already uploaded"
+--- the refusal a user sees comes from the luarocks CLIENT (see 41-luarocks-upload.txt, upload.lua:82-83)
+
+## (d) Module name validation
+79:parse_rockspec = (text) ->
+80:  spec, err = eval_rockspec text
+81:  return nil, err unless spec
+82:
+83:  unless spec.package
+84:    return nil, "Invalid rockspec (missing package)"
+85:
+86:  if spec.package == ""
+87:    return nil, "Invalid rockspec (blank package)"
+88:
+89:  unless strip_non_ascii(spec.package) == spec.package
+90:    return nil, "Invalid rockspec (invalid package name, ascii only)"
+91:
+92:  unless is_valid_manifest_string spec.package
+93:    return nil, "Invalid rockspec (package name contains invalid characters, only alphanumeric, period, underscore, and hyphen allowed)"
+94:
+95:  unless spec.version
+96:    return nil, "Invalid rockspec (missing version)"
+97:
+98:  if spec.version == ""
+99:    return nil, "Invalid rockspec (blank version)"
+100:
+101:  unless strip_non_ascii(spec.version) == spec.version
+102:    return nil, "Invalid rockspec (invalid version name, ascii only)"
+103:
+104:  unless is_valid_manifest_string spec.version
+105:    return nil, "Invalid rockspec (version name contains invalid characters, only alphanumeric, period, underscore, and hyphen allowed)"
+106:
+107:  spec
+--- models/modules.moon (name lowercased; unique per (user_id, name); display_name keeps case)
+38:-- CREATE UNIQUE INDEX modules_user_id_name_idx ON modules USING btree (user_id, name);
+81:  @create: (spec, user) =>
+82:    description = spec.description or {}
+83:    name = spec.package\lower!
+84:
+85:    mod = safe_insert @, {
+86:      :name
+87:      user_id: user.id
+88:      display_name: if name != spec.package then spec.package
+89:
+90:      current_version_id: -1
+91:
+92:      summary: description.summary
+93:      description: description.detailed
+94:      license: description.license
+95:      homepage: description.homepage
+96:    }, {
+97:      :name
+98:      user_id: user.id
+99:    }
+--- models/manifest_modules.moon (root manifest: first user to own a name wins)
+25:  @create: (manifest, mod) =>
+26:    if @check_unique_constraint manifest_id: manifest.id, module_name: mod.name
+27:      return nil, "Manifest already has a module named `#{mod.name}`"
+156:  -- try to insert into root
+157:  if new_module
+158:    root_manifest = Manifests\root!
+159:    unless ManifestModules\find manifest_id: root_manifest.id, module_id: mod.id
+160:      ManifestModules\create root_manifest, mod
+--- models/users.moon (TFA gate on uploads is opt-in per account)
+181:  requires_tfa_for_uploads: =>
+182:    secret = @get_totp_secret!
+183:    secret and secret.require_for_uploads or false

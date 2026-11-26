@@ -1,0 +1,17 @@
+[package]
+name = "airsstack-native"
+version = "0.0.1"
+edition = "2024"
+publish = false
+
+[lib]
+name = "airsstack"
+crate-type = ["cdylib"]
+
+[features]
+lua54 = ["mlua/lua54"]
+luajit = ["mlua/luajit"]
+
+[dependencies]
+airsstack-core = { path = "../core" }
+mlua = { version = "=0.12.0", features = ["module"] }

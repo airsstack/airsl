@@ -1,0 +1,29 @@
+# Probe 188 — the native module required twice / reloaded / loadlib'd twice in one Lua 5.4 state
+Question (P12): does a second `require("airsstack")` return the same table (rawequal)? What happens after
+`package.loaded.airsstack = nil` and a fresh `require` (new table, any error)? `package.loadlib` twice? Two processes (two states).
+Module: the probe 181 toy built for Lua 5.4 (mlua 0.12.0 `module` + `lua54`; Cargo version 0.0.2), the airsstack.so installed by
+`luarocks make` of airsstack-0.0.2-1 (copied to S/probes-M/p12/airsstack.so). Its luaopen returns a NEW table on every call with
+`opens` = a process-wide static counter (src in 181-toy-rocks/src/lib.rs).
+Scripts: 188-require-twice/twice.lua, two-states.lua. Versions: Lua 5.4.8 (/opt/homebrew/bin/lua5.4), rustc 1.94.1, macOS 26.3.1 arm64.
+Not covered: an airsl env overlay seen across states (the toy has no airsl modules); LuaJIT (toy built for 5.4 only).
+Date: 2026-11-26T07:21Z
+
+$ lua5.4 twice.lua /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/p12   (cwd=S/probes-M/p12)
+1st require:	table: 0x79d00c180	version=0.0.2	opens=1
+2nd require:	table: 0x79d00c180	rawequal(a, b)=true	opens=1
+package.loaded.airsstack == a:	true
+global airsstack:	nil
+after package.loaded.airsstack = nil, require ok=true	table: 0x79d00c240	rawequal(a, c)=false	opens=2
+loadlib twice:	function	nil	function	nil	rawequal(f1, f2)=true
+calling both:	table: 0x79d00c280	table: 0x79d00c2c0	opens=3,4	rawequal(d, e)=false
+mutating one table leaves the other:	false	true	true
+[exit 0]
+
+$ lua5.4 two-states.lua /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/p12 A   (cwd=S/probes-M/p12)
+process A:	version=0.0.2	opens=1
+[exit 0]
+
+$ lua5.4 two-states.lua /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/p12 B   (cwd=S/probes-M/p12)
+process B:	version=0.0.2	opens=1
+[exit 0]
+

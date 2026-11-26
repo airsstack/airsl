@@ -1,0 +1,25 @@
+# Probe 206 — what a stock interpreter gives a script as arg[0]/arg[1], and how an uncaught error() ends it
+# Question: for `<interpreter> sub/check.lua target/native/lua54` run from a directory, is arg[0] the script path as typed and arg[1]
+#   the first argument; and does an uncaught error("check.lua: ...") print that text and exit non-zero (native-load relies on both)?
+# Script (sub/check.lua, 2 lines): print(arg[0], arg[1], type(arg[2])) / error("check.lua: example failure")
+# Versions: Lua 5.4.8  Copyright (C) 1994-2025 Lua.org, PUC-Rio; LuaJIT 2.1.1770848219 (Homebrew); macOS 26.3.1 arm64
+# Date: 2026-11-26
+--- raw output (stdout and stderr combined, in order) ---
+$ lua5.4 sub/check.lua target/native/x   (cwd=<S>/p206)
+sub/check.lua	target/native/x	nil
+lua5.4: sub/check.lua:2: check.lua: example failure
+stack traceback:
+	[C]: in function 'error'
+	sub/check.lua:2: in main chunk
+	[C]: in ?
+[exit 1]
+
+$ luajit sub/check.lua target/native/x   (cwd=<S>/p206)
+luajit: sub/check.lua:2: check.lua: example failure
+stack traceback:
+	[C]: in function 'error'
+	sub/check.lua:2: in main chunk
+	[C]: at 0x01009363bc
+sub/check.lua	target/native/x	nil
+[exit 1]
+

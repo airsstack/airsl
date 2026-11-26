@@ -1,0 +1,200 @@
+Question B8: luarocks path --lr-cpath; luarocks config local_by_default; where homebrew luarocks installs without --tree/--local, and what happens when the tree is not writable (tested with a chmod a-w tree, never the system tree).
+Versions: luarocks 3.12.2 (/opt/homebrew/bin/luarocks, runs on Lua 5.4), Lua 5.4.8 (/opt/homebrew/bin/lua5.4), LuaJIT 2.1.1770848219 (/opt/homebrew/opt/luajit), cargo 1.94.1 / rustc 1.94.1, mlua =0.12.0 (mlua-sys 0.11.0), luarocks-build-rust-mlua 0.2.7-1, macOS Darwin 25.3.0 arm64 (arch macosx-aarch64).
+Date: 2026-11-26. Probe agent B.
+S = /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B (scratch; deleted after recording). Raw output below is unedited; paths appear in full.
+cwd = $S. $S/tree-ro created empty and chmod a-w; restored afterwards. LJ = /opt/homebrew/opt/luajit.
+
+$ luarocks path --lr-cpath
+/Users/hiraq/.luarocks/lib/lua/5.4/?.so;/opt/homebrew/lib/lua/5.4/?.so
+exit=0
+$ luarocks --tree $S/tree-54 path --lr-cpath
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-54/lib/lua/5.4/?.so;/Users/hiraq/.luarocks/lib/lua/5.4/?.so;/opt/homebrew/lib/lua/5.4/?.so
+exit=0
+$ luarocks --lua-version 5.1 --lua-dir $LJ --tree $S/tree-jit path --lr-cpath
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-jit/lib/lua/5.1/?.so;/Users/hiraq/.luarocks/lib/lua/5.1/?.so
+exit=0
+$ luarocks config local_by_default
+
+Error: Unknown entry local_by_default
+exit=1
+$ luarocks config | grep -n "local_by_default\|rocks_trees\|root_dir\|home_tree"
+62:home_tree = "/Users/hiraq/.luarocks"
+63-homeconfdir = "/Users/hiraq/.luarocks"
+64-hooks_enabled = true
+65-lib_extension = "so"
+--
+68:local_by_default = false
+69-local_cache = "/Users/hiraq/.cache/luarocks"
+70-lua_extension = "lua"
+71-lua_found = true
+--
+87:rocks_trees = {
+88-   {
+89-      name = "user",
+90-      root = "/Users/hiraq/.luarocks"
+$ luarocks config rocks_trees
+{
+   {
+      name = "user",
+      root = "/Users/hiraq/.luarocks"
+   },
+   {
+      name = "system",
+      root = "/opt/homebrew"
+   }
+}exit=0
+$ ls -ld /opt/homebrew /opt/homebrew/lib/luarocks
+ls: /opt/homebrew/lib/luarocks: No such file or directory
+drwxr-xr-x  41 hiraq  admin  1312 Nov 26 10:38 /opt/homebrew
+/opt/homebrew is writable by hiraq
+$ ls -ld $S/tree-ro   (after chmod a-w)
+dr-xr-xr-x@ 2 hiraq  wheel  64 Nov 26 13:19 tree-ro
+$ env PATH=... luarocks install --only-server=$S/server --tree $S/tree-ro airsstack
+
+Error: /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-ro/lib/luarocks/rocks-5.4 does not exist
+and your user does not have write permissions in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-ro
+
+You may want to run as a privileged user,
+or use --local to install into your local tree at /Users/hiraq/.luarocks
+or run 'luarocks config local_by_default true' to make --local the default.
+
+(You may need to configure your Lua package paths
+to use the local tree, see 'luarocks path --help')
+
+exit=2
+$ env PATH=... luarocks install --only-server=$S/server --tree $S/tree-ro/sub airsstack   (tree root does not exist, parent read-only)
+
+Error: /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-ro/sub/lib/luarocks/rocks-5.4 does not exist
+and your user does not have write permissions in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-ro
+
+You may want to run as a privileged user,
+or use --local to install into your local tree at /Users/hiraq/.luarocks
+or run 'luarocks config local_by_default true' to make --local the default.
+
+(You may need to configure your Lua package paths
+to use the local tree, see 'luarocks path --help')
+
+exit=2
+
+=== luarocks source
+--- 29-luarocks-3.12.2-src/cmd.lua:44-51
+29-luarocks-3.12.2-src/cmd.lua:44: cmd.errorcodes = {
+29-luarocks-3.12.2-src/cmd.lua:45:    OK = 0,
+29-luarocks-3.12.2-src/cmd.lua:46:    UNSPECIFIED = 1,
+29-luarocks-3.12.2-src/cmd.lua:47:    PERMISSIONDENIED = 2,
+29-luarocks-3.12.2-src/cmd.lua:48:    CONFIGFILE = 3,
+29-luarocks-3.12.2-src/cmd.lua:49:    LOCK = 4,
+29-luarocks-3.12.2-src/cmd.lua:50:    CRASH = 99,
+29-luarocks-3.12.2-src/cmd.lua:51: }
+--- 29-luarocks-3.12.2-src/cmd.lua:100-146
+29-luarocks-3.12.2-src/cmd.lua:100:    process_tree_args = function(args, project_dir)
+29-luarocks-3.12.2-src/cmd.lua:101: 
+29-luarocks-3.12.2-src/cmd.lua:102:       if args.global then
+29-luarocks-3.12.2-src/cmd.lua:103:          local ok, err = set_named_tree(args, "system")
+29-luarocks-3.12.2-src/cmd.lua:104:          if not ok then
+29-luarocks-3.12.2-src/cmd.lua:105:             return nil, err
+29-luarocks-3.12.2-src/cmd.lua:106:          end
+29-luarocks-3.12.2-src/cmd.lua:107:       elseif args.tree then
+29-luarocks-3.12.2-src/cmd.lua:108:          local named = set_named_tree(args, args.tree)
+29-luarocks-3.12.2-src/cmd.lua:109:          if not named then
+29-luarocks-3.12.2-src/cmd.lua:110:             local root_dir = fs.absolute_name(args.tree)
+29-luarocks-3.12.2-src/cmd.lua:111:             replace_tree(args, root_dir)
+29-luarocks-3.12.2-src/cmd.lua:112:             if (args.deps_mode or cfg.deps_mode) ~= "order" then
+29-luarocks-3.12.2-src/cmd.lua:113:                table.insert(cfg.rocks_trees, 1, { name = "arg", root = root_dir })
+29-luarocks-3.12.2-src/cmd.lua:114:             end
+29-luarocks-3.12.2-src/cmd.lua:115:          end
+29-luarocks-3.12.2-src/cmd.lua:116:       elseif args["local"] then
+29-luarocks-3.12.2-src/cmd.lua:117:          if fs.is_superuser() then
+29-luarocks-3.12.2-src/cmd.lua:118:             return nil, "The --local flag is meant for operating in a user's home directory.\n" ..
+29-luarocks-3.12.2-src/cmd.lua:119:             "You are running as a superuser, which is intended for system-wide operation.\n" ..
+29-luarocks-3.12.2-src/cmd.lua:120:             "To force using the superuser's home, use --tree explicitly."
+29-luarocks-3.12.2-src/cmd.lua:121:          else
+29-luarocks-3.12.2-src/cmd.lua:122:             local ok, err = set_named_tree(args, "user")
+29-luarocks-3.12.2-src/cmd.lua:123:             if not ok then
+29-luarocks-3.12.2-src/cmd.lua:124:                return nil, err
+29-luarocks-3.12.2-src/cmd.lua:125:             end
+29-luarocks-3.12.2-src/cmd.lua:126:          end
+29-luarocks-3.12.2-src/cmd.lua:127:       elseif args.project_tree then
+29-luarocks-3.12.2-src/cmd.lua:128:          local tree = args.project_tree
+29-luarocks-3.12.2-src/cmd.lua:129:          table.insert(cfg.rocks_trees, 1, { name = "project", root = tree })
+29-luarocks-3.12.2-src/cmd.lua:130:          manif.load_rocks_tree_manifests()
+29-luarocks-3.12.2-src/cmd.lua:131:          path.use_tree(tree)
+29-luarocks-3.12.2-src/cmd.lua:132:       elseif project_dir then
+29-luarocks-3.12.2-src/cmd.lua:133:          local project_tree = project_dir .. "/lua_modules"
+29-luarocks-3.12.2-src/cmd.lua:134:          table.insert(cfg.rocks_trees, 1, { name = "project", root = project_tree })
+29-luarocks-3.12.2-src/cmd.lua:135:          manif.load_rocks_tree_manifests()
+29-luarocks-3.12.2-src/cmd.lua:136:          path.use_tree(project_tree)
+29-luarocks-3.12.2-src/cmd.lua:137:       elseif cfg.local_by_default then
+29-luarocks-3.12.2-src/cmd.lua:138:          local ok, err = set_named_tree(args, "user")
+29-luarocks-3.12.2-src/cmd.lua:139:          if not ok then
+29-luarocks-3.12.2-src/cmd.lua:140:             return nil, err
+29-luarocks-3.12.2-src/cmd.lua:141:          end
+29-luarocks-3.12.2-src/cmd.lua:142:       else
+29-luarocks-3.12.2-src/cmd.lua:143:          local trees = cfg.rocks_trees
+29-luarocks-3.12.2-src/cmd.lua:144:          path.use_tree(trees[#trees])
+29-luarocks-3.12.2-src/cmd.lua:145:       end
+29-luarocks-3.12.2-src/cmd.lua:146: 
+--- 29-luarocks-3.12.2-src/cmd.lua:772-776
+29-luarocks-3.12.2-src/cmd.lua:772:    if cmd_mod.needs_lock and cmd_mod.needs_lock(args) then
+29-luarocks-3.12.2-src/cmd.lua:773:       ok, err = fs.check_command_permissions(args)
+29-luarocks-3.12.2-src/cmd.lua:774:       if not ok then
+29-luarocks-3.12.2-src/cmd.lua:775:          die(err, cmd.errorcodes.PERMISSIONDENIED)
+29-luarocks-3.12.2-src/cmd.lua:776:       end
+--- 29-luarocks-3.12.2-src/fs/lua.lua:1203-1252
+29-luarocks-3.12.2-src/fs/lua.lua:1203:    local ok = true
+29-luarocks-3.12.2-src/fs/lua.lua:1204:    local err = ""
+29-luarocks-3.12.2-src/fs/lua.lua:1205:    if args._command_permissions_checked then
+29-luarocks-3.12.2-src/fs/lua.lua:1206:       return true
+29-luarocks-3.12.2-src/fs/lua.lua:1207:    end
+29-luarocks-3.12.2-src/fs/lua.lua:1208:    for _, directory in ipairs { cfg.rocks_dir, cfg.deploy_lua_dir, cfg.deploy_bin_dir, cfg.deploy_lua_dir } do
+29-luarocks-3.12.2-src/fs/lua.lua:1209:       if fs.exists(directory) then
+29-luarocks-3.12.2-src/fs/lua.lua:1210:          if not fs.is_writable(directory) then
+29-luarocks-3.12.2-src/fs/lua.lua:1211:             ok = false
+29-luarocks-3.12.2-src/fs/lua.lua:1212:             err = "Your user does not have write permissions in " .. directory
+29-luarocks-3.12.2-src/fs/lua.lua:1213:             break
+29-luarocks-3.12.2-src/fs/lua.lua:1214:          end
+29-luarocks-3.12.2-src/fs/lua.lua:1215:       else
+29-luarocks-3.12.2-src/fs/lua.lua:1216:          local root = fs.root_of(directory)
+29-luarocks-3.12.2-src/fs/lua.lua:1217:          local parent = directory
+29-luarocks-3.12.2-src/fs/lua.lua:1218:          repeat
+29-luarocks-3.12.2-src/fs/lua.lua:1219:             parent = dir.dir_name(parent)
+29-luarocks-3.12.2-src/fs/lua.lua:1220:             if parent == "" then
+29-luarocks-3.12.2-src/fs/lua.lua:1221:                parent = root
+29-luarocks-3.12.2-src/fs/lua.lua:1222:             end
+29-luarocks-3.12.2-src/fs/lua.lua:1223:          until parent == root or fs.exists(parent)
+29-luarocks-3.12.2-src/fs/lua.lua:1224:          if not fs.is_writable(parent) then
+29-luarocks-3.12.2-src/fs/lua.lua:1225:             ok = false
+29-luarocks-3.12.2-src/fs/lua.lua:1226:             err = directory.." does not exist\nand your user does not have write permissions in " .. parent
+29-luarocks-3.12.2-src/fs/lua.lua:1227:             break
+29-luarocks-3.12.2-src/fs/lua.lua:1228:          end
+29-luarocks-3.12.2-src/fs/lua.lua:1229:       end
+29-luarocks-3.12.2-src/fs/lua.lua:1230:    end
+29-luarocks-3.12.2-src/fs/lua.lua:1231:    if ok then
+29-luarocks-3.12.2-src/fs/lua.lua:1232:       args._command_permissions_checked = true
+29-luarocks-3.12.2-src/fs/lua.lua:1233:       return true
+29-luarocks-3.12.2-src/fs/lua.lua:1234:    else
+29-luarocks-3.12.2-src/fs/lua.lua:1235:       if args["local"] or cfg.local_by_default then
+29-luarocks-3.12.2-src/fs/lua.lua:1236:          err = err .. "\n\nPlease check your permissions.\n"
+29-luarocks-3.12.2-src/fs/lua.lua:1237:       else
+29-luarocks-3.12.2-src/fs/lua.lua:1238:          local local_tree = get_local_tree()
+29-luarocks-3.12.2-src/fs/lua.lua:1239:          if local_tree then
+29-luarocks-3.12.2-src/fs/lua.lua:1240:             err = err .. "\n\nYou may want to run as a privileged user,"
+29-luarocks-3.12.2-src/fs/lua.lua:1241:                       .. "\nor use --local to install into your local tree at " .. local_tree
+29-luarocks-3.12.2-src/fs/lua.lua:1242:                       .. "\nor run 'luarocks config local_by_default true' to make --local the default.\n"
+29-luarocks-3.12.2-src/fs/lua.lua:1243: 
+29-luarocks-3.12.2-src/fs/lua.lua:1244:             if not is_local_tree_in_env(local_tree) then
+29-luarocks-3.12.2-src/fs/lua.lua:1245:                err = err .. "\n(You may need to configure your Lua package paths\nto use the local tree, see 'luarocks path --help')\n"
+29-luarocks-3.12.2-src/fs/lua.lua:1246:             end
+29-luarocks-3.12.2-src/fs/lua.lua:1247:          else
+29-luarocks-3.12.2-src/fs/lua.lua:1248:             err = err .. "\n\nYou may want to run as a privileged user.\n"
+29-luarocks-3.12.2-src/fs/lua.lua:1249:          end
+29-luarocks-3.12.2-src/fs/lua.lua:1250:       end
+29-luarocks-3.12.2-src/fs/lua.lua:1251:       return nil, err
+29-luarocks-3.12.2-src/fs/lua.lua:1252:    end
+
+=== findings
+- --lr-cpath prints only the luarocks part: default '/Users/hiraq/.luarocks/lib/lua/5.4/?.so;/opt/homebrew/lib/lua/5.4/?.so'; with --tree the tree comes first; under LuaJIT the paths are lib/lua/5.1.
+- 'luarocks config local_by_default' -> 'Error: Unknown entry local_by_default' exit 1 although the dump shows local_by_default = false (false values print as unknown; cmd/config.lua:133). Use 'luarocks config' dump or treat exit 1 as false.
+- Without --tree/--local/--global/project: tree = last of rocks_trees (cmd.lua:142-144) = system /opt/homebrew on this homebrew config; /opt/homebrew is owned by the user, so a plain 'luarocks install' writes into /opt/homebrew (not executed).
+- Unwritable tree: exit 2 (cmd.errorcodes.PERMISSIONDENIED, cmd.lua:47,775) with 'Error: <tree>/lib/luarocks/rocks-5.4 does not exist
+and your user does not have write permissions in <tree>' + the '--local' / 'local_by_default' advice (fs/lua.lua:1226-1246).

@@ -1,0 +1,42 @@
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -42,6 +42,13 @@
+ ]
+ 
+ [[package]]
++name = "airsl-lua"
++version = "0.2.0"
++dependencies = [
++ "airsl",
++]
++
++[[package]]
+ name = "anstream"
+ version = "1.0.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+@@ -492,6 +499,7 @@
+  "erased-serde",
+  "libc",
+  "mlua-sys",
++ "mlua_derive",
+  "num-traits",
+  "parking_lot",
+  "rustc-hash",
+@@ -514,6 +522,17 @@
+ ]
+ 
+ [[package]]
++name = "mlua_derive"
++version = "0.12.0"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "0232231813b214d44b57c7678e7dbbcfaac35bd1a01acef0dad7c5dfdc1b1973"
++dependencies = [
++ "proc-macro2",
++ "quote",
++ "syn 2.0.119",
++]
++
++[[package]]
+ name = "num-traits"
+ version = "0.2.19"
+ source = "registry+https://github.com/rust-lang/crates.io-index"

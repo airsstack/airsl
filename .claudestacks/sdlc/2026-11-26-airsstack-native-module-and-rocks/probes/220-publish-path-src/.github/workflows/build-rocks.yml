@@ -1,0 +1,225 @@
+# Probe Z: stand-in for the dist global-artifacts job `./build-rocks`. Uploads dummy rocks under
+# `artifacts-build-rocks` (Z1, the name the brief asked for) and under `rocks-linux-x86_64` (the
+# spec's `rocks-<arch>` naming), and on Windows builds a real rock and installs it with --local (Z2).
+name: build-rocks (probe Z)
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+
+jobs:
+  dummy-rocks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: write two dummy rocks
+        env:
+          PLAN: ${{ inputs.plan }}
+        run: |
+          echo "plan input: $PLAN"
+          echo "plan.announcement_tag via jq: $(jq -r .announcement_tag <<<"$PLAN")"
+          mkdir -p out
+          echo "dummy airsstack rock $(date -u +%FT%TZ)" > out/airsstack-0.0.0-1.linux-x86_64.rock
+          echo "dummy airsstack-luajit rock $(date -u +%FT%TZ)" > out/airsstack-luajit-0.0.0-1.linux-x86_64.rock
+          sha256sum out/*
+      - name: upload as artifacts-build-rocks
+        uses: actions/upload-artifact@v7
+        with:
+          name: artifacts-build-rocks
+          path: out/
+      - name: upload as rocks-linux-x86_64
+        uses: actions/upload-artifact@v7
+        with:
+          name: rocks-linux-x86_64
+          path: out/
+
+  windows-local:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - name: versions
+        continue-on-error: true
+        run: |
+          echo ImageOS=%ImageOS% ImageVersion=%ImageVersion%
+          echo HOME=%HOME% USERPROFILE=%USERPROFILE% APPDATA=%APPDATA% LOCALAPPDATA=%LOCALAPPDATA% CARGO_HOME=%CARGO_HOME% RUSTUP_HOME=%RUSTUP_HOME%
+          rustup toolchain install 1.94 --profile minimal 2>&1
+          rustc -V
+          cargo -V
+          where luarocks lua 2>&1
+      - name: build lua 5.4.8 (MSVC, lua54.dll) into C:\lua54
+        continue-on-error: true
+        run: |
+          curl -sSfL -o lua-5.4.8.tar.gz https://www.lua.org/ftp/lua-5.4.8.tar.gz
+          certutil -hashfile lua-5.4.8.tar.gz SHA256
+          tar -xzf lua-5.4.8.tar.gz
+          cd lua-5.4.8\src
+          cl /nologo /MD /O2 /W3 /c /DLUA_BUILD_AS_DLL *.c >NUL
+          echo cl exit=%ERRORLEVEL%
+          ren lua.obj lua.o
+          ren luac.obj luac.o
+          link /nologo /DLL /IMPLIB:lua54.lib /OUT:lua54.dll *.obj
+          echo link dll exit=%ERRORLEVEL%
+          link /nologo /OUT:lua.exe lua.o lua54.lib
+          echo link exe exit=%ERRORLEVEL%
+          mkdir C:\lua54\bin C:\lua54\lib C:\lua54\include
+          copy lua.exe C:\lua54\bin\ >NUL
+          copy lua54.dll C:\lua54\bin\ >NUL
+          copy lua54.lib C:\lua54\lib\ >NUL
+          for %%h in (lua.h luaconf.h lualib.h lauxlib.h lua.hpp) do copy %%h C:\lua54\include\ >NUL
+          C:\lua54\bin\lua.exe -v
+      - name: luarocks 3.12.2 windows zip
+        continue-on-error: true
+        run: |
+          curl -sSfL -o luarocks.zip https://luarocks.github.io/luarocks/releases/luarocks-3.12.2-windows-64.zip
+          certutil -hashfile luarocks.zip SHA256
+          mkdir C:\luarocks-dl
+          tar -xf luarocks.zip -C C:\luarocks-dl
+          C:\luarocks-dl\luarocks-3.12.2-windows-64\luarocks.exe --version
+      - name: luarocks make into a scratch tree, then pack the binary rock
+        continue-on-error: true
+        run: |
+          set LR=C:\luarocks-dl\luarocks-3.12.2-windows-64\luarocks.exe
+          set A=--lua-version 5.4 --lua-dir C:\lua54
+          %LR% %A% make --tree %RUNNER_TEMP%\t54 crates\airsl-lua\rockspecs\airsstack-0.0.0-1.rockspec 2>&1
+          echo make exit=%ERRORLEVEL%
+          mkdir %RUNNER_TEMP%\pack54
+          cd /d %RUNNER_TEMP%\pack54
+          %LR% %A% pack --tree %RUNNER_TEMP%\t54 airsstack 2>&1
+          echo pack exit=%ERRORLEVEL%
+          dir /b
+      # Every step from here on runs with HOME/USERPROFILE/APPDATA/LOCALAPPDATA pointing at fresh dirs
+      # and C:\lua54\bin + the luarocks zip dir on PATH, as a user's shell would have them.
+      - name: write zenv.bat (fresh user dirs, lua + luarocks on PATH)
+        continue-on-error: true
+        run: |
+          set H=%RUNNER_TEMP%\zhome
+          mkdir %H%\AppData\Roaming %H%\AppData\Local
+          > %RUNNER_TEMP%\zenv.bat echo @set HOME=%H%
+          >> %RUNNER_TEMP%\zenv.bat echo @set USERPROFILE=%H%
+          >> %RUNNER_TEMP%\zenv.bat echo @set APPDATA=%H%\AppData\Roaming
+          >> %RUNNER_TEMP%\zenv.bat echo @set LOCALAPPDATA=%H%\AppData\Local
+          >> %RUNNER_TEMP%\zenv.bat echo @set PATH=C:\lua54\bin;C:\luarocks-dl\luarocks-3.12.2-windows-64;%%PATH%%
+          type %RUNNER_TEMP%\zenv.bat
+      - name: (cmd) what a user sees before installing - config and path with no --lua-dir
+        continue-on-error: true
+        run: |
+          call %RUNNER_TEMP%\zenv.bat
+          echo APPDATA=%APPDATA%
+          where luarocks lua
+          echo === luarocks --lua-version 5.4 config lua_version / variables.LUA / home / rocks_trees
+          luarocks --lua-version 5.4 config lua_version 2>&1
+          luarocks --lua-version 5.4 config variables.LUA 2>&1
+          luarocks --lua-version 5.4 config home 2>&1
+          luarocks --lua-version 5.4 config rocks_trees 2>&1
+          echo === luarocks config lua_version (no flags)
+          luarocks config lua_version 2>&1
+          echo exit=%ERRORLEVEL%
+      - name: (cmd) luarocks --lua-version 5.4 install --local <the packed .rock>
+        continue-on-error: true
+        run: |
+          call %RUNNER_TEMP%\zenv.bat
+          cd /d %RUNNER_TEMP%\pack54
+          luarocks --lua-version 5.4 install --local airsstack-0.0.0-1.win32-x86_64.rock 2>&1
+          echo install-no-lua-dir exit=%ERRORLEVEL%
+          if exist "%APPDATA%\luarocks\lib\lua\5.4\airsstack.dll" goto listed
+          echo --- not installed without --lua-dir; retrying with --lua-dir C:\lua54
+          luarocks --lua-version 5.4 --lua-dir C:\lua54 install --local airsstack-0.0.0-1.win32-x86_64.rock 2>&1
+          echo install-with-lua-dir exit=%ERRORLEVEL%
+          :listed
+          echo --- files under %APPDATA%\luarocks:
+          dir /s /b "%APPDATA%\luarocks"
+          echo --- files under %HOME% (whole fresh home):
+          dir /s /b /a-d "%HOME%"
+      - name: (cmd) luarocks --lua-version 5.4 path, and luarocks path (no flags) -- raw output
+        continue-on-error: true
+        run: |
+          call %RUNNER_TEMP%\zenv.bat
+          echo === luarocks --lua-version 5.4 path
+          luarocks --lua-version 5.4 path
+          echo exit=%ERRORLEVEL%
+          echo === luarocks path
+          luarocks path
+          echo exit=%ERRORLEVEL%
+          echo === luarocks --lua-version 5.4 path --lr-path / --lr-cpath / --lr-bin
+          luarocks --lua-version 5.4 path --lr-path
+          luarocks --lua-version 5.4 path --lr-cpath
+          luarocks --lua-version 5.4 path --lr-bin
+      - name: (cmd) baseline - require with no luarocks path applied (expected to fail)
+        continue-on-error: true
+        run: |
+          call %RUNNER_TEMP%\zenv.bat
+          lua -e "print(require('airsstack').ok)"
+          echo exit=%ERRORLEVEL%
+      - name: (cmd) A - save luarocks path to a .bat and call it
+        continue-on-error: true
+        run: |
+          call %RUNNER_TEMP%\zenv.bat
+          luarocks --lua-version 5.4 path > %RUNNER_TEMP%\lrpath.bat
+          call %RUNNER_TEMP%\lrpath.bat
+          lua -e "print(require('airsstack').ok)"
+          echo exit=%ERRORLEVEL%
+          lua -e "print(package.searchpath('airsstack', package.cpath))"
+      - name: (cmd) B - for /f over luarocks path output
+        continue-on-error: true
+        run: |
+          call %RUNNER_TEMP%\zenv.bat
+          for /f "delims=" %%l in ('luarocks --lua-version 5.4 path') do %%l
+          lua -e "print(require('airsstack').ok)"
+          echo exit=%ERRORLEVEL%
+      - name: (pwsh) P1 - Invoke-Expression of the raw SET lines
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $H = "$env:RUNNER_TEMP\zhome"; $env:HOME = $H; $env:USERPROFILE = $H
+          $env:APPDATA = "$H\AppData\Roaming"; $env:LOCALAPPDATA = "$H\AppData\Local"
+          $env:PATH = "C:\lua54\bin;C:\luarocks-dl\luarocks-3.12.2-windows-64;$env:PATH"
+          luarocks --lua-version 5.4 path | Invoke-Expression
+          "LUA_CPATH env after iex: [$env:LUA_CPATH]"
+          lua -e "print(require('airsstack').ok)"
+          "exit=$LASTEXITCODE"
+      - name: (pwsh) P2 - parse SET "NAME=VALUE" into $env:NAME
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $H = "$env:RUNNER_TEMP\zhome"; $env:HOME = $H; $env:USERPROFILE = $H
+          $env:APPDATA = "$H\AppData\Roaming"; $env:LOCALAPPDATA = "$H\AppData\Local"
+          $env:PATH = "C:\lua54\bin;C:\luarocks-dl\luarocks-3.12.2-windows-64;$env:PATH"
+          luarocks --lua-version 5.4 path | ForEach-Object { if ($_ -match '^SET "([^=]+)=(.*)"$') { Set-Item "env:$($Matches[1])" $Matches[2] } }
+          "LUA_CPATH=[$env:LUA_CPATH]"
+          lua -e "print(require('airsstack').ok)"
+          "exit=$LASTEXITCODE"
+      - name: (pwsh) P3 - $env:LUA_PATH / $env:LUA_CPATH from --lr-path / --lr-cpath
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $H = "$env:RUNNER_TEMP\zhome"; $env:HOME = $H; $env:USERPROFILE = $H
+          $env:APPDATA = "$H\AppData\Roaming"; $env:LOCALAPPDATA = "$H\AppData\Local"
+          $env:PATH = "C:\lua54\bin;C:\luarocks-dl\luarocks-3.12.2-windows-64;$env:PATH"
+          $env:LUA_PATH = luarocks --lua-version 5.4 path --lr-path
+          $env:LUA_CPATH = luarocks --lua-version 5.4 path --lr-cpath
+          "LUA_CPATH=[$env:LUA_CPATH]"
+          lua -e "print(require('airsstack').ok)"
+          "exit=$LASTEXITCODE"
+      - name: (pwsh) P4 - cmd /c call of the saved .bat, then lua in the same cmd
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $H = "$env:RUNNER_TEMP\zhome"; $env:HOME = $H; $env:USERPROFILE = $H
+          $env:APPDATA = "$H\AppData\Roaming"; $env:LOCALAPPDATA = "$H\AppData\Local"
+          $env:PATH = "C:\lua54\bin;C:\luarocks-dl\luarocks-3.12.2-windows-64;$env:PATH"
+          cmd /c "call $env:RUNNER_TEMP\lrpath.bat && lua -e print(require('airsstack').ok)"
+          "exit=$LASTEXITCODE"
+      - name: upload the real Windows rock as rocks-windows-x86_64
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: rocks-windows-x86_64
+          path: ${{ runner.temp }}/pack54/*.rock

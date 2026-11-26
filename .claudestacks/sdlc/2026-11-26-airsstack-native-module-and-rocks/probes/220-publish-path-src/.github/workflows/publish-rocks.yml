@@ -1,0 +1,74 @@
+# Probe Z: stand-in for the dist publish job `./publish-rocks`. Downloads what build-rocks uploaded in
+# this run, three ways, and lists it. Uploads nothing anywhere; reads no secret value (length only).
+name: publish-rocks (probe Z)
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: inputs, token permissions, inherited secret presence
+        continue-on-error: true
+        env:
+          PLAN: ${{ inputs.plan }}
+          K: ${{ secrets.LUAROCKS_API_KEY }}
+        run: |
+          echo "plan input: $PLAN"
+          echo "LUAROCKS_API_KEY length: ${#K}"
+          echo "GITHUB_RUN_ID=$GITHUB_RUN_ID GITHUB_RUN_ATTEMPT=$GITHUB_RUN_ATTEMPT GITHUB_WORKFLOW_REF=$GITHUB_WORKFLOW_REF"
+      - name: (a) download pattern artifacts-* merge-multiple (dist host's form)
+        id: a
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          pattern: artifacts-*
+          path: dl-a/
+          merge-multiple: true
+      - name: (b) download by exact name artifacts-build-rocks
+        id: b
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: artifacts-build-rocks
+          path: dl-b/
+      - name: (c) download pattern rocks-* merge-multiple (the spec's rocks-<arch> naming)
+        id: c
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          pattern: rocks-*
+          path: dl-c/
+          merge-multiple: true
+      - name: (d) download pattern rocks-* without merge (one dir per artifact)
+        id: d
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          pattern: rocks-*
+          path: dl-d/
+      - name: list what each download produced
+        continue-on-error: true
+        run: |
+          echo "outcomes: a=${{ steps.a.outcome }} b=${{ steps.b.outcome }} c=${{ steps.c.outcome }} d=${{ steps.d.outcome }}"
+          echo "download-path outputs: a=${{ steps.a.outputs.download-path }} b=${{ steps.b.outputs.download-path }} c=${{ steps.c.outputs.download-path }} d=${{ steps.d.outputs.download-path }}"
+          for d in dl-a dl-b dl-c dl-d; do
+            echo "=== $d"
+            find "$d" -type f -printf '%s\t%p\n' 2>&1 | sort -k2
+            find "$d" -type f -exec sha256sum {} + 2>&1 | sort -k2
+          done
+          echo "=== contents of the dummy rocks in dl-b"
+          for f in dl-b/*.rock; do echo "$f: $(cat "$f")"; done
+      - name: checkout under the publish job's token (job-level permissions id-token+packages only)
+        id: co
+        continue-on-error: true
+        uses: actions/checkout@v6
+        with:
+          path: co
+      - name: checkout outcome
+        continue-on-error: true
+        run: echo "checkout outcome=${{ steps.co.outcome }}"; ls co 2>&1

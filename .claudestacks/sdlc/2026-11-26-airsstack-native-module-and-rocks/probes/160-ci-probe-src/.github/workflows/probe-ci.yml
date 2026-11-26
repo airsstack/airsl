@@ -1,0 +1,260 @@
+# Throwaway probe Y (2026-11-26-airsstack-native-module-and-rocks): CI toolchains for building and
+# packing the airsstack / airsstack-luajit binary rocks. Every step continue-on-error; outputs echoed.
+name: probe-ci-toolchain
+on:
+  push:
+    branches: [probe/ci-toolchain-2026-11-26]
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash --noprofile --norc {0}
+
+jobs:
+  # Y1a: the job itself runs inside manylinux2014 (`container:`); does actions/checkout (node) run there?
+  y1-container:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x86_64, runner: ubuntu-latest }
+          - { arch: aarch64, runner: ubuntu-24.04-arm }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    container: quay.io/pypa/manylinux2014_${{ matrix.arch }}
+    steps:
+      - name: run step inside the container, before any node action
+        continue-on-error: true
+        run: |
+          echo "runner=${{ matrix.runner }} ImageOS=${ImageOS:-} ImageVersion=${ImageVersion:-}"
+          uname -m; ldd --version 2>&1 | head -1; cat /etc/redhat-release
+          ls -la /__e 2>&1; ls /__e/node*/bin 2>&1
+          for n in /__e/node*/bin/node; do echo "$n -> $($n --version 2>&1 | head -3)"; done
+      - name: actions/checkout@v6 inside the container
+        id: co
+        continue-on-error: true
+        uses: actions/checkout@v6
+      - name: checkout outcome
+        continue-on-error: true
+        run: echo "checkout outcome=${{ steps.co.outcome }} conclusion=${{ steps.co.conclusion }}"; ls -la
+      - name: full Y1 build inside the job container (only if checkout worked)
+        if: steps.co.outcome == 'success'
+        continue-on-error: true
+        run: bash ci/y1-manylinux.sh "$PWD" /tmp/out
+
+  # Y1b: host runner + `docker run` of manylinux2014.
+  y1-docker:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x86_64, runner: ubuntu-latest }
+          - { arch: aarch64, runner: ubuntu-24.04-arm }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+      - name: docker run manylinux2014 -- Lua/LuaJIT/luarocks from source, make + pack both rockspecs
+        continue-on-error: true
+        run: |
+          echo "runner=${{ matrix.runner }} ImageOS=$ImageOS ImageVersion=$ImageVersion"; uname -m; docker version --format '{{.Server.Version}}'
+          I=quay.io/pypa/manylinux2014_${{ matrix.arch }}
+          docker pull -q $I; echo "image: $(docker image inspect --format '{{index .RepoDigests 0}}' $I)"
+          mkdir -p $RUNNER_TEMP/out
+          docker run --rm -v $PWD:/src:ro -v $RUNNER_TEMP/out:/out $I bash /src/ci/y1-manylinux.sh /src /out
+          echo "docker exit=$?"; ls -la $RUNNER_TEMP/out
+
+  # Y2: apt Lua 5.4 + LuaJIT + luarocks on ubuntu-latest itself.
+  y2-apt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+      - name: apt lua5.4 liblua5.4-dev luajit libluajit-5.1-dev luarocks; make + pack + load
+        continue-on-error: true
+        run: bash ci/y2-apt.sh
+
+  # Y3: Homebrew on arm64 and Intel macOS.
+  y3-brew:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-latest, macos-26-intel]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+      - name: brew lua@5.4 luajit luarocks; make + pack both rockspecs
+        continue-on-error: true
+        run: echo "runner=${{ matrix.runner }}"; bash ci/y3-mac.sh
+
+  # Y4: Windows MSVC Lua 5.4.8 + LuaJIT, luarocks 3.12.2 zip, make + pack both; Command resolution.
+  y4-windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - name: versions
+        continue-on-error: true
+        run: |
+          echo ImageOS=%ImageOS% ImageVersion=%ImageVersion%
+          rustup toolchain install 1.94 --profile minimal 2>&1
+          rustc -V
+          cargo -V
+          where luarocks lua luajit 2>&1
+      - name: build lua 5.4.8 (MSVC, lua54.dll) into C:\lua54
+        continue-on-error: true
+        run: |
+          curl -sSfL -o lua-5.4.8.tar.gz https://www.lua.org/ftp/lua-5.4.8.tar.gz
+          certutil -hashfile lua-5.4.8.tar.gz SHA256
+          tar -xzf lua-5.4.8.tar.gz
+          cd lua-5.4.8\src
+          cl /nologo /MD /O2 /W3 /c /DLUA_BUILD_AS_DLL *.c >NUL
+          echo cl exit=%ERRORLEVEL%
+          ren lua.obj lua.o
+          ren luac.obj luac.o
+          link /nologo /DLL /IMPLIB:lua54.lib /OUT:lua54.dll *.obj
+          echo link dll exit=%ERRORLEVEL%
+          link /nologo /OUT:lua.exe lua.o lua54.lib
+          echo link exe exit=%ERRORLEVEL%
+          mkdir C:\lua54\bin C:\lua54\lib C:\lua54\include
+          copy lua.exe C:\lua54\bin\ >NUL
+          copy lua54.dll C:\lua54\bin\ >NUL
+          copy lua54.lib C:\lua54\lib\ >NUL
+          for %%h in (lua.h luaconf.h lualib.h lauxlib.h lua.hpp) do copy %%h C:\lua54\include\ >NUL
+          C:\lua54\bin\lua.exe -v
+      - name: build luajit v2.1 (MSVC, msvcbuild.bat) into C:\luajit
+        continue-on-error: true
+        run: |
+          git clone -q --depth 1 --branch v2.1 https://github.com/LuaJIT/LuaJIT.git luajit-src
+          git -C luajit-src log -1 --format="luajit commit %%H %%cI"
+          cd luajit-src\src
+          call msvcbuild.bat >NUL
+          echo msvcbuild exit=%ERRORLEVEL%
+          dir /b *.exe *.dll *.lib
+          mkdir C:\luajit\bin C:\luajit\lib C:\luajit\include
+          copy luajit.exe C:\luajit\bin\ >NUL
+          copy lua51.dll C:\luajit\bin\ >NUL
+          copy lua51.lib C:\luajit\lib\ >NUL
+          for %%h in (lua.h luaconf.h lualib.h lauxlib.h luajit.h lua.hpp) do copy %%h C:\luajit\include\ >NUL
+          C:\luajit\bin\luajit.exe -v
+      - name: luarocks 3.12.2 windows zip
+        continue-on-error: true
+        run: |
+          curl -sSfL -o luarocks.zip https://luarocks.github.io/luarocks/releases/luarocks-3.12.2-windows-64.zip
+          certutil -hashfile luarocks.zip SHA256
+          mkdir C:\luarocks-dl
+          tar -xf luarocks.zip -C C:\luarocks-dl
+          echo --- files shipped by the zip:
+          dir /s /b C:\luarocks-dl
+          C:\luarocks-dl\luarocks-3.12.2-windows-64\luarocks.exe --version
+      - name: (54) luarocks make + pack airsstack (Lua 5.4), require via luarocks path
+        continue-on-error: true
+        run: |
+          set LR=C:\luarocks-dl\luarocks-3.12.2-windows-64\luarocks.exe
+          set A=--lua-version 5.4 --lua-dir C:\lua54
+          %LR% %A% config lua_version
+          %LR% %A% config arch
+          %LR% %A% make --tree %RUNNER_TEMP%\t54 crates\airsl-lua\rockspecs\airsstack-0.0.0-1.rockspec 2>&1
+          echo make exit=%ERRORLEVEL%
+          dir /s /b %RUNNER_TEMP%\t54\lib
+          %LR% %A% path --tree %RUNNER_TEMP%\t54 > %RUNNER_TEMP%\path54.bat
+          echo --- luarocks path output:
+          type %RUNNER_TEMP%\path54.bat
+          call %RUNNER_TEMP%\path54.bat
+          C:\lua54\bin\lua.exe ci\probe.lua
+          echo require exit=%ERRORLEVEL%
+          mkdir %RUNNER_TEMP%\pack54
+          cd /d %RUNNER_TEMP%\pack54
+          %LR% %A% pack --tree %RUNNER_TEMP%\t54 airsstack 2>&1
+          echo pack exit=%ERRORLEVEL%
+          dir /b
+          for %%r in (*.rock) do (echo == rock file: %%r & tar -tvf %%r)
+      - name: (jit) luarocks make + pack airsstack-luajit (LuaJIT), require via luarocks path
+        continue-on-error: true
+        run: |
+          set LR=C:\luarocks-dl\luarocks-3.12.2-windows-64\luarocks.exe
+          set A=--lua-version 5.1 --lua-dir C:\luajit
+          %LR% %A% config lua_version
+          %LR% %A% config variables.LUA
+          %LR% %A% config variables.LUALIB
+          %LR% %A% config luajit_version
+          %LR% %A% make --tree %RUNNER_TEMP%\tjit crates\airsl-lua\rockspecs\airsstack-luajit-0.0.0-1.rockspec 2>&1
+          echo make exit=%ERRORLEVEL%
+          dir /s /b %RUNNER_TEMP%\tjit\lib
+          %LR% %A% path --tree %RUNNER_TEMP%\tjit > %RUNNER_TEMP%\pathjit.bat
+          echo --- luarocks path output:
+          type %RUNNER_TEMP%\pathjit.bat
+          call %RUNNER_TEMP%\pathjit.bat
+          C:\luajit\bin\luajit.exe ci\probe.lua
+          echo require exit=%ERRORLEVEL%
+          mkdir %RUNNER_TEMP%\packjit
+          cd /d %RUNNER_TEMP%\packjit
+          %LR% %A% pack --tree %RUNNER_TEMP%\tjit airsstack-luajit 2>&1
+          echo pack exit=%ERRORLEVEL%
+          dir /b
+          for %%r in (*.rock) do (echo == rock file: %%r & tar -tvf %%r)
+      - name: Rust Command::new resolution of luarocks
+        continue-on-error: true
+        run: |
+          cargo build --release --manifest-path ci\cmdprobe\Cargo.toml 2>&1 | findstr /V /C:"Compiling"
+          set CP=%CD%\ci\cmdprobe\target\release\cmdprobe.exe
+          mkdir C:\lrbat
+          echo @"C:\luarocks-dl\luarocks-3.12.2-windows-64\luarocks.exe" %%*> C:\lrbat\luarocks.bat
+          echo --- C:\lrbat\luarocks.bat:
+          type C:\lrbat\luarocks.bat
+          echo === (a) PATH has the zip dir (luarocks.exe only)
+          setlocal
+          set PATH=C:\luarocks-dl\luarocks-3.12.2-windows-64;%PATH%
+          where luarocks
+          %CP% luarocks luarocks.exe luarocks.bat
+          endlocal
+          echo === (b) PATH has only C:\lrbat (luarocks.bat wrapper), not the zip dir
+          setlocal
+          set PATH=C:\lrbat;%PATH%
+          where luarocks
+          %CP% luarocks luarocks.bat luarocks.exe
+          endlocal
+
+  # Y5: leafo/gh-actions-lua v13.1.0 installing Lua 5.4 and LuaJIT in one job.
+  y5-gh-actions-lua:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: step-security/msvc-dev-cmd@v1
+      - name: first install, luaVersion 5.4
+        id: l54
+        continue-on-error: true
+        uses: leafo/gh-actions-lua@v13.1.0
+        with:
+          luaVersion: "5.4"
+      - name: after 5.4
+        continue-on-error: true
+        run: |
+          echo "runner=${{ matrix.runner }} ImageOS=$ImageOS ImageVersion=$ImageVersion outcome=${{ steps.l54.outcome }}"
+          echo "PATH head: $(echo "$PATH" | tr ':' '\n' | head -4 | tr '\n' ' ')"
+          which -a lua luajit 2>&1; lua -v 2>&1; ls -la .lua .lua/bin 2>&1
+      - name: second install, luaVersion luajit
+        id: ljit
+        continue-on-error: true
+        uses: leafo/gh-actions-lua@v13.1.0
+        with:
+          luaVersion: "luajit"
+      - name: after luajit
+        continue-on-error: true
+        run: |
+          echo "outcome=${{ steps.ljit.outcome }}"
+          echo "PATH head: $(echo "$PATH" | tr ':' '\n' | head -4 | tr '\n' ' ')"
+          which -a lua luajit 2>&1; lua -v 2>&1; luajit -v 2>&1; ls -la .lua .lua/bin .lua/include 2>&1
+          lua -e 'print("lua reports", _VERSION, jit and jit.version or "no jit")' 2>&1

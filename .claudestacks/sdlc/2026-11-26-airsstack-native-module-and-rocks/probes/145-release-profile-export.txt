@@ -1,0 +1,37 @@
+question: draft 7.2 #6: with R's [profile.release] (lto thin, codegen-units 1, strip symbols), does 'cargo build -p airsl-lua --release --features lua54' still export _luaopen_airsstack on macOS, and does it load in lua5.4?
+commands: each `$ ...` line below, run in the stated cwd, followed by its raw output and `[exit N]`
+versions: rustc 1.94.1 (e408947bf 2026-03-25), cargo 1.94.1 (29ea6fb6a 2026-03-24) via R/rust-toolchain.toml channel 1.94; mlua 0.12.0, mlua-sys 0.11.0, mlua_derive 0.12.0, syn 2.0.119 (copy's Cargo.lock); cargo-deny 0.20.2; cargo-dist 0.33.1; luarocks 3.12.2 (/opt/homebrew/bin/luarocks, runs on Lua 5.4); Lua 5.4.8 (/opt/homebrew/bin/lua5.4); LuaJIT 2.1.1770848219 (/opt/homebrew/opt/luajit); luarocks-build-rust-mlua 0.2.7-1; macOS 26.3.1 arm64
+setup: S=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad; copy = S/probes-L/repo = rsync of R at 9d054c4 (minus target/, .git, .claudestacks, book/book), with the draft's feature table applied: root mlua features ["serialize"], members += crates/airsl-lua; crates/airsl [features] default=[lua54,vendored,send], lua54/luajit/vendored/send/module -> mlua/*; crates/airsl-lua cdylib (lib name airsstack, airsl path dep default-features=false + module, features lua54/luajit, build.rs dynamic_lookup, lib.rs `mod entry;`, entry.rs #[mlua::lua_module]); probe-only `ModuleSet::open` added to crates/airsl/src/modules/registry.rs so the toy installs airsl's real Json module. Sources and diffs: 140-lua-module-private-mod/. Env: CARGO_BUILD_JOBS=2, CARGO_TARGET_DIR=S/probes-L/target (luarocks' backend passes --target-dir=target, i.e. S/probes-L/repo/target). Every command ran under zsh `setopt pipefail`, so [exit N] is the pipeline's real status.
+date: 2026-11-26 (probe agent L)
+--- raw output ---
+[profile.release]
+lto                = "thin"
+codegen-units      = 1
+strip              = "symbols"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
+
+$ cargo build -p airsl-lua --release --features lua54 2>&1 | grep -v '^ *\(Checking\|Compiling\)'   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+    Finished `release` profile [optimized] target(s) in 32.67s
+[exit 0]
+
+$ ls -l /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/target/release/libairsstack.dylib; file /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/target/release/libairsstack.dylib   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+-rwxr-xr-x@ 1 hiraq  wheel  637024 Nov 26 13:54 /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/target/release/libairsstack.dylib
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/target/release/libairsstack.dylib: Mach-O 64-bit dynamically linked shared library arm64
+[exit 0]
+
+$ nm -gU /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/target/release/libairsstack.dylib   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+00000000000244ec T _luaopen_airsstack
+[exit 0]
+
+$ nm -u /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/target/release/libairsstack.dylib | grep -c '_lua'   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+49
+[exit 0]
+
+$ lua5.4 -e 'package.cpath="/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/target/release/lib?.dylib;"..package.cpath; local m=require("airsstack"); print(m.version, m.json.encode({observed_at=1700000000,b={2,1},a=true}))'   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+0.2.0	{"a":true,"b":[2,1],"observed_at":1700000000}
+[exit 0]
+

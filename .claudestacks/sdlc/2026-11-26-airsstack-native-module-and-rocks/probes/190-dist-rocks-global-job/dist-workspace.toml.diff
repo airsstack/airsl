@@ -1,0 +1,21 @@
+diff --git a/dist-workspace.toml b/dist-workspace.toml
+index a33e189..1560123 100644
+--- a/dist-workspace.toml
++++ b/dist-workspace.toml
+@@ -28,11 +28,15 @@ github-attestations = true
+ # dist builds and publishes but never runs what it built. This hook runs after
+ # every archive is built and `host` waits for it, so an archive that fails its
+ # smoke test is never published. See .github/workflows/airsl-cli-smoke.yml.
+-global-artifacts-jobs = ["./airsl-cli-smoke"]
++global-artifacts-jobs = ["./airsl-cli-smoke", "./build-rocks"]
+ # Pull requests build and smoke-test every archive too, publishing nothing. The
+ # gate in ci.yml never builds musl or this profile, so without this a change that
+ # breaks a release target would first fail on the release tag itself.
+ pr-run-mode = "upload"
++# probe M: build only the packages dist ships
++precise-builds = true
++# probe M: upload the rocks after the GitHub release exists
++publish-jobs = ["./publish-rocks"]
+ 
+ # dist's defaults name fixed images (macos-14, ubuntu-22.04, windows-2022). GitHub retires
+ # those, and the macos-14 retirement broke every release. The `-latest` labels move with GitHub

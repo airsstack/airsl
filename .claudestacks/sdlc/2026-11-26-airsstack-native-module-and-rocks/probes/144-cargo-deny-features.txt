@@ -1,0 +1,174 @@
+question: draft 7.2 #5: cargo deny check with the copy's real features and R's deny.toml (a) as is, (b) [graph] exclude = ["airsl-lua"], (c) [bans] skip for syn 2 (syntax from cargo-deny 0.20.2 source: src/cfg/package_spec.rs -- 'name@ver' string or { crate = "name@ver", reason = ".." }; '@' makes the first comparator Exact, so 'syn@2' = semver '=2' = 2.x), (d) (c) + allow-wildcard-paths, (e) (b)+(c). Diffs: 144-cargo-deny-features/deny.*.diff.
+commands: each `$ ...` line below, run in the stated cwd, followed by its raw output and `[exit N]`
+versions: rustc 1.94.1 (e408947bf 2026-03-25), cargo 1.94.1 (29ea6fb6a 2026-03-24) via R/rust-toolchain.toml channel 1.94; mlua 0.12.0, mlua-sys 0.11.0, mlua_derive 0.12.0, syn 2.0.119 (copy's Cargo.lock); cargo-deny 0.20.2; cargo-dist 0.33.1; luarocks 3.12.2 (/opt/homebrew/bin/luarocks, runs on Lua 5.4); Lua 5.4.8 (/opt/homebrew/bin/lua5.4); LuaJIT 2.1.1770848219 (/opt/homebrew/opt/luajit); luarocks-build-rust-mlua 0.2.7-1; macOS 26.3.1 arm64
+setup: S=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad; copy = S/probes-L/repo = rsync of R at 9d054c4 (minus target/, .git, .claudestacks, book/book), with the draft's feature table applied: root mlua features ["serialize"], members += crates/airsl-lua; crates/airsl [features] default=[lua54,vendored,send], lua54/luajit/vendored/send/module -> mlua/*; crates/airsl-lua cdylib (lib name airsstack, airsl path dep default-features=false + module, features lua54/luajit, build.rs dynamic_lookup, lib.rs `mod entry;`, entry.rs #[mlua::lua_module]); probe-only `ModuleSet::open` added to crates/airsl/src/modules/registry.rs so the toy installs airsl's real Json module. Sources and diffs: 140-lua-module-private-mod/. Env: CARGO_BUILD_JOBS=2, CARGO_TARGET_DIR=S/probes-L/target (luarocks' backend passes --target-dir=target, i.e. S/probes-L/repo/target). Every command ran under zsh `setopt pipefail`, so [exit N] is the pipeline's real status.
+date: 2026-11-26 (probe agent L)
+--- raw output ---
+deny.toml identical to R
+=== (a) R's deny.toml as is
+$ ~/.cargo/bin/cargo-deny --version; ~/.cargo/bin/cargo-deny check 2>&1   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+cargo-deny 0.20.2
+error[wildcard]: found 1 wildcard dependency for crate 'airsl-lua'
+   ┌─ /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/crates/airsl-lua/Cargo.toml:26:9
+   │
+26 │ airsl = { path = "../airsl", default-features = false, features = ["module"] }
+   │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ wildcard dependency
+   │
+   ├ airsl-lua v0.2.0
+
+error[duplicate]: found 2 duplicate entries for crate 'syn'
+   ┌─ /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/Cargo.lock:82:1
+   │  
+82 │ ╭ syn 2.0.119 registry+https://github.com/rust-lang/crates.io-index
+83 │ │ syn 3.0.3 registry+https://github.com/rust-lang/crates.io-index
+   │ ╰───────────────────────────────────────────────────────────────┘ lock entries
+   │  
+   ├ syn v2.0.119
+     └── mlua_derive v0.12.0
+         └── mlua v0.12.0
+             ├── airsl v0.2.0
+             │   ├── airsl-cli v0.2.0
+             │   └── airsl-lua v0.2.0
+             └── airsl-cli v0.2.0 (*)
+   ├ syn v3.0.3
+     ├── clap_derive v4.6.4
+     │   └── clap v4.6.6
+     │       └── airsl-cli v0.2.0
+     ├── serde_derive v1.0.229
+     │   └── serde v1.0.229
+     │       ├── airsl v0.2.0
+     │       │   ├── airsl-cli v0.2.0 (*)
+     │       │   └── airsl-lua v0.2.0
+     │       ├── mlua v0.12.0
+     │       │   ├── airsl v0.2.0 (*)
+     │       │   └── airsl-cli v0.2.0 (*)
+     │       └── serde-value v0.7.0
+     │           └── mlua v0.12.0 (*)
+     └── thiserror-impl v2.0.20
+         └── thiserror v2.0.20
+             └── airsl v0.2.0 (*)
+
+advisories ok, bans FAILED, licenses ok, sources ok
+[exit 2]
+
+=== (b) [graph] exclude = ["airsl-lua"]   -- deny.toml in the copy replaced by q5src/deny.b.toml; diff:
+--- /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/q5src/deny.orig.toml	2026-11-26 13:53:03
++++ /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/q5src/deny.b.toml	2026-11-26 13:53:03
+@@ -15,6 +15,7 @@
+ # platforms this workspace has not ruled out, and the whole-graph view costs
+ # nothing while every license present resolves to something permissive.
+ all-features = true
++exclude = ["airsl-lua"]
+ 
+ [output]
+ feature-depth = 1
+$ ~/.cargo/bin/cargo-deny check 2>&1   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+error[duplicate]: found 2 duplicate entries for crate 'syn'
+   ┌─ /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/Cargo.lock:81:1
+   │  
+81 │ ╭ syn 2.0.119 registry+https://github.com/rust-lang/crates.io-index
+82 │ │ syn 3.0.3 registry+https://github.com/rust-lang/crates.io-index
+   │ ╰───────────────────────────────────────────────────────────────┘ lock entries
+   │  
+   ├ syn v2.0.119
+     └── mlua_derive v0.12.0
+         └── mlua v0.12.0
+             ├── airsl v0.2.0
+             │   └── airsl-cli v0.2.0
+             └── airsl-cli v0.2.0 (*)
+   ├ syn v3.0.3
+     ├── clap_derive v4.6.4
+     │   └── clap v4.6.6
+     │       └── airsl-cli v0.2.0
+     ├── serde_derive v1.0.229
+     │   └── serde v1.0.229
+     │       ├── airsl v0.2.0
+     │       │   └── airsl-cli v0.2.0 (*)
+     │       ├── mlua v0.12.0
+     │       │   ├── airsl v0.2.0 (*)
+     │       │   └── airsl-cli v0.2.0 (*)
+     │       └── serde-value v0.7.0
+     │           └── mlua v0.12.0 (*)
+     └── thiserror-impl v2.0.20
+         └── thiserror v2.0.20
+             └── airsl v0.2.0 (*)
+
+advisories ok, bans FAILED, licenses ok, sources ok
+[exit 2]
+
+=== (c) [bans] skip = [{ crate = "syn@2", reason = ... }] (no graph exclude)   -- deny.toml in the copy replaced by q5src/deny.c.toml; diff:
+--- /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/q5src/deny.orig.toml	2026-11-26 13:53:03
++++ /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/q5src/deny.c.toml	2026-11-26 13:53:03
+@@ -69,7 +69,9 @@
+ external-default-features = "allow"
+ allow = []
+ deny = []
+-skip = []
++skip = [
++    { crate = "syn@2", reason = "mlua_derive 0.12 (mlua `module` feature) is still on syn 2" },
++]
+ skip-tree = []
+ 
+ # ---------------------------------------------------------------------------
+$ ~/.cargo/bin/cargo-deny check 2>&1   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+error[wildcard]: found 1 wildcard dependency for crate 'airsl-lua'
+   ┌─ /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/crates/airsl-lua/Cargo.toml:26:9
+   │
+26 │ airsl = { path = "../airsl", default-features = false, features = ["module"] }
+   │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ wildcard dependency
+   │
+   ├ airsl-lua v0.2.0
+
+advisories ok, bans FAILED, licenses ok, sources ok
+[exit 2]
+
+=== (d) (c) + [bans] allow-wildcard-paths = true   -- deny.toml in the copy replaced by q5src/deny.d.toml; diff:
+--- /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/q5src/deny.orig.toml	2026-11-26 13:53:03
++++ /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/q5src/deny.d.toml	2026-11-26 13:53:03
+@@ -64,12 +64,15 @@
+ multiple-versions = "deny"
+ # No `version = "*"` dependencies. The root manifest pins every direct one.
+ wildcards = "deny"
++allow-wildcard-paths = true
+ highlight = "all"
+ workspace-default-features = "allow"
+ external-default-features = "allow"
+ allow = []
+ deny = []
+-skip = []
++skip = [
++    { crate = "syn@2", reason = "mlua_derive 0.12 (mlua `module` feature) is still on syn 2" },
++]
+ skip-tree = []
+ 
+ # ---------------------------------------------------------------------------
+$ ~/.cargo/bin/cargo-deny check 2>&1   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+advisories ok, bans ok, licenses ok, sources ok
+[exit 0]
+
+=== (e) (b) + (c): graph exclude airsl-lua and skip syn@2, no allow-wildcard-paths; diff:
+--- /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/q5src/deny.orig.toml	2026-11-26 13:53:03
++++ /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/q5src/deny.e.toml	2026-11-26 13:53:21
+@@ -15,6 +15,7 @@
+ # platforms this workspace has not ruled out, and the whole-graph view costs
+ # nothing while every license present resolves to something permissive.
+ all-features = true
++exclude = ["airsl-lua"]
+ 
+ [output]
+ feature-depth = 1
+@@ -69,7 +70,9 @@
+ external-default-features = "allow"
+ allow = []
+ deny = []
+-skip = []
++skip = [
++    { crate = "syn@2", reason = "mlua_derive 0.12 (mlua `module` feature) is still on syn 2" },
++]
+ skip-tree = []
+ 
+ # ---------------------------------------------------------------------------
+$ ~/.cargo/bin/cargo-deny check 2>&1   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+advisories ok, bans ok, licenses ok, sources ok
+[exit 0]
+

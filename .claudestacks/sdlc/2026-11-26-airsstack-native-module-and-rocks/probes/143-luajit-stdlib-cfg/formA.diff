@@ -1,0 +1,24 @@
+--- a/crates/airsl/src/sandbox/language_surface.rs
++++ b/crates/airsl/src/sandbox/language_surface.rs
+@@ -92,6 +92,7 @@
+             // is arithmetic over an encoding — and without it `#s` counts bytes with no way to
+             // count characters, so a confined script cannot truncate text without risking a cut
+             // through the middle of one.
++            #[cfg(not(feature = "luajit"))]
+             Self::Restricted => {
+                 StdLib::STRING
+                     | StdLib::TABLE
+@@ -100,7 +101,13 @@
+                     | StdLib::COROUTINE
+                     | StdLib::OS
+             }
++            // LuaJIT's `coroutine` is part of its base library and it has no `utf8`.
++            #[cfg(feature = "luajit")]
++            Self::Restricted => StdLib::STRING | StdLib::TABLE | StdLib::MATH | StdLib::OS,
++            #[cfg(not(feature = "luajit"))]
+             Self::Minimal => StdLib::STRING | StdLib::TABLE | StdLib::MATH | StdLib::UTF8,
++            #[cfg(feature = "luajit")]
++            Self::Minimal => StdLib::STRING | StdLib::TABLE | StdLib::MATH,
+         }
+     }
+ 

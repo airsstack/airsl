@@ -1,0 +1,107 @@
+# Probe 182 — luarocks install --local: same version twice; older version over newer; --keep; --force
+Question (P3): `luarocks install --local airsstack <v>` when <v> is already installed (text, exit), and when a different
+version is installed (is it removed without --keep?). Fake HOME=S/probes-M/home-p3 (so --local = HOME/.luarocks).
+Versions: luarocks 3.12.2 (/opt/homebrew/bin/luarocks, Homebrew; sources cited from /opt/homebrew/Cellar/luarocks/3.12.2/share/lua/5.4/luarocks/), Lua 5.4.8 (/opt/homebrew/bin/lua5.4), macOS 26.3.1 arm64 (arch macosx-aarch64).
+Toy rocks and server: probe 181 (181-toy-rocks/). S=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad
+Each `$ ...` line is followed by its combined stdout+stderr and `[exit N]`; cwd S/probes-M.
+Source (luarocks 3.12.2 cmd/install.lua): :83-88 `if repos.is_installed(name, version) then if not (opts.force or opts.force_fast) then
+printout(name .. " " .. version .. " is already installed in " .. root_dir); printout("Use --force to reinstall."); return name, version`
+(a success return, so exit 0); :201-208 `if (not opts.keep) and not cfg.keep_other_versions then remove.remove_other_versions(...)`
+runs after that return too (see the 0.0.1-1 removal following "already installed" below); remove.lua:78-80 the
+"Checking stability of dependencies in the absence of" text.
+Date: 2026-11-26T07:16Z
+
+$ luarocks --lua-version 5.4 install --local --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server airsstack 0.0.2
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server/airsstack-0.0.2-1.macosx-aarch64.rock
+
+airsstack 0.0.2-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack 0.0.2-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p3/.luarocks (license: Apache-2.0)
+
+[exit 0]
+
+$ luarocks --lua-version 5.4 install --local --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server airsstack 0.0.2
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server/airsstack-0.0.2-1.macosx-aarch64.rock
+airsstack 0.0.2-1 is already installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p3/.luarocks
+Use --force to reinstall.
+[exit 0]
+
+$ luarocks --lua-version 5.4 list --local --porcelain
+airsstack	0.0.2-1	installed	/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p3/.luarocks/lib/luarocks/rocks-5.4
+[exit 0]
+
+$ luarocks --lua-version 5.4 install --local --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server airsstack 0.0.1
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server/airsstack-0.0.1-2.macosx-aarch64.rock
+
+airsstack 0.0.1-2 depends on lua 5.4 (5.4-1 provided by VM: success)
+airsstack 0.0.1-2 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p3/.luarocks (license: Apache-2.0)
+
+Checking stability of dependencies in the absence of
+airsstack 0.0.2-1...
+
+Removing airsstack 0.0.2-1...
+Removal successful.
+[exit 0]
+
+$ luarocks --lua-version 5.4 list --local --porcelain
+airsstack	0.0.1-2	installed	/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p3/.luarocks/lib/luarocks/rocks-5.4
+[exit 0]
+
+$ find /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p3/.luarocks -name *.so -o -name *.rockspec
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p3/.luarocks/lib/lua/5.4/airsstack.so
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p3/.luarocks/lib/luarocks/rocks-5.4/airsstack/0.0.1-2/airsstack-0.0.1-2.rockspec
+[exit 0]
+
+$ lua5.4 -e package.cpath="/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p3/.luarocks/lib/lua/5.4/?.so;"..package.cpath; local m=require("airsstack"); print(m.version)
+0.0.1
+[exit 0]
+
+$ luarocks --lua-version 5.4 install --local --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server airsstack 0.0.2-1
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server/airsstack-0.0.2-1.macosx-aarch64.rock
+
+airsstack 0.0.2-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+airsstack 0.0.2-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p3/.luarocks (license: Apache-2.0)
+
+Checking stability of dependencies in the absence of
+airsstack 0.0.1-2...
+
+Removing airsstack 0.0.1-2...
+Removal successful.
+[exit 0]
+
+$ luarocks --lua-version 5.4 install --local --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server --keep airsstack 0.0.1-1
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server/airsstack-0.0.1-1.macosx-aarch64.rock
+
+airsstack 0.0.1-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+airsstack 0.0.1-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p3/.luarocks (license: Apache-2.0)
+
+[exit 0]
+
+$ luarocks --lua-version 5.4 list --local --porcelain
+airsstack	0.0.2-1	installed	/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p3/.luarocks/lib/luarocks/rocks-5.4
+airsstack	0.0.1-1	installed	/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p3/.luarocks/lib/luarocks/rocks-5.4
+[exit 0]
+
+$ luarocks --lua-version 5.4 install --local --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server airsstack 0.0.2-1
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server/airsstack-0.0.2-1.macosx-aarch64.rock
+airsstack 0.0.2-1 is already installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p3/.luarocks
+Use --force to reinstall.
+Checking stability of dependencies in the absence of
+airsstack 0.0.1-1...
+
+Removing airsstack 0.0.1-1...
+Removal successful.
+[exit 0]
+
+$ luarocks --lua-version 5.4 list --local --porcelain
+airsstack	0.0.2-1	installed	/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p3/.luarocks/lib/luarocks/rocks-5.4
+[exit 0]
+
+$ luarocks --lua-version 5.4 install --local --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server --force airsstack 0.0.2-1
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server/airsstack-0.0.2-1.macosx-aarch64.rock
+
+airsstack 0.0.2-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+airsstack 0.0.2-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p3/.luarocks (license: Apache-2.0)
+
+[exit 0]
+

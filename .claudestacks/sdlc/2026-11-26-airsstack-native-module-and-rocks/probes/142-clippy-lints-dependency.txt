@@ -1,0 +1,113 @@
+question: draft 7.2 #3: does 'cargo clippy -p airsl-lua --features lua54' lint airsl (a workspace-member dependency) in module mode? Counted with and without --no-deps; B/C plant one clippy warning in airsl to make the difference visible (bait removed afterwards).
+commands: each `$ ...` line below, run in the stated cwd, followed by its raw output and `[exit N]`
+versions: rustc 1.94.1 (e408947bf 2026-03-25), cargo 1.94.1 (29ea6fb6a 2026-03-24) via R/rust-toolchain.toml channel 1.94; mlua 0.12.0, mlua-sys 0.11.0, mlua_derive 0.12.0, syn 2.0.119 (copy's Cargo.lock); cargo-deny 0.20.2; cargo-dist 0.33.1; luarocks 3.12.2 (/opt/homebrew/bin/luarocks, runs on Lua 5.4); Lua 5.4.8 (/opt/homebrew/bin/lua5.4); LuaJIT 2.1.1770848219 (/opt/homebrew/opt/luajit); luarocks-build-rust-mlua 0.2.7-1; macOS 26.3.1 arm64
+setup: S=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad; copy = S/probes-L/repo = rsync of R at 9d054c4 (minus target/, .git, .claudestacks, book/book), with the draft's feature table applied: root mlua features ["serialize"], members += crates/airsl-lua; crates/airsl [features] default=[lua54,vendored,send], lua54/luajit/vendored/send/module -> mlua/*; crates/airsl-lua cdylib (lib name airsstack, airsl path dep default-features=false + module, features lua54/luajit, build.rs dynamic_lookup, lib.rs `mod entry;`, entry.rs #[mlua::lua_module]); probe-only `ModuleSet::open` added to crates/airsl/src/modules/registry.rs so the toy installs airsl's real Json module. Sources and diffs: 140-lua-module-private-mod/. Env: CARGO_BUILD_JOBS=2, CARGO_TARGET_DIR=S/probes-L/target (luarocks' backend passes --target-dir=target, i.e. S/probes-L/repo/target). Every command ran under zsh `setopt pipefail`, so [exit N] is the pipeline's real status.
+date: 2026-11-26 (probe agent L)
+--- raw output ---
+NOTE: sections A and B ran before pipefail was set in the helper, so their [exit N] is grep's status, not cargo's; section C reruns the -D warnings pair under pipefail (cargo's real exit codes 101 / 0).
+--- A: real airsl (no bait) ---
+$ cargo clippy -p airsl-lua --features lua54 2>&1 | grep -v '^ *\(Checking\|Compiling\)'   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.27s
+[exit 0]
+
+$ cargo clippy -p airsl-lua --features lua54 --no-deps 2>&1 | grep -v '^ *\(Checking\|Compiling\)'   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.83s
+[exit 0]
+
+--- B: airsl with bait: pub const fn probe_bait() -> u8 { return 1; } added to ModuleSet in crates/airsl/src/modules/registry.rs ---
+$ cargo clippy -p airsl-lua --features lua54 2>&1 | grep -v '^ *\(Checking\|Compiling\)'   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+warning: item in documentation is missing backticks
+   --> crates/airsl/src/modules/registry.rs:229:33
+    |
+229 |     /// Probe-only clippy bait (needless_return).
+    |                                 ^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#doc_markdown
+    = note: `-W clippy::doc-markdown` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::doc_markdown)]`
+help: try
+    |
+229 -     /// Probe-only clippy bait (needless_return).
+229 +     /// Probe-only clippy bait (`needless_return`).
+    |
+
+warning: unneeded `return` statement
+   --> crates/airsl/src/modules/registry.rs:232:9
+    |
+232 |         return 1;
+    |         ^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#needless_return
+    = note: `#[warn(clippy::needless_return)]` on by default
+help: remove `return`
+    |
+232 -         return 1;
+232 +         1
+    |
+
+warning: `airsl` (lib) generated 2 warnings (run `cargo clippy --fix --lib -p airsl` to apply 2 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.11s
+[exit 0]
+
+$ cargo clippy -p airsl-lua --features lua54 --no-deps 2>&1 | grep -v '^ *\(Checking\|Compiling\)'   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.69s
+[exit 0]
+
+$ cargo clippy -p airsl-lua --features lua54 -- -D warnings 2>&1 | grep -v '^ *\(Checking\|Compiling\)'   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+error: item in documentation is missing backticks
+   --> crates/airsl/src/modules/registry.rs:229:33
+    |
+229 |     /// Probe-only clippy bait (needless_return).
+    |                                 ^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#doc_markdown
+    = note: `-D clippy::doc-markdown` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::doc_markdown)]`
+help: try
+    |
+229 -     /// Probe-only clippy bait (needless_return).
+229 +     /// Probe-only clippy bait (`needless_return`).
+    |
+
+error: unneeded `return` statement
+   --> crates/airsl/src/modules/registry.rs:232:9
+    |
+232 |         return 1;
+    |         ^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#needless_return
+    = note: `-D clippy::needless-return` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_return)]`
+help: remove `return`
+    |
+232 -         return 1;
+232 +         1
+    |
+
+error: could not compile `airsl` (lib) due to 2 previous errors
+[exit 0]
+
+--- C: rerun with pipefail (exit codes are cargo's); bait doc reworded to '/// Probe-only clippy bait.' so only needless_return fires ---
+$ cargo clippy -p airsl-lua --features lua54 -- -D warnings 2>&1 | grep -v '^ *\(Checking\|Compiling\)'   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+error: unneeded `return` statement
+   --> crates/airsl/src/modules/registry.rs:232:9
+    |
+232 |         return 1;
+    |         ^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#needless_return
+    = note: `-D clippy::needless-return` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_return)]`
+help: remove `return`
+    |
+232 -         return 1;
+232 +         1
+    |
+
+error: could not compile `airsl` (lib) due to 1 previous error
+[exit 101]
+
+$ cargo clippy -p airsl-lua --features lua54 --no-deps -- -D warnings 2>&1 | grep -v '^ *\(Checking\|Compiling\)'   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.63s
+[exit 0]
+

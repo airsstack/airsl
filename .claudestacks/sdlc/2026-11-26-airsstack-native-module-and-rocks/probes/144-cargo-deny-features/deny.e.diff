@@ -1,0 +1,21 @@
+--- a/deny.toml
++++ b/deny.toml
+@@ -15,6 +15,7 @@
+ # platforms this workspace has not ruled out, and the whole-graph view costs
+ # nothing while every license present resolves to something permissive.
+ all-features = true
++exclude = ["airsl-lua"]
+ 
+ [output]
+ feature-depth = 1
+@@ -69,7 +70,9 @@
+ external-default-features = "allow"
+ allow = []
+ deny = []
+-skip = []
++skip = [
++    { crate = "syn@2", reason = "mlua_derive 0.12 (mlua `module` feature) is still on syn 2" },
++]
+ skip-tree = []
+ 
+ # ---------------------------------------------------------------------------

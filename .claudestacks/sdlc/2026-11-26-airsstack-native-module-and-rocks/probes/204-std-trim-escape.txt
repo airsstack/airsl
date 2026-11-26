@@ -1,0 +1,25 @@
+# Probe 204 — std's view of luarocks' config output, for the spec's detection rule and its messages
+# Question: for each edge input, what does <[u8]>::trim_ascii leave, is it strict UTF-8, how does escape_debug show it
+#   (the value quoted in the 'printed `...`, which is not a Lua version' message), and is it ASCII digits '.' ASCII digits?
+# Source: 204-std-trim-escape/main.rs (std only; the digits.digits column is the spec's shape test written out, not airsl code).
+# Versions: rustc 1.94.1 (e408947bf 2026-03-25) (R pins channel 1.94); macOS 26.3.1 arm64
+# Date: 2026-11-26
+--- raw output ---
+$ rustc +1.94 --edition 2024 -O main.rs -o probe && ./probe
+raw="5.4\\n" trimmed_bytes="5.4" empty=false utf8=true shown=`5.4` digits.digits=true
+raw="5.4" trimmed_bytes="5.4" empty=false utf8=true shown=`5.4` digits.digits=true
+raw=" 5.4 \\r\\n" trimmed_bytes="5.4" empty=false utf8=true shown=`5.4` digits.digits=true
+raw="5.1\\n" trimmed_bytes="5.1" empty=false utf8=true shown=`5.1` digits.digits=true
+raw="5.5\\n" trimmed_bytes="5.5" empty=false utf8=true shown=`5.5` digits.digits=true
+raw="" trimmed_bytes="" empty=true utf8=true shown=`` digits.digits=false
+raw="\\n" trimmed_bytes="" empty=true utf8=true shown=`` digits.digits=false
+raw="  \\t " trimmed_bytes="" empty=true utf8=true shown=`` digits.digits=false
+raw="5.4.8\\n" trimmed_bytes="5.4.8" empty=false utf8=true shown=`5.4.8` digits.digits=false
+raw="5.4\\n5.1\\n" trimmed_bytes="5.4\\n5.1" empty=false utf8=true shown=`5.4\n5.1` digits.digits=false
+raw="5.4\\xc2\\xa0" trimmed_bytes="5.4\\xc2\\xa0" empty=false utf8=true shown=`5.4\u{a0}` digits.digits=false
+raw="\\xef\\xbb\\xbf5.4" trimmed_bytes="\\xef\\xbb\\xbf5.4" empty=false utf8=true shown=`\u{feff}5.4` digits.digits=false
+raw="5.04\\n" trimmed_bytes="5.04" empty=false utf8=true shown=`5.04` digits.digits=true
+raw="\\xff5.4\\n" trimmed_bytes="\\xff5.4" empty=false utf8=false shown=`�5.4` digits.digits=false
+raw="\\xef\\xbc\\x95.\\xef\\xbc\\x94" trimmed_bytes="\\xef\\xbc\\x95.\\xef\\xbc\\x94" empty=false utf8=true shown=`５.４` digits.digits=false
+raw="10.0\\n" trimmed_bytes="10.0" empty=false utf8=true shown=`10.0` digits.digits=true
+[exit 0]

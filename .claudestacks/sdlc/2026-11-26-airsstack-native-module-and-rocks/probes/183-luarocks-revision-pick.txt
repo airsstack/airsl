@@ -1,0 +1,101 @@
+# Probe 183 — luarocks install <name> <version-without-revision> when revisions -1 and -2 exist
+Question (P8): with 0.0.1-1 and 0.0.1-2 on the server, what does `luarocks install airsstack 0.0.1` pick? And when -2 exists
+only as a rockspec while -1 has a binary rock (a release where the binary upload has not landed)?
+Versions: luarocks 3.12.2 (/opt/homebrew/bin/luarocks, Homebrew; sources cited from /opt/homebrew/Cellar/luarocks/3.12.2/share/lua/5.4/luarocks/), Lua 5.4.8 (/opt/homebrew/bin/lua5.4), macOS 26.3.1 arm64 (arch macosx-aarch64).
+Toy rocks and server: probe 181 (181-toy-rocks/). S=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad
+Each `$ ...` line is followed by its combined stdout+stderr and `[exit N]`; cwd S/probes-M.
+server2 = S/probes-M/server2: copies of airsstack-0.0.1-1.macosx-aarch64.rock, airsstack-0.0.1-1.rockspec, airsstack-0.0.1-2.rockspec + `luarocks-admin make_manifest`.
+The rockspecs source.url is git+file://S/probes-M/toy, which is not a git repository, so a source build fails at clone.
+Date: 2026-11-26T07:16Z
+
+== server = S/probes-M/server (0.0.1-1 rock+rockspec, 0.0.1-2 rock+rockspec, 0.0.2-1 rock+rockspec); HOME=S/probes-M/home-p8a
+$ luarocks --lua-version 5.4 search --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server airsstack 0.0.1
+
+airsstack 0.0.1 - Search results for Lua 5.4:
+=============================================
+
+
+Rockspecs and source rocks:
+---------------------------
+
+airsstack
+   0.0.1-2 (rockspec) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server
+   0.0.1-1 (rockspec) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server
+
+
+Binary and pure-Lua rocks:
+--------------------------
+
+airsstack
+   0.0.1-2 (macosx-aarch64) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server
+   0.0.1-1 (macosx-aarch64) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server
+
+[exit 0]
+
+$ luarocks --lua-version 5.4 install --local --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server airsstack 0.0.1
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server/airsstack-0.0.1-2.macosx-aarch64.rock
+
+airsstack 0.0.1-2 depends on lua 5.4 (5.4-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack 0.0.1-2 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p8a/.luarocks (license: Apache-2.0)
+
+[exit 0]
+
+$ luarocks --lua-version 5.4 install --local --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server --keep airsstack 0.0.1-1
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server/airsstack-0.0.1-1.macosx-aarch64.rock
+
+airsstack 0.0.1-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+airsstack 0.0.1-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p8a/.luarocks (license: Apache-2.0)
+
+[exit 0]
+
+$ luarocks --lua-version 5.4 list --local --porcelain
+airsstack	0.0.1-2	installed	/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p8a/.luarocks/lib/luarocks/rocks-5.4
+airsstack	0.0.1-1	installed	/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p8a/.luarocks/lib/luarocks/rocks-5.4
+[exit 0]
+
+$ find /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p8a/.luarocks/lib/lua -type f
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p8a/.luarocks/lib/lua/5.4/airsstack_0_0_1_1-airsstack.so
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p8a/.luarocks/lib/lua/5.4/airsstack.so
+[exit 0]
+
+== server2 = S/probes-M/server2 (0.0.1-1 binary rock + rockspec, 0.0.1-2 rockspec only); HOME=S/probes-M/home-p8b
+$ luarocks --lua-version 5.4 search --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server2 airsstack 0.0.1
+
+airsstack 0.0.1 - Search results for Lua 5.4:
+=============================================
+
+
+Rockspecs and source rocks:
+---------------------------
+
+airsstack
+   0.0.1-2 (rockspec) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server2
+   0.0.1-1 (rockspec) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server2
+
+
+Binary and pure-Lua rocks:
+--------------------------
+
+airsstack
+   0.0.1-1 (macosx-aarch64) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server2
+
+[exit 0]
+
+$ luarocks --lua-version 5.4 install --local --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server2 airsstack 0.0.1
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server2/airsstack-0.0.1-2.rockspec
+fatal: repository '/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/toy' does not exist
+
+Error: Failed cloning git repository.
+[exit 1]
+
+$ luarocks --lua-version 5.4 install --local --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server2 airsstack
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server2/airsstack-0.0.1-2.rockspec
+fatal: repository '/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/toy' does not exist
+
+Error: Failed cloning git repository.
+[exit 1]
+
+$ luarocks --lua-version 5.4 list --local --porcelain
+[exit 0]
+

@@ -1,0 +1,328 @@
+# Probe 166 -- y3-brew-macos-x86_64
+# question: Y3: Homebrew lua@5.4 + luajit + luarocks -- versions, keg-only lua@5.4 path, luarocks --lua-version/--lua-dir config, luarocks make + pack both rockspecs, binary rock names.
+# run: https://github.com/airsstack/airsl/actions/runs/45773840390 (run id 45773840390, attempt 1), job id 139752616602: https://github.com/airsstack/airsl/actions/runs/45773840390/job/139752616602
+# job: y3-brew (macos-26-intel) | runner label: macos-26-intel | started 2026-11-26T07:14:30Z | head 64c02e9c3a4d5993e45ffe694f57b0c72eb7b458
+# runner image: macos-26 20260819.586 (from the log's Runner Image group)
+# branch: probe/ci-toolchain-2026-11-26 (throwaway orphan, deleted after the probe); sources: 160-ci-probe-src/
+# date: 2026-11-26 (probe agent Y); log fetched with: gh api repos/airsstack/airsl/actions/jobs/139752616602/logs (byte for byte below this header)
+# --- raw job log ---
+﻿2026-11-26T07:14:31.3459570Z Current runner version: '2.338.2'
+2026-11-26T07:14:31.3506170Z ##[group]Runner Image Provisioner
+2026-11-26T07:14:31.3508150Z Hosted Compute Agent
+2026-11-26T07:14:31.3509100Z Version: 20260819.586
+2026-11-26T07:14:31.3510830Z Commit: 3cc4a88dfa507ef76119ad1bb3eccc6378bb2b76
+2026-11-26T07:14:31.3512510Z Build Date: 2026-08-18T23:20:18Z
+2026-11-26T07:14:31.3513750Z Worker ID: {cca21b9f-8c86-4842-8a36-1aca8eea72aa}
+2026-11-26T07:14:31.3514970Z Azure Region: westus
+2026-11-26T07:14:31.3515880Z ##[endgroup]
+2026-11-26T07:14:31.3518900Z ##[group]Operating System
+2026-11-26T07:14:31.3520340Z macOS
+2026-11-26T07:14:31.3521220Z 26.6.1
+2026-11-26T07:14:31.3522100Z 25G76
+2026-11-26T07:14:31.3523180Z ##[endgroup]
+2026-11-26T07:14:31.3524430Z ##[group]Runner Image
+2026-11-26T07:14:31.3525790Z Image: macos-26
+2026-11-26T07:14:31.3527020Z Version: 20260824.0517.1
+2026-11-26T07:14:31.3530450Z Included Software: https://github.com/actions/runner-images/blob/macos-26/20260824.0517/images/macos/macos-26-Readme.md
+2026-11-26T07:14:31.3534500Z Image Release: https://github.com/actions/runner-images/releases/tag/macos-26%2F20260824.0517
+2026-11-26T07:14:31.3536870Z ##[endgroup]
+2026-11-26T07:14:31.3539750Z ##[group]GITHUB_TOKEN Permissions
+2026-11-26T07:14:31.3544430Z Contents: read
+2026-11-26T07:14:31.3545990Z Metadata: read
+2026-11-26T07:14:31.3547920Z ##[endgroup]
+2026-11-26T07:14:31.3552720Z Secret source: Actions
+2026-11-26T07:14:31.3554940Z Cache mode: write
+2026-11-26T07:14:31.3558770Z Prepare workflow directory
+2026-11-26T07:14:31.4314230Z Prepare all required actions
+2026-11-26T07:14:31.4401490Z Getting action download info
+2026-11-26T07:14:31.8035430Z Download action repository 'actions/checkout@v6' (SHA:d23441a48e516b6c34aea4fa41551a30e30af803)
+2026-11-26T07:14:32.2821190Z Complete job name: y3-brew (macos-26-intel)
+2026-11-26T07:14:32.4496420Z ##[group]Run actions/checkout@v6
+2026-11-26T07:14:32.4498180Z with:
+2026-11-26T07:14:32.4499020Z   repository: airsstack/airsl
+2026-11-26T07:14:32.4507240Z   token: ***
+2026-11-26T07:14:32.4508090Z   ssh-strict: true
+2026-11-26T07:14:32.4508920Z   ssh-user: git
+2026-11-26T07:14:32.4509780Z   persist-credentials: true
+2026-11-26T07:14:32.4510700Z   clean: true
+2026-11-26T07:14:32.4511560Z   sparse-checkout-cone-mode: true
+2026-11-26T07:14:32.4512580Z   fetch-depth: 1
+2026-11-26T07:14:32.4513410Z   fetch-tags: false
+2026-11-26T07:14:32.4514280Z   show-progress: true
+2026-11-26T07:14:32.4515140Z   lfs: false
+2026-11-26T07:14:32.4515930Z   submodules: false
+2026-11-26T07:14:32.4516790Z   set-safe-directory: true
+2026-11-26T07:14:32.4517780Z   allow-unsafe-pr-checkout: false
+2026-11-26T07:14:32.4519780Z ##[endgroup]
+2026-11-26T07:14:32.9157560Z Syncing repository: airsstack/airsl
+2026-11-26T07:14:32.9161750Z ##[group]Getting Git version info
+2026-11-26T07:14:32.9163740Z Working directory is '/Users/runner/work/airsl/airsl'
+2026-11-26T07:14:32.9166390Z [command]/usr/local/bin/git version
+2026-11-26T07:14:32.9461530Z git version 2.55.0
+2026-11-26T07:14:32.9499580Z ##[endgroup]
+2026-11-26T07:14:32.9519660Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/fb62d69a-5929-49a3-b72a-4a2c3043fbde/.gitconfig'
+2026-11-26T07:14:32.9540600Z Temporarily overriding HOME='/Users/runner/work/_temp/fb62d69a-5929-49a3-b72a-4a2c3043fbde' before making global git config changes
+2026-11-26T07:14:32.9543940Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T07:14:32.9550090Z [command]/usr/local/bin/git config --global --add safe.directory /Users/runner/work/airsl/airsl
+2026-11-26T07:14:32.9782290Z Deleting the contents of '/Users/runner/work/airsl/airsl'
+2026-11-26T07:14:32.9789970Z ##[group]Determining repository object format
+2026-11-26T07:14:32.9795580Z ##[endgroup]
+2026-11-26T07:14:32.9799040Z ##[group]Initializing the repository
+2026-11-26T07:14:32.9802950Z [command]/usr/local/bin/git init /Users/runner/work/airsl/airsl
+2026-11-26T07:14:33.0346550Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-26T07:14:33.0354610Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-26T07:14:33.0358090Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-26T07:14:33.0360530Z hint: call:
+2026-11-26T07:14:33.0361790Z hint:
+2026-11-26T07:14:33.0362970Z hint: 	git config --global init.defaultBranch <name>
+2026-11-26T07:14:33.0364470Z hint:
+2026-11-26T07:14:33.0365880Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-26T07:14:33.0368230Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-26T07:14:33.0369930Z hint:
+2026-11-26T07:14:33.0371140Z hint: 	git branch -m <name>
+2026-11-26T07:14:33.0372870Z hint:
+2026-11-26T07:14:33.0375040Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-26T07:14:33.0378090Z Initialized empty Git repository in /Users/runner/work/airsl/airsl/.git/
+2026-11-26T07:14:33.0382940Z [command]/usr/local/bin/git remote add origin https://github.com/airsstack/airsl
+2026-11-26T07:14:33.0722110Z ##[endgroup]
+2026-11-26T07:14:33.0969490Z ##[group]Disabling automatic garbage collection
+2026-11-26T07:14:33.0977330Z [command]/usr/local/bin/git config --local gc.auto 0
+2026-11-26T07:14:33.0985980Z ##[endgroup]
+2026-11-26T07:14:33.0994360Z ##[group]Setting up auth
+2026-11-26T07:14:33.0996500Z Removing SSH command configuration
+2026-11-26T07:14:33.0998450Z [command]/usr/local/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T07:14:33.1003550Z [command]/usr/local/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T07:14:33.3131290Z Removing HTTP extra header
+2026-11-26T07:14:33.3139090Z [command]/usr/local/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T07:14:33.3288390Z [command]/usr/local/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T07:14:33.6182020Z Removing includeIf entries pointing to credentials config files
+2026-11-26T07:14:33.6199940Z [command]/usr/local/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T07:14:33.6288020Z [command]/usr/local/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T07:14:33.8037420Z [command]/usr/local/bin/git config --file /Users/runner/work/_temp/git-credentials-b402a601-2be1-4238-a6df-f42919bbd270.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-26T07:14:33.8183210Z [command]/usr/local/bin/git config --local includeIf.gitdir:/Users/runner/work/airsl/airsl/.git.path /Users/runner/work/_temp/git-credentials-b402a601-2be1-4238-a6df-f42919bbd270.config
+2026-11-26T07:14:33.8314290Z [command]/usr/local/bin/git config --local includeIf.gitdir:/Users/runner/work/airsl/airsl/.git/worktrees/*.path /Users/runner/work/_temp/git-credentials-b402a601-2be1-4238-a6df-f42919bbd270.config
+2026-11-26T07:14:33.8460550Z [command]/usr/local/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-b402a601-2be1-4238-a6df-f42919bbd270.config
+2026-11-26T07:14:33.8604140Z [command]/usr/local/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-b402a601-2be1-4238-a6df-f42919bbd270.config
+2026-11-26T07:14:33.8755770Z ##[endgroup]
+2026-11-26T07:14:33.8760240Z ##[group]Fetching the repository
+2026-11-26T07:14:33.8769580Z [command]/usr/local/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +64c02e9c3a4d5993e45ffe694f57b0c72eb7b458:refs/remotes/origin/probe/ci-toolchain-2026-11-26
+2026-11-26T07:14:34.6296010Z From https://github.com/airsstack/airsl
+2026-11-26T07:14:34.6300000Z  * [new ref]         64c02e9c3a4d5993e45ffe694f57b0c72eb7b458 -> origin/probe/ci-toolchain-2026-11-26
+2026-11-26T07:14:34.6307120Z [command]/usr/local/bin/git branch --list --remote origin/probe/ci-toolchain-2026-11-26
+2026-11-26T07:14:34.6443520Z   origin/probe/ci-toolchain-2026-11-26
+2026-11-26T07:14:34.6456880Z [command]/usr/local/bin/git rev-parse refs/remotes/origin/probe/ci-toolchain-2026-11-26
+2026-11-26T07:14:34.6567220Z 64c02e9c3a4d5993e45ffe694f57b0c72eb7b458
+2026-11-26T07:14:34.6574200Z ##[endgroup]
+2026-11-26T07:14:34.6575370Z ##[group]Determining the checkout info
+2026-11-26T07:14:34.6580190Z ##[endgroup]
+2026-11-26T07:14:34.6582880Z [command]/usr/local/bin/git sparse-checkout disable
+2026-11-26T07:14:34.6763530Z [command]/usr/local/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-26T07:14:34.6903080Z ##[group]Checking out the ref
+2026-11-26T07:14:34.6944760Z [command]/usr/local/bin/git checkout --progress --force -B probe/ci-toolchain-2026-11-26 refs/remotes/origin/probe/ci-toolchain-2026-11-26
+2026-11-26T07:14:34.7364640Z Switched to a new branch 'probe/ci-toolchain-2026-11-26'
+2026-11-26T07:14:34.7397820Z branch 'probe/ci-toolchain-2026-11-26' set up to track 'origin/probe/ci-toolchain-2026-11-26'.
+2026-11-26T07:14:34.7403040Z ##[endgroup]
+2026-11-26T07:14:34.7564390Z [command]/usr/local/bin/git log -1 --format=%H
+2026-11-26T07:14:34.7710480Z 64c02e9c3a4d5993e45ffe694f57b0c72eb7b458
+2026-11-26T07:14:34.8103690Z ##[group]Run echo "runner=macos-26-intel"; bash ci/y3-mac.sh
+2026-11-26T07:14:34.8104990Z [36;1mecho "runner=macos-26-intel"; bash ci/y3-mac.sh[0m
+2026-11-26T07:14:34.8191670Z shell: /bin/bash --noprofile --norc {0}
+2026-11-26T07:14:34.8192480Z ##[endgroup]
+2026-11-26T07:14:34.8641640Z runner=macos-26-intel
+2026-11-26T07:14:34.8713620Z ImageOS=macos26 ImageVersion=20260824.0517.1
+2026-11-26T07:14:34.8760210Z x86_64
+2026-11-26T07:14:34.8975030Z ProductName:		macOS
+2026-11-26T07:14:34.8977700Z ProductVersion:		26.6.1
+2026-11-26T07:14:34.8981150Z BuildVersion:		25G76
+2026-11-26T07:14:34.9043830Z == preinstalled: lua=none luajit=none luarocks=none
+2026-11-26T07:14:34.9660890Z Homebrew 6.0.18
+2026-11-26T07:14:35.0589030Z /usr/local/Homebrew/Library/Homebrew/cmd/--version.sh: line 29: echo: write error: Broken pipe
+2026-11-26T07:14:35.2256940Z /usr/local/Homebrew/Library/Homebrew/cmd/--version.sh: line 34: echo: write error: Broken pipe
+2026-11-26T07:14:45.7599430Z [34m==>[0m [1mCaveats[0m
+2026-11-26T07:14:45.7669030Z You may also want luarocks:
+2026-11-26T07:14:45.7973630Z   brew install luarocks
+2026-11-26T07:14:45.8020150Z [34m==>[0m [1mSummary[0m
+2026-11-26T07:14:45.8025550Z 🍺  /usr/local/Cellar/lua@5.4/5.4.8: 30 files, 669.8KB
+2026-11-26T07:14:45.9031200Z [34m==>[0m [1mPouring luajit--2.1.1787165859.sonoma.bottle.tar.gz[0m
+2026-11-26T07:14:45.9189450Z 🍺  /usr/local/Cellar/luajit/2.1.1787165859: 56 files, 2MB
+2026-11-26T07:14:45.9210490Z [32m==>[0m [1mInstalling luarocks dependency: [32mlua[39m[0m
+2026-11-26T07:14:45.9272890Z [34m==>[0m [1mPouring lua--5.5.1.sonoma.bottle.tar.gz[0m
+2026-11-26T07:14:45.9288910Z Unlinking /usr/local/Cellar/lua@5.4/5.4.8... 18 symlinks removed.
+2026-11-26T07:14:45.9361440Z 🍺  /usr/local/Cellar/lua/5.5.1: 30 files, 867KB
+2026-11-26T07:14:45.9378450Z [32m==>[0m [1mInstalling [32mluarocks[39m[0m
+2026-11-26T07:14:45.9451250Z [34m==>[0m [1mPouring luarocks--3.13.0_1.all.bottle.tar.gz[0m
+2026-11-26T07:14:45.9464980Z 🍺  /usr/local/Cellar/luarocks/3.13.0_1: 113 files, 800.0KB
+2026-11-26T07:14:45.9479690Z [32m==>[0m [1mCaveats[0m
+2026-11-26T07:14:45.9497450Z Bash completion has been installed to:
+2026-11-26T07:14:45.9510360Z   /usr/local/etc/bash_completion.d
+2026-11-26T07:14:45.9566410Z [34m==>[0m [1mlua@5.4[0m
+2026-11-26T07:14:45.9582960Z You may also want luarocks:
+2026-11-26T07:14:45.9672320Z   brew install luarocks
+2026-11-26T07:14:45.9713370Z brew install exit=0
+2026-11-26T07:14:46.6134870Z lua 5.5.1
+2026-11-26T07:14:46.6236930Z lua@5.4 5.4.8
+2026-11-26T07:14:46.6394300Z luajit 2.1.1787165859
+2026-11-26T07:14:46.6523730Z luarocks 3.13.0_1
+2026-11-26T07:14:48.0067750Z [32m==>[0m [1mluarocks[0m: stable 3.13.0 (bottled), HEAD
+2026-11-26T07:14:48.0157170Z Package manager for the Lua programming language
+2026-11-26T07:14:48.0239620Z [4mhttps://luarocks.org/[24m
+2026-11-26T07:14:48.0276160Z Installed (on request)
+2026-11-26T07:14:48.0308160Z From: [4mhttps://github.com/Homebrew/homebrew-core/blob/HEAD/Formula/l/luarocks.rb[24m
+2026-11-26T07:14:48.0358270Z License: MIT
+2026-11-26T07:14:48.0438560Z [34m==>[0m [1mInstalled Versions[0m
+2026-11-26T07:14:48.0473170Z luarocks 3.13.0_1 (113 files, 800.0KB) [Linked]
+2026-11-26T07:14:48.0494770Z [34m==>[0m [1mDependencies[0m
+2026-11-26T07:14:48.0518600Z Required (1): lua
+2026-11-26T07:14:48.0549630Z Recursive Runtime (1): all installed [32m✔[0m
+2026-11-26T07:14:48.0605840Z [34m==>[0m [1mOptions[0m
+2026-11-26T07:14:48.1548120Z brew --prefix lua@5.4 = /usr/local/opt/lua@5.4
+2026-11-26T07:14:48.1645260Z total 96
+2026-11-26T07:14:48.1650410Z drwxr-xr-x   8 runner  admin    256 May 21  2025 .
+2026-11-26T07:14:48.1659710Z drwxr-xr-x  10 runner  admin    320 Nov 26 07:14 ..
+2026-11-26T07:14:48.1667000Z -r-xr-xr-x   1 runner  admin  24072 Nov 26 07:14 lua
+2026-11-26T07:14:48.1690820Z lrwxr-xr-x   1 runner  admin      3 May 21  2025 lua-5.4 -> lua
+2026-11-26T07:14:48.1708810Z lrwxr-xr-x   1 runner  admin      3 May 21  2025 lua5.4 -> lua
+2026-11-26T07:14:48.1741600Z -r-xr-xr-x   1 runner  admin  22880 Nov 26 07:14 luac
+2026-11-26T07:14:48.1772200Z lrwxr-xr-x   1 runner  admin      4 May 21  2025 luac-5.4 -> luac
+2026-11-26T07:14:48.1783300Z lrwxr-xr-x   1 runner  admin      4 May 21  2025 luac5.4 -> luac
+2026-11-26T07:14:48.1799580Z brew --prefix luajit = /usr/local/opt/luajit
+2026-11-26T07:14:48.1826820Z total 896
+2026-11-26T07:14:48.1843440Z drwxr-xr-x   4 runner  admin     128 Aug 19 18:57 .
+2026-11-26T07:14:48.1861000Z drwxr-xr-x  11 runner  admin     352 Nov 26 07:14 ..
+2026-11-26T07:14:48.1872760Z lrwxr-xr-x   1 runner  admin      21 Aug 19 18:57 luajit -> luajit-2.1.1787165859
+2026-11-26T07:14:48.1874400Z -r-xr-xr-x   1 runner  admin  456464 Aug 19 18:57 luajit-2.1.1787165859
+2026-11-26T07:14:48.1887490Z which lua lua5.4 luajit luarocks: /usr/local/bin/lua /usr/local/bin/luajit /usr/local/bin/luarocks 
+2026-11-26T07:14:48.1958080Z Lua 5.5.1  Copyright (C) 1994-2026 Lua.org, PUC-Rio
+2026-11-26T07:14:48.2024390Z Lua 5.4.8  Copyright (C) 1994-2025 Lua.org, PUC-Rio
+2026-11-26T07:14:48.2095000Z Lua 5.4.8  Copyright (C) 1994-2025 Lua.org, PUC-Rio
+2026-11-26T07:14:48.2193820Z LuaJIT 2.1.1787165859 -- Copyright (C) 2005-2026 Mike Pall. https://luajit.org/
+2026-11-26T07:14:48.4154260Z /usr/local/bin/luarocks 3.13.0
+2026-11-26T07:14:48.4156830Z LuaRocks main command-line interface
+2026-11-26T07:14:48.7244790Z default lua_version: 5.5
+2026-11-26T07:14:49.4213750Z --lua-version 5.4 --lua-dir lua@5.4: lua_version=5.4  LUA=/usr/local/opt/lua@5.4/bin/lua5.4
+2026-11-26T07:14:50.1641420Z --lua-version 5.4 (no --lua-dir): lua_version=5.4 LUA=
+2026-11-26T07:14:50.1657500Z Error: Unknown entry LUA
+2026-11-26T07:14:50.8658080Z --lua-version 5.1 --lua-dir luajit: lua_version=5.1 LUA=/usr/local/opt/luajit/bin/luajit
+2026-11-26T07:15:05.6624210Z rustc 1.94.1 (e408947bf 2026-03-25)
+2026-11-26T07:15:05.7229520Z cargo 1.94.1 (29ea6fb6a 2026-03-24)
+2026-11-26T07:15:05.7318480Z === (54) luarocks --lua-version 5.4 --lua-dir /usr/local/opt/lua@5.4 make
+2026-11-26T07:15:50.5261550Z Missing dependencies for airsstack 0.0.0-1:
+2026-11-26T07:15:50.5287630Z    luarocks-build-rust-mlua 0.2.7 (not installed)
+2026-11-26T07:15:50.5316880Z 
+2026-11-26T07:15:50.5351520Z airsstack 0.0.0-1 depends on luarocks-build-rust-mlua 0.2.7 (not installed)
+2026-11-26T07:15:50.5379410Z Installing https://luarocks.org/luarocks-build-rust-mlua-0.2.7-1.src.rock
+2026-11-26T07:15:50.5389520Z 
+2026-11-26T07:15:50.5394500Z 
+2026-11-26T07:15:50.5402730Z No existing manifest. Attempting to rebuild...
+2026-11-26T07:15:50.5407950Z     Updating crates.io index
+2026-11-26T07:15:50.5424100Z     Finished `release` profile [optimized] target(s) in 41.78s
+2026-11-26T07:15:50.5429560Z luarocks-build-rust-mlua 0.2.7-1 is now installed in /Users/runner/work/_temp/tree-54 (license: MIT)
+2026-11-26T07:15:50.5433000Z 
+2026-11-26T07:15:50.5443160Z 
+2026-11-26T07:15:50.5460420Z airsstack 0.0.0-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+2026-11-26T07:15:50.5470030Z No existing manifest. Attempting to rebuild...
+2026-11-26T07:15:50.5491580Z airsstack 0.0.0-1 is now installed in /Users/runner/work/_temp/tree-54 (license: Apache-2.0)
+2026-11-26T07:15:50.5503100Z 
+2026-11-26T07:15:50.5519990Z Missing dependencies for airsstack 0.0.0-1:
+2026-11-26T07:15:50.5526700Z    lua 5.4 (not installed)
+2026-11-26T07:15:50.5532440Z make exit=0
+2026-11-26T07:15:50.5562340Z /Users/runner/work/_temp/tree-54/lib/lua/5.4/airsstack.so
+2026-11-26T07:15:50.5566670Z /Users/runner/work/_temp/tree-54/lib/luarocks/rocks-5.4/airsstack
+2026-11-26T07:15:50.5613280Z /Users/runner/work/_temp/tree-54/lib/luarocks/rocks-5.4/airsstack/0.0.0-1/airsstack-0.0.0-1.rockspec
+2026-11-26T07:15:50.8615630Z host: Lua 5.4
+2026-11-26T07:15:50.9077310Z require("airsstack").ok = true  json = [2,2.0]
+2026-11-26T07:15:50.9082520Z require exit=0
+2026-11-26T07:15:51.4457940Z Packed: /Users/runner/work/_temp/pack-54/airsstack-0.0.0-1.macosx-x86_64.rock
+2026-11-26T07:15:51.4463420Z pack exit=0
+2026-11-26T07:15:51.4551170Z total 536
+2026-11-26T07:15:51.4558270Z drwxr-xr-x  3 runner  staff      96 Nov 26 07:15 .
+2026-11-26T07:15:51.4570610Z drwxr-xr-x  8 runner  staff     256 Nov 26 07:15 ..
+2026-11-26T07:15:51.4616410Z -rw-r--r--  1 runner  staff  272961 Nov 26 07:15 airsstack-0.0.0-1.macosx-x86_64.rock
+2026-11-26T07:15:51.4627840Z == rock file: airsstack-0.0.0-1.macosx-x86_64.rock
+2026-11-26T07:15:51.4804700Z Archive:  /Users/runner/work/_temp/pack-54/airsstack-0.0.0-1.macosx-x86_64.rock
+2026-11-26T07:15:51.4838280Z   Length      Date    Time    Name
+2026-11-26T07:15:51.4887600Z ---------  ---------- -----   ----
+2026-11-26T07:15:51.4897120Z       581  11-26-2026 07:15   airsstack-0.0.0-1.rockspec
+2026-11-26T07:15:51.4952670Z         0  11-26-2026 07:15   lib/
+2026-11-26T07:15:51.5073950Z    623220  11-26-2026 07:15   lib/airsstack.so
+2026-11-26T07:15:51.5076420Z       168  11-26-2026 07:15   rock_manifest
+2026-11-26T07:15:51.5095460Z ---------                     -------
+2026-11-26T07:15:51.5099770Z    623969                     4 files
+2026-11-26T07:15:51.5102830Z === (jit) luarocks --lua-version 5.1 --lua-dir /usr/local/opt/luajit make
+2026-11-26T07:16:10.1966480Z Missing dependencies for airsstack-luajit 0.0.0-1:
+2026-11-26T07:16:10.2034130Z    luarocks-build-rust-mlua 0.2.7 (not installed)
+2026-11-26T07:16:10.2084470Z 
+2026-11-26T07:16:10.2091430Z airsstack-luajit 0.0.0-1 depends on luarocks-build-rust-mlua 0.2.7 (not installed)
+2026-11-26T07:16:10.2114790Z Installing https://luarocks.org/luarocks-build-rust-mlua-0.2.7-1.src.rock
+2026-11-26T07:16:10.2136220Z 
+2026-11-26T07:16:10.2157450Z 
+2026-11-26T07:16:10.2265790Z No existing manifest. Attempting to rebuild...
+2026-11-26T07:16:10.2323000Z     Finished `release` profile [optimized] target(s) in 14.69s
+2026-11-26T07:16:10.2363290Z luarocks-build-rust-mlua 0.2.7-1 is now installed in /Users/runner/work/_temp/tree-jit (license: MIT)
+2026-11-26T07:16:10.2393910Z 
+2026-11-26T07:16:10.2432500Z 
+2026-11-26T07:16:10.2460700Z airsstack-luajit 0.0.0-1 depends on lua 5.1 (5.1-1 provided by VM: success)
+2026-11-26T07:16:10.2490200Z airsstack-luajit 0.0.0-1 depends on luajit >= 2.1 (2.1.1787165859-1 provided by VM: success)
+2026-11-26T07:16:10.2530530Z No existing manifest. Attempting to rebuild...
+2026-11-26T07:16:10.2550210Z airsstack-luajit 0.0.0-1 is now installed in /Users/runner/work/_temp/tree-jit (license: Apache-2.0)
+2026-11-26T07:16:10.2578550Z 
+2026-11-26T07:16:10.2608800Z Missing dependencies for airsstack-luajit 0.0.0-1:
+2026-11-26T07:16:10.2640460Z    lua 5.1 (not installed)
+2026-11-26T07:16:10.2647970Z    luajit >= 2.1 (not installed)
+2026-11-26T07:16:10.2676630Z make exit=0
+2026-11-26T07:16:10.2687720Z /Users/runner/work/_temp/tree-jit/lib/lua/5.1/airsstack.so
+2026-11-26T07:16:10.2705320Z /Users/runner/work/_temp/tree-jit/lib/luarocks/rocks-5.1/airsstack-luajit
+2026-11-26T07:16:10.2733140Z /Users/runner/work/_temp/tree-jit/lib/luarocks/rocks-5.1/airsstack-luajit/0.0.0-1/airsstack-luajit-0.0.0-1.rockspec
+2026-11-26T07:16:10.5858360Z host: Lua 5.1 / LuaJIT 2.1.1787165859
+2026-11-26T07:16:10.5860180Z require("airsstack").ok = true  json = [2,2]
+2026-11-26T07:16:10.5869850Z require exit=0
+2026-11-26T07:16:11.1409230Z Packed: /Users/runner/work/_temp/pack-jit/airsstack-luajit-0.0.0-1.macosx-x86_64.rock
+2026-11-26T07:16:11.1484260Z pack exit=0
+2026-11-26T07:16:11.1531250Z total 544
+2026-11-26T07:16:11.1685870Z drwxr-xr-x   3 runner  staff      96 Nov 26 07:16 .
+2026-11-26T07:16:11.1744130Z drwxr-xr-x  10 runner  staff     320 Nov 26 07:16 ..
+2026-11-26T07:16:11.1765420Z -rw-r--r--   1 runner  staff  276933 Nov 26 07:16 airsstack-luajit-0.0.0-1.macosx-x86_64.rock
+2026-11-26T07:16:11.1778670Z == rock file: airsstack-luajit-0.0.0-1.macosx-x86_64.rock
+2026-11-26T07:16:11.1784560Z Archive:  /Users/runner/work/_temp/pack-jit/airsstack-luajit-0.0.0-1.macosx-x86_64.rock
+2026-11-26T07:16:11.1787400Z   Length      Date    Time    Name
+2026-11-26T07:16:11.1790010Z ---------  ---------- -----   ----
+2026-11-26T07:16:11.1795660Z       608  11-26-2026 07:16   airsstack-luajit-0.0.0-1.rockspec
+2026-11-26T07:16:11.1797930Z         0  11-26-2026 07:16   lib/
+2026-11-26T07:16:11.1805280Z    633036  11-26-2026 07:16   lib/airsstack.so
+2026-11-26T07:16:11.1901250Z       175  11-26-2026 07:16   rock_manifest
+2026-11-26T07:16:11.1929170Z ---------                     -------
+2026-11-26T07:16:11.1952610Z    633819                     4 files
+2026-11-26T07:16:11.2207520Z Post job cleanup.
+2026-11-26T07:16:11.4222310Z [command]/usr/local/bin/git version
+2026-11-26T07:16:11.4381410Z git version 2.55.0
+2026-11-26T07:16:11.4674270Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/f0f6e93c-4745-45b8-ba40-07a0384ec77b/.gitconfig'
+2026-11-26T07:16:11.4759200Z Temporarily overriding HOME='/Users/runner/work/_temp/f0f6e93c-4745-45b8-ba40-07a0384ec77b' before making global git config changes
+2026-11-26T07:16:11.4842710Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T07:16:11.4936800Z [command]/usr/local/bin/git config --global --add safe.directory /Users/runner/work/airsl/airsl
+2026-11-26T07:16:11.5152960Z Removing SSH command configuration
+2026-11-26T07:16:11.5207390Z [command]/usr/local/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T07:16:11.5360050Z [command]/usr/local/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T07:16:11.7465100Z Removing HTTP extra header
+2026-11-26T07:16:11.7520510Z [command]/usr/local/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T07:16:11.7653320Z [command]/usr/local/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T07:16:12.0364440Z Removing includeIf entries pointing to credentials config files
+2026-11-26T07:16:12.0463310Z [command]/usr/local/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T07:16:12.0550370Z includeif.gitdir:/Users/runner/work/airsl/airsl/.git.path
+2026-11-26T07:16:12.0593440Z includeif.gitdir:/Users/runner/work/airsl/airsl/.git/worktrees/*.path
+2026-11-26T07:16:12.0625180Z includeif.gitdir:/github/workspace/.git.path
+2026-11-26T07:16:12.0660190Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-11-26T07:16:12.0862990Z [command]/usr/local/bin/git config --local --get-all includeif.gitdir:/Users/runner/work/airsl/airsl/.git.path
+2026-11-26T07:16:12.0895090Z /Users/runner/work/_temp/git-credentials-b402a601-2be1-4238-a6df-f42919bbd270.config
+2026-11-26T07:16:12.0966900Z [command]/usr/local/bin/git config --local --unset includeif.gitdir:/Users/runner/work/airsl/airsl/.git.path /Users/runner/work/_temp/git-credentials-b402a601-2be1-4238-a6df-f42919bbd270.config
+2026-11-26T07:16:12.1070540Z [command]/usr/local/bin/git config --local --get-all includeif.gitdir:/Users/runner/work/airsl/airsl/.git/worktrees/*.path
+2026-11-26T07:16:12.1105870Z /Users/runner/work/_temp/git-credentials-b402a601-2be1-4238-a6df-f42919bbd270.config
+2026-11-26T07:16:12.1228880Z [command]/usr/local/bin/git config --local --unset includeif.gitdir:/Users/runner/work/airsl/airsl/.git/worktrees/*.path /Users/runner/work/_temp/git-credentials-b402a601-2be1-4238-a6df-f42919bbd270.config
+2026-11-26T07:16:12.1290410Z [command]/usr/local/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+2026-11-26T07:16:12.1321650Z /github/runner_temp/git-credentials-b402a601-2be1-4238-a6df-f42919bbd270.config
+2026-11-26T07:16:12.1379180Z [command]/usr/local/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-b402a601-2be1-4238-a6df-f42919bbd270.config
+2026-11-26T07:16:12.1491260Z [command]/usr/local/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-11-26T07:16:12.1576310Z /github/runner_temp/git-credentials-b402a601-2be1-4238-a6df-f42919bbd270.config
+2026-11-26T07:16:12.1626500Z [command]/usr/local/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-b402a601-2be1-4238-a6df-f42919bbd270.config
+2026-11-26T07:16:12.1842780Z [command]/usr/local/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T07:16:12.4302490Z Removing credentials config '/Users/runner/work/_temp/git-credentials-b402a601-2be1-4238-a6df-f42919bbd270.config'
+2026-11-26T07:16:12.4523830Z Cleaning up orphan processes

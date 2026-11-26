@@ -1,0 +1,13 @@
+# 42 luarocks.org manifest filter, run with the server's own ext/luarocks/deps.lua
+Question: C1(a) - which manifest-X.Y lists a version whose rockspec says 'lua == 5.4' / 'lua == 5.1'.
+Source: luarocks-site@7849c0a3f8bdc5613672e0e2e472ba44414fef34 ext/luarocks/deps.lua + util.lua (copies in 40-luarocks-site/).
+Probe: 42-luarocks-site-manifest-filter/probe.lua mirrors helpers/manifests.moon:68-71.
+Command: LUA_PATH="<lib with ext/luarocks/{deps,util}.lua>/?.lua;;" luajit probe.lua   (deps.lua uses module(), i.e. Lua 5.1 / LuaJIT as on OpenResty)
+Date: 2026-11-26
+--- output
+LuaJIT 2.1.1770848219 -- Copyright (C) 2005-2026 Mike Pall. https://luajit.org/
+lua == 5.4           manifest-5.1=false manifest-5.2=false manifest-5.3=false manifest-5.4=true manifest-5.5=false
+lua == 5.1           manifest-5.1=true manifest-5.2=false manifest-5.3=false manifest-5.4=false manifest-5.5=false
+lua >= 5.1           manifest-5.1=true manifest-5.2=true manifest-5.3=true manifest-5.4=true manifest-5.5=true
+lua >= 5.1, < 5.5    manifest-5.1=true manifest-5.2=true manifest-5.3=true manifest-5.4=true manifest-5.5=false
+lua ~> 5.4           manifest-5.1=false manifest-5.2=false manifest-5.3=false manifest-5.4=true manifest-5.5=false

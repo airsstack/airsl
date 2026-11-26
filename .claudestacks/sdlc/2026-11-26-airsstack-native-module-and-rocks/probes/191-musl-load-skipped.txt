@@ -1,0 +1,23 @@
+# Probe 191 — musl (Alpine): loading the glibc aarch64 toy .so — SKIPPED, no built Linux artifact to reuse
+Question (P18): in one alpine arm64 container (apk add lua5.4), load the glibc aarch64 toy .so built in probe 60.
+Rule given to this probe: reuse an already built artifact from P/60-*; if none exists, do not build one — skip and cite probe 60.
+Search (raw):
+$ find P/60-glibc-linux-aarch64 S -name "*.so" -exec file {} +   (P = the chain's probes dir, S = the session scratchpad)
+S/probes-M/airsstack-0.0.2.so:                                            Mach-O 64-bit dynamically linked shared library arm64
+S/probes-M/p12/airsstack.so:                                              Mach-O 64-bit dynamically linked shared library arm64
+S/probes-M/home-p3/.luarocks/lib/lua/5.4/airsstack.so:                    Mach-O 64-bit dynamically linked shared library arm64
+S/probes-M/home-p5b/.luarocks/lib/lua/5.4/airsstack.so:                   Mach-O 64-bit dynamically linked shared library arm64
+S/probes-M/p6-tree/lib/lua/5.4/airsstack.so:                              Mach-O 64-bit dynamically linked shared library arm64
+S/probes-M/home-p8a/.luarocks/lib/lua/5.4/airsstack_0_0_1_1-airsstack.so: Mach-O 64-bit dynamically linked shared library arm64
+S/probes-M/home-p8a/.luarocks/lib/lua/5.4/airsstack.so:                   Mach-O 64-bit dynamically linked shared library arm64
+S/probes-M/home-p7/.luarocks/lib/lua/5.4/airsstack.so:                    Mach-O 64-bit dynamically linked shared library arm64
+S/probes-M/p7/proj54/lua_modules/lib/lua/5.4/airsstack.so:                Mach-O 64-bit dynamically linked shared library arm64
+[exit 0]
+$ ls P/60-glibc-linux-aarch64
+rust-1.94.1-platform-support.md
+[exit 0]
+Result: no Linux ELF .so survives (probe 60 deleted its build output; the only .so files present are probe M's macOS Mach-O toys).
+P18 is therefore not probed. What probe 60 established instead (60-glibc-linux-aarch64.txt): the module-mode toy built in
+manylinux2014_aarch64 references at most GLIBC_2.17 (lines 38-44), the one built in rust:1-bookworm needs up to GLIBC_2.34
+(lines 72-78); the documented Rust floor is glibc 2.17 (lines 13-15). The musl loader's behaviour on a glibc-linked .so is unprobed.
+Date: 2026-11-26T07:25Z

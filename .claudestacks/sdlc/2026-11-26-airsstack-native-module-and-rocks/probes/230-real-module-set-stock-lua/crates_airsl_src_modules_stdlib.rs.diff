@@ -1,0 +1,29 @@
+--- a/crates/airsl/src/modules/stdlib.rs
++++ b/crates/airsl/src/modules/stdlib.rs
+@@ -20,6 +20,18 @@
+ /// Returns [`crate::Error::DuplicateModule`] if two entries ever claim the same name, which would
+ /// be a bug in this function rather than in caller input.
+ pub fn stdlib() -> Result<ModuleSet> {
++    let mut set = standalone()?;
++    set.insert(Box::new(Ext::new()))?;
++    Ok(set)
++}
++
++/// Builds every built-in except `ext`, in `stdlib()` order (probe stand-in for the spec's
++/// `modules::standalone`).
++///
++/// # Errors
++///
++/// Returns [`crate::Error::DuplicateModule`] if two entries ever claim the same name.
++pub fn standalone() -> Result<ModuleSet> {
+     let mut set = ModuleSet::new();
+     set.insert(Box::new(Json::new()))?;
+     set.insert(Box::new(Path::new()))?;
+@@ -32,7 +44,6 @@
+     set.insert(Box::new(Glob::new()))?;
+     set.insert(Box::new(Stdio::new()))?;
+     set.insert(Box::new(Hook::new()))?;
+-    set.insert(Box::new(Ext::new()))?;
+     Ok(set)
+ }
+ 

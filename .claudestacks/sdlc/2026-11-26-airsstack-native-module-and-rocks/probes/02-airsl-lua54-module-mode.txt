@@ -1,0 +1,840 @@
+question: A2: with only the root mlua line changed to features [lua54, module, serialize] (vendored and send removed), does airsl --lib, airsl --all-targets, and airsl-cli compile? (repo copy via rsync -a --exclude target --exclude .git)
+commands: sed root Cargo.toml mlua line to features ["lua54","module","serialize"]; cargo check -p airsl --lib; cargo check -p airsl --all-targets; cargo check -p airsl-cli
+tools: rustc 1.94.1 (e408947bf 2026-03-25); cargo 1.94.1 (29ea6fb6a 2026-03-24); mlua =0.12.0, mlua-sys 0.11.0; Lua 5.4.8  Copyright (C) 1994-2025 Lua.org, PUC-Rio; LuaJIT 2.1.1770848219 -- Copyright (C) 2005-2026 Mike Pall. https://luajit.org/; macOS 26.3.1 arm64
+date: 2026-11-26T06:11:55Z
+--- raw output ---
+$ grep -n ^mlua Cargo.toml
+21:mlua       = { version = "0.12", features = ["lua54", "module", "serialize"] }
+=== $ cargo check -p airsl --lib
+     Locking 1 package to latest Rust 1.94 compatible version
+      Adding mlua_derive v0.12.0 (available: v0.12.2)
+   Compiling libc v0.2.189
+   Compiling serde_core v1.0.229
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.24
+   Compiling quote v1.0.47
+    Checking cfg-if v1.0.4
+    Checking memchr v2.8.3
+    Checking typenum v1.20.1
+   Compiling autocfg v1.5.1
+   Compiling shlex v2.0.1
+   Compiling find-msvc-tools v0.1.11
+   Compiling parking_lot_core v0.9.12
+   Compiling num-traits v0.2.19
+   Compiling cc v1.4.4
+   Compiling serde v1.0.229
+    Checking hybrid-array v0.4.15
+   Compiling pkg-config v0.3.34
+   Compiling typeid v1.0.3
+    Checking crypto-common v0.2.2
+    Checking block-buffer v0.12.1
+   Compiling mlua-sys v0.11.0
+    Checking aho-corasick v1.1.5
+    Checking const-oid v0.10.3
+   Compiling zmij v1.0.23
+    Checking smallvec v1.15.2
+    Checking regex-syntax v0.8.11
+   Compiling erased-serde v0.4.10
+   Compiling syn v3.0.3
+   Compiling rustix v1.1.4
+    Checking scopeguard v1.2.0
+   Compiling getrandom v0.4.3
+    Checking cpufeatures v0.3.1
+    Checking errno v0.3.14
+    Checking lock_api v0.4.14
+    Checking bstr v1.13.1
+   Compiling syn v2.0.119
+    Checking ordered-float v2.10.1
+    Checking regex-automata v0.4.18
+   Compiling serde_derive v1.0.229
+    Checking digest v0.11.3
+   Compiling thiserror v2.0.20
+   Compiling serde_json v1.0.151
+    Checking winnow v1.0.5
+    Checking bitflags v2.13.1
+    Checking toml_parser v1.1.6+spec-1.1.0
+   Compiling mlua_derive v0.12.0
+    Checking parking_lot v0.12.5
+   Compiling thiserror-impl v2.0.20
+    Checking serde_spanned v1.1.3
+    Checking toml_datetime v1.1.3+spec-1.1.0
+    Checking jiff-core v0.1.0
+    Checking rustc-hash v2.1.3
+    Checking log v0.4.33
+    Checking once_cell v1.21.4
+    Checking fastrand v2.5.0
+    Checking either v1.18.0
+    Checking itoa v1.0.18
+    Checking same-file v1.0.6
+    Checking walkdir v2.5.0
+    Checking jiff v0.2.35
+    Checking tempfile v3.27.0
+    Checking globset v0.4.20
+    Checking toml v1.2.2+spec-1.1.0
+    Checking sha2 v0.11.1
+    Checking sha1 v0.11.0
+    Checking regex v1.13.1
+    Checking serde-value v0.7.0
+    Checking mlua v0.12.0
+    Checking airsl v0.2.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/repo-copy/crates/airsl)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.79s
+exit=0
+=== $ cargo check -p airsl --all-targets
+    Checking airsl v0.2.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/repo-copy/crates/airsl)
+error[E0277]: `(dyn std::error::Error + 'static)` cannot be shared between threads safely
+   --> crates/airsl/examples/engine-reuse/main.rs:207:22
+    |
+207 |           workers.push(thread::spawn(move || {
+    |  ______________________^
+208 | |             let script = Script::from_source(DOUBLE, "double")?.with_args([id.to_string()]);
+209 | |             engine.eval_to::<i64>(&script).map(|doubled| (id, doubled))
+210 | |         }));
+    | |__________^ `(dyn std::error::Error + 'static)` cannot be shared between threads safely
+    |
+    = help: the trait `Sync` is not implemented for `(dyn std::error::Error + 'static)`
+    = note: required for `Arc<(dyn std::error::Error + 'static)>` to implement `Send`
+note: required because it appears within the type `LuaError`
+   --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-0.12.0/src/error.rs:25:10
+    |
+ 25 | pub enum Error {
+    |          ^^^^^
+    = note: required for `Unique<LuaError>` to implement `Send`
+note: required because it appears within the type `Box<LuaError>`
+   --> /Users/hiraq/.rustup/toolchains/1.94-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/boxed.rs:234:12
+    |
+234 | pub struct Box<
+    |            ^^^
+note: required because it appears within the type `airsl::Error`
+   --> crates/airsl/src/error.rs:22:10
+    |
+ 22 | pub enum Error {
+    |          ^^^^^
+note: required because it appears within the type `Result<(i64, i64), airsl::Error>`
+   --> /Users/hiraq/.rustup/toolchains/1.94-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/result.rs:557:10
+    |
+557 | pub enum Result<T, E> {
+    |          ^^^^^^
+note: required by a bound in `spawn`
+   --> /Users/hiraq/.rustup/toolchains/1.94-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/thread/functions.rs:129:8
+    |
+125 | pub fn spawn<F, T>(f: F) -> JoinHandle<T>
+    |        ----- required by a bound in this function
+...
+129 |     T: Send + 'static,
+    |        ^^^^ required by this bound in `spawn`
+
+error[E0277]: `(dyn std::error::Error + 'static)` cannot be sent between threads safely
+   --> crates/airsl/examples/engine-reuse/main.rs:207:22
+    |
+207 |           workers.push(thread::spawn(move || {
+    |  ______________________^
+208 | |             let script = Script::from_source(DOUBLE, "double")?.with_args([id.to_string()]);
+209 | |             engine.eval_to::<i64>(&script).map(|doubled| (id, doubled))
+210 | |         }));
+    | |__________^ `(dyn std::error::Error + 'static)` cannot be sent between threads safely
+    |
+    = help: the trait `Send` is not implemented for `(dyn std::error::Error + 'static)`
+    = note: required for `Arc<(dyn std::error::Error + 'static)>` to implement `Send`
+note: required because it appears within the type `LuaError`
+   --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-0.12.0/src/error.rs:25:10
+    |
+ 25 | pub enum Error {
+    |          ^^^^^
+    = note: required for `Unique<LuaError>` to implement `Send`
+note: required because it appears within the type `Box<LuaError>`
+   --> /Users/hiraq/.rustup/toolchains/1.94-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/boxed.rs:234:12
+    |
+234 | pub struct Box<
+    |            ^^^
+note: required because it appears within the type `airsl::Error`
+   --> crates/airsl/src/error.rs:22:10
+    |
+ 22 | pub enum Error {
+    |          ^^^^^
+note: required because it appears within the type `Result<(i64, i64), airsl::Error>`
+   --> /Users/hiraq/.rustup/toolchains/1.94-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/result.rs:557:10
+    |
+557 | pub enum Result<T, E> {
+    |          ^^^^^^
+note: required by a bound in `spawn`
+   --> /Users/hiraq/.rustup/toolchains/1.94-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/thread/functions.rs:129:8
+    |
+125 | pub fn spawn<F, T>(f: F) -> JoinHandle<T>
+    |        ----- required by a bound in this function
+...
+129 |     T: Send + 'static,
+    |        ^^^^ required by this bound in `spawn`
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `airsl` (example "engine-reuse") due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error[E0277]: `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be shared between threads safely
+    --> crates/airsl/src/engine.rs:1269:25
+     |
+1269 |     impl HostModule for Boomerang {
+     |                         ^^^^^^^^^ `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be shared between threads safely
+     |
+     = help: within `Engine`, the trait `Sync` is not implemented for `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>`
+note: required because it appears within the type `Lua`
+    --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-0.12.0/src/state.rs:57:12
+     |
+  57 | pub struct Lua {
+     |            ^^^
+note: required because it appears within the type `Engine`
+    --> crates/airsl/src/engine.rs:48:12
+     |
+  48 | pub struct Engine {
+     |            ^^^^^^
+     = note: required for `OnceLock<Engine>` to implement `Sync`
+     = note: 1 redundant requirement hidden
+     = note: required for `Arc<OnceLock<Engine>>` to implement `Sync`
+note: required because it appears within the type `Boomerang`
+    --> crates/airsl/src/engine.rs:1264:12
+     |
+1264 |     struct Boomerang {
+     |            ^^^^^^^^^
+note: required by a bound in `HostModule`
+    --> crates/airsl/src/modules/registry.rs:109:30
+     |
+ 109 | pub trait HostModule: Send + Sync {
+     |                              ^^^^ required by this bound in `HostModule`
+
+error[E0277]: `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be sent between threads safely
+    --> crates/airsl/src/engine.rs:1269:25
+     |
+1269 |     impl HostModule for Boomerang {
+     |                         ^^^^^^^^^ `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be sent between threads safely
+     |
+     = help: within `Engine`, the trait `Send` is not implemented for `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>`
+note: required because it appears within the type `Lua`
+    --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-0.12.0/src/state.rs:57:12
+     |
+  57 | pub struct Lua {
+     |            ^^^
+note: required because it appears within the type `Engine`
+    --> crates/airsl/src/engine.rs:48:12
+     |
+  48 | pub struct Engine {
+     |            ^^^^^^
+     = note: required for `OnceLock<Engine>` to implement `Sync`
+     = note: 1 redundant requirement hidden
+     = note: required for `Arc<OnceLock<Engine>>` to implement `Sync`
+note: required because it appears within the type `Boomerang`
+    --> crates/airsl/src/engine.rs:1264:12
+     |
+1264 |     struct Boomerang {
+     |            ^^^^^^^^^
+note: required by a bound in `HostModule`
+    --> crates/airsl/src/modules/registry.rs:109:30
+     |
+ 109 | pub trait HostModule: Send + Sync {
+     |                              ^^^^ required by this bound in `HostModule`
+
+error[E0277]: `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be shared between threads safely
+    --> crates/airsl/src/engine.rs:1347:25
+     |
+1347 |     impl HostModule for EvalBoomerang {
+     |                         ^^^^^^^^^^^^^ `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be shared between threads safely
+     |
+     = help: within `Engine`, the trait `Sync` is not implemented for `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>`
+note: required because it appears within the type `Lua`
+    --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-0.12.0/src/state.rs:57:12
+     |
+  57 | pub struct Lua {
+     |            ^^^
+note: required because it appears within the type `Engine`
+    --> crates/airsl/src/engine.rs:48:12
+     |
+  48 | pub struct Engine {
+     |            ^^^^^^
+     = note: required for `OnceLock<Engine>` to implement `Sync`
+     = note: 1 redundant requirement hidden
+     = note: required for `Arc<OnceLock<Engine>>` to implement `Sync`
+note: required because it appears within the type `EvalBoomerang`
+    --> crates/airsl/src/engine.rs:1342:12
+     |
+1342 |     struct EvalBoomerang {
+     |            ^^^^^^^^^^^^^
+note: required by a bound in `HostModule`
+    --> crates/airsl/src/modules/registry.rs:109:30
+     |
+ 109 | pub trait HostModule: Send + Sync {
+     |                              ^^^^ required by this bound in `HostModule`
+
+error[E0277]: `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be sent between threads safely
+    --> crates/airsl/src/engine.rs:1347:25
+     |
+1347 |     impl HostModule for EvalBoomerang {
+     |                         ^^^^^^^^^^^^^ `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be sent between threads safely
+     |
+     = help: within `Engine`, the trait `Send` is not implemented for `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>`
+note: required because it appears within the type `Lua`
+    --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-0.12.0/src/state.rs:57:12
+     |
+  57 | pub struct Lua {
+     |            ^^^
+note: required because it appears within the type `Engine`
+    --> crates/airsl/src/engine.rs:48:12
+     |
+  48 | pub struct Engine {
+     |            ^^^^^^
+     = note: required for `OnceLock<Engine>` to implement `Sync`
+     = note: 1 redundant requirement hidden
+     = note: required for `Arc<OnceLock<Engine>>` to implement `Sync`
+note: required because it appears within the type `EvalBoomerang`
+    --> crates/airsl/src/engine.rs:1342:12
+     |
+1342 |     struct EvalBoomerang {
+     |            ^^^^^^^^^^^^^
+note: required by a bound in `HostModule`
+    --> crates/airsl/src/modules/registry.rs:109:30
+     |
+ 109 | pub trait HostModule: Send + Sync {
+     |                              ^^^^ required by this bound in `HostModule`
+
+error[E0277]: `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be shared between threads safely
+    --> crates/airsl/src/engine.rs:1472:25
+     |
+1472 |     impl HostModule for Poisoner {
+     |                         ^^^^^^^^ `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be shared between threads safely
+     |
+     = help: within `Engine`, the trait `Sync` is not implemented for `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>`
+note: required because it appears within the type `Lua`
+    --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-0.12.0/src/state.rs:57:12
+     |
+  57 | pub struct Lua {
+     |            ^^^
+note: required because it appears within the type `Engine`
+    --> crates/airsl/src/engine.rs:48:12
+     |
+  48 | pub struct Engine {
+     |            ^^^^^^
+     = note: required for `OnceLock<Engine>` to implement `Sync`
+     = note: 1 redundant requirement hidden
+     = note: required for `Arc<OnceLock<Engine>>` to implement `Sync`
+note: required because it appears within the type `Poisoner`
+    --> crates/airsl/src/engine.rs:1445:12
+     |
+1445 |     struct Poisoner {
+     |            ^^^^^^^^
+note: required by a bound in `HostModule`
+    --> crates/airsl/src/modules/registry.rs:109:30
+     |
+ 109 | pub trait HostModule: Send + Sync {
+     |                              ^^^^ required by this bound in `HostModule`
+
+error[E0277]: `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be sent between threads safely
+    --> crates/airsl/src/engine.rs:1472:25
+     |
+1472 |     impl HostModule for Poisoner {
+     |                         ^^^^^^^^ `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be sent between threads safely
+     |
+     = help: within `Engine`, the trait `Send` is not implemented for `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>`
+note: required because it appears within the type `Lua`
+    --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-0.12.0/src/state.rs:57:12
+     |
+  57 | pub struct Lua {
+     |            ^^^
+note: required because it appears within the type `Engine`
+    --> crates/airsl/src/engine.rs:48:12
+     |
+  48 | pub struct Engine {
+     |            ^^^^^^
+     = note: required for `OnceLock<Engine>` to implement `Sync`
+     = note: 1 redundant requirement hidden
+     = note: required for `Arc<OnceLock<Engine>>` to implement `Sync`
+note: required because it appears within the type `Poisoner`
+    --> crates/airsl/src/engine.rs:1445:12
+     |
+1445 |     struct Poisoner {
+     |            ^^^^^^^^
+note: required by a bound in `HostModule`
+    --> crates/airsl/src/modules/registry.rs:109:30
+     |
+ 109 | pub trait HostModule: Send + Sync {
+     |                              ^^^^ required by this bound in `HostModule`
+
+error[E0277]: `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be sent between threads safely
+   --> crates/airsl/src/engine.rs:484:28
+    |
+484 |         assert_send_sync::<Engine>();
+    |                            ^^^^^^ `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be sent between threads safely
+    |
+    = help: within `Engine`, the trait `Send` is not implemented for `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>`
+note: required because it appears within the type `Lua`
+   --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-0.12.0/src/state.rs:57:12
+    |
+ 57 | pub struct Lua {
+    |            ^^^
+note: required because it appears within the type `Engine`
+   --> crates/airsl/src/engine.rs:48:12
+    |
+ 48 | pub struct Engine {
+    |            ^^^^^^
+note: required by a bound in `assert_send_sync`
+   --> crates/airsl/src/engine.rs:480:34
+    |
+480 |     const fn assert_send_sync<T: Send + Sync>() {}
+    |                                  ^^^^ required by this bound in `assert_send_sync`
+
+error[E0277]: `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be shared between threads safely
+   --> crates/airsl/src/engine.rs:484:28
+    |
+484 |         assert_send_sync::<Engine>();
+    |                            ^^^^^^ `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be shared between threads safely
+    |
+    = help: within `Engine`, the trait `Sync` is not implemented for `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>`
+note: required because it appears within the type `Lua`
+   --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-0.12.0/src/state.rs:57:12
+    |
+ 57 | pub struct Lua {
+    |            ^^^
+note: required because it appears within the type `Engine`
+   --> crates/airsl/src/engine.rs:48:12
+    |
+ 48 | pub struct Engine {
+    |            ^^^^^^
+note: required by a bound in `assert_send_sync`
+   --> crates/airsl/src/engine.rs:480:41
+    |
+480 |     const fn assert_send_sync<T: Send + Sync>() {}
+    |                                         ^^^^ required by this bound in `assert_send_sync`
+
+error[E0277]: `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be shared between threads safely
+   --> crates/airsl/src/engine.rs:690:45
+    |
+690 |               threads.push(std::thread::spawn(move || {
+    |  __________________________------------------_^
+    | |                          |
+    | |                          required by a bound introduced by this call
+691 | |                 let want = id.to_string();
+692 | |                 let source = script("return arg[1]").with_args([want.clone()]);
+693 | |                 (0..500)
+694 | |                     .filter(|_| engine.eval_to::<String>(&source).unwrap() != want)
+695 | |                     .count()
+696 | |             }));
+    | |_____________^ `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be shared between threads safely
+    |
+    = help: within `Engine`, the trait `Sync` is not implemented for `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>`
+note: required because it appears within the type `Lua`
+   --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-0.12.0/src/state.rs:57:12
+    |
+ 57 | pub struct Lua {
+    |            ^^^
+note: required because it appears within the type `Engine`
+   --> crates/airsl/src/engine.rs:48:12
+    |
+ 48 | pub struct Engine {
+    |            ^^^^^^
+    = note: required for `Arc<Engine>` to implement `Send`
+note: required because it's used within this closure
+   --> crates/airsl/src/engine.rs:690:45
+    |
+690 |             threads.push(std::thread::spawn(move || {
+    |                                             ^^^^^^^
+note: required by a bound in `spawn`
+   --> /Users/hiraq/.rustup/toolchains/1.94-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/thread/functions.rs:128:8
+    |
+125 | pub fn spawn<F, T>(f: F) -> JoinHandle<T>
+    |        ----- required by a bound in this function
+...
+128 |     F: Send + 'static,
+    |        ^^^^ required by this bound in `spawn`
+
+error[E0277]: `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be sent between threads safely
+   --> crates/airsl/src/engine.rs:690:45
+    |
+690 |               threads.push(std::thread::spawn(move || {
+    |  __________________________------------------_^
+    | |                          |
+    | |                          required by a bound introduced by this call
+691 | |                 let want = id.to_string();
+692 | |                 let source = script("return arg[1]").with_args([want.clone()]);
+693 | |                 (0..500)
+694 | |                     .filter(|_| engine.eval_to::<String>(&source).unwrap() != want)
+695 | |                     .count()
+696 | |             }));
+    | |_____________^ `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be sent between threads safely
+    |
+    = help: within `Engine`, the trait `Send` is not implemented for `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>`
+note: required because it appears within the type `Lua`
+   --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-0.12.0/src/state.rs:57:12
+    |
+ 57 | pub struct Lua {
+    |            ^^^
+note: required because it appears within the type `Engine`
+   --> crates/airsl/src/engine.rs:48:12
+    |
+ 48 | pub struct Engine {
+    |            ^^^^^^
+    = note: required for `Arc<Engine>` to implement `Send`
+note: required because it's used within this closure
+   --> crates/airsl/src/engine.rs:690:45
+    |
+690 |             threads.push(std::thread::spawn(move || {
+    |                                             ^^^^^^^
+note: required by a bound in `spawn`
+   --> /Users/hiraq/.rustup/toolchains/1.94-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/thread/functions.rs:128:8
+    |
+125 | pub fn spawn<F, T>(f: F) -> JoinHandle<T>
+    |        ----- required by a bound in this function
+...
+128 |     F: Send + 'static,
+    |        ^^^^ required by this bound in `spawn`
+
+error[E0277]: `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be shared between threads safely
+    --> crates/airsl/src/engine.rs:1559:36
+     |
+1559 |                   std::thread::spawn(move || {
+     |  _________________------------------_^
+     | |                 |
+     | |                 required by a bound introduced by this call
+1560 | |                     let mut results = Vec::new();
+1561 | |                     for j in 0..200 {
+1562 | |                         let reply = engine
+...    |
+1567 | |                     results
+1568 | |                 })
+     | |_________________^ `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be shared between threads safely
+     |
+     = help: within `Engine`, the trait `Sync` is not implemented for `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>`
+note: required because it appears within the type `Lua`
+    --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-0.12.0/src/state.rs:57:12
+     |
+  57 | pub struct Lua {
+     |            ^^^
+note: required because it appears within the type `Engine`
+    --> crates/airsl/src/engine.rs:48:12
+     |
+  48 | pub struct Engine {
+     |            ^^^^^^
+     = note: required for `Arc<Engine>` to implement `Send`
+note: required because it's used within this closure
+    --> crates/airsl/src/engine.rs:1559:36
+     |
+1559 |                 std::thread::spawn(move || {
+     |                                    ^^^^^^^
+note: required by a bound in `spawn`
+    --> /Users/hiraq/.rustup/toolchains/1.94-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/thread/functions.rs:128:8
+     |
+ 125 | pub fn spawn<F, T>(f: F) -> JoinHandle<T>
+     |        ----- required by a bound in this function
+...
+ 128 |     F: Send + 'static,
+     |        ^^^^ required by this bound in `spawn`
+
+error[E0277]: `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be sent between threads safely
+    --> crates/airsl/src/engine.rs:1559:36
+     |
+1559 |                   std::thread::spawn(move || {
+     |  _________________------------------_^
+     | |                 |
+     | |                 required by a bound introduced by this call
+1560 | |                     let mut results = Vec::new();
+1561 | |                     for j in 0..200 {
+1562 | |                         let reply = engine
+...    |
+1567 | |                     results
+1568 | |                 })
+     | |_________________^ `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be sent between threads safely
+     |
+     = help: within `Engine`, the trait `Send` is not implemented for `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>`
+note: required because it appears within the type `Lua`
+    --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-0.12.0/src/state.rs:57:12
+     |
+  57 | pub struct Lua {
+     |            ^^^
+note: required because it appears within the type `Engine`
+    --> crates/airsl/src/engine.rs:48:12
+     |
+  48 | pub struct Engine {
+     |            ^^^^^^
+     = note: required for `Arc<Engine>` to implement `Send`
+note: required because it's used within this closure
+    --> crates/airsl/src/engine.rs:1559:36
+     |
+1559 |                 std::thread::spawn(move || {
+     |                                    ^^^^^^^
+note: required by a bound in `spawn`
+    --> /Users/hiraq/.rustup/toolchains/1.94-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/thread/functions.rs:128:8
+     |
+ 125 | pub fn spawn<F, T>(f: F) -> JoinHandle<T>
+     |        ----- required by a bound in this function
+...
+ 128 |     F: Send + 'static,
+     |        ^^^^ required by this bound in `spawn`
+
+error[E0277]: `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be sent between threads safely
+   --> crates/airsl/src/extension/host.rs:725:18
+    |
+725 |         assert::<ExtensionHost>();
+    |                  ^^^^^^^^^^^^^ `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be sent between threads safely
+    |
+    = help: within `host::ExtensionHost`, the trait `Send` is not implemented for `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>`
+note: required because it appears within the type `Lua`
+   --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-0.12.0/src/state.rs:57:12
+    |
+ 57 | pub struct Lua {
+    |            ^^^
+note: required because it appears within the type `Engine`
+   --> crates/airsl/src/engine.rs:48:12
+    |
+ 48 | pub struct Engine {
+    |            ^^^^^^
+note: required because it appears within the type `loaded::Extension`
+   --> crates/airsl/src/extension/loaded.rs:167:12
+    |
+167 | pub struct Extension {
+    |            ^^^^^^^^^
+note: required because it appears within the type `PhantomData<loaded::Extension>`
+   --> /Users/hiraq/.rustup/toolchains/1.94-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/marker.rs:819:12
+    |
+819 | pub struct PhantomData<T: PointeeSized>;
+    |            ^^^^^^^^^^^
+note: required because it appears within the type `alloc::raw_vec::RawVec<loaded::Extension>`
+   --> /Users/hiraq/.rustup/toolchains/1.94-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/raw_vec/mod.rs:73:19
+    |
+ 73 | pub(crate) struct RawVec<T, A: Allocator = Global> {
+    |                   ^^^^^^
+note: required because it appears within the type `Vec<loaded::Extension>`
+   --> /Users/hiraq/.rustup/toolchains/1.94-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:440:12
+    |
+440 | pub struct Vec<T, #[unstable(feature = "allocator_api", issue = "32838")] A: Allocator = Global> {
+    |            ^^^
+note: required because it appears within the type `host::ExtensionHost`
+   --> crates/airsl/src/extension/host.rs:211:12
+    |
+211 | pub struct ExtensionHost<A: Approver = ManifestApprover, F: ModuleFactory = Stdlib> {
+    |            ^^^^^^^^^^^^^
+note: required by a bound in `host::tests::host_is_send_and_sync::assert`
+   --> crates/airsl/src/extension/host.rs:724:28
+    |
+724 |         const fn assert<T: Send + Sync>() {}
+    |                            ^^^^ required by this bound in `assert`
+
+error[E0277]: `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be shared between threads safely
+   --> crates/airsl/src/extension/host.rs:725:18
+    |
+725 |         assert::<ExtensionHost>();
+    |                  ^^^^^^^^^^^^^ `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be shared between threads safely
+    |
+    = help: within `host::ExtensionHost`, the trait `Sync` is not implemented for `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>`
+note: required because it appears within the type `Lua`
+   --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-0.12.0/src/state.rs:57:12
+    |
+ 57 | pub struct Lua {
+    |            ^^^
+note: required because it appears within the type `Engine`
+   --> crates/airsl/src/engine.rs:48:12
+    |
+ 48 | pub struct Engine {
+    |            ^^^^^^
+note: required because it appears within the type `loaded::Extension`
+   --> crates/airsl/src/extension/loaded.rs:167:12
+    |
+167 | pub struct Extension {
+    |            ^^^^^^^^^
+note: required because it appears within the type `PhantomData<loaded::Extension>`
+   --> /Users/hiraq/.rustup/toolchains/1.94-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/marker.rs:819:12
+    |
+819 | pub struct PhantomData<T: PointeeSized>;
+    |            ^^^^^^^^^^^
+note: required because it appears within the type `alloc::raw_vec::RawVec<loaded::Extension>`
+   --> /Users/hiraq/.rustup/toolchains/1.94-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/raw_vec/mod.rs:73:19
+    |
+ 73 | pub(crate) struct RawVec<T, A: Allocator = Global> {
+    |                   ^^^^^^
+note: required because it appears within the type `Vec<loaded::Extension>`
+   --> /Users/hiraq/.rustup/toolchains/1.94-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:440:12
+    |
+440 | pub struct Vec<T, #[unstable(feature = "allocator_api", issue = "32838")] A: Allocator = Global> {
+    |            ^^^
+note: required because it appears within the type `host::ExtensionHost`
+   --> crates/airsl/src/extension/host.rs:211:12
+    |
+211 | pub struct ExtensionHost<A: Approver = ManifestApprover, F: ModuleFactory = Stdlib> {
+    |            ^^^^^^^^^^^^^
+note: required by a bound in `host::tests::host_is_send_and_sync::assert`
+   --> crates/airsl/src/extension/host.rs:724:35
+    |
+724 |         const fn assert<T: Send + Sync>() {}
+    |                                   ^^^^ required by this bound in `assert`
+
+error[E0277]: `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be sent between threads safely
+   --> crates/airsl/src/extension/loaded.rs:628:18
+    |
+628 |         assert::<Extension>();
+    |                  ^^^^^^^^^ `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be sent between threads safely
+    |
+    = help: within `loaded::Extension`, the trait `Send` is not implemented for `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>`
+note: required because it appears within the type `Lua`
+   --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-0.12.0/src/state.rs:57:12
+    |
+ 57 | pub struct Lua {
+    |            ^^^
+note: required because it appears within the type `Engine`
+   --> crates/airsl/src/engine.rs:48:12
+    |
+ 48 | pub struct Engine {
+    |            ^^^^^^
+note: required because it appears within the type `loaded::Extension`
+   --> crates/airsl/src/extension/loaded.rs:167:12
+    |
+167 | pub struct Extension {
+    |            ^^^^^^^^^
+note: required by a bound in `loaded::tests::extension_is_send_and_sync::assert`
+   --> crates/airsl/src/extension/loaded.rs:627:28
+    |
+627 |         const fn assert<T: Send + Sync>() {}
+    |                            ^^^^ required by this bound in `assert`
+
+error[E0277]: `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be shared between threads safely
+   --> crates/airsl/src/extension/loaded.rs:628:18
+    |
+628 |         assert::<Extension>();
+    |                  ^^^^^^^^^ `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>` cannot be shared between threads safely
+    |
+    = help: within `loaded::Extension`, the trait `Sync` is not implemented for `Rc<mlua::types::sync::inner::ReentrantMutex<RawLua>>`
+note: required because it appears within the type `Lua`
+   --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-0.12.0/src/state.rs:57:12
+    |
+ 57 | pub struct Lua {
+    |            ^^^
+note: required because it appears within the type `Engine`
+   --> crates/airsl/src/engine.rs:48:12
+    |
+ 48 | pub struct Engine {
+    |            ^^^^^^
+note: required because it appears within the type `loaded::Extension`
+   --> crates/airsl/src/extension/loaded.rs:167:12
+    |
+167 | pub struct Extension {
+    |            ^^^^^^^^^
+note: required by a bound in `loaded::tests::extension_is_send_and_sync::assert`
+   --> crates/airsl/src/extension/loaded.rs:627:35
+    |
+627 |         const fn assert<T: Send + Sync>() {}
+    |                                   ^^^^ required by this bound in `assert`
+
+error: could not compile `airsl` (lib test) due to 16 previous errors
+exit=101
+=== $ cargo check -p airsl-cli
+   Compiling syn v3.0.3
+    Checking utf8parse v0.2.2
+    Checking anstyle v1.0.14
+    Checking anstyle-query v1.1.5
+    Checking colorchoice v1.0.5
+    Checking is_terminal_polyfill v1.70.2
+    Checking strsim v0.11.1
+   Compiling heck v0.5.0
+    Checking clap_lex v1.1.0
+    Checking anstyle-parse v1.0.0
+    Checking anstream v1.0.0
+    Checking clap_builder v4.6.6
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.20
+   Compiling clap_derive v4.6.4
+    Checking thiserror v2.0.20
+    Checking clap v4.6.6
+    Checking serde v1.0.229
+    Checking serde-value v0.7.0
+    Checking mlua v0.12.0
+    Checking airsl v0.2.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/repo-copy/crates/airsl)
+    Checking airsl-cli v0.2.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/repo-copy/crates/airsl-cli)
+error[E0277]: `(dyn std::error::Error + 'static)` cannot be shared between threads safely
+   --> crates/airsl-cli/src/cli.rs:124:10
+    |
+124 |         .try_map(|name| name.parse::<HostAccess>())
+    |          ^^^^^^^ `(dyn std::error::Error + 'static)` cannot be shared between threads safely
+    |
+    = help: the trait `Sync` is not implemented for `(dyn std::error::Error + 'static)`
+    = note: required for `Arc<(dyn std::error::Error + 'static)>` to implement `Send`
+note: required because it appears within the type `LuaError`
+   --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-0.12.0/src/error.rs:25:10
+    |
+ 25 | pub enum Error {
+    |          ^^^^^
+    = note: required for `Unique<LuaError>` to implement `Send`
+note: required because it appears within the type `Box<LuaError>`
+   --> /Users/hiraq/.rustup/toolchains/1.94-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/boxed.rs:234:12
+    |
+234 | pub struct Box<
+    |            ^^^
+note: required because it appears within the type `airsl::Error`
+   --> crates/airsl/src/error.rs:22:10
+    |
+ 22 | pub enum Error {
+    |          ^^^^^
+    = note: required for `Box<(dyn std::error::Error + Send + Sync + 'static)>` to implement `From<airsl::Error>`
+    = note: required for `airsl::Error` to implement `Into<Box<(dyn std::error::Error + Send + Sync + 'static)>>`
+note: required by a bound in `try_map`
+   --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clap_builder-4.6.6/src/builder/value_parser.rs:864:12
+    |
+860 |     fn try_map<T, E, F>(self, func: F) -> TryMapValueParser<Self, F>
+    |        ------- required by a bound in this associated function
+...
+864 |         E: Into<Box<dyn std::error::Error + Send + Sync + 'static>>,
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `TypedValueParser::try_map`
+
+error[E0277]: `(dyn std::error::Error + 'static)` cannot be sent between threads safely
+   --> crates/airsl-cli/src/cli.rs:124:10
+    |
+124 |         .try_map(|name| name.parse::<HostAccess>())
+    |          ^^^^^^^ `(dyn std::error::Error + 'static)` cannot be sent between threads safely
+    |
+    = help: the trait `Send` is not implemented for `(dyn std::error::Error + 'static)`
+    = note: required for `Arc<(dyn std::error::Error + 'static)>` to implement `Send`
+note: required because it appears within the type `LuaError`
+   --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-0.12.0/src/error.rs:25:10
+    |
+ 25 | pub enum Error {
+    |          ^^^^^
+    = note: required for `Unique<LuaError>` to implement `Send`
+note: required because it appears within the type `Box<LuaError>`
+   --> /Users/hiraq/.rustup/toolchains/1.94-aarch64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/boxed.rs:234:12
+    |
+234 | pub struct Box<
+    |            ^^^
+note: required because it appears within the type `airsl::Error`
+   --> crates/airsl/src/error.rs:22:10
+    |
+ 22 | pub enum Error {
+    |          ^^^^^
+    = note: required for `Box<(dyn std::error::Error + Send + Sync + 'static)>` to implement `From<airsl::Error>`
+    = note: required for `airsl::Error` to implement `Into<Box<(dyn std::error::Error + Send + Sync + 'static)>>`
+note: required by a bound in `try_map`
+   --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clap_builder-4.6.6/src/builder/value_parser.rs:864:12
+    |
+860 |     fn try_map<T, E, F>(self, func: F) -> TryMapValueParser<Self, F>
+    |        ------- required by a bound in this associated function
+...
+864 |         E: Into<Box<dyn std::error::Error + Send + Sync + 'static>>,
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `TypedValueParser::try_map`
+
+error[E0277]: the trait bound `TryMapValueParser<PossibleValuesParser, ...>: TypedValueParser` is not satisfied
+    --> crates/airsl-cli/src/cli.rs:122:22
+     |
+ 122 |   fn access_names() -> impl clap::builder::TypedValueParser<Value = HostAccess> {
+     |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+ 123 | /     PossibleValuesParser::new(HostAccess::ALL.map(HostAccess::as_str))
+ 124 | |         .try_map(|name| name.parse::<HostAccess>())
+     | |___________________________________________________- return type was inferred to be `TryMapValueParser<PossibleValuesParser, {closure@crates/airsl-cli/src/cli.rs:124:18: 124:24}>` here
+     |
+     = help: the trait `TypedValueParser` is not implemented for `TryMapValueParser<PossibleValuesParser, {closure@crates/airsl-cli/src/cli.rs:124:18: 124:24}>`
+help: the trait `TypedValueParser` is implemented for `TryMapValueParser<P, F>`
+    --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clap_builder-4.6.6/src/builder/value_parser.rs:2091:1
+     |
+2091 | / impl<P, F, T, E> TypedValueParser for TryMapValueParser<P, F>
+2092 | | where
+2093 | |     P: TypedValueParser,
+2094 | |     P::Value: Send + Sync + Clone,
+2095 | |     F: Fn(P::Value) -> Result<T, E> + Clone + Send + Sync + 'static,
+2096 | |     T: Send + Sync + Clone,
+2097 | |     E: Into<Box<dyn std::error::Error + Send + Sync + 'static>>,
+     | |________________________________________________________________^
+     = note: the full name for the type has been written to '/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/repo-copy/target/debug/deps/airsl-1af21bde77ebc80a.long-type-8930368198804698493.txt'
+     = note: consider using `--verbose` to print the full type name to the console
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `airsl-cli` (bin "airsl") due to 3 previous errors
+exit=101

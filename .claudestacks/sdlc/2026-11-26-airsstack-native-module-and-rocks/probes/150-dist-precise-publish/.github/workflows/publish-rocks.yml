@@ -1,0 +1,13 @@
+# Probe stub: dist custom publish job (reusable workflow).
+name: publish-rocks
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+jobs:
+  stub:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "stub publish-rocks"

@@ -1,0 +1,10 @@
+question: A7: what io::ErrorKind and Display does std::process::Command::output() give for a missing binary and a non-executable file, and what do status.code() and status Display give for a child killed by SIGKILL? (macOS)
+commands: cargo run -q (source in 09-process-command-errors/)
+tools: rustc 1.94.1 (e408947bf 2026-03-25); cargo 1.94.1 (29ea6fb6a 2026-03-24); mlua =0.12.0, mlua-sys 0.11.0; Lua 5.4.8  Copyright (C) 1994-2025 Lua.org, PUC-Rio; LuaJIT 2.1.1770848219 -- Copyright (C) 2005-2026 Mike Pall. https://luajit.org/; macOS 26.3.1 arm64
+date: 2026-11-26T06:17:36Z
+--- raw output ---
+$ cargo run -q
+missing: Err; kind=NotFound; Display="No such file or directory (os error 2)"; raw_os_error=Some(2)
+non-executable (absolute path, mode 0644): Err; kind=PermissionDenied; Display="Permission denied (os error 13)"; raw_os_error=Some(13)
+killed: Ok; status.code()=None; status Display="signal: 9 (SIGKILL)"; status.success()=false
+exit=0

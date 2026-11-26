@@ -1,0 +1,104 @@
+question: draft 7.2 #14: Homebrew luarocks -- 'luarocks --lua-version 5.4 config lua_version', 'config variables.LUA'; does 'luarocks path' (with and without --lua-version) include the --local tree (~/.luarocks)? 'config deploy_lib_dir --local'. Then 'luarocks --local install' into a fake HOME (binary rock from probe 146's server, no build): where --local writes and what 'luarocks path' then prints. Nothing installed into the real ~/.luarocks.
+commands: each `$ ...` line below, run in the stated cwd, followed by its raw output and `[exit N]`
+versions: rustc 1.94.1 (e408947bf 2026-03-25), cargo 1.94.1 (29ea6fb6a 2026-03-24) via R/rust-toolchain.toml channel 1.94; mlua 0.12.0, mlua-sys 0.11.0, mlua_derive 0.12.0, syn 2.0.119 (copy's Cargo.lock); cargo-deny 0.20.2; cargo-dist 0.33.1; luarocks 3.12.2 (/opt/homebrew/bin/luarocks, runs on Lua 5.4); Lua 5.4.8 (/opt/homebrew/bin/lua5.4); LuaJIT 2.1.1770848219 (/opt/homebrew/opt/luajit); luarocks-build-rust-mlua 0.2.7-1; macOS 26.3.1 arm64
+setup: S=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad; copy = S/probes-L/repo = rsync of R at 9d054c4 (minus target/, .git, .claudestacks, book/book), with the draft's feature table applied: root mlua features ["serialize"], members += crates/airsl-lua; crates/airsl [features] default=[lua54,vendored,send], lua54/luajit/vendored/send/module -> mlua/*; crates/airsl-lua cdylib (lib name airsstack, airsl path dep default-features=false + module, features lua54/luajit, build.rs dynamic_lookup, lib.rs `mod entry;`, entry.rs #[mlua::lua_module]); probe-only `ModuleSet::open` added to crates/airsl/src/modules/registry.rs so the toy installs airsl's real Json module. Sources and diffs: 140-lua-module-private-mod/. Env: CARGO_BUILD_JOBS=2, CARGO_TARGET_DIR=S/probes-L/target (luarocks' backend passes --target-dir=target, i.e. S/probes-L/repo/target). Every command ran under zsh `setopt pipefail`, so [exit N] is the pipeline's real status.
+date: 2026-11-26 (probe agent L)
+--- raw output ---
+NOTE: every command runs under 'env PATH=/opt/homebrew/bin:/usr/bin:/bin' so the PATH line luarocks prints is short; HOME is the real one unless HOME= is shown.
+real ~/.luarocks exists? no
+$ env PATH=/opt/homebrew/bin:/usr/bin:/bin luarocks --version; env PATH=/opt/homebrew/bin:/usr/bin:/bin luarocks config lua_version; env PATH=/opt/homebrew/bin:/usr/bin:/bin luarocks --lua-version 5.4 config lua_version; env PATH=/opt/homebrew/bin:/usr/bin:/bin luarocks --lua-version 5.4 config variables.LUA; env PATH=/opt/homebrew/bin:/usr/bin:/bin luarocks config variables.LUA   (cwd=/tmp)
+/opt/homebrew/bin/luarocks 3.12.2
+LuaRocks main command-line interface
+
+5.4
+5.4
+/opt/homebrew/opt/lua/bin/lua5.4
+/opt/homebrew/opt/lua/bin/lua5.4
+[exit 0]
+
+$ env PATH=/opt/homebrew/bin:/usr/bin:/bin luarocks config rocks_trees; echo; env PATH=/opt/homebrew/bin:/usr/bin:/bin luarocks config home_tree   (cwd=/tmp)
+{
+   {
+      name = "user",
+      root = "/Users/hiraq/.luarocks"
+   },
+   {
+      name = "system",
+      root = "/opt/homebrew"
+   }
+}
+/Users/hiraq/.luarocks
+[exit 0]
+
+$ env PATH=/opt/homebrew/bin:/usr/bin:/bin luarocks path   (cwd=/tmp)
+export LUA_PATH='/opt/homebrew/Cellar/luarocks/3.12.2/share/lua/5.4/?.lua;/opt/homebrew/share/lua/5.4/?.lua;/opt/homebrew/share/lua/5.4/?/init.lua;/opt/homebrew/lib/lua/5.4/?.lua;/opt/homebrew/lib/lua/5.4/?/init.lua;./?.lua;./?/init.lua;/Users/hiraq/.luarocks/share/lua/5.4/?.lua;/Users/hiraq/.luarocks/share/lua/5.4/?/init.lua'
+export LUA_CPATH='/opt/homebrew/lib/lua/5.4/?.so;/opt/homebrew/lib/lua/5.4/loadall.so;./?.so;/Users/hiraq/.luarocks/lib/lua/5.4/?.so'
+export PATH='/Users/hiraq/.luarocks/bin:/opt/homebrew/bin:/usr/bin:/bin'
+[exit 0]
+
+$ env PATH=/opt/homebrew/bin:/usr/bin:/bin luarocks --lua-version 5.4 path   (cwd=/tmp)
+export LUA_PATH='/opt/homebrew/Cellar/luarocks/3.12.2/share/lua/5.4/?.lua;/opt/homebrew/share/lua/5.4/?.lua;/opt/homebrew/share/lua/5.4/?/init.lua;/opt/homebrew/lib/lua/5.4/?.lua;/opt/homebrew/lib/lua/5.4/?/init.lua;./?.lua;./?/init.lua;/Users/hiraq/.luarocks/share/lua/5.4/?.lua;/Users/hiraq/.luarocks/share/lua/5.4/?/init.lua'
+export LUA_CPATH='/opt/homebrew/lib/lua/5.4/?.so;/opt/homebrew/lib/lua/5.4/loadall.so;./?.so;/Users/hiraq/.luarocks/lib/lua/5.4/?.so'
+export PATH='/Users/hiraq/.luarocks/bin:/opt/homebrew/bin:/usr/bin:/bin'
+[exit 0]
+
+$ env PATH=/opt/homebrew/bin:/usr/bin:/bin luarocks --local path   (cwd=/tmp)
+export LUA_PATH='/opt/homebrew/Cellar/luarocks/3.12.2/share/lua/5.4/?.lua;/opt/homebrew/share/lua/5.4/?.lua;/opt/homebrew/share/lua/5.4/?/init.lua;/opt/homebrew/lib/lua/5.4/?.lua;/opt/homebrew/lib/lua/5.4/?/init.lua;./?.lua;./?/init.lua;/Users/hiraq/.luarocks/share/lua/5.4/?.lua;/Users/hiraq/.luarocks/share/lua/5.4/?/init.lua'
+export LUA_CPATH='/opt/homebrew/lib/lua/5.4/?.so;/opt/homebrew/lib/lua/5.4/loadall.so;./?.so;/Users/hiraq/.luarocks/lib/lua/5.4/?.so'
+export PATH='/Users/hiraq/.luarocks/bin:/opt/homebrew/bin:/usr/bin:/bin'
+[exit 0]
+
+$ env PATH=/opt/homebrew/bin:/usr/bin:/bin luarocks config deploy_lib_dir; env PATH=/opt/homebrew/bin:/usr/bin:/bin luarocks --local config deploy_lib_dir; env PATH=/opt/homebrew/bin:/usr/bin:/bin luarocks config deploy_lib_dir --local 2>&1; env PATH=/opt/homebrew/bin:/usr/bin:/bin luarocks --lua-version 5.4 --local config deploy_lib_dir   (cwd=/tmp)
+/opt/homebrew/lib/lua/5.4
+/Users/hiraq/.luarocks/lib/lua/5.4
+/Users/hiraq/.luarocks/lib/lua/5.4
+/Users/hiraq/.luarocks/lib/lua/5.4
+[exit 0]
+
+=== fake HOME=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/fakehome: --local install of the binary rock from the probe server (no build)
+$ HOME=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/fakehome env PATH=/opt/homebrew/bin:/usr/bin:/bin luarocks --lua-version 5.4 --local install --only-server file:///private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/server airsstack 2>&1   (cwd=/tmp)
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/server/airsstack-0.0.0-1.macosx-aarch64.rock
+
+airsstack 0.0.0-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack 0.0.0-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/fakehome/.luarocks (license: Apache-2.0)
+
+[exit 0]
+
+$ cd /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/fakehome && find . -type f | sort   (cwd=/tmp)
+./.luarocks/lib/lua/5.4/airsstack.so
+./.luarocks/lib/luarocks/rocks-5.4/airsstack/0.0.0-1/airsstack-0.0.0-1.rockspec
+./.luarocks/lib/luarocks/rocks-5.4/airsstack/0.0.0-1/doc/CHANGELOG.md
+./.luarocks/lib/luarocks/rocks-5.4/airsstack/0.0.0-1/doc/CLAUDE.md
+./.luarocks/lib/luarocks/rocks-5.4/airsstack/0.0.0-1/doc/LICENSE
+./.luarocks/lib/luarocks/rocks-5.4/airsstack/0.0.0-1/doc/README.md
+./.luarocks/lib/luarocks/rocks-5.4/airsstack/0.0.0-1/rock_manifest
+./.luarocks/lib/luarocks/rocks-5.4/manifest
+[exit 0]
+
+$ HOME=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/fakehome env PATH=/opt/homebrew/bin:/usr/bin:/bin luarocks path   (cwd=/tmp)
+export LUA_PATH='/opt/homebrew/Cellar/luarocks/3.12.2/share/lua/5.4/?.lua;/opt/homebrew/share/lua/5.4/?.lua;/opt/homebrew/share/lua/5.4/?/init.lua;/opt/homebrew/lib/lua/5.4/?.lua;/opt/homebrew/lib/lua/5.4/?/init.lua;./?.lua;./?/init.lua;/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/fakehome/.luarocks/share/lua/5.4/?.lua;/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/fakehome/.luarocks/share/lua/5.4/?/init.lua'
+export LUA_CPATH='/opt/homebrew/lib/lua/5.4/?.so;/opt/homebrew/lib/lua/5.4/loadall.so;./?.so;/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/fakehome/.luarocks/lib/lua/5.4/?.so'
+export PATH='/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/fakehome/.luarocks/bin:/opt/homebrew/bin:/usr/bin:/bin'
+[exit 0]
+
+$ HOME=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/fakehome env PATH=/opt/homebrew/bin:/usr/bin:/bin luarocks --lua-version 5.4 path   (cwd=/tmp)
+export LUA_PATH='/opt/homebrew/Cellar/luarocks/3.12.2/share/lua/5.4/?.lua;/opt/homebrew/share/lua/5.4/?.lua;/opt/homebrew/share/lua/5.4/?/init.lua;/opt/homebrew/lib/lua/5.4/?.lua;/opt/homebrew/lib/lua/5.4/?/init.lua;./?.lua;./?/init.lua;/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/fakehome/.luarocks/share/lua/5.4/?.lua;/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/fakehome/.luarocks/share/lua/5.4/?/init.lua'
+export LUA_CPATH='/opt/homebrew/lib/lua/5.4/?.so;/opt/homebrew/lib/lua/5.4/loadall.so;./?.so;/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/fakehome/.luarocks/lib/lua/5.4/?.so'
+export PATH='/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/fakehome/.luarocks/bin:/opt/homebrew/bin:/usr/bin:/bin'
+[exit 0]
+
+$ HOME=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/fakehome env PATH=/opt/homebrew/bin:/usr/bin:/bin luarocks list 2>&1   (cwd=/tmp)
+
+Rocks installed for Lua 5.4
+---------------------------
+
+airsstack
+   0.0.0-1 (installed) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/fakehome/.luarocks/lib/luarocks/rocks-5.4
+
+[exit 0]
+
+$ eval "$(HOME=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/fakehome env PATH=/opt/homebrew/bin:/usr/bin:/bin luarocks path)"; lua5.4 -e 'local m=require("airsstack"); print(package.searchpath("airsstack", package.cpath), m.version)'   (cwd=/tmp)
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/fakehome/.luarocks/lib/lua/5.4/airsstack.so	0.2.0
+[exit 0]
+

@@ -1,0 +1,993 @@
+question: A3: in a toy workspace mirroring airsl (resolver 3, workspace mlua =0.12.0 with no features, airsl lints), can a module-mode cdylib crate live beside a vendored+send lib/bin? Results of (a)-(k)
+commands: see === headers below; each command run from the workspace root except (e), run from crates/native
+tools: rustc 1.99.0 (b940084d7 2026-09-28); cargo 1.99.0 (5f94df478 2026-08-27); mlua =0.12.0, mlua-sys 0.11.0; Lua 5.4.8  Copyright (C) 1994-2025 Lua.org, PUC-Rio; LuaJIT 2.1.1770848219 -- Copyright (C) 2005-2026 Mike Pall. https://luajit.org/; macOS 26.3.1 arm64
+date: 2026-11-26T06:15:46Z
+--- raw output ---
+NOTE: the stand-in for airsl is named `hostlib`, not `core`: a package named `core` would shadow Rust's built-in `core` crate and confound (k). (g) was run with `-- -D warnings` (stricter than asked). Workspace lints are copied from the airsl root Cargo.toml (unsafe_code = forbid, pedantic, nursery...).
+=== (a) $ cargo build --workspace
+     Locking 1 package to highest Rust 1.94 compatible version
+      Adding mlua_derive v0.12.0 (available: v0.12.2)
+   Compiling libc v0.2.189
+   Compiling shlex v2.0.1
+   Compiling find-msvc-tools v0.1.11
+   Compiling cfg-if v1.0.4
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.24
+   Compiling pkg-config v0.3.34
+   Compiling parking_lot_core v0.9.12
+   Compiling autocfg v1.5.1
+   Compiling smallvec v1.15.2
+   Compiling cc v1.4.4
+   Compiling scopeguard v1.2.0
+   Compiling lock_api v0.4.14
+   Compiling num-traits v0.2.19
+   Compiling memchr v2.8.3
+   Compiling either v1.18.0
+   Compiling rustc-hash v2.1.3
+   Compiling bstr v1.13.1
+   Compiling syn v2.0.119
+   Compiling lua-src v550.1.1
+   Compiling which v8.0.5
+   Compiling luajit-src v210.7.2+b925b3e
+   Compiling parking_lot v0.12.5
+   Compiling mlua-sys v0.11.0
+error: `vendored`, `external` and `module` features are mutually exclusive
+  --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-sys-0.11.0/build/main_inner.rs:22:5
+   |
+22 |     compile_error!("`vendored`, `external` and `module` features are mutually exclusive");
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: could not compile `mlua-sys` (build script) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+exit=101
+=== (b) $ cargo build --workspace --features native/lua54
+   Compiling mlua-sys v0.11.0
+   Compiling mlua_derive v0.12.0
+error: `vendored`, `external` and `module` features are mutually exclusive
+  --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-sys-0.11.0/build/main_inner.rs:22:5
+   |
+22 |     compile_error!("`vendored`, `external` and `module` features are mutually exclusive");
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: could not compile `mlua-sys` (build script) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+exit=101
+=== (c) $ cargo build --workspace --exclude native
+   Compiling mlua-sys v0.11.0
+   Compiling mlua v0.12.0
+   Compiling hostlib v0.0.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/crates/hostlib)
+   Compiling cli v0.0.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/crates/cli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.43s
+exit=0
+=== (d) $ cargo build -p native --features lua54
+   Compiling mlua-sys v0.11.0
+   Compiling mlua v0.12.0
+   Compiling hostlib v0.0.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/crates/hostlib)
+   Compiling native v0.0.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/crates/native)
+error: linking with `cc` failed: exit status: 1
+  |
+  = note:  "cc" "-Wl,-exported_symbols_list" "-Wl,/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/target/debug/deps/rustcng0MVc/list" "/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/target/debug/deps/rustcng0MVc/symbols.o" "<12 object files omitted>" "/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/target/debug/deps/{libhostlib-3e9ed6a5568eb901,libmlua-b135099d7e19835b,libmlua_sys-3b03a31633ceb300,libparking_lot-22d0bc07b3df14f0,libparking_lot_core-497d4c058b56efb4,liblibc-b80384a1ab117ef3,libcfg_if-5961dbb60a675de3,libsmallvec-aa3cc8c1979c1d9b,liblock_api-09bde01970e5f4cf,libscopeguard-f94d8dfeb1965bc2,librustc_hash-1922c5269cc5adcc,libeither-feecadaa681b2985,libnum_traits-f8dad4a23597e346,libbstr-5bd62217491bf69c,libmemchr-2fd701f973603a9e}.rlib" "<sysroot>/lib/rustlib/aarch64-apple-darwin/lib/{libstd-*,libpanic_unwind-*,libobject-*,libmemchr-*,libaddr2line-*,libgimli-*,libcfg_if-*,librustc_demangle-*,libstd_detect-*,libhashbrown-*,librustc_std_workspace_alloc-*,libminiz_oxide-*,libadler2-*,libunwind-*,liblibc-*,librustc_std_workspace_core-*,liballoc-*,libcore-*,libcompiler_builtins-*}.rlib" "-liconv" "-lSystem" "-lc" "-lm" "-arch" "arm64" "-mmacosx-version-min=11.0.0" "-o" "/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/target/debug/deps/libnative.dylib" "-Wl,-dead_strip" "-dynamiclib" "-nodefaultlibs"
+  = note: some arguments are omitted. use `--verbose` to show all linker arguments
+  = note: Undefined symbols for architecture arm64:
+            "_luaL_checkstack", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+            "_luaL_ref", referenced from:
+                __RNCNvMs0_NtNtCsjdmXvNL10OO_4mlua5state5extraNtB7_9ExtraData4init0Bb_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_luaL_tolstring", referenced from:
+                __RNvNtNtCsjdmXvNL10OO_4mlua4util5error15error_traceback in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+            "_luaL_traceback", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCINvMs6_B4_NtB4_3Lua10entrypointNCINvBZ_11entrypoint1NCNvCs3crFeZ7VnVH_6native17luaopen_airsstack0NtNtB6_5table5TableE0uB2v_E0lEB1Q_ in native.01j58a7aw4bm0tf44y8jlm7qi.0iaczpv.rcgu.o
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNvNtNtCsjdmXvNL10OO_4mlua4util5error15error_traceback in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+            "_lua_checkstack", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCINvMs6_B4_NtB4_3Lua10entrypointNCINvBZ_11entrypoint1NCNvCs3crFeZ7VnVH_6native17luaopen_airsstack0NtNtB6_5table5TableE0uB2v_E0lEB1Q_ in native.01j58a7aw4bm0tf44y8jlm7qi.0iaczpv.rcgu.o
+                __RNvNtCsjdmXvNL10OO_4mlua4util11check_stackCsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[12](hostlib-3e9ed6a5568eb901.d9gnakw1whu0on2rzzomxkcu8.17ilvna.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNvNtNtCsjdmXvNL10OO_4mlua4util5error15error_traceback in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNvNtNtCsjdmXvNL10OO_4mlua4util5error15error_traceback in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNvMs0_NtNtCsjdmXvNL10OO_4mlua5state5extraNtB5_9ExtraData13ref_stack_pop in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                ...
+            "_lua_close", referenced from:
+                __RNvXNtNtCsjdmXvNL10OO_4mlua5state3rawNtB2_6RawLuaNtNtNtCsjIpoRzUjyHQ_4core3ops4drop4Drop4drop in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+            "_lua_copy", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua8drop_ref in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvMNvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNtB2_19PreallocatedFailure3use in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvMs0_NtNtCsjdmXvNL10OO_4mlua5state5extraNtB5_9ExtraData13ref_stack_pop in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_createtable", referenced from:
+                __RNCNvNtCsjdmXvNL10OO_4mlua4util10push_table0B5_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util10push_tableB3_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_error", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCINvMs6_B4_NtB4_3Lua10entrypointNCINvBZ_11entrypoint1NCNvCs3crFeZ7VnVH_6native17luaopen_airsstack0NtNtB6_5table5TableE0uB2v_E0lEB1Q_ in native.01j58a7aw4bm0tf44y8jlm7qi.0iaczpv.rcgu.o
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCINvMs6_B4_NtB4_3Lua10entrypointNCINvBZ_11entrypoint1NCNvCs3crFeZ7VnVH_6native17luaopen_airsstack0NtNtB6_5table5TableE0uB2v_E0lEB1Q_ in native.01j58a7aw4bm0tf44y8jlm7qi.0iaczpv.rcgu.o
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCINvMs6_B4_NtB4_3Lua10entrypointNCINvBZ_11entrypoint1NCNvCs3crFeZ7VnVH_6native17luaopen_airsstack0NtNtB6_5table5TableE0uB2v_E0lEB1Q_ in native.01j58a7aw4bm0tf44y8jlm7qi.0iaczpv.rcgu.o
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                ...
+            "_lua_gc", referenced from:
+                __RNvNvMs6_NtCsjdmXvNL10OO_4mlua5stateNtB7_3Lua10gc_collect7do_call in libmlua-b135099d7e19835b.rlib[16](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.12.rcgu.o)
+            "_lua_getallocf", referenced from:
+                __RNvMNtCsjdmXvNL10OO_4mlua6memoryNtB2_11MemoryState3getCsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[8](hostlib-3e9ed6a5568eb901.65awm21jpsoolfgdvqns7262c.17ilvna.rcgu.o)
+                __RNvMNtCsjdmXvNL10OO_4mlua6memoryNtB2_11MemoryState3getB4_ in libmlua-b135099d7e19835b.rlib[16](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.12.rcgu.o)
+            "_lua_getmetatable", referenced from:
+                __RNvMNtCsjdmXvNL10OO_4mlua5tableNtB2_5Table13has_metatableCsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[6](hostlib-3e9ed6a5568eb901.5d3ryggklxq30p1phr8pv4bma.17ilvna.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata21get_internal_userdataNtNtB4_5error14WrappedFailureEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+            "_lua_gettop", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCINvMs6_B4_NtB4_3Lua10entrypointNCINvBZ_11entrypoint1NCNvCs3crFeZ7VnVH_6native17luaopen_airsstack0NtNtB6_5table5TableE0uB2v_E0lEB1Q_ in native.01j58a7aw4bm0tf44y8jlm7qi.0iaczpv.rcgu.o
+                __RNvMNtCsjdmXvNL10OO_4mlua4utilNtB2_10StackGuard3newCsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[12](hostlib-3e9ed6a5568eb901.d9gnakw1whu0on2rzzomxkcu8.17ilvna.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataNtB2_14WrappedFailureE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataNtNtCs6zY7rJBZy9D_5alloc6string6StringE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                ...
+            "_lua_newthread", referenced from:
+                __RNCNvMs0_NtNtCsjdmXvNL10OO_4mlua5state5extraNtB7_9ExtraData4init0Bb_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_newuserdatauv", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataNtNtB4_5error14WrappedFailureEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataNtNtCs6zY7rJBZy9D_5alloc6string6StringEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB8_5state5extra9ExtraDataEEE0B8_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataNtNtB6_5error14WrappedFailureE0B8_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataNtNtCs6zY7rJBZy9D_5alloc6string6StringE0B8_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+            "_lua_pcallk", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataNtB2_14WrappedFailureE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataNtNtCs6zY7rJBZy9D_5alloc6string6StringE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata23init_internal_metatableINtNtB6_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB24_3ops8function2FnTRL0_NtNtNtB6_5state3raw6RawLualEEp6OutputINtNtB24_6result6ResultlNtNtB6_5error5ErrorEEL_EEEE0uEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcDG1_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL2_NtNtB6_5state3LuaRL1_INtNtB6_5debug5DebugL0_EEEp6OutputINtNtB2j_6result6ResultNtNtB6_5types7VmStateNtNtB6_5error5ErrorEEL_EE0uEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEE0uEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL0_NtNtNtB6_5state3raw6RawLualEEp6OutputINtNtB2m_6result6ResultlNtNtB6_5error5ErrorEEL_EE0uEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                ...
+            "_lua_pushboolean", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua10push_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableINtNtB6_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB1t_3ops8function2FnTRL0_NtNtNtB6_5state3raw6RawLualEEp6OutputINtNtB1t_6result6ResultlNtNtB6_5error5ErrorEEL_EEEEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcDG1_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL2_NtNtB6_5state3LuaRL1_INtNtB6_5debug5DebugL0_EEEp6OutputINtNtB1I_6result6ResultNtNtB6_5types7VmStateNtNtB6_5error5ErrorEEL_EEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL0_NtNtNtB6_5state3raw6RawLualEEp6OutputINtNtB1L_6result6ResultlNtNtB6_5error5ErrorEEL_EEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableNtNtB4_5error14WrappedFailureEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableNtNtCs6zY7rJBZy9D_5alloc6string6StringEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                ...
+            "_lua_pushcclosure", referenced from:
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB6_8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB8_5state5extra9ExtraDataEEE0OB1E_E0B8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB6_8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB8_5state5extra9ExtraDataEEE0OB1E_E0B8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB6_8userdata22push_internal_userdataNtB4_14WrappedFailureE0OB1E_E0B8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB6_8userdata22push_internal_userdataNtB4_14WrappedFailureE0OB1E_E0B8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB6_8userdata22push_internal_userdataNtNtCs6zY7rJBZy9D_5alloc6string6StringE0OB1E_E0B8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB6_8userdata22push_internal_userdataNtNtCs6zY7rJBZy9D_5alloc6string6StringE0OB1E_E0B8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB6_8userdata23init_internal_metatableINtNtB8_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB26_3ops8function2FnTRL0_NtNtNtB8_5state3raw6RawLualEEp6OutputINtNtB26_6result6ResultlNtNtB8_5error5ErrorEEL_EEEE0uE0B8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB6_8userdata23init_internal_metatableINtNtB8_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB26_3ops8function2FnTRL0_NtNtNtB8_5state3raw6RawLualEEp6OutputINtNtB26_6result6ResultlNtNtB8_5error5ErrorEEL_EEEE0uE0B8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                ...
+            "_lua_pushinteger", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua10push_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+            "_lua_pushlightuserdata", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataNtB2_14WrappedFailureE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataNtNtCs6zY7rJBZy9D_5alloc6string6StringE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata23init_internal_metatableINtNtB6_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB24_3ops8function2FnTRL0_NtNtNtB6_5state3raw6RawLualEEp6OutputINtNtB24_6result6ResultlNtNtB6_5error5ErrorEEL_EEEE0uEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcDG1_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL2_NtNtB6_5state3LuaRL1_INtNtB6_5debug5DebugL0_EEEp6OutputINtNtB2j_6result6ResultNtNtB6_5types7VmStateNtNtB6_5error5ErrorEEL_EE0uEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEE0uEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL0_NtNtNtB6_5state3raw6RawLualEEp6OutputINtNtB2m_6result6ResultlNtNtB6_5error5ErrorEEL_EE0uEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                ...
+            "_lua_pushlstring", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua13create_string in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNCNvNtCsjdmXvNL10OO_4mlua4util11push_string0B5_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNCNvNtCsjdmXvNL10OO_4mlua4util12rawset_field0B5_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RINvNtCsjdmXvNL10OO_4mlua10conversion21push_bytes_into_stackReEB4_ in libmlua-b135099d7e19835b.rlib[17](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.13.rcgu.o)
+            "_lua_pushnil", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua10push_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua8drop_ref in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvMNvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNtB2_19PreallocatedFailure3use in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_pushnumber", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua10push_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+            "_lua_pushstring", referenced from:
+                __RNCNvNtNtCsjdmXvNL10OO_4mlua4util5error19init_error_registry0B7_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+            "_lua_pushvalue", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua8push_refCsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[10](hostlib-3e9ed6a5568eb901.8ot3oloqg7x3qlqgkfagvp3yf.17ilvna.rcgu.o)
+                __RNvNtNtCsjdmXvNL10OO_4mlua4util5error19init_error_registry in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua8push_refB8_ in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvMNvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNtB2_19PreallocatedFailure3use in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util12rawset_field in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_rawgeti", referenced from:
+                __RNvNtCsjdmXvNL10OO_4mlua4util14get_main_state in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_rawgetp", referenced from:
+                __RNCNvNvNtNtCsjdmXvNL10OO_4mlua4util5error19init_error_registry14error_tostring0B9_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCNvNvNtNtCsjdmXvNL10OO_4mlua4util5error19init_error_registry14error_tostring0B9_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22get_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22get_internal_metatableNtNtB4_5error14WrappedFailureEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22get_internal_metatableNtNtCs6zY7rJBZy9D_5alloc6string6StringEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNvNtNtCsjdmXvNL10OO_4mlua4util8userdata33get_destructed_userdata_metatable in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNvMs0_NtNtCsjdmXvNL10OO_4mlua5state5extraNtB5_9ExtraData3get in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                ...
+            "_lua_rawset", referenced from:
+                __RINvMNtCsjdmXvNL10OO_4mlua5tableNtB3_5Table7raw_setReBN_ECsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[7](hostlib-3e9ed6a5568eb901.5s6nqflktycrqu1mmz33tikhg.17ilvna.rcgu.o)
+                __RNvNvMNtCsjdmXvNL10OO_4mlua5tableNtB4_5Table7raw_set7do_call in libmlua-b135099d7e19835b.rlib[10](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.06.rcgu.o)
+                __RNCNvNtCsjdmXvNL10OO_4mlua4util12rawset_field0B5_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_rawsetp", referenced from:
+                __RNvNvNtNtCsjdmXvNL10OO_4mlua4util5error19init_error_registry7do_call in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNvNvNtNtCsjdmXvNL10OO_4mlua4util5error19init_error_registrys_7do_call in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableINtNtB8_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB1v_3ops8function2FnTRL0_NtNtNtB8_5state3raw6RawLualEEp6OutputINtNtB1v_6result6ResultlNtNtB8_5error5ErrorEEL_EEEE0B8_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcDG1_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL2_NtNtB8_5state3LuaRL1_INtNtB8_5debug5DebugL0_EEEp6OutputINtNtB1K_6result6ResultNtNtB8_5types7VmStateNtNtB8_5error5ErrorEEL_EE0B8_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB8_5state5extra9ExtraDataEEE0B8_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL0_NtNtNtB8_5state3raw6RawLualEEp6OutputINtNtB1N_6result6ResultlNtNtB8_5error5ErrorEEL_EE0B8_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableNtNtB6_5error14WrappedFailureE0B8_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                ...
+            "_lua_rotate", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataNtB2_14WrappedFailureE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataNtB2_14WrappedFailureE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                ...
+            "_lua_setfield", referenced from:
+                __RNCNvNtNtCsjdmXvNL10OO_4mlua4util5error19init_error_registry0B7_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCNvNtNtCsjdmXvNL10OO_4mlua4util5error19init_error_registry0B7_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+            "_lua_setmetatable", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCINvMs6_B4_NtB4_3Lua10entrypointNCINvBZ_11entrypoint1NCNvCs3crFeZ7VnVH_6native17luaopen_airsstack0NtNtB6_5table5TableE0uB2v_E0lEB1Q_ in native.01j58a7aw4bm0tf44y8jlm7qi.0iaczpv.rcgu.o
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCINvMs6_B4_NtB4_3Lua10entrypointNCINvBZ_11entrypoint1NCNvCs3crFeZ7VnVH_6native17luaopen_airsstack0NtNtB6_5table5TableE0uB2v_E0lEB1Q_ in native.01j58a7aw4bm0tf44y8jlm7qi.0iaczpv.rcgu.o
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCINvMs6_B4_NtB4_3Lua10entrypointNCINvBZ_11entrypoint1NCNvCs3crFeZ7VnVH_6native17luaopen_airsstack0NtNtB6_5table5TableE0uB2v_E0lEB1Q_ in native.01j58a7aw4bm0tf44y8jlm7qi.0iaczpv.rcgu.o
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataNtNtB4_5error14WrappedFailureEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataNtNtCs6zY7rJBZy9D_5alloc6string6StringEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+            "_lua_settable", referenced from:
+                __RNvNvMNtCsjdmXvNL10OO_4mlua5tableNtB4_5Table13set_protected7do_call in libmlua-b135099d7e19835b.rlib[10](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.06.rcgu.o)
+            "_lua_settop", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCINvMs6_B4_NtB4_3Lua10entrypointNCINvBZ_11entrypoint1NCNvCs3crFeZ7VnVH_6native17luaopen_airsstack0NtNtB6_5table5TableE0uB2v_E0lEB1Q_ in native.01j58a7aw4bm0tf44y8jlm7qi.0iaczpv.rcgu.o
+                __RNvMNtCsjdmXvNL10OO_4mlua5tableNtB2_5Table13has_metatableCsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[6](hostlib-3e9ed6a5568eb901.5d3ryggklxq30p1phr8pv4bma.17ilvna.rcgu.o)
+                __RINvMNtCsjdmXvNL10OO_4mlua5tableNtB3_5Table7raw_setReBN_ECsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[7](hostlib-3e9ed6a5568eb901.5s6nqflktycrqu1mmz33tikhg.17ilvna.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                ...
+            "_lua_toboolean", referenced from:
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_tointegerx", referenced from:
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_tolstring", referenced from:
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_tonumberx", referenced from:
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_topointer", referenced from:
+                __RNvMNtCsjdmXvNL10OO_4mlua5tableNtB2_5Table13has_metatableCsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[6](hostlib-3e9ed6a5568eb901.5d3ryggklxq30p1phr8pv4bma.17ilvna.rcgu.o)
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua13init_from_ptr in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata21get_internal_userdataNtNtB4_5error14WrappedFailureEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata21get_internal_userdataNtNtB4_5error14WrappedFailureEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNvMs0_NtNtCsjdmXvNL10OO_4mlua5state5extraNtB5_9ExtraData4init in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                ...
+            "_lua_tothread", referenced from:
+                __RNvNtCsjdmXvNL10OO_4mlua4util14get_main_state in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_touserdata", referenced from:
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB8_5state5extra9ExtraDataEEE0OB1M_EB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata22push_internal_userdataNtB4_14WrappedFailureE0OB1M_EB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata22push_internal_userdataNtNtCs6zY7rJBZy9D_5alloc6string6StringE0OB1M_EB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata23init_internal_metatableINtNtB8_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB2e_3ops8function2FnTRL0_NtNtNtB8_5state3raw6RawLualEEp6OutputINtNtB2e_6result6ResultlNtNtB8_5error5ErrorEEL_EEEE0uEB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcDG1_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL2_NtNtB8_5state3LuaRL1_INtNtB8_5debug5DebugL0_EEEp6OutputINtNtB2t_6result6ResultNtNtB8_5types7VmStateNtNtB8_5error5ErrorEEL_EE0uEB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB8_5state5extra9ExtraDataEEE0uEB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL0_NtNtNtB8_5state3raw6RawLualEEp6OutputINtNtB2w_6result6ResultlNtNtB8_5error5ErrorEEL_EE0uEB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                ...
+            "_lua_type", referenced from:
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB8_5state5extra9ExtraDataEEE0OB1M_EB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata22push_internal_userdataNtB4_14WrappedFailureE0OB1M_EB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata22push_internal_userdataNtNtCs6zY7rJBZy9D_5alloc6string6StringE0OB1M_EB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata23init_internal_metatableINtNtB8_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB2e_3ops8function2FnTRL0_NtNtNtB8_5state3raw6RawLualEEp6OutputINtNtB2e_6result6ResultlNtNtB8_5error5ErrorEEL_EEEE0uEB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcDG1_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL2_NtNtB8_5state3LuaRL1_INtNtB8_5debug5DebugL0_EEEp6OutputINtNtB2t_6result6ResultNtNtB8_5types7VmStateNtNtB8_5error5ErrorEEL_EE0uEB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB8_5state5extra9ExtraDataEEE0uEB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL0_NtNtNtB8_5state3raw6RawLualEEp6OutputINtNtB2w_6result6ResultlNtNtB8_5error5ErrorEEL_EE0uEB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                ...
+            "_lua_typename", referenced from:
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_xmove", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua8push_refCsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[10](hostlib-3e9ed6a5568eb901.8ot3oloqg7x3qlqgkfagvp3yf.17ilvna.rcgu.o)
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua7pop_refB8_ in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua8push_refB8_ in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvMNvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNtB2_19PreallocatedFailure3use in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvMNvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNtB2_19PreallocatedFailure7release in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+          ld: symbol(s) not found for architecture arm64
+          clang: error: linker command failed with exit code 1 (use -v to see invocation)
+          
+
+error: could not compile `native` (lib) due to 1 previous error
+exit=101
+=== (e) $ cargo build -p native --features lua54
+   Compiling native v0.0.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/crates/native)
+error: linking with `cc` failed: exit status: 1
+  |
+  = note:  "cc" "-Wl,-exported_symbols_list" "-Wl,/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/target/debug/deps/rustcAPit9J/list" "/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/target/debug/deps/rustcAPit9J/symbols.o" "<12 object files omitted>" "/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/target/debug/deps/{libhostlib-3e9ed6a5568eb901,libmlua-b135099d7e19835b,libmlua_sys-3b03a31633ceb300,libparking_lot-22d0bc07b3df14f0,libparking_lot_core-497d4c058b56efb4,liblibc-b80384a1ab117ef3,libcfg_if-5961dbb60a675de3,libsmallvec-aa3cc8c1979c1d9b,liblock_api-09bde01970e5f4cf,libscopeguard-f94d8dfeb1965bc2,librustc_hash-1922c5269cc5adcc,libeither-feecadaa681b2985,libnum_traits-f8dad4a23597e346,libbstr-5bd62217491bf69c,libmemchr-2fd701f973603a9e}.rlib" "<sysroot>/lib/rustlib/aarch64-apple-darwin/lib/{libstd-*,libpanic_unwind-*,libobject-*,libmemchr-*,libaddr2line-*,libgimli-*,libcfg_if-*,librustc_demangle-*,libstd_detect-*,libhashbrown-*,librustc_std_workspace_alloc-*,libminiz_oxide-*,libadler2-*,libunwind-*,liblibc-*,librustc_std_workspace_core-*,liballoc-*,libcore-*,libcompiler_builtins-*}.rlib" "-liconv" "-lSystem" "-lc" "-lm" "-arch" "arm64" "-mmacosx-version-min=11.0.0" "-o" "/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/target/debug/deps/libnative.dylib" "-Wl,-dead_strip" "-dynamiclib" "-nodefaultlibs"
+  = note: some arguments are omitted. use `--verbose` to show all linker arguments
+  = note: Undefined symbols for architecture arm64:
+            "_luaL_checkstack", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+            "_luaL_ref", referenced from:
+                __RNCNvMs0_NtNtCsjdmXvNL10OO_4mlua5state5extraNtB7_9ExtraData4init0Bb_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_luaL_tolstring", referenced from:
+                __RNvNtNtCsjdmXvNL10OO_4mlua4util5error15error_traceback in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+            "_luaL_traceback", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCINvMs6_B4_NtB4_3Lua10entrypointNCINvBZ_11entrypoint1NCNvCs3crFeZ7VnVH_6native17luaopen_airsstack0NtNtB6_5table5TableE0uB2v_E0lEB1Q_ in native.01j58a7aw4bm0tf44y8jlm7qi.090ugl4.rcgu.o
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNvNtNtCsjdmXvNL10OO_4mlua4util5error15error_traceback in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+            "_lua_checkstack", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCINvMs6_B4_NtB4_3Lua10entrypointNCINvBZ_11entrypoint1NCNvCs3crFeZ7VnVH_6native17luaopen_airsstack0NtNtB6_5table5TableE0uB2v_E0lEB1Q_ in native.01j58a7aw4bm0tf44y8jlm7qi.090ugl4.rcgu.o
+                __RNvNtCsjdmXvNL10OO_4mlua4util11check_stackCsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[12](hostlib-3e9ed6a5568eb901.d9gnakw1whu0on2rzzomxkcu8.17ilvna.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNvNtNtCsjdmXvNL10OO_4mlua4util5error15error_traceback in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNvNtNtCsjdmXvNL10OO_4mlua4util5error15error_traceback in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNvMs0_NtNtCsjdmXvNL10OO_4mlua5state5extraNtB5_9ExtraData13ref_stack_pop in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                ...
+            "_lua_close", referenced from:
+                __RNvXNtNtCsjdmXvNL10OO_4mlua5state3rawNtB2_6RawLuaNtNtNtCsjIpoRzUjyHQ_4core3ops4drop4Drop4drop in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+            "_lua_copy", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua8drop_ref in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvMNvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNtB2_19PreallocatedFailure3use in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvMs0_NtNtCsjdmXvNL10OO_4mlua5state5extraNtB5_9ExtraData13ref_stack_pop in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_createtable", referenced from:
+                __RNCNvNtCsjdmXvNL10OO_4mlua4util10push_table0B5_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util10push_tableB3_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_error", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCINvMs6_B4_NtB4_3Lua10entrypointNCINvBZ_11entrypoint1NCNvCs3crFeZ7VnVH_6native17luaopen_airsstack0NtNtB6_5table5TableE0uB2v_E0lEB1Q_ in native.01j58a7aw4bm0tf44y8jlm7qi.090ugl4.rcgu.o
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCINvMs6_B4_NtB4_3Lua10entrypointNCINvBZ_11entrypoint1NCNvCs3crFeZ7VnVH_6native17luaopen_airsstack0NtNtB6_5table5TableE0uB2v_E0lEB1Q_ in native.01j58a7aw4bm0tf44y8jlm7qi.090ugl4.rcgu.o
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCINvMs6_B4_NtB4_3Lua10entrypointNCINvBZ_11entrypoint1NCNvCs3crFeZ7VnVH_6native17luaopen_airsstack0NtNtB6_5table5TableE0uB2v_E0lEB1Q_ in native.01j58a7aw4bm0tf44y8jlm7qi.090ugl4.rcgu.o
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                ...
+            "_lua_gc", referenced from:
+                __RNvNvMs6_NtCsjdmXvNL10OO_4mlua5stateNtB7_3Lua10gc_collect7do_call in libmlua-b135099d7e19835b.rlib[16](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.12.rcgu.o)
+            "_lua_getallocf", referenced from:
+                __RNvMNtCsjdmXvNL10OO_4mlua6memoryNtB2_11MemoryState3getCsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[8](hostlib-3e9ed6a5568eb901.65awm21jpsoolfgdvqns7262c.17ilvna.rcgu.o)
+                __RNvMNtCsjdmXvNL10OO_4mlua6memoryNtB2_11MemoryState3getB4_ in libmlua-b135099d7e19835b.rlib[16](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.12.rcgu.o)
+            "_lua_getmetatable", referenced from:
+                __RNvMNtCsjdmXvNL10OO_4mlua5tableNtB2_5Table13has_metatableCsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[6](hostlib-3e9ed6a5568eb901.5d3ryggklxq30p1phr8pv4bma.17ilvna.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata21get_internal_userdataNtNtB4_5error14WrappedFailureEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+            "_lua_gettop", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCINvMs6_B4_NtB4_3Lua10entrypointNCINvBZ_11entrypoint1NCNvCs3crFeZ7VnVH_6native17luaopen_airsstack0NtNtB6_5table5TableE0uB2v_E0lEB1Q_ in native.01j58a7aw4bm0tf44y8jlm7qi.090ugl4.rcgu.o
+                __RNvMNtCsjdmXvNL10OO_4mlua4utilNtB2_10StackGuard3newCsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[12](hostlib-3e9ed6a5568eb901.d9gnakw1whu0on2rzzomxkcu8.17ilvna.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataNtB2_14WrappedFailureE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataNtNtCs6zY7rJBZy9D_5alloc6string6StringE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                ...
+            "_lua_newthread", referenced from:
+                __RNCNvMs0_NtNtCsjdmXvNL10OO_4mlua5state5extraNtB7_9ExtraData4init0Bb_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_newuserdatauv", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataNtNtB4_5error14WrappedFailureEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataNtNtCs6zY7rJBZy9D_5alloc6string6StringEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB8_5state5extra9ExtraDataEEE0B8_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataNtNtB6_5error14WrappedFailureE0B8_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataNtNtCs6zY7rJBZy9D_5alloc6string6StringE0B8_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+            "_lua_pcallk", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataNtB2_14WrappedFailureE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataNtNtCs6zY7rJBZy9D_5alloc6string6StringE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata23init_internal_metatableINtNtB6_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB24_3ops8function2FnTRL0_NtNtNtB6_5state3raw6RawLualEEp6OutputINtNtB24_6result6ResultlNtNtB6_5error5ErrorEEL_EEEE0uEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcDG1_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL2_NtNtB6_5state3LuaRL1_INtNtB6_5debug5DebugL0_EEEp6OutputINtNtB2j_6result6ResultNtNtB6_5types7VmStateNtNtB6_5error5ErrorEEL_EE0uEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEE0uEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL0_NtNtNtB6_5state3raw6RawLualEEp6OutputINtNtB2m_6result6ResultlNtNtB6_5error5ErrorEEL_EE0uEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                ...
+            "_lua_pushboolean", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua10push_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableINtNtB6_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB1t_3ops8function2FnTRL0_NtNtNtB6_5state3raw6RawLualEEp6OutputINtNtB1t_6result6ResultlNtNtB6_5error5ErrorEEL_EEEEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcDG1_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL2_NtNtB6_5state3LuaRL1_INtNtB6_5debug5DebugL0_EEEp6OutputINtNtB1I_6result6ResultNtNtB6_5types7VmStateNtNtB6_5error5ErrorEEL_EEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL0_NtNtNtB6_5state3raw6RawLualEEp6OutputINtNtB1L_6result6ResultlNtNtB6_5error5ErrorEEL_EEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableNtNtB4_5error14WrappedFailureEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableNtNtCs6zY7rJBZy9D_5alloc6string6StringEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                ...
+            "_lua_pushcclosure", referenced from:
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB6_8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB8_5state5extra9ExtraDataEEE0OB1E_E0B8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB6_8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB8_5state5extra9ExtraDataEEE0OB1E_E0B8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB6_8userdata22push_internal_userdataNtB4_14WrappedFailureE0OB1E_E0B8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB6_8userdata22push_internal_userdataNtB4_14WrappedFailureE0OB1E_E0B8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB6_8userdata22push_internal_userdataNtNtCs6zY7rJBZy9D_5alloc6string6StringE0OB1E_E0B8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB6_8userdata22push_internal_userdataNtNtCs6zY7rJBZy9D_5alloc6string6StringE0OB1E_E0B8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB6_8userdata23init_internal_metatableINtNtB8_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB26_3ops8function2FnTRL0_NtNtNtB8_5state3raw6RawLualEEp6OutputINtNtB26_6result6ResultlNtNtB8_5error5ErrorEEL_EEEE0uE0B8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB6_8userdata23init_internal_metatableINtNtB8_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB26_3ops8function2FnTRL0_NtNtNtB8_5state3raw6RawLualEEp6OutputINtNtB26_6result6ResultlNtNtB8_5error5ErrorEEL_EEEE0uE0B8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                ...
+            "_lua_pushinteger", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua10push_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+            "_lua_pushlightuserdata", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataNtB2_14WrappedFailureE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataNtNtCs6zY7rJBZy9D_5alloc6string6StringE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata23init_internal_metatableINtNtB6_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB24_3ops8function2FnTRL0_NtNtNtB6_5state3raw6RawLualEEp6OutputINtNtB24_6result6ResultlNtNtB6_5error5ErrorEEL_EEEE0uEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcDG1_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL2_NtNtB6_5state3LuaRL1_INtNtB6_5debug5DebugL0_EEEp6OutputINtNtB2j_6result6ResultNtNtB6_5types7VmStateNtNtB6_5error5ErrorEEL_EE0uEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEE0uEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL0_NtNtNtB6_5state3raw6RawLualEEp6OutputINtNtB2m_6result6ResultlNtNtB6_5error5ErrorEEL_EE0uEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                ...
+            "_lua_pushlstring", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua13create_string in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNCNvNtCsjdmXvNL10OO_4mlua4util11push_string0B5_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNCNvNtCsjdmXvNL10OO_4mlua4util12rawset_field0B5_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RINvNtCsjdmXvNL10OO_4mlua10conversion21push_bytes_into_stackReEB4_ in libmlua-b135099d7e19835b.rlib[17](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.13.rcgu.o)
+            "_lua_pushnil", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua10push_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua8drop_ref in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvMNvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNtB2_19PreallocatedFailure3use in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_pushnumber", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua10push_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+            "_lua_pushstring", referenced from:
+                __RNCNvNtNtCsjdmXvNL10OO_4mlua4util5error19init_error_registry0B7_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+            "_lua_pushvalue", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua8push_refCsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[10](hostlib-3e9ed6a5568eb901.8ot3oloqg7x3qlqgkfagvp3yf.17ilvna.rcgu.o)
+                __RNvNtNtCsjdmXvNL10OO_4mlua4util5error19init_error_registry in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua8push_refB8_ in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvMNvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNtB2_19PreallocatedFailure3use in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util12rawset_field in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_rawgeti", referenced from:
+                __RNvNtCsjdmXvNL10OO_4mlua4util14get_main_state in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_rawgetp", referenced from:
+                __RNCNvNvNtNtCsjdmXvNL10OO_4mlua4util5error19init_error_registry14error_tostring0B9_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCNvNvNtNtCsjdmXvNL10OO_4mlua4util5error19init_error_registry14error_tostring0B9_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22get_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22get_internal_metatableNtNtB4_5error14WrappedFailureEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22get_internal_metatableNtNtCs6zY7rJBZy9D_5alloc6string6StringEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNvNtNtCsjdmXvNL10OO_4mlua4util8userdata33get_destructed_userdata_metatable in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNvMs0_NtNtCsjdmXvNL10OO_4mlua5state5extraNtB5_9ExtraData3get in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                ...
+            "_lua_rawset", referenced from:
+                __RINvMNtCsjdmXvNL10OO_4mlua5tableNtB3_5Table7raw_setReBN_ECsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[7](hostlib-3e9ed6a5568eb901.5s6nqflktycrqu1mmz33tikhg.17ilvna.rcgu.o)
+                __RNvNvMNtCsjdmXvNL10OO_4mlua5tableNtB4_5Table7raw_set7do_call in libmlua-b135099d7e19835b.rlib[10](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.06.rcgu.o)
+                __RNCNvNtCsjdmXvNL10OO_4mlua4util12rawset_field0B5_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_rawsetp", referenced from:
+                __RNvNvNtNtCsjdmXvNL10OO_4mlua4util5error19init_error_registry7do_call in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNvNvNtNtCsjdmXvNL10OO_4mlua4util5error19init_error_registrys_7do_call in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableINtNtB8_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB1v_3ops8function2FnTRL0_NtNtNtB8_5state3raw6RawLualEEp6OutputINtNtB1v_6result6ResultlNtNtB8_5error5ErrorEEL_EEEE0B8_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcDG1_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL2_NtNtB8_5state3LuaRL1_INtNtB8_5debug5DebugL0_EEEp6OutputINtNtB1K_6result6ResultNtNtB8_5types7VmStateNtNtB8_5error5ErrorEEL_EE0B8_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB8_5state5extra9ExtraDataEEE0B8_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL0_NtNtNtB8_5state3raw6RawLualEEp6OutputINtNtB1N_6result6ResultlNtNtB8_5error5ErrorEEL_EE0B8_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableNtNtB6_5error14WrappedFailureE0B8_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                ...
+            "_lua_rotate", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataNtB2_14WrappedFailureE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataNtB2_14WrappedFailureE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                ...
+            "_lua_setfield", referenced from:
+                __RNCNvNtNtCsjdmXvNL10OO_4mlua4util5error19init_error_registry0B7_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCNvNtNtCsjdmXvNL10OO_4mlua4util5error19init_error_registry0B7_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+            "_lua_setmetatable", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCINvMs6_B4_NtB4_3Lua10entrypointNCINvBZ_11entrypoint1NCNvCs3crFeZ7VnVH_6native17luaopen_airsstack0NtNtB6_5table5TableE0uB2v_E0lEB1Q_ in native.01j58a7aw4bm0tf44y8jlm7qi.090ugl4.rcgu.o
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCINvMs6_B4_NtB4_3Lua10entrypointNCINvBZ_11entrypoint1NCNvCs3crFeZ7VnVH_6native17luaopen_airsstack0NtNtB6_5table5TableE0uB2v_E0lEB1Q_ in native.01j58a7aw4bm0tf44y8jlm7qi.090ugl4.rcgu.o
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCINvMs6_B4_NtB4_3Lua10entrypointNCINvBZ_11entrypoint1NCNvCs3crFeZ7VnVH_6native17luaopen_airsstack0NtNtB6_5table5TableE0uB2v_E0lEB1Q_ in native.01j58a7aw4bm0tf44y8jlm7qi.090ugl4.rcgu.o
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataNtNtB4_5error14WrappedFailureEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataNtNtCs6zY7rJBZy9D_5alloc6string6StringEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+            "_lua_settable", referenced from:
+                __RNvNvMNtCsjdmXvNL10OO_4mlua5tableNtB4_5Table13set_protected7do_call in libmlua-b135099d7e19835b.rlib[10](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.06.rcgu.o)
+            "_lua_settop", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCINvMs6_B4_NtB4_3Lua10entrypointNCINvBZ_11entrypoint1NCNvCs3crFeZ7VnVH_6native17luaopen_airsstack0NtNtB6_5table5TableE0uB2v_E0lEB1Q_ in native.01j58a7aw4bm0tf44y8jlm7qi.090ugl4.rcgu.o
+                __RNvMNtCsjdmXvNL10OO_4mlua5tableNtB2_5Table13has_metatableCsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[6](hostlib-3e9ed6a5568eb901.5d3ryggklxq30p1phr8pv4bma.17ilvna.rcgu.o)
+                __RINvMNtCsjdmXvNL10OO_4mlua5tableNtB3_5Table7raw_setReBN_ECsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[7](hostlib-3e9ed6a5568eb901.5s6nqflktycrqu1mmz33tikhg.17ilvna.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                ...
+            "_lua_toboolean", referenced from:
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_tointegerx", referenced from:
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_tolstring", referenced from:
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_tonumberx", referenced from:
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_topointer", referenced from:
+                __RNvMNtCsjdmXvNL10OO_4mlua5tableNtB2_5Table13has_metatableCsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[6](hostlib-3e9ed6a5568eb901.5d3ryggklxq30p1phr8pv4bma.17ilvna.rcgu.o)
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua13init_from_ptr in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata21get_internal_userdataNtNtB4_5error14WrappedFailureEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata21get_internal_userdataNtNtB4_5error14WrappedFailureEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNvMs0_NtNtCsjdmXvNL10OO_4mlua5state5extraNtB5_9ExtraData4init in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                ...
+            "_lua_tothread", referenced from:
+                __RNvNtCsjdmXvNL10OO_4mlua4util14get_main_state in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_touserdata", referenced from:
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB8_5state5extra9ExtraDataEEE0OB1M_EB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata22push_internal_userdataNtB4_14WrappedFailureE0OB1M_EB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata22push_internal_userdataNtNtCs6zY7rJBZy9D_5alloc6string6StringE0OB1M_EB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata23init_internal_metatableINtNtB8_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB2e_3ops8function2FnTRL0_NtNtNtB8_5state3raw6RawLualEEp6OutputINtNtB2e_6result6ResultlNtNtB8_5error5ErrorEEL_EEEE0uEB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcDG1_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL2_NtNtB8_5state3LuaRL1_INtNtB8_5debug5DebugL0_EEEp6OutputINtNtB2t_6result6ResultNtNtB8_5types7VmStateNtNtB8_5error5ErrorEEL_EE0uEB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB8_5state5extra9ExtraDataEEE0uEB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL0_NtNtNtB8_5state3raw6RawLualEEp6OutputINtNtB2w_6result6ResultlNtNtB8_5error5ErrorEEL_EE0uEB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                ...
+            "_lua_type", referenced from:
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB8_5state5extra9ExtraDataEEE0OB1M_EB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata22push_internal_userdataNtB4_14WrappedFailureE0OB1M_EB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata22push_internal_userdataNtNtCs6zY7rJBZy9D_5alloc6string6StringE0OB1M_EB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata23init_internal_metatableINtNtB8_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB2e_3ops8function2FnTRL0_NtNtNtB8_5state3raw6RawLualEEp6OutputINtNtB2e_6result6ResultlNtNtB8_5error5ErrorEEL_EEEE0uEB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcDG1_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL2_NtNtB8_5state3LuaRL1_INtNtB8_5debug5DebugL0_EEEp6OutputINtNtB2t_6result6ResultNtNtB8_5types7VmStateNtNtB8_5error5ErrorEEL_EE0uEB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB8_5state5extra9ExtraDataEEE0uEB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL0_NtNtNtB8_5state3raw6RawLualEEp6OutputINtNtB2w_6result6ResultlNtNtB8_5error5ErrorEEL_EE0uEB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                ...
+            "_lua_typename", referenced from:
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_xmove", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua8push_refCsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[10](hostlib-3e9ed6a5568eb901.8ot3oloqg7x3qlqgkfagvp3yf.17ilvna.rcgu.o)
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua7pop_refB8_ in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua8push_refB8_ in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvMNvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNtB2_19PreallocatedFailure3use in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvMNvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNtB2_19PreallocatedFailure7release in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+          ld: symbol(s) not found for architecture arm64
+          clang: error: linker command failed with exit code 1 (use -v to see invocation)
+          
+
+error: could not compile `native` (lib) due to 1 previous error
+exit=101
+=== (f) $ cargo build -p native
+   Compiling mlua-sys v0.11.0
+error: No Lua feature enabled. Please enable one of: lua55, lua54, lua53, lua52, lua51, luajit, luajit52, luau
+  --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-sys-0.11.0/build/main.rs:18:13
+   |
+18 |             compile_error!("No Lua feature enabled. Please enable one of: lua55, lua54, lua53, lua52, lua51, luajit, luajit52, luau");
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: could not compile `mlua-sys` (build script) due to 1 previous error
+exit=101
+=== (g) $ cargo clippy -p native --all-targets --features lua54 -- -D warnings
+    Checking libc v0.2.189
+   Compiling cfg-if v1.0.4
+    Checking smallvec v1.15.2
+    Checking scopeguard v1.2.0
+    Checking memchr v2.8.3
+    Checking num-traits v0.2.19
+    Checking either v1.18.0
+    Checking rustc-hash v2.1.3
+   Compiling mlua-sys v0.11.0
+    Checking lock_api v0.4.14
+    Checking bstr v1.13.1
+    Checking parking_lot_core v0.9.12
+    Checking parking_lot v0.12.5
+    Checking mlua v0.12.0
+    Checking hostlib v0.0.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/crates/hostlib)
+    Checking native v0.0.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/crates/native)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.48s
+exit=0
+=== (h) $ cargo test -p native --features lua54
+   Compiling native v0.0.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/crates/native)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.69s
+     Running unittests src/lib.rs (target/debug/deps/native-5850a595affc3c51)
+
+running 1 test
+test tests::a_test_in_a_module_mode_crate_runs ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+exit=0
+=== (i) $ cargo doc -p native --no-deps --features lua54
+    Checking hostlib v0.0.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/crates/hostlib)
+ Documenting native v0.0.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/crates/native)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.80s
+   Generated /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/target/doc/native/index.html
+exit=0
+=== (j) $ cargo test -p native --doc --features lua54
+warning: doc tests are not supported for crate type(s) `cdylib` in package `native`
+error: no library targets found in package `native`
+exit=101
+=== (h2) lib.rs gains a test that calls mlua::Lua::new() and the luaopen function:
+mod lua_tests {
+    #[test]
+    fn a_test_that_opens_a_lua_state_in_a_module_mode_crate() {
+        let lua = mlua::Lua::new();
+        let table = super::airsstack(&lua);
+        assert!(table.is_ok());
+    }
+}
+=== (h2) $ cargo test -p native --features lua54
+   Compiling native v0.0.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/crates/native)
+error: linking with `cc` failed: exit status: 1
+  |
+  = note:  "cc" "/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/target/debug/deps/rustcl4WgMA/symbols.o" "<24 object files omitted>" "/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/target/debug/deps/libhostlib-3e9ed6a5568eb901.rlib" "<sysroot>/lib/rustlib/aarch64-apple-darwin/lib/{libtest-*,libgetopts-*,librustc_std_workspace_std-*}.rlib" "/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/target/debug/deps/{libmlua-b135099d7e19835b,libmlua_sys-3b03a31633ceb300,libparking_lot-22d0bc07b3df14f0,libparking_lot_core-497d4c058b56efb4,liblibc-b80384a1ab117ef3,libcfg_if-5961dbb60a675de3,libsmallvec-aa3cc8c1979c1d9b,liblock_api-09bde01970e5f4cf,libscopeguard-f94d8dfeb1965bc2,librustc_hash-1922c5269cc5adcc,libeither-feecadaa681b2985,libnum_traits-f8dad4a23597e346,libbstr-5bd62217491bf69c,libmemchr-2fd701f973603a9e}.rlib" "<sysroot>/lib/rustlib/aarch64-apple-darwin/lib/{libstd-*,libpanic_unwind-*,libobject-*,libmemchr-*,libaddr2line-*,libgimli-*,libcfg_if-*,librustc_demangle-*,libstd_detect-*,libhashbrown-*,librustc_std_workspace_alloc-*,libminiz_oxide-*,libadler2-*,libunwind-*,liblibc-*,librustc_std_workspace_core-*,liballoc-*,libcore-*,libcompiler_builtins-*}.rlib" "-liconv" "-lSystem" "-lc" "-lm" "-arch" "arm64" "-mmacosx-version-min=11.0.0" "-o" "/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/target/debug/deps/native-5850a595affc3c51" "-Wl,-dead_strip" "-nodefaultlibs"
+  = note: some arguments are omitted. use `--verbose` to show all linker arguments
+  = note: Undefined symbols for architecture arm64:
+            "_luaL_checkstack", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util10safe_pcall in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util11safe_xpcall in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNvNtCsjdmXvNL10OO_4mlua4util11safe_xpcall11xpcall_msgh in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_luaL_newstate", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua3new in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+            "_luaL_ref", referenced from:
+                __RNCNvMs0_NtNtCsjdmXvNL10OO_4mlua5state5extraNtB7_9ExtraData4init0Bb_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_luaL_requiref", referenced from:
+                __RNCNvNvNtNtCsjdmXvNL10OO_4mlua5state3raw13load_std_libs8requiref0B9_ in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua3new in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+            "_luaL_tolstring", referenced from:
+                __RNvNtNtCsjdmXvNL10OO_4mlua4util5error15error_traceback in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+            "_luaL_traceback", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNvNtNtCsjdmXvNL10OO_4mlua4util5error15error_traceback in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCNvNvMs_NtB4_3rawNtB13_6RawLua15create_callback13call_callback0lEB6_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_callk", referenced from:
+                __RNvNvNtCsjdmXvNL10OO_4mlua4util11safe_xpcall11xpcall_msgh in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_checkstack", referenced from:
+                __RNvNtCsjdmXvNL10OO_4mlua4util11check_stackCsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[12](hostlib-3e9ed6a5568eb901.d9gnakw1whu0on2rzzomxkcu8.17ilvna.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNvNtNtCsjdmXvNL10OO_4mlua4util5error15error_traceback in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNvNtNtCsjdmXvNL10OO_4mlua4util5error15error_traceback in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCNvNvMs_NtB4_3rawNtB13_6RawLua15create_callback13call_callback0lEB6_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvMs0_NtNtCsjdmXvNL10OO_4mlua5state5extraNtB5_9ExtraData13ref_stack_pop in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                ...
+            "_lua_close", referenced from:
+                __RNvXNtNtCsjdmXvNL10OO_4mlua5state3rawNtB2_6RawLuaNtNtNtCsjIpoRzUjyHQ_4core3ops4drop4Drop4drop in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+            "_lua_copy", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua8drop_ref in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvMNvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNtB2_19PreallocatedFailure3use in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvMs0_NtNtCsjdmXvNL10OO_4mlua5state5extraNtB5_9ExtraData13ref_stack_pop in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util11safe_xpcall in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util11safe_xpcall in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_createtable", referenced from:
+                __RNCNvNtCsjdmXvNL10OO_4mlua4util10push_table0B5_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util10push_tableB3_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_error", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCNvNvMs_NtB4_3rawNtB13_6RawLua15create_callback13call_callback0lEB6_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCNvNvMs_NtB4_3rawNtB13_6RawLua15create_callback13call_callback0lEB6_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCNvNvMs_NtB4_3rawNtB13_6RawLua15create_callback13call_callback0lEB6_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                ...
+            "_lua_gc", referenced from:
+                __RNvNvMs6_NtCsjdmXvNL10OO_4mlua5stateNtB7_3Lua10gc_collect7do_call in libmlua-b135099d7e19835b.rlib[16](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.12.rcgu.o)
+            "_lua_getallocf", referenced from:
+                __RNvMNtCsjdmXvNL10OO_4mlua6memoryNtB2_11MemoryState3getCsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[8](hostlib-3e9ed6a5568eb901.65awm21jpsoolfgdvqns7262c.17ilvna.rcgu.o)
+                __RNvMNtCsjdmXvNL10OO_4mlua6memoryNtB2_11MemoryState3getB4_ in libmlua-b135099d7e19835b.rlib[16](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.12.rcgu.o)
+            "_lua_getmetatable", referenced from:
+                __RNvMNtCsjdmXvNL10OO_4mlua5tableNtB2_5Table13has_metatableCsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[6](hostlib-3e9ed6a5568eb901.5d3ryggklxq30p1phr8pv4bma.17ilvna.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata21get_internal_userdataNtNtB4_5error14WrappedFailureEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNvMNtCsjdmXvNL10OO_4mlua5tableNtB2_5Table13has_metatableB4_ in libmlua-b135099d7e19835b.rlib[10](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.06.rcgu.o)
+            "_lua_gettable", referenced from:
+                __RNvNvMNtCsjdmXvNL10OO_4mlua5tableNtB4_5Table13get_protected7do_call in libmlua-b135099d7e19835b.rlib[10](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.06.rcgu.o)
+            "_lua_gettop", referenced from:
+                __RNvMNtCsjdmXvNL10OO_4mlua4utilNtB2_10StackGuard3newCsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[12](hostlib-3e9ed6a5568eb901.d9gnakw1whu0on2rzzomxkcu8.17ilvna.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvMNtB6_5tableNtB11_5Table10raw_removelE0uEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataINtNtB6_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB23_3ops8function2FnTRL0_NtNtNtB6_5state3raw6RawLualEEp6OutputINtNtB23_6result6ResultlNtNtB6_5error5ErrorEEL_EEEE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataNtB2_14WrappedFailureE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                ...
+            "_lua_isinteger", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua11stack_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+            "_lua_newstate", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua3new in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+            "_lua_newthread", referenced from:
+                __RNCNvMs0_NtNtCsjdmXvNL10OO_4mlua5state5extraNtB7_9ExtraData4init0Bb_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_newuserdatauv", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataINtNtB6_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB1s_3ops8function2FnTRL0_NtNtNtB6_5state3raw6RawLualEEp6OutputINtNtB1s_6result6ResultlNtNtB6_5error5ErrorEEL_EEEEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataNtNtB4_5error14WrappedFailureEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataNtNtCs6zY7rJBZy9D_5alloc6string6StringEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataINtNtB8_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB1u_3ops8function2FnTRL0_NtNtNtB8_5state3raw6RawLualEEp6OutputINtNtB1u_6result6ResultlNtNtB8_5error5ErrorEEL_EEEE0B8_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB8_5state5extra9ExtraDataEEE0B8_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataNtNtB6_5error14WrappedFailureE0B8_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                ...
+            "_lua_pcallk", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvMNtB6_5tableNtB11_5Table10raw_removelE0uEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataINtNtB6_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB23_3ops8function2FnTRL0_NtNtNtB6_5state3raw6RawLualEEp6OutputINtNtB23_6result6ResultlNtNtB6_5error5ErrorEEL_EEEE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataNtB2_14WrappedFailureE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataNtNtCs6zY7rJBZy9D_5alloc6string6StringE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata23init_internal_metatableINtNtB6_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB24_3ops8function2FnTRL0_NtNtNtB6_5state3raw6RawLualEEp6OutputINtNtB24_6result6ResultlNtNtB6_5error5ErrorEEL_EEEE0uEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcDG1_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL2_NtNtB6_5state3LuaRL1_INtNtB6_5debug5DebugL0_EEEp6OutputINtNtB2j_6result6ResultNtNtB6_5types7VmStateNtNtB6_5error5ErrorEEL_EE0uEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                ...
+            "_lua_pushboolean", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua10push_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableINtNtB6_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB1t_3ops8function2FnTRL0_NtNtNtB6_5state3raw6RawLualEEp6OutputINtNtB1t_6result6ResultlNtNtB6_5error5ErrorEEL_EEEEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcDG1_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL2_NtNtB6_5state3LuaRL1_INtNtB6_5debug5DebugL0_EEEp6OutputINtNtB1I_6result6ResultNtNtB6_5types7VmStateNtNtB6_5error5ErrorEEL_EEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL0_NtNtNtB6_5state3raw6RawLualEEp6OutputINtNtB1L_6result6ResultlNtNtB6_5error5ErrorEEL_EEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableNtNtB4_5error14WrappedFailureEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableNtNtCs6zY7rJBZy9D_5alloc6string6StringEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                ...
+            "_lua_pushcclosure", referenced from:
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvMNtB8_5tableNtB13_5Table10raw_removelE0uE0B8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvMNtB8_5tableNtB13_5Table10raw_removelE0uE0B8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB6_8userdata22push_internal_userdataINtNtB8_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB25_3ops8function2FnTRL0_NtNtNtB8_5state3raw6RawLualEEp6OutputINtNtB25_6result6ResultlNtNtB8_5error5ErrorEEL_EEEE0OB1E_E0B8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB6_8userdata22push_internal_userdataINtNtB8_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB25_3ops8function2FnTRL0_NtNtNtB8_5state3raw6RawLualEEp6OutputINtNtB25_6result6ResultlNtNtB8_5error5ErrorEEL_EEEE0OB1E_E0B8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB6_8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB8_5state5extra9ExtraDataEEE0OB1E_E0B8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB6_8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB8_5state5extra9ExtraDataEEE0OB1E_E0B8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB6_8userdata22push_internal_userdataNtB4_14WrappedFailureE0OB1E_E0B8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB6_8userdata22push_internal_userdataNtB4_14WrappedFailureE0OB1E_E0B8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                ...
+            "_lua_pushinteger", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua10push_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvXs1i_NtCsjdmXvNL10OO_4mlua10conversionlNtNtB8_6traits7IntoLua15push_into_stackB8_ in libmlua-b135099d7e19835b.rlib[17](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.13.rcgu.o)
+            "_lua_pushlightuserdata", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvMNtB6_5tableNtB11_5Table10raw_removelE0uEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataINtNtB6_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB23_3ops8function2FnTRL0_NtNtNtB6_5state3raw6RawLualEEp6OutputINtNtB23_6result6ResultlNtNtB6_5error5ErrorEEL_EEEE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataNtB2_14WrappedFailureE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataNtNtCs6zY7rJBZy9D_5alloc6string6StringE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata23init_internal_metatableINtNtB6_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB24_3ops8function2FnTRL0_NtNtNtB6_5state3raw6RawLualEEp6OutputINtNtB24_6result6ResultlNtNtB6_5error5ErrorEEL_EEEE0uEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcDG1_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL2_NtNtB6_5state3LuaRL1_INtNtB6_5debug5DebugL0_EEEp6OutputINtNtB2j_6result6ResultNtNtB6_5types7VmStateNtNtB6_5error5ErrorEEL_EE0uEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                ...
+            "_lua_pushlstring", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua13create_string in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNCNvNtCsjdmXvNL10OO_4mlua4util11push_string0B5_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNCNvNtCsjdmXvNL10OO_4mlua4util12rawset_field0B5_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RINvNtCsjdmXvNL10OO_4mlua10conversion21push_bytes_into_stackReEB4_ in libmlua-b135099d7e19835b.rlib[17](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.13.rcgu.o)
+            "_lua_pushnil", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua10push_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua8drop_ref in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNCINvMNtCsjdmXvNL10OO_4mlua5tableNtB5_5Table10raw_removelE0B7_ in libmlua-b135099d7e19835b.rlib[10](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.06.rcgu.o)
+                __RNvMNvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNtB2_19PreallocatedFailure3use in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_pushnumber", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua10push_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvXs1i_NtCsjdmXvNL10OO_4mlua10conversionlNtNtB8_6traits7IntoLua15push_into_stackB8_ in libmlua-b135099d7e19835b.rlib[17](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.13.rcgu.o)
+            "_lua_pushstring", referenced from:
+                __RNCNvNtNtCsjdmXvNL10OO_4mlua4util5error19init_error_registry0B7_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util10safe_pcall in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util11safe_xpcall in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_pushvalue", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua8push_refCsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[10](hostlib-3e9ed6a5568eb901.8ot3oloqg7x3qlqgkfagvp3yf.17ilvna.rcgu.o)
+                __RNvNtNtCsjdmXvNL10OO_4mlua4util5error19init_error_registry in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua11stack_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua11stack_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua11stack_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua11stack_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua11stack_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua11stack_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                ...
+            "_lua_rawget", referenced from:
+                __RINvMNtCsjdmXvNL10OO_4mlua5tableNtB3_5Table7raw_getBu_ReEB5_ in libmlua-b135099d7e19835b.rlib[10](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.06.rcgu.o)
+            "_lua_rawgeti", referenced from:
+                __RNCNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB6_6RawLua3new0Ba_ in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNCINvMNtCsjdmXvNL10OO_4mlua5tableNtB5_5Table10raw_removelE0B7_ in libmlua-b135099d7e19835b.rlib[10](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.06.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util14get_main_state in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvMs6_NtCsjdmXvNL10OO_4mlua5stateNtB5_3Lua7globals in libmlua-b135099d7e19835b.rlib[16](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.12.rcgu.o)
+            "_lua_rawgetp", referenced from:
+                __RNCNvNvNtNtCsjdmXvNL10OO_4mlua4util5error19init_error_registry14error_tostring0B9_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCNvNvNtNtCsjdmXvNL10OO_4mlua4util5error19init_error_registry14error_tostring0B9_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22get_internal_metatableINtNtB6_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB1s_3ops8function2FnTRL0_NtNtNtB6_5state3raw6RawLualEEp6OutputINtNtB1s_6result6ResultlNtNtB6_5error5ErrorEEL_EEEEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22get_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22get_internal_metatableNtNtB4_5error14WrappedFailureEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22get_internal_metatableNtNtCs6zY7rJBZy9D_5alloc6string6StringEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNvNtNtCsjdmXvNL10OO_4mlua4util8userdata33get_destructed_userdata_metatable in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                ...
+            "_lua_rawlen", referenced from:
+                __RNvMNtCsjdmXvNL10OO_4mlua5tableNtB2_5Table7raw_len in libmlua-b135099d7e19835b.rlib[10](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.06.rcgu.o)
+            "_lua_rawset", referenced from:
+                __RINvMNtCsjdmXvNL10OO_4mlua5tableNtB3_5Table7raw_setReBN_ECsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[7](hostlib-3e9ed6a5568eb901.5s6nqflktycrqu1mmz33tikhg.17ilvna.rcgu.o)
+                __RINvMNtCsjdmXvNL10OO_4mlua5tableNtB3_5Table7raw_setNtNtB5_5value5ValueBN_EB5_ in libmlua-b135099d7e19835b.rlib[10](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.06.rcgu.o)
+                __RINvMNtCsjdmXvNL10OO_4mlua5tableNtB3_5Table7raw_setReNtNtB5_8function8FunctionEB5_ in libmlua-b135099d7e19835b.rlib[10](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.06.rcgu.o)
+                __RINvMNtCsjdmXvNL10OO_4mlua5tableNtB3_5Table7raw_setlNtNtB5_8function8FunctionEB5_ in libmlua-b135099d7e19835b.rlib[10](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.06.rcgu.o)
+                __RNvNvMNtCsjdmXvNL10OO_4mlua5tableNtB4_5Table7raw_set7do_call in libmlua-b135099d7e19835b.rlib[10](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.06.rcgu.o)
+                __RNCNvNtCsjdmXvNL10OO_4mlua4util12rawset_field0B5_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_rawseti", referenced from:
+                __RNCINvMNtCsjdmXvNL10OO_4mlua5tableNtB5_5Table10raw_removelE0B7_ in libmlua-b135099d7e19835b.rlib[10](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.06.rcgu.o)
+                __RNCINvMNtCsjdmXvNL10OO_4mlua5tableNtB5_5Table10raw_removelE0B7_ in libmlua-b135099d7e19835b.rlib[10](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.06.rcgu.o)
+            "_lua_rawsetp", referenced from:
+                __RNvNvNtNtCsjdmXvNL10OO_4mlua4util5error19init_error_registry7do_call in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNvNvNtNtCsjdmXvNL10OO_4mlua4util5error19init_error_registrys_7do_call in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableINtNtB8_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB1v_3ops8function2FnTRL0_NtNtNtB8_5state3raw6RawLualEEp6OutputINtNtB1v_6result6ResultlNtNtB8_5error5ErrorEEL_EEEE0B8_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcDG1_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL2_NtNtB8_5state3LuaRL1_INtNtB8_5debug5DebugL0_EEEp6OutputINtNtB1K_6result6ResultNtNtB8_5types7VmStateNtNtB8_5error5ErrorEEL_EE0B8_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB8_5state5extra9ExtraDataEEE0B8_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL0_NtNtNtB8_5state3raw6RawLualEEp6OutputINtNtB1N_6result6ResultlNtNtB8_5error5ErrorEEL_EE0B8_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNCINvNtNtCsjdmXvNL10OO_4mlua4util8userdata23init_internal_metatableNtNtB6_5error14WrappedFailureE0B8_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                ...
+            "_lua_rotate", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvMNtB6_5tableNtB11_5Table10raw_removelE0uEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvMNtB6_5tableNtB11_5Table10raw_removelE0uEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataINtNtB6_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB23_3ops8function2FnTRL0_NtNtNtB6_5state3raw6RawLualEEp6OutputINtNtB23_6result6ResultlNtNtB6_5error5ErrorEEL_EEEE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closureNCINvNtB4_8userdata22push_internal_userdataINtNtB6_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB23_3ops8function2FnTRL0_NtNtNtB6_5state3raw6RawLualEEp6OutputINtNtB23_6result6ResultlNtNtB6_5error5ErrorEEL_EEEE0OB1C_EB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                ...
+            "_lua_setfield", referenced from:
+                __RNCNvNtNtCsjdmXvNL10OO_4mlua4util5error19init_error_registry0B7_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RNCNvNtNtCsjdmXvNL10OO_4mlua4util5error19init_error_registry0B7_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+            "_lua_setmetatable", referenced from:
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataINtNtB6_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB1s_3ops8function2FnTRL0_NtNtNtB6_5state3raw6RawLualEEp6OutputINtNtB1s_6result6ResultlNtNtB6_5error5ErrorEEL_EEEEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB6_5state5extra9ExtraDataEEEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataNtNtB4_5error14WrappedFailureEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata22push_internal_userdataNtNtCs6zY7rJBZy9D_5alloc6string6StringEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCNvNvMs_NtB4_3rawNtB13_6RawLua15create_callback13call_callback0lEB6_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCNvNvMs_NtB4_3rawNtB13_6RawLua15create_callback13call_callback0lEB6_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua5state4util18callback_error_extNCNvNvMs_NtB4_3rawNtB13_6RawLua15create_callback13call_callback0lEB6_ in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                ...
+            "_lua_settable", referenced from:
+                __RNvNvMNtCsjdmXvNL10OO_4mlua5tableNtB4_5Table13set_protected7do_call in libmlua-b135099d7e19835b.rlib[10](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.06.rcgu.o)
+            "_lua_settop", referenced from:
+                __RNvMNtCsjdmXvNL10OO_4mlua5tableNtB2_5Table13has_metatableCsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[6](hostlib-3e9ed6a5568eb901.5d3ryggklxq30p1phr8pv4bma.17ilvna.rcgu.o)
+                __RINvMNtCsjdmXvNL10OO_4mlua5tableNtB3_5Table7raw_setReBN_ECsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[7](hostlib-3e9ed6a5568eb901.5s6nqflktycrqu1mmz33tikhg.17ilvna.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry14error_tostring0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util5error14callback_errorNCNvNvB2_19init_error_registry16destructed_error0lEB6_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                ...
+            "_lua_toboolean", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua11stack_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_tointegerx", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua11stack_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_tolstring", referenced from:
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_tonumberx", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua11stack_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_topointer", referenced from:
+                __RNvMNtCsjdmXvNL10OO_4mlua5tableNtB2_5Table13has_metatableCsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[6](hostlib-3e9ed6a5568eb901.5d3ryggklxq30p1phr8pv4bma.17ilvna.rcgu.o)
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua13init_from_ptr in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata21get_internal_userdataNtNtB4_5error14WrappedFailureEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RINvNtNtCsjdmXvNL10OO_4mlua4util8userdata21get_internal_userdataNtNtB4_5error14WrappedFailureEB6_ in libmlua-b135099d7e19835b.rlib[8](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.04.rcgu.o)
+                __RNvMNtCsjdmXvNL10OO_4mlua5tableNtB2_5Table13has_metatableB4_ in libmlua-b135099d7e19835b.rlib[10](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.06.rcgu.o)
+                __RNvMs0_NtNtCsjdmXvNL10OO_4mlua5state5extraNtB5_9ExtraData4init in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+                ...
+            "_lua_tothread", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua11stack_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvNtCsjdmXvNL10OO_4mlua4util14get_main_state in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_touserdata", referenced from:
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvMNtB8_5tableNtB1b_5Table10raw_removelE0uEB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata22push_internal_userdataINtNtB8_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB2d_3ops8function2FnTRL0_NtNtNtB8_5state3raw6RawLualEEp6OutputINtNtB2d_6result6ResultlNtNtB8_5error5ErrorEEL_EEEE0OB1M_EB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB8_5state5extra9ExtraDataEEE0OB1M_EB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata22push_internal_userdataNtB4_14WrappedFailureE0OB1M_EB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata22push_internal_userdataNtNtCs6zY7rJBZy9D_5alloc6string6StringE0OB1M_EB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata23init_internal_metatableINtNtB8_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB2e_3ops8function2FnTRL0_NtNtNtB8_5state3raw6RawLualEEp6OutputINtNtB2e_6result6ResultlNtNtB8_5error5ErrorEEL_EEEE0uEB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcDG1_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL2_NtNtB8_5state3LuaRL1_INtNtB8_5debug5DebugL0_EEEp6OutputINtNtB2t_6result6ResultNtNtB8_5types7VmStateNtNtB8_5error5ErrorEEL_EE0uEB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                ...
+            "_lua_type", referenced from:
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvMNtB8_5tableNtB1b_5Table10raw_removelE0uEB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata22push_internal_userdataINtNtB8_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB2d_3ops8function2FnTRL0_NtNtNtB8_5state3raw6RawLualEEp6OutputINtNtB2d_6result6ResultlNtNtB8_5error5ErrorEEL_EEEE0OB1M_EB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata22push_internal_userdataINtNtCs6zY7rJBZy9D_5alloc2rc2RcINtNtCsjIpoRzUjyHQ_4core4cell10UnsafeCellNtNtNtB8_5state5extra9ExtraDataEEE0OB1M_EB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata22push_internal_userdataNtB4_14WrappedFailureE0OB1M_EB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata22push_internal_userdataNtNtCs6zY7rJBZy9D_5alloc6string6StringE0OB1M_EB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata23init_internal_metatableINtNtB8_5types7UpvalueINtNtCsjIpoRzUjyHQ_4core6option6OptionINtNtCs6zY7rJBZy9D_5alloc5boxed3BoxDG_INtNtNtB2e_3ops8function2FnTRL0_NtNtNtB8_5state3raw6RawLualEEp6OutputINtNtB2e_6result6ResultlNtNtB8_5error5ErrorEEL_EEEE0uEB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                __RINvNvNtNtCsjdmXvNL10OO_4mlua4util5error19protect_lua_closure7do_callNCINvNtB6_8userdata23init_internal_metatableINtNtCs6zY7rJBZy9D_5alloc2rc2RcDG1_INtNtNtCsjIpoRzUjyHQ_4core3ops8function2FnTRL2_NtNtB8_5state3LuaRL1_INtNtB8_5debug5DebugL0_EEEp6OutputINtNtB2t_6result6ResultNtNtB8_5types7VmStateNtNtB8_5error5ErrorEEL_EE0uEB8_ in libmlua-b135099d7e19835b.rlib[4](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.00.rcgu.o)
+                ...
+            "_lua_typename", referenced from:
+                __RNvNtCsjdmXvNL10OO_4mlua4util9to_string in libmlua-b135099d7e19835b.rlib[11](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.07.rcgu.o)
+            "_lua_xmove", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua8push_refCsfwGwpdu5ddU_7hostlib in libhostlib-3e9ed6a5568eb901.rlib[10](hostlib-3e9ed6a5568eb901.8ot3oloqg7x3qlqgkfagvp3yf.17ilvna.rcgu.o)
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua11stack_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua11stack_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua11stack_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua11stack_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua11stack_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua11stack_value in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+                ...
+            "_luaopen_base", referenced from:
+                __RNvMs_NtNtCsjdmXvNL10OO_4mlua5state3rawNtB4_6RawLua3new in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+            "_luaopen_coroutine", referenced from:
+                __RNvNtNtCsjdmXvNL10OO_4mlua5state3raw13load_std_libs in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+            "_luaopen_debug", referenced from:
+                __RNvNtNtCsjdmXvNL10OO_4mlua5state3raw13load_std_libs in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+            "_luaopen_io", referenced from:
+                __RNvNtNtCsjdmXvNL10OO_4mlua5state3raw13load_std_libs in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+            "_luaopen_math", referenced from:
+                __RNvNtNtCsjdmXvNL10OO_4mlua5state3raw13load_std_libs in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+            "_luaopen_os", referenced from:
+                __RNvNtNtCsjdmXvNL10OO_4mlua5state3raw13load_std_libs in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+            "_luaopen_package", referenced from:
+                __RNvNtNtCsjdmXvNL10OO_4mlua5state3raw13load_std_libs in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+            "_luaopen_string", referenced from:
+                __RNvNtNtCsjdmXvNL10OO_4mlua5state3raw13load_std_libs in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+            "_luaopen_table", referenced from:
+                __RNvNtNtCsjdmXvNL10OO_4mlua5state3raw13load_std_libs in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+            "_luaopen_utf8", referenced from:
+                __RNvNtNtCsjdmXvNL10OO_4mlua5state3raw13load_std_libs in libmlua-b135099d7e19835b.rlib[6](mlua-b135099d7e19835b.mlua.dfd10a5e4426fa58-cgu.02.rcgu.o)
+          ld: symbol(s) not found for architecture arm64
+          clang: error: linker command failed with exit code 1 (use -v to see invocation)
+          
+
+error: could not compile `native` (lib test) due to 1 previous error
+exit=101
+=== (k1) crates/native/Cargo.toml:
+[package]
+name    = "native"
+version = "0.0.0"
+edition.workspace      = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Variant (k): no direct mlua dependency; module mode comes through hostlib.
+hostlib = { path = "../hostlib", default-features = false, features = ["module"] }
+
+[features]
+lua54  = ["hostlib/lua54"]
+luajit = ["hostlib/luajit"]
+=== (k1) crates/native/src/lib.rs:
+//! Variant (k1): the attribute is reached through the re-export, with no `use` of `mlua`.
+
+use hostlib::mlua::{Lua, Result as LuaResult, Table as LuaTable};
+
+/// The `luaopen_airsstack` entry point.
+#[hostlib::mlua::lua_module]
+fn airsstack(lua: &Lua) -> LuaResult<LuaTable> {
+    hostlib::root(lua)
+}
+=== (k1) $ cargo check -p native --features lua54
+    Checking hostlib v0.0.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/crates/hostlib)
+    Checking native v0.0.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/crates/native)
+error[E0433]: cannot find module or crate `mlua` in this scope
+ --> crates/native/src/lib.rs:6:1
+  |
+6 | #[hostlib::mlua::lua_module]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `mlua`
+  |
+  = note: this error originates in the attribute macro `hostlib::mlua::lua_module` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0433]: cannot find module or crate `mlua` in this scope
+ --> crates/native/src/lib.rs:6:1
+  |
+6 | #[hostlib::mlua::lua_module]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `mlua`
+  |
+  = help: if you wanted to use a crate named `mlua`, use `cargo add mlua` to add it to your `Cargo.toml`
+  = note: this error originates in the attribute macro `hostlib::mlua::lua_module` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+For more information about this error, try `rustc --explain E0433`.
+error: could not compile `native` (lib) due to 2 previous errors
+exit=101
+=== (k2) crates/native/src/lib.rs:
+//! Variant (k2): as (k1), plus `use hostlib::mlua::{self, ..}` so the expansion finds `mlua`.
+
+use hostlib::mlua::{self, Lua, Result as LuaResult, Table as LuaTable};
+
+/// The `luaopen_airsstack` entry point.
+#[hostlib::mlua::lua_module]
+fn airsstack(lua: &Lua) -> LuaResult<LuaTable> {
+    hostlib::root(lua)
+}
+=== (k2) $ cargo check -p native --features lua54
+    Checking native v0.0.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/crates/native)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.06s
+exit=0
+=== (k2) $ cargo clippy -p native --all-targets --features lua54 -- -D warnings
+    Checking hostlib v0.0.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/crates/hostlib)
+    Checking native v0.0.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/a3-feature-split/crates/native)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.21s
+exit=0

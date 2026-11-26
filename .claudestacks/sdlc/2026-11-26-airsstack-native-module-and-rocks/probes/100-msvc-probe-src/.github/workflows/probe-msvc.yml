@@ -1,0 +1,139 @@
+# Throwaway probe: does an mlua 0.12.0 `module` cdylib built by MSVC load in MSVC-built
+# Lua 5.4 (lua54.dll), LuaJIT 2.1 (lua51.dll), via LuaRocks rust-mlua, and in Neovim?
+name: probe-msvc
+on:
+  push:
+    branches: [probe/msvc-module-2026-11-26]
+jobs:
+  probe:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - name: versions
+        continue-on-error: true
+        run: |
+          echo ImageOS=%ImageOS% ImageVersion=%ImageVersion%
+          rustc -vV 2>&1
+          cargo -V 2>&1
+          cl 2>&1
+          link 2>&1 | findstr /C:"Version"
+      - name: build lua 5.4.8 (MSVC, lua54.dll)
+        continue-on-error: true
+        run: |
+          curl -sSfL -o lua-5.4.8.tar.gz https://www.lua.org/ftp/lua-5.4.8.tar.gz
+          echo curl exit=%ERRORLEVEL%
+          certutil -hashfile lua-5.4.8.tar.gz SHA256
+          tar -xzf lua-5.4.8.tar.gz
+          cd lua-5.4.8\src
+          cl /nologo /MD /O2 /W3 /c /DLUA_BUILD_AS_DLL *.c
+          echo cl exit=%ERRORLEVEL%
+          ren lua.obj lua.o
+          ren luac.obj luac.o
+          link /nologo /DLL /IMPLIB:lua54.lib /OUT:lua54.dll *.obj
+          echo link dll exit=%ERRORLEVEL%
+          link /nologo /OUT:lua.exe lua.o lua54.lib
+          echo link exe exit=%ERRORLEVEL%
+          mkdir C:\lua54\bin C:\lua54\lib C:\lua54\include
+          copy lua.exe C:\lua54\bin\
+          copy lua54.dll C:\lua54\bin\
+          copy lua54.lib C:\lua54\lib\
+          copy lua.h C:\lua54\include\
+          copy luaconf.h C:\lua54\include\
+          copy lualib.h C:\lua54\include\
+          copy lauxlib.h C:\lua54\include\
+          copy lua.hpp C:\lua54\include\
+          C:\lua54\bin\lua.exe -v
+          echo lua -v exit=%ERRORLEVEL%
+      - name: build luajit v2.1 (MSVC, msvcbuild.bat)
+        continue-on-error: true
+        run: |
+          git clone --depth 1 --branch v2.1 https://github.com/LuaJIT/LuaJIT.git luajit-src
+          git -C luajit-src log -1 --format="luajit commit %%H %%cI"
+          cd luajit-src\src
+          call msvcbuild.bat
+          echo msvcbuild exit=%ERRORLEVEL%
+          mkdir C:\luajit
+          copy luajit.exe C:\luajit\
+          copy lua51.dll C:\luajit\
+          C:\luajit\luajit.exe -v
+          echo luajit -v exit=%ERRORLEVEL%
+      - name: cargo build lua54 + luajit modules
+        continue-on-error: true
+        run: |
+          cargo build --release --locked --features lua54 --target-dir target-lua54 2>&1
+          echo cargo lua54 exit=%ERRORLEVEL%
+          cargo build --release --locked --features luajit --target-dir target-luajit 2>&1
+          echo cargo luajit exit=%ERRORLEVEL%
+          mkdir C:\mods54 C:\modsjit
+          copy target-lua54\release\airsstack.dll C:\mods54\airsstack.dll
+          copy target-luajit\release\airsstack.dll C:\modsjit\airsstack.dll
+          echo --- dumpbin lua54 build
+          dumpbin /nologo /dependents C:\mods54\airsstack.dll
+          echo --- dumpbin luajit build
+          dumpbin /nologo /dependents C:\modsjit\airsstack.dll
+      - name: (1) lua54 build under lua.exe 5.4
+        continue-on-error: true
+        run: |
+          C:\lua54\bin\lua.exe probe.lua C:\mods54 2>&1
+          echo exit=%ERRORLEVEL%
+          C:\lua54\bin\lua.exe -e "package.cpath='C:\\mods54\\?.dll;'..package.cpath; local m=require('airsstack'); print(type(m), m.ok, m.json)" 2>&1
+          echo exit=%ERRORLEVEL%
+      - name: (2) luajit build under luajit.exe
+        continue-on-error: true
+        run: |
+          C:\luajit\luajit.exe probe.lua C:\modsjit 2>&1
+          echo exit=%ERRORLEVEL%
+      - name: (2b) lua54 build under luajit.exe (expected failure)
+        continue-on-error: true
+        run: |
+          C:\luajit\luajit.exe probe.lua C:\mods54 2>&1
+          echo exit=%ERRORLEVEL%
+      - name: (2c) luajit build under lua.exe 5.4 (expected failure)
+        continue-on-error: true
+        run: |
+          C:\lua54\bin\lua.exe probe.lua C:\modsjit 2>&1
+          echo exit=%ERRORLEVEL%
+      - name: (3) luarocks make rust-mlua against lua 5.4
+        continue-on-error: true
+        run: |
+          curl -sSfL -o luarocks.zip https://luarocks.github.io/luarocks/releases/luarocks-3.12.2-windows-64.zip
+          echo curl exit=%ERRORLEVEL%
+          certutil -hashfile luarocks.zip SHA256
+          mkdir C:\luarocks-dl
+          tar -xf luarocks.zip -C C:\luarocks-dl
+          dir /s /b C:\luarocks-dl
+          for /r C:\luarocks-dl %%f in (luarocks.exe) do if exist "%%f" set LR=%%f
+          echo LR=%LR%
+          "%LR%" --version
+          "%LR%" --lua-dir C:\lua54 --lua-version 5.4 config 2>&1
+          echo config exit=%ERRORLEVEL%
+          mkdir %RUNNER_TEMP%\rtree
+          "%LR%" --lua-dir C:\lua54 --lua-version 5.4 make --tree %RUNNER_TEMP%\rtree airsstack-0.0.0-1.rockspec 2>&1
+          echo make exit=%ERRORLEVEL%
+          dir /s /b %RUNNER_TEMP%\rtree
+          "%LR%" --lua-dir C:\lua54 --lua-version 5.4 list --tree %RUNNER_TEMP%\rtree 2>&1
+          C:\lua54\bin\lua.exe probe.lua %RUNNER_TEMP%\rtree\lib\lua\5.4 2>&1
+          echo require exit=%ERRORLEVEL%
+      - name: (4) neovim windows zip, nvim -l
+        continue-on-error: true
+        run: |
+          curl -sSfL -o nvim-win64.zip https://github.com/neovim/neovim/releases/latest/download/nvim-win64.zip
+          echo curl exit=%ERRORLEVEL%
+          mkdir C:\nvim
+          tar -xf nvim-win64.zip -C C:\nvim
+          dir /b C:\nvim\nvim-win64\bin
+          C:\nvim\nvim-win64\bin\nvim.exe --version 2>&1
+          echo --- dumpbin nvim.exe
+          dumpbin /nologo /dependents C:\nvim\nvim-win64\bin\nvim.exe
+          echo --- nvim -l luajit build
+          C:\nvim\nvim-win64\bin\nvim.exe --clean -l probe.lua C:\modsjit 2>&1
+          echo exit=%ERRORLEVEL%
+          echo --- nvim -l lua54 build (expected failure)
+          C:\nvim\nvim-win64\bin\nvim.exe --clean -l probe.lua C:\mods54 2>&1
+          echo exit=%ERRORLEVEL%

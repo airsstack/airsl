@@ -1,0 +1,17 @@
+--- a/crates/airsl/Cargo.toml
++++ b/crates/airsl/Cargo.toml
+@@ -28,6 +28,14 @@
+ path = "examples/notes-module/setup.rs"
+ test = true
+ 
++[features]
++default  = ["lua54", "vendored", "send"]
++lua54    = ["mlua/lua54"]
++luajit   = ["mlua/luajit"]
++vendored = ["mlua/vendored"]
++send     = ["mlua/send"]
++module   = ["mlua/module"]
++
+ [dependencies]
+ mlua       = { workspace = true }
+ serde      = { workspace = true }

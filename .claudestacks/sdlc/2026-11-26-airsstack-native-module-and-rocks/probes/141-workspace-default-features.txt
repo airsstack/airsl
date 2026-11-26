@@ -1,0 +1,113 @@
+question: draft 7.2 #2 (D8): edition 2024, member 'airsl = { workspace = true, default-features = false, features = ["module"] }' while [workspace.dependencies] airsl leaves defaults on -- error or warning? And the alternative: workspace entry default-features = false, airsl-cli opting into defaults.
+commands: each `$ ...` line below, run in the stated cwd, followed by its raw output and `[exit N]`
+versions: rustc 1.94.1 (e408947bf 2026-03-25), cargo 1.94.1 (29ea6fb6a 2026-03-24) via R/rust-toolchain.toml channel 1.94; mlua 0.12.0, mlua-sys 0.11.0, mlua_derive 0.12.0, syn 2.0.119 (copy's Cargo.lock); cargo-deny 0.20.2; cargo-dist 0.33.1; luarocks 3.12.2 (/opt/homebrew/bin/luarocks, runs on Lua 5.4); Lua 5.4.8 (/opt/homebrew/bin/lua5.4); LuaJIT 2.1.1770848219 (/opt/homebrew/opt/luajit); luarocks-build-rust-mlua 0.2.7-1; macOS 26.3.1 arm64
+setup: S=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad; copy = S/probes-L/repo = rsync of R at 9d054c4 (minus target/, .git, .claudestacks, book/book), with the draft's feature table applied: root mlua features ["serialize"], members += crates/airsl-lua; crates/airsl [features] default=[lua54,vendored,send], lua54/luajit/vendored/send/module -> mlua/*; crates/airsl-lua cdylib (lib name airsstack, airsl path dep default-features=false + module, features lua54/luajit, build.rs dynamic_lookup, lib.rs `mod entry;`, entry.rs #[mlua::lua_module]); probe-only `ModuleSet::open` added to crates/airsl/src/modules/registry.rs so the toy installs airsl's real Json module. Sources and diffs: 140-lua-module-private-mod/. Env: CARGO_BUILD_JOBS=2, CARGO_TARGET_DIR=S/probes-L/target (luarocks' backend passes --target-dir=target, i.e. S/probes-L/repo/target). Every command ran under zsh `setopt pipefail`, so [exit N] is the pipeline's real status.
+date: 2026-11-26 (probe agent L)
+--- raw output ---
+=== V1: workspace entry unchanged: airsl = { version = "0.2.0", path = "crates/airsl" } ; crates/airsl-lua: airsl = { workspace = true, default-features = false, features = ["module"] }
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/crates/airsl-lua/Cargo.toml:26:airsl = { workspace = true, default-features = false, features = ["module"] }
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/Cargo.toml:57:airsl      = { version = "0.2.0", path = "crates/airsl" }
+$ cargo metadata --format-version 1 --no-deps >/dev/null   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+error: failed to load manifest for workspace member `/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/crates/airsl-lua`
+referenced by workspace at `/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/Cargo.toml`
+
+Caused by:
+  failed to parse manifest at `/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/crates/airsl-lua/Cargo.toml`
+
+Caused by:
+  error inheriting `airsl` from workspace root manifest's `workspace.dependencies.airsl`
+
+Caused by:
+  `default-features = false` cannot override workspace's `default-features`
+[exit 101]
+
+$ cargo tree -p airsl-lua --features lua54 -e features -i mlua 2>&1 | head -30   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+error: failed to load manifest for workspace member `/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/crates/airsl-lua`
+referenced by workspace at `/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/Cargo.toml`
+
+Caused by:
+  failed to parse manifest at `/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/crates/airsl-lua/Cargo.toml`
+
+Caused by:
+  error inheriting `airsl` from workspace root manifest's `workspace.dependencies.airsl`
+
+Caused by:
+  `default-features = false` cannot override workspace's `default-features`
+[exit 101]
+
+$ cargo check -p airsl-lua --features lua54 2>&1 | grep -v '^ *\(Checking\|Compiling\)' | head -30   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+error: failed to load manifest for workspace member `/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/crates/airsl-lua`
+referenced by workspace at `/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/Cargo.toml`
+
+Caused by:
+  failed to parse manifest at `/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/crates/airsl-lua/Cargo.toml`
+
+Caused by:
+  error inheriting `airsl` from workspace root manifest's `workspace.dependencies.airsl`
+
+Caused by:
+  `default-features = false` cannot override workspace's `default-features`
+[exit 101]
+
+=== V2a: workspace entry default-features = false; airsl-cli unchanged (airsl = { workspace = true }); airsl-lua workspace = true, default-features = false, features = ["module"]
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/Cargo.toml:57:airsl      = { version = "0.2.0", path = "crates/airsl", default-features = false }
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/crates/airsl-lua/Cargo.toml:26:airsl = { workspace = true, default-features = false, features = ["module"] }
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/crates/airsl-cli/Cargo.toml:32:airsl      = { workspace = true }
+$ cargo metadata --format-version 1 --no-deps >/dev/null   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+[exit 0]
+
+$ cargo tree -p airsl-lua --features lua54 -e features -i mlua --depth 1 2>&1   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+mlua v0.12.0
+├── mlua feature "default"
+├── mlua feature "lua54"
+├── mlua feature "mlua_derive"
+├── mlua feature "module"
+├── mlua feature "serde"
+└── mlua feature "serialize"
+[exit 0]
+
+$ cargo tree -p airsl-cli -e features -i mlua --depth 1 2>&1   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+mlua v0.12.0
+├── mlua feature "default"
+├── mlua feature "serde"
+└── mlua feature "serialize"
+[exit 0]
+
+=== V2b: same, airsl-cli opts in with default-features = true
+32:airsl      = { workspace = true, default-features = true }
+$ cargo tree -p airsl-cli -e features -i mlua --depth 1 2>&1   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+mlua v0.12.0
+├── mlua feature "default"
+├── mlua feature "error-send"
+├── mlua feature "lua54"
+├── mlua feature "send"
+├── mlua feature "serde"
+├── mlua feature "serialize"
+└── mlua feature "vendored"
+[exit 0]
+
+=== V2c: same, airsl-cli opts in with features = ["default"]
+32:airsl      = { workspace = true, features = ["default"] }
+$ cargo tree -p airsl-cli -e features -i mlua --depth 1 2>&1   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+mlua v0.12.0
+├── mlua feature "default"
+├── mlua feature "error-send"
+├── mlua feature "lua54"
+├── mlua feature "send"
+├── mlua feature "serde"
+├── mlua feature "serialize"
+└── mlua feature "vendored"
+[exit 0]
+
+=== V2d: workspace entry default-features=false, airsl-cli plain workspace=true, cargo check -p airsl-cli (what happens with no Lua)
+$ cargo check -p airsl-cli 2>&1 | grep -v '^ *\(Checking\|Compiling\)' | head -15   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+error: No Lua feature enabled. Please enable one of: lua55, lua54, lua53, lua52, lua51, luajit, luajit52, luau
+  --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-sys-0.11.0/build/main.rs:18:13
+   |
+18 |             compile_error!("No Lua feature enabled. Please enable one of: lua55, lua54, lua53, lua52, lua51, luajit, luajit52, luau");
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: could not compile `mlua-sys` (build script) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+[exit 101]
+

@@ -1,0 +1,42 @@
+# Probe 232 — `default-members` keeps bare cargo commands working with the airsl-lua member
+question: review finding 13 (spec §2.3, D1): with airsl-lua a member, a bare `cargo check`/`build`/`test` (no -p, no --workspace) unifies
+  `module` with `vendored`/`send`. Does `[workspace] default-members` without airsl-lua make the bare command pass, and does it leave
+  `--workspace` unchanged (still failing, so --exclude airsl-lua stays on every --workspace command)?
+versions: rustc 1.94.1 (e408947bf 2026-03-25), cargo 1.94.1 (29ea6fb6a 2026-03-24); mlua 0.12.0, mlua-sys 0.11.0; jq-1.7.1-apple; macOS 26.3.1 arm64.
+setup: S=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/fix-01;
+  S/repo = probe 230's copy (R at 9d054c4 + the spec's §2.4 manifests + airsl-lua member); the one edit is the `default-members` line shown.
+commands: cwd S/repo, env CARGO_BUILD_JOBS=2 CARGO_TARGET_DIR=S/target; Compiling/Checking lines removed (grep -vE); [exit N] is cargo's status.
+date: 2026-11-26
+--- raw output ---
+$ cargo check --all-targets   (no default-members: control)
+error: `vendored`, `external` and `module` features are mutually exclusive
+  --> ~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-sys-0.11.0/build/main_inner.rs:22:5
+   |
+22 |     compile_error!("`vendored`, `external` and `module` features are mutually exclusive");
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: could not compile `mlua-sys` (build script) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+[exit 101]
+$ sed -n 1,6p Cargo.toml   (after adding default-members)
+[workspace]
+resolver = "3"
+# `docs-check` is unpublished and test-only; the other two are the crates.io releases.
+members  = ["crates/airsl", "crates/airsl-cli", "crates/airsl-lua", "crates/docs-check"]
+# Bare `cargo build`/`test`/`check` leave out airsl-lua, whose `module` feature cannot share a build.
+default-members = ["crates/airsl", "crates/airsl-cli", "crates/docs-check"]
+$ cargo check --all-targets
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 15.65s
+[exit 0]
+$ cargo check --workspace --all-targets   (default-members does not cover --workspace)
+error: `vendored`, `external` and `module` features are mutually exclusive
+  --> ~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-sys-0.11.0/build/main_inner.rs:22:5
+   |
+22 |     compile_error!("`vendored`, `external` and `module` features are mutually exclusive");
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: could not compile `mlua-sys` (build script) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+[exit 101]
+$ cargo metadata --format-version 1 --no-deps | jq -c .workspace_default_members
+["path+file://<S>/repo/crates/airsl#0.2.0","path+file://<S>/repo/crates/airsl-cli#0.2.0","path+file://<S>/repo/crates/docs-check#0.0.0"]

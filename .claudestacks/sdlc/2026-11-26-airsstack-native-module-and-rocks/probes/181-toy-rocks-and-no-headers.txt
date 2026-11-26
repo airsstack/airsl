@@ -1,0 +1,103 @@
+# Probe 181 — toy rocks for probes 182-189 (build log), and P17: source build when Lua headers are absent
+Question (P17): does `luarocks make` of a build.type = "rust-mlua" rockspec still build when LUA_INCDIR
+holds no lua.h (empty dir) or does not exist? Output + exit.
+Toy: 181-toy-rocks/ = probe 66's crate (mlua =0.12.0, features ["module"], cdylib `airsstack`, build.rs
+`-undefined dynamic_lookup` on macOS) + lib.rs returning {ok, version = CARGO_PKG_VERSION, opens = n}
+where n counts luaopen calls in this process (a static AtomicUsize). Rockspecs 0.0.1-1, 0.0.1-2, 0.0.2-1
+(rockspecs/; build.type rust-mlua, build_dependencies luarocks-build-rust-mlua == 0.2.7, dependencies lua == 5.4).
+Cargo.toml version was 0.0.1 for the 0.0.1-* builds and 0.0.2 for 0.0.2-1 (Cargo.lock as saved = final state).
+Local server S/probes-M/server = the three binary rocks + three rockspecs, `luarocks-admin make_manifest`
+(manifest-5.4 saved as 181-toy-rocks/server-manifest-5.4).
+Versions: luarocks 3.12.2 (/opt/homebrew/bin/luarocks, Homebrew, runs on Lua 5.4.8); luarocks-build-rust-mlua 0.2.7-1;
+mlua 0.12.0 / mlua-sys 0.11.0; rustc 1.94.1 / cargo 1.94.1 (RUSTUP_TOOLCHAIN=1.94); macOS 26.3.1 arm64.
+Env for every luarocks call: HOME=S/probes-M/home-b (fake), RUSTUP_HOME/CARGO_HOME = the real ones, CARGO_BUILD_JOBS=2.
+S=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad
+Source cited: 29-luarocks-3.12.2-src/build.lua:239-251 (`if not driver.skip_lua_inc_lib_check then ... deps.check_lua_incdir`
+runs before `driver.run`), 29-luarocks-3.12.2-src/deps.lua:707-723 (lua_h_exists: the "Failed finding Lua header lua.h" text, deps.lua:722),
+deps.lua:754-780 (check_lua_incdir: an explicit LUA_INCDIR is checked as-is, no search). rust-mlua 0.2.7 does not set
+skip_lua_inc_lib_check (`grep -c skip_lua_inc_lib_check 20-luarocks-build-rust-mlua/rust-mlua.lua` = 0).
+Date: 2026-11-26T07:15Z
+
+=== build log (Compiling lines removed)
+$ luarocks --lua-version 5.4 make --tree /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/btree rockspecs/airsstack-0.0.1-1.rockspec
+    Finished `release` profile [optimized] target(s) in 10.10s
+
+airsstack 0.0.1-1 depends on luarocks-build-rust-mlua 0.2.7 (0.2.7-1 installed: success)
+
+airsstack 0.0.1-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+airsstack 0.0.1-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/btree (license: Apache-2.0)
+
+[exit 0]
+$ luarocks --lua-version 5.4 pack airsstack 0.0.1-1 --tree /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/btree
+Packed: /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/rocks/airsstack-0.0.1-1.macosx-aarch64.rock
+[exit 0]
+$ luarocks --lua-version 5.4 make --tree /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/btree rockspecs/airsstack-0.0.1-2.rockspec
+    Finished `release` profile [optimized] target(s) in 0.07s
+
+airsstack 0.0.1-2 depends on luarocks-build-rust-mlua 0.2.7 (0.2.7-1 installed: success)
+
+airsstack 0.0.1-2 depends on lua 5.4 (5.4-1 provided by VM: success)
+airsstack 0.0.1-2 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/btree (license: Apache-2.0)
+
+Checking stability of dependencies in the absence of
+airsstack 0.0.1-1...
+
+Removing airsstack 0.0.1-1...
+Removal successful.
+[exit 0]
+$ luarocks --lua-version 5.4 pack airsstack 0.0.1-2 --tree /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/btree
+Packed: /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/rocks/airsstack-0.0.1-2.macosx-aarch64.rock
+[exit 0]
+$ luarocks --lua-version 5.4 make --tree /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/btree rockspecs/airsstack-0.0.2-1.rockspec
+    Finished `release` profile [optimized] target(s) in 0.85s
+
+airsstack 0.0.2-1 depends on luarocks-build-rust-mlua 0.2.7 (0.2.7-1 installed: success)
+
+airsstack 0.0.2-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+airsstack 0.0.2-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/btree (license: Apache-2.0)
+
+Checking stability of dependencies in the absence of
+airsstack 0.0.1-2...
+
+Removing airsstack 0.0.1-2...
+Removal successful.
+[exit 0]
+$ luarocks --lua-version 5.4 pack airsstack 0.0.2-1 --tree /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/btree
+Packed: /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/rocks/airsstack-0.0.2-1.macosx-aarch64.rock
+[exit 0]
+$ luarocks-admin make_manifest /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server
+Making manifest for /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server
+Generating index.html for /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server
+[exit 0]
+
+=== P17
+== LUAROCKS_CONFIG=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/p17/config-empty-inc.lua
+variables = {
+   LUA_INCDIR = "/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/p17/empty-inc",
+}
+$ LUAROCKS_CONFIG=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/p17/config-empty-inc.lua luarocks --lua-version 5.4 config variables.LUA_INCDIR   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/toy)
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/p17/empty-inc
+[exit 0]
+$ LUAROCKS_CONFIG=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/p17/config-empty-inc.lua luarocks --lua-version 5.4 make --tree /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/btree rockspecs/airsstack-0.0.2-1.rockspec   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/toy)
+
+airsstack 0.0.2-1 depends on luarocks-build-rust-mlua 0.2.7 (0.2.7-1 installed: success)
+
+airsstack 0.0.2-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+
+Error: Failed finding Lua header lua.h (searched at /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/p17/empty-inc). You may need to install Lua development headers. You can use `luarocks config variables.LUA_INCDIR <path>` to set the correct location.
+[exit 1]
+== LUAROCKS_CONFIG=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/p17/config-missing-inc.lua
+variables = {
+   LUA_INCDIR = "/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/p17/no-such-dir",
+}
+$ LUAROCKS_CONFIG=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/p17/config-missing-inc.lua luarocks --lua-version 5.4 config variables.LUA_INCDIR   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/toy)
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/p17/no-such-dir
+[exit 0]
+$ LUAROCKS_CONFIG=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/p17/config-missing-inc.lua luarocks --lua-version 5.4 make --tree /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/btree rockspecs/airsstack-0.0.2-1.rockspec   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/toy)
+
+Error: Failed finding Lua header lua.h (searched at /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/p17/no-such-dir). You may need to install Lua development headers. You can use `luarocks config variables.LUA_INCDIR <path>` to set the correct location.
+
+airsstack 0.0.2-1 depends on luarocks-build-rust-mlua 0.2.7 (0.2.7-1 installed: success)
+
+airsstack 0.0.2-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+[exit 1]
