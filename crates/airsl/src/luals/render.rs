@@ -10,7 +10,8 @@
 //!
 //! - [`TypeFile`], the rendered text, the file name it belongs under and its accessors.
 //! - The layout: the header, the root class, then per module its class and fields, its records and
-//!   its functions, with every inline doc written after ` # ` so it stays doc text.
+//!   its functions, then `return <root>`, with every inline doc written after ` # ` so it stays
+//!   doc text.
 //! - Writing a module whose name is a Lua reserved word in bracket form.
 //!
 //! Non-responsibilities: writing the file anywhere, and checking that a description matches what a
@@ -75,7 +76,8 @@ impl TypeFile {
     ///
     /// Calls each module's `describe` in the set's insertion order. The file holds the header, the
     /// root class, and for every module its class with one field per described field, then one
-    /// class per record, then one block per function.
+    /// class per record, then one block per function. It ends by returning the root table, which
+    /// is what lets the language server type `require("<root>")`.
     ///
     /// # Errors
     ///
@@ -114,6 +116,7 @@ impl TypeFile {
                 }
             }
         }
+        blocks.push(format!("return {root_name}"));
         let mut text = blocks.join("\n\n");
         text.push('\n');
         Ok(Self {
@@ -300,7 +303,9 @@ mod tests {
              \n\
              ---Host modules installed under `airsstack`.\n\
              ---@class airsstack\n\
-             airsstack = {}\n"
+             airsstack = {}\n\
+             \n\
+             return airsstack\n"
         );
     }
 
@@ -369,10 +374,22 @@ mod tests {
              airsstack.m = {}\n\
              \n\
              ---@param x string\n\
-             function airsstack.m.f(x) end\n"
+             function airsstack.m.f(x) end\n\
+             \n\
+             return airsstack\n"
         ));
         assert!(!text.contains('#'));
         assert!(text.lines().all(|line| line == line.trim_end()));
+    }
+
+    #[test]
+    fn the_type_file_ends_by_returning_the_root() {
+        let default = TypeFile::render(&stdlib().unwrap(), &RootTable::default()).unwrap();
+        assert!(default.as_str().ends_with("\n\nreturn airsstack\n"));
+
+        let root = RootTable::new("myapp").unwrap();
+        let custom = TypeFile::render(&stdlib().unwrap(), &root).unwrap();
+        assert!(custom.as_str().ends_with("\n\nreturn myapp\n"));
     }
 
     #[test]
