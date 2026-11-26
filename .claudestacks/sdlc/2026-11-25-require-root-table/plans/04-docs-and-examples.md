@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [02, 03]
 built-on: ae381756f52b
@@ -171,3 +171,36 @@ checkout's `airsl lua setup`.
   Task 1 or Task 2 rewrites. New wording must say "refuses every call except …", which matches
   none of these phrases.
 - `cargo make dod` is green, and `cargo make book-build` builds.
+
+## Review findings
+
+Reviewer, 2026-11-25: 0 🔴, 3 🟡, 6 🔵 code + 1 🔵 plan. Blocking: ch06-02:51 and ch06-02:55-58. All fixed in one round. Final: `cargo make dod` exit 0; `cargo make book-build` exit 0; `cmp` of fresh `cargo run -q -p airsl --example <name>` against the README Output block identical for multi-file-project, policy-presets and engine-reuse; proof grep over `book` and `crates/airsl/examples` → no output.
+
+- 🟡 ch06-02:51, the `pure` sentence still said every `require` is refused: fixed, now "refused, except `require("airsstack")`".
+- 🟡 ch06-02:55-58, the from-source claim had no policy condition: fixed, qualified by policy and linked to ch02 (see Deviations).
+- 🟡 multi-file-project heading "one name, three functions": fixed, now "four functions"; README block re-pasted, `cmp` identical.
+- 🔵 ch01-04:83, the link pointed at the whole chapter: fixed, now `#requiring-the-modules-by-name`.
+- 🔵 ch02-00:146-147, uneven reflow: fixed.
+- 🔵 ch02-00:215, "including `pure`" read as covering the snippet's `print`: fixed, the claim is now about the call.
+- 🔵 ch07-00:61: fixed, "can also write".
+- 🔵 multi-file-project/main.rs:28-29, omitted the `require` grant: fixed.
+- 🔵 policy-presets/README.md:73-75, the from-source script runs `require("lib")`: fixed, `cmp` identical.
+- 🔵 appendix-03:17, the row had no link to ch02: fixed, linked.
+- 🔵 No automated guard against docs drift: fixed on 2026-11-25 at the author's request. `crates/docs-check` fails the gate when:
+  - an example's output differs from its README `## Output` block;
+  - a cited source path, module path or `:line` citation is stale or present;
+  - a book `{{#include}}`, `{{#rustdoc_include}}` or `{{#playground}}` target is missing;
+  - an example's `no-output` or `unix-only` marker file is not named in its expected list in `crates/docs-check/src/examples.rs`;
+  - the `examples` task of `Makefile.toml` compares output with anything but the book appendix.
+
+  Bite proof: changing "doubles to 6" to "doubles to 7" in the engine-reuse README fails with "README drift: example engine-reuse: its output differs…".
+
+## Deviations
+
+- 2026-11-25: The task-briefer step was skipped. Tasks 1–3 ran in three parallel coders (disjoint files), each running the gate once at the end.
+- 2026-11-25: Task 2's wording for ch06-02 ("a script built with `Script::from_source` has a `require` that answers only `require("airsstack")`") is unconditional, and the code shows it holds only below `Full` with `require` granted. A probe crate against the checkout evaluated `pcall(require,"lib")` from source: trusted → `module 'lib' not found:` (Lua's own require); confined → ``module `lib` cannot be loaded: the script has no directory to load modules from``; pure → ``require denied: `require` is not granted — no access is granted``. The chapter was written qualified by policy. This is plan wording, not a spec claim.
+- 2026-11-25: `which_require.lua`'s `flavour` doc lists four kinds of `require` but notes that root-only never reaches a file-backed script; the code cannot tell it from confined.
+- 2026-11-25: The policy-presets README now counts four kinds of answer (it said three); the `memory` row is the fourth.
+- 2026-11-25: The ch01-04 LuaLS transcript has its ANSI escapes and `\r` progress redraws stripped, matching the chapter's existing transcripts.
+- 2026-11-25: Not committed; the commit waits for the author.
+- 2026-11-25: Scope addition, signed off by the author ("fix all of findings"; then chose "unpublished member crate" and "deviation in plan 04"). A new workspace member `crates/docs-check` (`publish = false`, tests only) joins the `cargo make dod` gate. It checks example output against README `## Output` blocks, cited `.rs` paths, `CLAUDE.md` module paths and lone code names, refuses `:line` citations, and checks book include, rustdoc_include and playground targets, the marker files of the examples against their expected lists, and that the `examples` task compares output with the appendix only. It came from three reversion-guard findings this chain had first declined (plans 01, 02, 04). Side effects: 11 `CLAUDE.md` citations now carry `crates/airsl/src/…`; `denials-are-data/README.md` cites symbols instead of line numbers; the duckscript `examples` task no longer repeats the output check. Reviewed in two rounds; findings fixed.

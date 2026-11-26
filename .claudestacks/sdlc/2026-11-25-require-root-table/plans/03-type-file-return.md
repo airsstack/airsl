@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 built-on: ae381756f52b
 ---
@@ -68,3 +68,12 @@ joined like every other block. Both descriptions of the layout gain the new bloc
 
 - `cargo make dod` is green.
 - `cargo test -p airsl luals::` passes.
+
+## Review findings
+
+Reviewer, 2026-11-25 (batch with plan 01): no findings on `render.rs`. `cargo make dod` exit 0; `cargo test -p airsl luals::` → 102 passed.
+
+## Deviations
+
+- 2026-11-25: The test `renders_the_header_and_root_class`, not named in this plan, was updated. It `assert_eq!`s the whole empty-set file, so its expected text gained `\nreturn airsstack\n`.
+- 2026-11-25: Not committed; the commit waits for the author.

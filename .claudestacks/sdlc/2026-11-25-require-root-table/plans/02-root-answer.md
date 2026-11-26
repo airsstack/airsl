@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [01]
 built-on: ae381756f52b
@@ -240,3 +240,33 @@ crates/airsl/src/extension/loaded.rs      — modify  test only
 - `git grep -n "looks at none of them\|no \`require\` at all\|a missing one\|gets none\|removes the global\|is unavailable to it" -- crates/airsl/src`
   prints nothing. On the parent commit it prints six lines: `require_loader.rs:13`, `:49`, `:75`
   and `:150`, `script.rs:32` and `engine.rs:278`. Each is a passage this plan rewrites.
+
+## Review findings
+
+Reviewer, 2026-11-25: 0 🔴, 0 🟡, 11 🔵 code + 1 🔵 plan. Nothing blocking. `cargo make dod` exit 0; `cargo test -p airsl require::` → 44 passed; `engine::` → 57 passed; proof grep → no output.
+
+- F1 fixed: `error.rs` `RequireDenied` doc reworded ("before any module is looked up"); no message text changed. `cargo make dod-crate airsl` → `Build Done`, `test result: ok. 854 passed; 0 failed`, doctests `25 passed`.
+- F2 fixed: `require/root.rs` Non-responsibilities names `RequireDisposition` as the chooser. `cargo make dod-crate airsl` → rustdoc step green (`-D warnings`), `Build Done`.
+- F3 fixed: `require/disposition.rs` `decide` doc says "refuses every call but the root table's". `cargo make dod-crate airsl` → `Build Done`.
+- F4 fixed: redundant last sentence dropped from the `set_require` doc. `cargo make dod-crate airsl` → `Build Done`.
+- F5 fixed: `script.rs` doc wraps at 100 columns. A python line-length scan of `script.rs` → no line over 100.
+- F6 fixed: the invalid-target test asserts `message_of(&confined)` contains "require target". `cargo test -p airsl require::` → `test result: ok. 44 passed; 0 failed`.
+- F7 fixed: `message_of` uses `split_once(..).map_or(raised, |(message, _)| message)`. `cargo test -p airsl require::` → `test result: ok. 44 passed; 0 failed`.
+- F8 fixed: one `pure_with_require()` helper in the engine tests replaces both inline policies. `cargo test -p airsl engine::` → `test result: ok. 57 passed; 0 failed`.
+- F9 fixed: the tuple carries `points_package_at_folder`; the label is no longer branched on. `cargo test -p airsl engine::` → `test result: ok. 57 passed; 0 failed`.
+- F10 fixed: the table-replaced test loops over labelled policies and its assert names the policy. `cargo test -p airsl engine::` → `test result: ok. 57 passed; 0 failed`.
+- F11 fixed on 2026-11-25 at the author's request. Two tests drive the real failures:
+  - `require::root::tests::register_names_its_stage_when_package_loaded_is_not_a_table` sets `package.loaded = 1`.
+  - `require::loader::tests::the_root_only_require_names_its_stage_when_the_state_cannot_hold_it` runs `gc_collect` twice, then `set_memory_limit(used_memory())`.
+
+  Each test fails when its stage text is reworded, and the second passed 20 of 20 runs.
+- P1 applied: deviations recorded below.
+
+## Deviations
+
+- 2026-11-25: The task-briefer step was skipped. Tasks 1–3 ran in one coder, because they share files.
+- 2026-11-25: `a_dispatched_handler_requires_the_root` returns `rawequal(require('airsstack'), airsstack)` and asserts `true`. Returning the table fails dispatch with "cannot serialize <function>", so the identity check replaces "a value equal to the root".
+- 2026-11-25: The root-only tests for an invalid target and a non-string compare the message with its traceback stripped (`message_of`). The last traceback frame names a file for a confined script and `probe:1` for a script from source.
+- 2026-11-25: "installs a function that refuses instead" changed only in `loader.rs`. `mod.rs` never carried it.
+- 2026-11-25: One test string literal is 106 columns, because rustfmt cannot wrap a string literal.
+- 2026-11-25: Not committed; the commit waits for the author.

@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 built-on: ae381756f52b
 ---
@@ -108,3 +108,19 @@ green. Commit `docs: point references at the require/ module`.
 - `cargo make dod` is green.
 - `git grep -n require_loader -- ':!.claudestacks'` prints nothing.
 - `cargo test -p airsl require::` runs the same number of tests the old module did.
+
+## Review findings
+
+Reviewer, 2026-11-25: 0 🔴, 0 🟡, 7 🔵. Nothing blocking. `cargo make dod` exit 0; `cargo test -p airsl --lib require::` → 33 passed (4 disposition, 29 loader), same names as the 33 under `require_loader::` on the parent commit; `git grep -n require_loader -- ':!.claudestacks'` → no output.
+
+- 🔵 `require/mod.rs:10`: the doc says an absent `require` is "installed". Handed to plan 02, which replaces `Absent`.
+- 🔵 `require/loader.rs:3`, `:6`: `//!` lines are 132 and 136 columns. Handed to plan 02 (same file).
+- 🔵 `require/disposition.rs:11`: `//!` line is 101 columns. Handed to plan 02.
+- 🔵 `CLAUDE.md:93`, `multi-file-project/README.md:82`: repointed lines are past the wrap. Handed to plan 04 (same files).
+- 🔵 No gate step guards against a stale `require_loader` path coming back: fixed on 2026-11-25 at the author's request ("fix all of findings"). The unpublished workspace crate `crates/docs-check` fails `cargo make dod` when a cited `.rs` path, a module path or a lone code name in `CLAUDE.md` no longer resolves. Bite proof: changing `require::loader` to `require_loader` in CLAUDE.md fails with "cites require_loader: appears in no .rs or Cargo.toml file of the workspace".
+
+## Deviations
+
+- 2026-11-25: The task-briefer ledger/brief step was skipped. The coder read the plan directly, and Tasks 1 and 2 ran in one coder.
+- 2026-11-25: `require/mod.rs` also carries `#![expect(clippy::redundant_pub_crate, …)]`. Without it, the `pub(crate) use` lines in a private module fail clippy. `paths/mod.rs` does the same.
+- 2026-11-25: Not committed. Execute leaves the tree uncommitted until the author asks; the commit message for Task 1 must record the count 33.
