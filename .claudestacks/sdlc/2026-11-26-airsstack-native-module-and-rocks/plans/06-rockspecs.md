@@ -193,10 +193,10 @@ both rocks`.
 ## Review findings
 
 - Reviewer (35-reviewer-p05-p06, shared with plan 05): plan 06 SPEC COMPLIANT; its one blocker was in plan 05's `ci.yml`. DoD: `cargo make dod` → exit 0, test step ends with both `check.lua: ok` lines; `luarocks lint` on both rockspecs → exit 0 each, both byte-identical to the probe 235 sources (`cmp`); `cmp LICENSE crates/airsl-lua/doc/LICENSE` → identical; `cargo make rocks` → exit 0, packing airsstack-0.2.0-1.macosx-aarch64.rock + "check.lua: ok (Lua 5.4)" and airsstack-luajit-0.2.0-1.macosx-aarch64.rock + "check.lua: ok (Lua 5.1, LuaJIT 2.1.1770848219)"; the 3 tool refusals → exit 1 with the plan's exact text and no `Compiling` line.
-- 🔵 `Makefile.toml`:403 — `root = pwd` prints the root as a stray output line — open — the plan prescribes `pwd`; cosmetic.
+- 🔵 `Makefile.toml`:403 — `root = pwd` prints the root as a stray output line — open — accepted: the plan prescribes `pwd`; cosmetic. Fix round 1 replaced it with `get_env CARGO_MAKE_WORKING_DIRECTORY`; review 38 judged that form unproven on Windows (`pwd` is proven on all three runners, probe 252) and round 2 (2026-11-27) reverted to `root = pwd` — `cargo make rocks` → exit 0 (both rocks Packed, both `check.lua: ok` lines, the root line printed again).
 - 🔵 `Makefile.toml`:463 — the comment says every argument is copied to a name first, but `${6}` is read with `get_env` — fixed — the comment says `${6}` is read with `get_env` before the first `enter`; `cargo make rocks` → exit 0 (both `check.lua: ok` lines); `cargo make dod` → exit 0.
 - 🔵 `Makefile.toml`:459-470 — duckscript has one global namespace, so `root = set ${9}` rebinds the caller's `root`; the comment named only the `${1}` hazard — fixed — the comment names it (same value today); `cargo make rocks` → exit 0; `cargo make dod` → exit 0.
-- 🟡 `Makefile.toml` (`rocks`) — no CI or DoD step runs `cargo make rocks`; reverting the `cd` check is caught by nothing, the anchored glob and the named-variable fix only by a manual success run — open — the plan accepts it (the task is the test; R12).
+- 🟡 `Makefile.toml` (`rocks`) — no CI or DoD step runs `cargo make rocks`; reverting the `cd` check is caught by nothing, the anchored glob and the named-variable fix only by a manual success run — open — plan 09 (the build-rocks workflow) runs the rocks in CI; the plan accepts it until then (the task is the test; R12), and neither findings-fix round (2026-11-27) added a CI step.
 
 ## Deviations
 

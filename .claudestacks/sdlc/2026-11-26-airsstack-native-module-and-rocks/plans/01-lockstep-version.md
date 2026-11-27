@@ -88,8 +88,8 @@ is green. Commit `chore(workspace): take every published crate's version from th
 ## Review findings
 
 - Reviewer (12-reviewer-p01): SPEC COMPLIANT, blocking none. DoD: `cargo make dod` → exit 0 (fmt, clippy -D warnings, rustdoc -D warnings, 855+101+66+1 tests, 25 doctests).
-- 🔵 `Cargo.toml`:10 — the `[workspace.package]` comment names `airsl-lua` and says the CLI installs the rocks at its own version, which was not true at this commit (plan-mandated text) — open — `crates/airsl-lua` exists since plan 04; the CLI half becomes true with a later plan in this chain.
-- 🟡 `Cargo.toml` / `crates/*/Cargo.toml` — nothing guards the lockstep; a member going back to its own `version` fails no test, lint or DoD step — open — the plan's Risks accept it until plan 07's docs-check guard.
+- 🔵 `Cargo.toml`:10 — the `[workspace.package]` comment names `airsl-lua` and says the CLI installs the rocks at its own version, which was not true at this commit (plan-mandated text) — fixed (2026-11-27) — the comment now says only what is true today: airsl, airsl-cli and airsl-lua share one number, so the crates and the LuaRocks packages built from one commit carry the same version — `cargo make dod` → exit 0 (866+101+66+1 tests, 27 doctests); review 38 re-checked it: "The version comment is true today (rockspecs at 0.2.0)".
+- 🟡 `Cargo.toml` / `crates/*/Cargo.toml` — nothing guards the lockstep; a member going back to its own `version` fails no test, lint or DoD step — open — plan 07 adds the docs-check guard; the plan's Risks accept it until then, and neither findings-fix round (2026-11-27) touched it.
 - 🔵 `crates/airsl/src/version.rs`:27 (tests module) — removing the `#![expect(clippy::unwrap_used)]` is not in Task 1's text — open — accepted, no code change; recorded under Deviations.
 
 ## Deviations
