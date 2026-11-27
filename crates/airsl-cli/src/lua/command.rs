@@ -339,6 +339,29 @@ mod tests {
     }
 
     #[test]
+    fn native_on_a_lua_5_1_without_luajit_writes_and_installs_nothing() {
+        let project = tempfile::tempdir().unwrap();
+        let luarocks = Scripted::default()
+            .then_stdout(b"5.1\n")
+            .then_stdout(b"{\n   luajit_version_checked = true\n}\n");
+
+        let (stdout, stderr, code) = run_native(&luarocks, project.path(), Flavour::Unix);
+
+        assert!(
+            stderr.starts_with(
+                "airsl: `luarocks` found no LuaJIT for Lua 5.1: its Lua 5.1 is not LuaJIT, or it \
+                 has none, and `airsstack-luajit` needs LuaJIT\n"
+            ),
+            "{stderr}"
+        );
+        assert!(stdout.is_empty());
+        assert_eq!(code, 1);
+        assert!(!project.path().join(".airsl").exists());
+        assert!(!project.path().join(".luarc.json").exists());
+        assert_eq!(luarocks.calls(), ["config lua_version", "config cache"]);
+    }
+
+    #[test]
     fn native_type_file_failure_installs_nothing() {
         let project = tempfile::tempdir().unwrap();
         let luarocks = lua54_then_install(Some(0));

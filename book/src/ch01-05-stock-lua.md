@@ -410,10 +410,19 @@ one LuaRocks targets when you name none, so the last one you run decides. After 
 
 ### Ubuntu with apt
 
-The `luarocks` package targets Lua 5.1 from the `lua5.1` package, not LuaJIT. `airsl lua setup
---native` takes Lua 5.1 to mean LuaJIT, and the LuaJIT package needs LuaJIT 2.1, which LuaRocks
-does not find in that Lua. The install then stops with an error, not with the harmless list of
-[the quirk above](#building-from-the-repository). LuaRocks 3.12 prints:
+The `luarocks` package targets Lua 5.1 from the `lua5.1` package, not LuaJIT. A Lua 5.1 that is not
+LuaJIT cannot load `airsstack-luajit`, and the package needs LuaJIT 2.1, which LuaRocks does not
+find in that Lua. `airsl lua setup --native` sees this before it writes anything and refuses:
+
+```text
+airsl: `luarocks` found no LuaJIT for Lua 5.1: its Lua 5.1 is not LuaJIT, or it has none, and `airsstack-luajit` needs LuaJIT
+       install Lua 5.4 and run again with `--lua 5.4` to install it for Lua 5.4
+       or run `luarocks --lua-version 5.1 config --scope user lua_dir <LuaJIT prefix>` to point `luarocks` at LuaJIT
+       https://airsstack.github.io/airsl/ch01-05-stock-lua.html#pointing-luarocks-at-lua-54-or-luajit shows how to point `luarocks` at Lua 5.4 or LuaJIT
+```
+
+`luarocks install` on its own stops in the same place, later, with a LuaRocks error. LuaRocks 3.12
+prints:
 
 ```text
 Error: Could not satisfy dependency luajit >= 2.1: No results matching query were found for Lua 5.1.
@@ -421,9 +430,11 @@ Error: Could not satisfy dependency luajit >= 2.1: No results matching query wer
 
 So on Ubuntu, name the Lua yourself: `airsl lua setup --native --lua 5.4`.
 
-For LuaJIT, point `--lua-dir` at a folder that holds only LuaJIT: a `bin/luajit` and the LuaJIT
-headers in `include`. For Lua 5.4, `--lua-version 5.4` is enough after
-`apt install lua5.4 liblua5.4-dev`.
+For LuaJIT, point LuaRocks at a folder that holds only LuaJIT: a `bin/luajit` and the LuaJIT
+headers in `include`. Pass it as `--lua-dir`, or store it once with
+`luarocks --lua-version 5.1 config --scope user lua_dir <LuaJIT prefix>`, as
+[Homebrew on macOS](#homebrew-on-macos) does. After that, `airsl lua setup --native --lua luajit`
+works. For Lua 5.4, `--lua-version 5.4` is enough after `apt install lua5.4 liblua5.4-dev`.
 
 If you build from source, LuaRocks needs the build tool in its own Lua 5.1 tree first:
 
