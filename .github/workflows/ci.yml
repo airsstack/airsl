@@ -75,6 +75,55 @@ jobs:
         if: runner.os == 'Windows'
         run: reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /t REG_DWORD /f /v AllowDevelopmentWithoutDevLicense /d 1
 
+      # The gate loads the native module into real Lua 5.4 and LuaJIT interpreters,
+      # and no runner image ships Lua, so each OS installs both before the gate runs.
+      # Lua is pinned to 5.4 because Homebrew's `lua` and gh-actions-lua default to
+      # 5.5. gh-actions-lua is not used at all: installed twice in one job it keeps the
+      # first Lua and silently skips the second, so it cannot provide both.
+      #
+      # apt and Homebrew follow the runner image and are not pinned; the gate refuses a
+      # wrong interpreter, so drift fails loudly instead of testing the wrong thing.
+      #
+      # The default names, `lua5.4` and `luajit`, are what apt installs, so no variable
+      # is needed here.
+      - name: Install Lua 5.4 and LuaJIT (Ubuntu)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y lua5.4 luajit
+
+      # `lua@5.4` is keg-only: it is not linked into the PATH, so the gate is told
+      # where its interpreter is.
+      - name: Install Lua 5.4 and LuaJIT (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install lua@5.4 luajit
+          echo "AIRSL_LUA54=$(brew --prefix lua@5.4)/bin/lua5.4" >> "$GITHUB_ENV"
+
+      # The module links against an MSVC-built lua54.dll / lua51.dll and their import
+      # libraries, which no Windows package provides, so both interpreters are built
+      # from source with MSVC. msvc-lua.cmd holds the build because the rock leg of
+      # build-rocks.yml needs the same interpreters, and the build needs the MSVC
+      # environment this action sets up for the steps after it. The pin is the commit
+      # the build was proven with.
+      - name: Enter the MSVC developer environment
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: x64
+
+      - name: Build Lua 5.4 and LuaJIT (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call crates\airsl-lua\ci\msvc-lua.cmd
+
+      # Absolute paths: the build installs outside the PATH, and the gate must find
+      # these exact interpreters.
+      - name: Point the gate at the Windows interpreters
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          echo 'AIRSL_LUA54=C:\lua54\bin\lua.exe' >> "$GITHUB_ENV"
+          echo 'AIRSL_LUAJIT=C:\luajit\bin\luajit.exe' >> "$GITHUB_ENV"
+
       # One command, the same one a developer runs locally: fmt-check, clippy,
       # rustdoc, tests, doctests — each with warnings as errors.
       - name: cargo make dod
