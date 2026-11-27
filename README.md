@@ -110,7 +110,7 @@ For maintainers:
 - Before tagging, rename `## Unreleased` in CHANGELOG.md to the heading form of the entries below
   it, `## airsl <version> — airsl-cli <version> — <date>`.
 - The command lines in `book/src/ch01-05-stock-lua.md` under "Installing" and "Homebrew on macOS"
-  show real output, from the 0.3.0 rocks on macOS on Apple Silicon. After a release, run them
+  show real output, from the 0.3.1 rocks on macOS on Apple Silicon. After a release, run them
   again against luarocks.org and update the transcripts where the output changed: the package
   version, and the platform in the file name. The musl refusal under "No binary package" names the
   same version in its `luarocks` lines. The Windows lines in "Pointing LuaRocks at Lua 5.4 or
