@@ -20,6 +20,8 @@
 //!   task of `Makefile.toml` from comparing output with README text.
 //! - `citations`: requiring the source paths, module paths and book include targets that prose
 //!   cites to exist, and refusing line-number citations.
+//! - `book_links`: requiring each address into the published book that a source file, `CLAUDE.md`
+//!   or a README carries to name a chapter the book lists, and its anchor to be a heading of it.
 //! - `rockspecs`: requiring the rockspec file names, the `package`, `version` and `tag` inside
 //!   them, and the published members' versions to follow the workspace version.
 //! - `workspace`: locating the workspace root, its crates and the documents the guards read.
@@ -28,6 +30,8 @@
 //! of shipped `.lua` files, which stay with `cargo make examples`; and whether the book builds,
 //! which is the `mdbook build` step of CI.
 
+#[cfg(test)]
+mod book_links;
 #[cfg(test)]
 mod citations;
 #[cfg(test)]

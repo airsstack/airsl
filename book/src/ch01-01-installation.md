@@ -44,6 +44,11 @@ $ cargo install --locked airsl-cli
 This needs a C compiler, because `airsl` compiles Lua itself from its C source and links it into the
 binary. That is also why the prebuilt binary needs nothing else installed: Lua is already inside it.
 
+## Running scripts outside airsl
+
+To use `require("airsstack")` in stock Lua 5.4, LuaJIT or Neovim, install the native module with
+LuaRocks. [Running Scripts in Stock Lua](ch01-05-stock-lua.md) shows how.
+
 ## Other ways to install
 
 Each [release](https://github.com/airsstack/airsl/releases) also carries a plain archive for every

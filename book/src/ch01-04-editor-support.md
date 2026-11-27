@@ -83,6 +83,14 @@ Diagnosis complete, 1 problems found
 Completion works from the same type. For the form itself, see
 [Requiring the modules by name](ch02-00-first-project.md#requiring-the-modules-by-name).
 
+## Scripts that run outside `airsl`
+
+The same description fits a script that runs in stock Lua with the native module. Two things in it
+hold only inside `airsl`. The global `airsstack` exists only there, so code meant for stock Lua
+should take the table with `local airsstack = require("airsstack")`, even though the editor accepts
+the bare global. And `ext` exists only there too, so the editor completes it where a script run in
+stock Lua has none. [Running Scripts in Stock Lua](ch01-05-stock-lua.md) covers the module.
+
 ## What it writes
 
 Setup writes two things:
@@ -154,4 +162,6 @@ server find the description, so commit that file, and teammates only need to run
   it is.
 - Your existing settings are kept. A file with comments is refused, and you add the entry yourself.
 - Run it again after upgrading `airsl`.
+- The description declares `ext`, which only `airsl` provides. For running scripts in stock Lua, see
+  [Running Scripts in Stock Lua](ch01-05-stock-lua.md).
 - To describe a module of your own, see [Writing Your Own Module](ch07-00-your-own-module.md).
