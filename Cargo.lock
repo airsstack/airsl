@@ -42,6 +42,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "airsl-lua"
+version = "0.2.0"
+dependencies = [
+ "airsl",
+]
+
+[[package]]
 name = "anstream"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

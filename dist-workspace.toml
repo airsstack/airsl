@@ -33,6 +33,9 @@ global-artifacts-jobs = ["./airsl-cli-smoke"]
 # gate in ci.yml never builds musl or this profile, so without this a change that
 # breaks a release target would first fail on the release tag itself.
 pr-run-mode = "upload"
+# Build only the package each artifact ships. Without this dist builds `--workspace`, and the
+# native module's `module` feature cannot share a build with the rest of the workspace.
+precise-builds = true
 
 # dist's defaults name fixed images (macos-14, ubuntu-22.04, windows-2022). GitHub retires
 # those, and the macos-14 retirement broke every release. The `-latest` labels move with GitHub
