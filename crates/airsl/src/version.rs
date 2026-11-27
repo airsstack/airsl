@@ -25,19 +25,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg(test)]
 mod tests {
-    #![expect(
-        clippy::unwrap_used,
-        reason = "tests unwrap known-valid fixtures; a panic is the intended failure signal"
-    )]
-
     use super::VERSION;
-
-    #[test]
-    fn the_version_is_the_one_the_crate_manifest_declares() {
-        let manifest: toml::Value = toml::from_str(include_str!("../Cargo.toml")).unwrap();
-        let declared = manifest["package"]["version"].as_str().unwrap();
-        assert_eq!(VERSION, declared);
-    }
 
     #[test]
     fn the_version_has_three_numeric_components() {

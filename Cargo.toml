@@ -4,6 +4,8 @@ resolver = "3"
 members  = ["crates/airsl", "crates/airsl-cli", "crates/docs-check"]
 
 [workspace.package]
+# One number for airsl, airsl-cli and airsl-lua: the CLI installs the rocks at its own version.
+version       = "0.2.0"
 edition       = "2024"
 rust-version  = "1.94"
 license       = "Apache-2.0"
