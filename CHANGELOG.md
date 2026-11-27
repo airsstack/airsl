@@ -12,12 +12,59 @@ each crate had a number of its own and one commit could ship them under two diff
 
 ## airsl 0.3.0 — airsl-cli 0.3.0 — 2026-11-27
 
+A breaking release that takes the `airsstack` modules beyond `airsl`: into the Lua you already have,
+as a native module installed with LuaRocks, and into your editor, as a type file for the Lua
+language server. `HostModule` gains a required method and `airsl` gains Cargo features, so both
+crates take a middle-number bump, per the rule above. The new pieces are in
+[Editor Support](https://airsstack.github.io/airsl/ch01-04-editor-support.html) and
+[Running Scripts in Stock Lua](https://airsstack.github.io/airsl/ch01-05-stock-lua.html).
+
 ### Breaking
 
 - **`airsl` gains Cargo features.** With `default-features = false`, a dependent now has to enable
   `lua54` or `luajit` itself, because no Lua is selected without one, and must also enable
   `vendored`, or `mlua` looks for a system Lua through pkg-config. `Engine` is `Send + Sync` only
   with the default `send` feature.
+- **`HostModule` has a required `describe` method**, returning the description of every key
+  `install` sets. A host module written for 0.2.0 does not compile until it implements it.
+  `airsl::luals::verify` checks a description against what the module really installs, so a host
+  can keep its own honest from a test.
+- **`require("airsstack")` never loads a file of that name.** The root's name is answered with the
+  root table before any search, so a script's own `airsstack.lua` is no longer reached by it, under
+  any preset. An engine built with another root name answers that name instead, and `airsstack` is
+  then an ordinary module name.
+
+### Added
+
+- **The native module.** The `airsstack` modules, all but `ext`, as a library that stock Lua
+  loads with `require("airsstack")`, in two LuaRocks packages: `airsstack` for Lua 5.4 and
+  `airsstack-luajit` for LuaJIT, Neovim included. It sets no global and runs with the full
+  authority of the Lua that loaded it, with no grants and no limits. Binary packages cover macOS on
+  Apple Silicon and Intel, Windows on x64, and Linux with glibc on x86_64 and aarch64; elsewhere
+  LuaRocks builds from the recipe, which needs Rust 1.94 or newer, a C compiler and the Lua
+  headers. musl Linux is not supported. Every release uploads both packages to luarocks.org at the crates' version. See
+  [Running Scripts in Stock Lua](https://airsstack.github.io/airsl/ch01-05-stock-lua.html).
+- **`airsl lua setup [DIR]`** writes a type file for the `airsstack` modules to
+  `.airsl/types/airsstack.lua` and adds `.airsl/types` to `workspace.library` in `.luarc.json`, so
+  the Lua language server completes and checks `airsstack.*` calls. Running it again leaves an
+  up-to-date project untouched, and it refuses a luarc it cannot rewrite safely.
+- **`airsl lua setup --native`** also installs the native module: it asks LuaRocks which Lua it
+  targets, installs the matching package into your own tree with `luarocks install --local`, and
+  prints the `luarocks path` command that lets the shell find it. `--lua 5.4` or `--lua luajit`
+  names the Lua instead.
+- **`require("airsstack")` returns the root table** under `trusted`, `confined` and `pure`, from a
+  file or from source, so a script can keep the modules in a local. A script built from source
+  that is granted `require` gets one that answers only the root, and refuses any other name with
+  `Error::RequireNoDirectory`.
+- **`airsl::luals`**: `setup`, the call behind `airsl lua setup` for a host, `TypeFile` to render
+  the type file for any root name, and `verify` with `Drift` to check a module's description.
+  **`airsl::description`** holds the description types.
+- **`modules::standalone()`**, the built-in modules without `ext`, and **`ModuleSet::open`**, which
+  installs a set into a Lua state airsl did not create, with trusted authority, and returns the
+  root table. They are what the native module is built from.
+- **`Error::InvalidDescription`**, **`DescribeFailed`**, **`DescriptionDrift`**,
+  **`VerifyFailed`**, **`LuarcRefused`**, **`TypeFileRefused`** and **`RequireNoDirectory`**, for
+  the failures above.
 
 ## airsl 0.2.0 — airsl-cli 0.2.0 — 2026-11-25
 
