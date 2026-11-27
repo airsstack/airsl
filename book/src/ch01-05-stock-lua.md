@@ -59,22 +59,22 @@ If you have `airsl`, it can run LuaRocks for you:
 $ airsl lua setup --native
 created .airsl/types/airsstack.lua
 created .luarc.json
-Installing https://luarocks.org/airsstack-0.3.0-1.macosx-aarch64.rock
+Installing https://luarocks.org/airsstack-0.3.1-1.macosx-aarch64.rock
 
-airsstack 0.3.0-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+airsstack 0.3.1-1 depends on lua 5.4 (5.4-1 provided by VM: success)
 No existing manifest. Attempting to rebuild...
-airsstack 0.3.0-1 is now installed in ~/.luarocks (license: Apache-2.0)
+airsstack 0.3.1-1 is now installed in ~/.luarocks (license: Apache-2.0)
 
 require("airsstack") works once you run: eval "$(luarocks path)"
 $ airsl lua setup --native --lua luajit
 unchanged .airsl/types/airsstack.lua
 unchanged .luarc.json
-Installing https://luarocks.org/airsstack-luajit-0.3.0-1.macosx-aarch64.rock
+Installing https://luarocks.org/airsstack-luajit-0.3.1-1.macosx-aarch64.rock
 
-airsstack-luajit 0.3.0-1 depends on lua 5.1 (5.1-1 provided by VM: success)
-airsstack-luajit 0.3.0-1 depends on luajit >= 2.1 (2.1.1770848219-1 provided by VM: success)
+airsstack-luajit 0.3.1-1 depends on lua 5.1 (5.1-1 provided by VM: success)
+airsstack-luajit 0.3.1-1 depends on luajit >= 2.1 (2.1.1770848219-1 provided by VM: success)
 No existing manifest. Attempting to rebuild...
-airsstack-luajit 0.3.0-1 is now installed in ~/.luarocks (license: Apache-2.0)
+airsstack-luajit 0.3.1-1 is now installed in ~/.luarocks (license: Apache-2.0)
 
 require("airsstack") works once you run: eval "$(luarocks --lua-version 5.1 path)"
 ```
@@ -99,19 +99,19 @@ already targets 5.1:
 
 ```console
 $ luarocks --lua-version 5.4 install --local airsstack
-Installing https://luarocks.org/airsstack-0.3.0-1.macosx-aarch64.rock
+Installing https://luarocks.org/airsstack-0.3.1-1.macosx-aarch64.rock
 
-airsstack 0.3.0-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+airsstack 0.3.1-1 depends on lua 5.4 (5.4-1 provided by VM: success)
 No existing manifest. Attempting to rebuild...
-airsstack 0.3.0-1 is now installed in ~/.luarocks (license: Apache-2.0)
+airsstack 0.3.1-1 is now installed in ~/.luarocks (license: Apache-2.0)
 
 $ luarocks --lua-version 5.1 install --local airsstack-luajit
-Installing https://luarocks.org/airsstack-luajit-0.3.0-1.macosx-aarch64.rock
+Installing https://luarocks.org/airsstack-luajit-0.3.1-1.macosx-aarch64.rock
 
-airsstack-luajit 0.3.0-1 depends on lua 5.1 (5.1-1 provided by VM: success)
-airsstack-luajit 0.3.0-1 depends on luajit >= 2.1 (2.1.1770848219-1 provided by VM: success)
+airsstack-luajit 0.3.1-1 depends on lua 5.1 (5.1-1 provided by VM: success)
+airsstack-luajit 0.3.1-1 depends on luajit >= 2.1 (2.1.1770848219-1 provided by VM: success)
 No existing manifest. Attempting to rebuild...
-airsstack-luajit 0.3.0-1 is now installed in ~/.luarocks (license: Apache-2.0)
+airsstack-luajit 0.3.1-1 is now installed in ~/.luarocks (license: Apache-2.0)
 
 ```
 
@@ -347,19 +347,19 @@ it the folder:
 
 ```console
 $ luarocks --lua-version 5.4 --lua-dir "$(brew --prefix lua@5.4)" install --local airsstack
-Installing https://luarocks.org/airsstack-0.3.0-1.macosx-aarch64.rock
+Installing https://luarocks.org/airsstack-0.3.1-1.macosx-aarch64.rock
 
-airsstack 0.3.0-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+airsstack 0.3.1-1 depends on lua 5.4 (5.4-1 provided by VM: success)
 No existing manifest. Attempting to rebuild...
-airsstack 0.3.0-1 is now installed in ~/.luarocks (license: Apache-2.0)
+airsstack 0.3.1-1 is now installed in ~/.luarocks (license: Apache-2.0)
 
 $ luarocks --lua-version 5.1 --lua-dir "$(brew --prefix luajit)" install --local airsstack-luajit
-Installing https://luarocks.org/airsstack-luajit-0.3.0-1.macosx-aarch64.rock
+Installing https://luarocks.org/airsstack-luajit-0.3.1-1.macosx-aarch64.rock
 
-airsstack-luajit 0.3.0-1 depends on lua 5.1 (5.1-1 provided by VM: success)
-airsstack-luajit 0.3.0-1 depends on luajit >= 2.1 (2.1.1770848219-1 provided by VM: success)
+airsstack-luajit 0.3.1-1 depends on lua 5.1 (5.1-1 provided by VM: success)
+airsstack-luajit 0.3.1-1 depends on luajit >= 2.1 (2.1.1770848219-1 provided by VM: success)
 No existing manifest. Attempting to rebuild...
-airsstack-luajit 0.3.0-1 is now installed in ~/.luarocks (license: Apache-2.0)
+airsstack-luajit 0.3.1-1 is now installed in ~/.luarocks (license: Apache-2.0)
 
 ```
 
