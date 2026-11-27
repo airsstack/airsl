@@ -2,9 +2,10 @@
 //!
 //! Exists as a module tree so each capability a script needs is one file with its own
 //! tests, rather than one large surface. Every submodule here implements [`HostModule`] and is
-//! installed as a subtable of the single `airsstack` global — `airsstack.json.decode`,
-//! `airsstack.fs.read`. Downstream crates add their own the same way, which is what makes this
-//! crate a shared Lua integration point instead of a fixed runner.
+//! installed as a subtable of one root table. An engine publishes that table as the single
+//! `airsstack` global — `airsstack.json.decode`, `airsstack.fs.read` — while [`ModuleSet::open`]
+//! hands it back for the caller to place. Downstream crates add their own the same way, which is
+//! what makes this crate a shared Lua integration point instead of a fixed runner.
 //!
 //! Responsibilities:
 //!
@@ -23,7 +24,8 @@
 //! - [`json`] — JSON encoding and decoding.
 //! - [`mod@path`] — path manipulation; `absolute` of a relative path needs `cwd`, the rest needs no
 //!   authority.
-//! - [`mod@stdlib`] — the default module set the engine installs.
+//! - [`mod@stdlib`] — the default module set the engine installs, and `standalone`, the same set
+//!   without `ext` for a Lua state airsl did not create.
 //!
 //! Non-responsibilities: sandboxing. Which Lua standard libraries a script sees is
 //! [`crate::Policy`]'s decision, applied by the engine before any of these are installed.
@@ -59,5 +61,5 @@ pub use proc::Proc;
 pub use regex::Regex;
 pub use registry::{HostModule, InstallContext, ModuleSet};
 pub use stdio::Stdio;
-pub use stdlib::stdlib;
+pub use stdlib::{standalone, stdlib};
 pub use time::Time;

@@ -8,8 +8,11 @@
 //! Responsibilities:
 //!
 //! - [`HostModule`], the trait a contributor implements.
-//! - [`InstallContext`], what the engine tells a module about the policy it is being installed under.
+//! - [`InstallContext`], what a module is told about the policy it is being installed under.
 //! - [`ModuleSet`], an ordered collection of modules with name uniqueness enforced on insert.
+//! - `ModuleSet::install`, the one loop that builds the root table and installs each module into
+//!   its own subtable, shared by the engine and by [`ModuleSet::open`].
+//! - [`ModuleSet::open`], installing the set into a Lua state airsl did not create.
 //!
 //! Non-responsibilities: installation order effects. Modules are installed in insertion order and
 //! must not depend on one another's presence.
@@ -19,7 +22,8 @@ use crate::error::{Error, Result};
 use crate::sandbox::{GrantSet, Policy};
 use crate::types::{ModuleName, RootTable};
 
-/// What the engine tells a module while installing it.
+/// What a module is told while it is being installed, whether by an engine or by
+/// [`ModuleSet::open`].
 ///
 /// The authority a module enforces has to be the same object the policy reports, so it arrives at
 /// installation rather than at construction. A module built with its own copy of the grants could
@@ -225,6 +229,77 @@ impl ModuleSet {
     pub fn iter(&self) -> impl Iterator<Item = &dyn HostModule> {
         self.modules.iter().map(AsRef::as_ref)
     }
+
+    /// Creates the root table and installs every module into its own subtable, in set order.
+    ///
+    /// Every module is told `policy` and `root_table`, so a module that guards an operation reads
+    /// its authority from the same place [`crate::Engine::policy`] reports it from. Returns the
+    /// root table and sets nothing else: the global and the `require` registration belong to the
+    /// caller.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::ModuleInstall`] when a table cannot be created or set, and a module's own
+    /// install error unchanged.
+    pub(crate) fn install(
+        &self,
+        lua: &mlua::Lua,
+        policy: &Policy,
+        root_table: &RootTable,
+    ) -> Result<mlua::Table> {
+        let fail = |e: mlua::Error| Error::ModuleInstall {
+            module: root_table.to_string(),
+            reason: e.to_string(),
+        };
+
+        let context = InstallContext::new(policy, root_table);
+        let root = lua.create_table().map_err(fail)?;
+        for module in self.iter() {
+            let table = lua.create_table().map_err(fail)?;
+            module.install(lua, &table, &context)?;
+            root.set(module.name().as_str(), table).map_err(fail)?;
+        }
+        Ok(root)
+    }
+
+    /// Installs every module into a Lua state airsl did not create, and returns the root table.
+    ///
+    /// The returned table holds one subtable per module, in set order. The caller decides where it
+    /// goes: this sets no global, registers nothing for `require` and does not touch
+    /// `package.loaded`. It arms no memory or instruction ceiling and loads, withholds or reshapes
+    /// no Lua library, so the state keeps exactly the surface its owner gave it.
+    ///
+    /// Modules are installed with [`Policy::trusted`] authority. A [`Policy`] is not a parameter
+    /// because its language surface and resource limits cannot be applied to a state airsl did not
+    /// create, and offering them would promise a confinement this call cannot deliver. Host
+    /// authority is therefore unrestricted: use this only where the script is as trusted as the
+    /// program loading it.
+    ///
+    /// State that is process-wide rather than per-state, such as the `env` overlay and the origin
+    /// `time` measures from, is shared with every other Lua state in the process.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::ModuleInstall`] when a table cannot be created or set, and a module's own
+    /// install error unchanged.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use airsl::RootTable;
+    /// use airsl::mlua::Lua;
+    ///
+    /// let lua = Lua::new();
+    /// let modules = airsl::modules::standalone()?;
+    /// let root = modules.open(&lua, &RootTable::default())?;
+    ///
+    /// let json: airsl::mlua::Table = root.get("json").map_err(|e| airsl::Error::lua("json", e))?;
+    /// assert!(json.contains_key("encode").map_err(|e| airsl::Error::lua("json", e))?);
+    /// # Ok::<(), airsl::Error>(())
+    /// ```
+    pub fn open(&self, lua: &mlua::Lua, root_table: &RootTable) -> Result<mlua::Table> {
+        self.install(lua, &Policy::trusted(), root_table)
+    }
 }
 
 impl core::fmt::Debug for ModuleSet {
@@ -242,10 +317,64 @@ mod tests {
         reason = "tests unwrap known-valid fixtures; a panic is the intended failure signal"
     )]
 
+    use std::sync::{Arc, Mutex};
+
     use super::{HostModule, InstallContext, ModuleSet};
     use crate::description::ModuleDescription;
     use crate::error::Result;
-    use crate::types::ModuleName;
+    use crate::modules::Fs;
+    use crate::sandbox::Policy;
+    use crate::types::{ModuleName, RootTable};
+
+    struct Failing(ModuleName);
+
+    impl HostModule for Failing {
+        fn name(&self) -> &ModuleName {
+            &self.0
+        }
+
+        fn install(
+            &self,
+            _lua: &mlua::Lua,
+            _table: &mlua::Table,
+            _context: &InstallContext<'_>,
+        ) -> Result<()> {
+            Err(crate::Error::lua(
+                "failing",
+                mlua::Error::RuntimeError("refused".into()),
+            ))
+        }
+
+        fn describe(&self) -> Result<ModuleDescription> {
+            ModuleDescription::builder("A failing stub.").build()
+        }
+    }
+
+    /// Records its name each time it is installed, so a test can observe the install order.
+    struct Recorder {
+        name: ModuleName,
+        log: Arc<Mutex<Vec<String>>>,
+    }
+
+    impl HostModule for Recorder {
+        fn name(&self) -> &ModuleName {
+            &self.name
+        }
+
+        fn install(
+            &self,
+            _lua: &mlua::Lua,
+            _table: &mlua::Table,
+            _context: &InstallContext<'_>,
+        ) -> Result<()> {
+            self.log.lock().unwrap().push(self.name.to_string());
+            Ok(())
+        }
+
+        fn describe(&self) -> Result<ModuleDescription> {
+            ModuleDescription::builder("A recording stub.").build()
+        }
+    }
 
     struct Stub(ModuleName);
 
@@ -339,5 +468,127 @@ mod tests {
             "{err}"
         );
         assert_eq!(set.len(), 1);
+    }
+
+    #[test]
+    fn install_hands_modules_the_policy_it_is_given() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("note.txt");
+        std::fs::write(&file, "hello").unwrap();
+
+        let mut set = ModuleSet::new();
+        set.insert(Box::new(Fs::new())).unwrap();
+        let lua = mlua::Lua::new();
+        let root = set
+            .install(&lua, &Policy::confined(), &RootTable::default())
+            .unwrap();
+
+        let fs: mlua::Table = root.get("fs").unwrap();
+        let read: mlua::Function = fs.get("read").unwrap();
+        let err = read
+            .call::<String>(file.to_string_lossy().into_owned())
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("outside the granted read roots"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn open_returns_one_subtable_per_module() {
+        let mut set = ModuleSet::new();
+        for name in ["json", "fs", "path"] {
+            set.insert(Stub::boxed(name)).unwrap();
+        }
+        let lua = mlua::Lua::new();
+        let root = set.open(&lua, &RootTable::default()).unwrap();
+
+        let mut keys = Vec::new();
+        for pair in root.pairs::<String, mlua::Table>() {
+            keys.push(pair.unwrap().0);
+        }
+        keys.sort();
+        assert_eq!(keys, ["fs", "json", "path"]);
+    }
+
+    #[test]
+    fn open_installs_modules_in_set_order() {
+        let log = Arc::new(Mutex::new(Vec::new()));
+        let mut set = ModuleSet::new();
+        for name in ["json", "fs", "path"] {
+            let module = Recorder {
+                name: ModuleName::new(name).unwrap(),
+                log: Arc::clone(&log),
+            };
+            set.insert(Box::new(module)).unwrap();
+        }
+        let lua = mlua::Lua::new();
+        set.open(&lua, &RootTable::default()).unwrap();
+
+        let installed = log.lock().unwrap().clone();
+        let expected: Vec<_> = set.names().iter().map(ToString::to_string).collect();
+        assert_eq!(installed, expected);
+    }
+
+    #[test]
+    fn open_sets_no_global() {
+        let mut set = ModuleSet::new();
+        set.insert(Stub::boxed("json")).unwrap();
+        let lua = mlua::Lua::new();
+        set.open(&lua, &RootTable::default()).unwrap();
+        let global: mlua::Value = lua.globals().get("airsstack").unwrap();
+        assert!(global.is_nil());
+    }
+
+    #[test]
+    fn open_leaves_package_loaded_and_the_require_registry_untouched() {
+        let mut set = ModuleSet::new();
+        set.insert(Stub::boxed("json")).unwrap();
+        let lua = mlua::Lua::new();
+        let root_table = RootTable::default();
+        set.open(&lua, &root_table).unwrap();
+
+        let package: mlua::Table = lua.globals().get("package").unwrap();
+        let loaded: mlua::Table = package.get("loaded").unwrap();
+        let entry: mlua::Value = loaded.get("airsstack").unwrap();
+        assert!(entry.is_nil());
+        // `answer` fails only when `require::root::register` never wrote its registry value.
+        assert!(crate::require::root::answer(&lua, &root_table, b"airsstack").is_err());
+    }
+
+    #[test]
+    fn open_installs_with_trusted_authority() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("note.txt");
+        std::fs::write(&file, "hello").unwrap();
+
+        let mut set = ModuleSet::new();
+        set.insert(Box::new(Fs::new())).unwrap();
+        let lua = mlua::Lua::new();
+        let root = set.open(&lua, &RootTable::default()).unwrap();
+
+        let fs: mlua::Table = root.get("fs").unwrap();
+        let read: mlua::Function = fs.get("read").unwrap();
+        let content: String = read.call(file.to_string_lossy().into_owned()).unwrap();
+        assert_eq!(content, "hello");
+    }
+
+    #[test]
+    fn open_on_an_empty_set_returns_an_empty_table() {
+        let lua = mlua::Lua::new();
+        let root = ModuleSet::new().open(&lua, &RootTable::default()).unwrap();
+        assert_eq!(root.pairs::<mlua::Value, mlua::Value>().count(), 0);
+    }
+
+    #[test]
+    fn open_propagates_a_module_install_error() {
+        let mut set = ModuleSet::new();
+        set.insert(Box::new(Failing(ModuleName::new("bad").unwrap())))
+            .unwrap();
+        let lua = mlua::Lua::new();
+        let err = set.open(&lua, &RootTable::default()).unwrap_err();
+        let expected =
+            crate::Error::lua("failing", mlua::Error::RuntimeError("refused".into())).to_string();
+        assert_eq!(err.to_string(), expected);
     }
 }
