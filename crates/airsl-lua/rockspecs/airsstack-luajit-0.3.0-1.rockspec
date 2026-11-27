@@ -1,17 +1,18 @@
 rockspec_format = "3.0"
-package = "airsstack"
-version = "0.2.0-1"
+package = "airsstack-luajit"
+version = "0.3.0-1"
 source = {
    url = "git+https://github.com/airsstack/airsl",
-   tag = "airsl-cli-v0.2.0",
+   tag = "airsl-cli-v0.3.0",
 }
 description = {
-   summary = "The airsl host modules as a native module for Lua 5.4",
+   summary = "The airsl host modules as a native module for LuaJIT",
    homepage = "https://airsstack.github.io/airsl/",
    license = "Apache-2.0",
 }
 dependencies = {
-   "lua == 5.4",
+   "lua == 5.1",
+   "luajit >= 2.1",
 }
 build_dependencies = {
    "luarocks-build-rust-mlua == 0.2.7",

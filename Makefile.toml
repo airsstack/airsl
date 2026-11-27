@@ -497,7 +497,7 @@ description = "Build, pack and load both LuaRocks packages of the native module 
 #
 # Every tool and rockspec is looked up before anything builds, so a missing one is reported at
 # once and not after the first package's compile. The rockspec is the one file the anchored
-# pattern finds: `<package>-*-1.rockspec` would take `airsstack-luajit-0.2.0-1.rockspec` for
+# pattern finds: `<package>-*-1.rockspec` would take `airsstack-luajit-0.3.0-1.rockspec` for
 # `airsstack`. The task does not compare the version it reads with the workspace version, which
 # `docs-check` owns.
 #
