@@ -109,12 +109,12 @@ For maintainers:
 - The release does not wait for CI. Tag only a commit on `main` whose pull request passed.
 - Before tagging, rename `## Unreleased` in CHANGELOG.md to the heading form of the entries below
   it, `## airsl <version> — airsl-cli <version> — <date>`.
-- After the first release whose `publish-rocks` job succeeds, the maintainer who pushed the
-  `airsl-cli-v*` tag runs, against luarocks.org, the command lines that
-  `book/src/ch01-05-stock-lua.md` shows under "Installing": `airsl lua setup --native` and the two
-  `luarocks install --local` lines. They also run the Homebrew lines on macOS and the Windows lines
-  in "Pointing LuaRocks at Lua 5.4 or LuaJIT". Each output is pasted under its own command line, in
-  the chapter's `console` blocks, and merged as a `docs:` pull request.
+- The command lines in `book/src/ch01-05-stock-lua.md` under "Installing" and "Homebrew on macOS"
+  show real output, from the 0.3.0 rocks on macOS on Apple Silicon. After a release, run them
+  again against luarocks.org and update the transcripts where the output changed: the package
+  version, and the platform in the file name. The Windows lines in "Pointing LuaRocks at Lua 5.4 or
+  LuaJIT" have not been run on Windows and show no output. Paste each output under its own command
+  line in the chapter's `console` blocks, and merge it as a `docs:` pull request.
 - Release notes stay in CHANGELOG.md. The GitHub Release carries install instructions only.
 - `.github/workflows/pages.yml` publishes the book and the `install/` scripts to GitHub Pages on
   every merge that touches them, so a change to `install/` is live as soon as it merges.

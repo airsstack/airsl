@@ -57,11 +57,37 @@ If you have `airsl`, it can run LuaRocks for you:
 
 ```console
 $ airsl lua setup --native
+created .airsl/types/airsstack.lua
+created .luarc.json
+Installing https://luarocks.org/airsstack-0.3.0-1.macosx-aarch64.rock
+
+airsstack 0.3.0-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack 0.3.0-1 is now installed in ~/.luarocks (license: Apache-2.0)
+
+require("airsstack") works once you run: eval "$(luarocks path)"
+$ airsl lua setup --native --lua luajit
+unchanged .airsl/types/airsstack.lua
+unchanged .luarc.json
+Installing https://luarocks.org/airsstack-luajit-0.3.0-1.macosx-aarch64.rock
+
+airsstack-luajit 0.3.0-1 depends on lua 5.1 (5.1-1 provided by VM: success)
+airsstack-luajit 0.3.0-1 depends on luajit >= 2.1 (2.1.1770848219-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack-luajit 0.3.0-1 is now installed in ~/.luarocks (license: Apache-2.0)
+
+require("airsstack") works once you run: eval "$(luarocks --lua-version 5.1 path)"
 ```
 
-It asks LuaRocks which Lua it targets and installs the matching package into your own tree, which
-needs no administrator rights. Name the Lua with `--lua 5.4` or `--lua luajit` to choose one. It
-installs the package version that matches your `airsl`, so run it again after you upgrade `airsl`.
+The first two lines are the editor files, then LuaRocks prints its own install output, and the last
+line is `airsl`'s hint for `luarocks path`. Both commands ran in the same folder, so the second one
+finds the editor files already written and reports them as `unchanged`. The transcripts in this
+chapter show your home folder as `~`, where LuaRocks prints the full path. They are from macOS on
+Apple Silicon, so the package file name ends in `macosx-aarch64`; yours names your platform. The
+command asks LuaRocks which Lua it targets and installs the matching package into your own tree,
+which needs no administrator rights. Name the Lua with `--lua 5.4` or `--lua luajit` to choose one.
+It installs the package version that matches your `airsl`, so run it again after you upgrade
+`airsl`.
 
 The command also writes the editor files that [Editor Support](ch01-04-editor-support.md)
 describes, into the current folder or into `DIR` if you give one, and it writes them even if the
@@ -73,7 +99,20 @@ already targets 5.1:
 
 ```console
 $ luarocks --lua-version 5.4 install --local airsstack
+Installing https://luarocks.org/airsstack-0.3.0-1.macosx-aarch64.rock
+
+airsstack 0.3.0-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack 0.3.0-1 is now installed in ~/.luarocks (license: Apache-2.0)
+
 $ luarocks --lua-version 5.1 install --local airsstack-luajit
+Installing https://luarocks.org/airsstack-luajit-0.3.0-1.macosx-aarch64.rock
+
+airsstack-luajit 0.3.0-1 depends on lua 5.1 (5.1-1 provided by VM: success)
+airsstack-luajit 0.3.0-1 depends on luajit >= 2.1 (2.1.1770848219-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack-luajit 0.3.0-1 is now installed in ~/.luarocks (license: Apache-2.0)
+
 ```
 
 A `--local` install is outside the folders Lua searches. Tell your shell where it is. On macOS and
@@ -300,13 +339,28 @@ version, so the flag is no longer needed for it.
 
 ### Homebrew on macOS
 
-`lua@5.4` is keg-only: Homebrew installs it but does not link it onto your `PATH`, so LuaRocks does
-not find it. LuaRocks itself targets the newest Lua Homebrew has, which can be Lua 5.5. Give it the
-folder:
+Homebrew's `lua` formula is Lua 5.5 or newer, and `lua@5.4` is keg-only: Homebrew installs it but
+does not link it onto your `PATH`. So on a new install LuaRocks targets the newer Lua and does not
+find Lua 5.4. A Mac whose `lua` is still a 5.4 that was never upgraded needs no `--lua-dir` for it,
+as the transcripts under [Installing](#installing) show. Where LuaRocks does not find the Lua, give
+it the folder:
 
 ```console
 $ luarocks --lua-version 5.4 --lua-dir "$(brew --prefix lua@5.4)" install --local airsstack
+Installing https://luarocks.org/airsstack-0.3.0-1.macosx-aarch64.rock
+
+airsstack 0.3.0-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack 0.3.0-1 is now installed in ~/.luarocks (license: Apache-2.0)
+
 $ luarocks --lua-version 5.1 --lua-dir "$(brew --prefix luajit)" install --local airsstack-luajit
+Installing https://luarocks.org/airsstack-luajit-0.3.0-1.macosx-aarch64.rock
+
+airsstack-luajit 0.3.0-1 depends on lua 5.1 (5.1-1 provided by VM: success)
+airsstack-luajit 0.3.0-1 depends on luajit >= 2.1 (2.1.1770848219-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack-luajit 0.3.0-1 is now installed in ~/.luarocks (license: Apache-2.0)
+
 ```
 
 Give `luarocks path` the same two flags, and run your script with the interpreter in that folder,
@@ -315,16 +369,42 @@ because no `lua5.4` is on your `PATH`:
 ```console
 $ eval "$(luarocks --lua-version 5.4 --lua-dir "$(brew --prefix lua@5.4)" path)"
 $ "$(brew --prefix lua@5.4)/bin/lua5.4" hello.lua
+modules: env, fs, glob, hash, hook, json, path, proc, regex, stdio, time
+ext: nil
+global airsstack: nil
+package.loaded holds the same table: true
+a second require returns it again: true
+{"name":"airsl","numbers":[1,2.5]}
+src/main.lua
+ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
 ```
 
 To stop repeating `--lua-dir`, store the folder once for each Lua:
 
 ```console
 $ luarocks --lua-version 5.4 config --scope user lua_dir "$(brew --prefix lua@5.4)"
+Wrote
+	variables.LUA = "/opt/homebrew/opt/lua@5.4/bin/lua5.4"
+	variables.LUA_BINDIR = "/opt/homebrew/opt/lua@5.4/bin"
+	variables.LUA_DIR = "/opt/homebrew/opt/lua@5.4"
+	variables.LUA_INCDIR = "/opt/homebrew/opt/lua@5.4/include/lua5.4"
+	variables.LUA_LIBDIR = "/opt/homebrew/opt/lua@5.4/lib"
+to
+	~/.luarocks/config-5.4.lua
 $ luarocks --lua-version 5.1 config --scope user lua_dir "$(brew --prefix luajit)"
+Wrote
+	variables.LUA = "/opt/homebrew/opt/luajit/bin/luajit"
+	variables.LUA_BINDIR = "/opt/homebrew/opt/luajit/bin"
+	variables.LUA_DIR = "/opt/homebrew/opt/luajit"
+	variables.LUA_INCDIR = "/opt/homebrew/opt/luajit/include/luajit-2.1"
+	variables.LUA_LIBDIR = "/opt/homebrew/opt/luajit/lib"
+to
+	~/.luarocks/config-5.1.lua
 ```
 
-Each command makes LuaRocks remember the folder for that version, and also makes that version the
+LuaRocks lists what it stored. The folders above are the Apple Silicon ones: Homebrew's prefix is
+`/opt/homebrew` there and `/usr/local` on an Intel Mac. Each command makes LuaRocks remember the
+folder for that version, and also makes that version the
 one LuaRocks targets when you name none, so the last one you run decides. After that,
 `airsl lua setup --native --lua 5.4` or `--lua luajit` works without `--lua-dir`.
 
