@@ -92,8 +92,11 @@ unset_env RUSTDOCFLAGS
 
 [tasks.test]
 category = "Gate"
-description = "Unit, integration, example and bench targets, the prose guards in docs-check, and the native module loaded into real interpreters, with its refusals checked"
-dependencies = ["test-cargo", "native-load", "native-refusals"]
+description = "The native module loaded into real interpreters, then unit, integration, example and bench targets and the prose guards in docs-check, then the module's refusals checked"
+# `native-load` comes first because docs-check runs the Lua examples of `crates/airsl-lua/examples`
+# against the module it builds, in `target/native/<abi>/`. A `target/` restored from a cache
+# holds none of those files, so the order is what makes a warm run and a clean one the same.
+dependencies = ["native-load", "test-cargo", "native-refusals"]
 
 [tasks.test-cargo]
 category = "Gate"
@@ -107,7 +110,9 @@ description = "The cargo test run behind the test step"
 #
 # The `test` step is this command plus `native-load` and `native-refusals`, which are what test
 # the native module: a module-mode build cannot link a Rust test, so the module is loaded into
-# real interpreters instead. The five step names and their order stay, a step can run more than
+# real interpreters instead. `native-load` runs before this command, because the guards run the
+# Lua examples against the module it builds and fail, naming `cargo make native-load`, when it
+# has not run. The five step names and their order stay, a step can run more than
 # one command, and `dod` needs `lua5.4` and `luajit` (or `AIRSL_LUA54` and `AIRSL_LUAJIT`)
 # because of it.
 #
@@ -283,6 +288,40 @@ expect_message "check.lua for lua54 under LuaJIT" ${out.code} ${output} ${messag
 # ---------------------------------------------------------------------------
 # Examples
 # ---------------------------------------------------------------------------
+
+[tasks.nvim-examples]
+category = "Examples"
+description = "Run the Neovim example of the native module and require its README's output block to equal what it prints"
+# Not a dependency of `dod`, so a developer needs no Neovim to run the gate: the comparison is
+# a `docs-check` test marked `#[ignore]`, and this task is what runs it, by name. The module is
+# built first through `native-load`, which builds and loads both ABIs and so needs both
+# interpreters, the same as `dod`, and CI runs this right after `dod` in the job that has them.
+#
+# The test is run with the workspace selection of `test-cargo`, so cargo resolves the same
+# features and reuses the test binary `dod` built instead of compiling a second `docs-check`.
+# `--lib` selects only the unit-test binaries, which is where the test lives.
+#
+# A name filter that matches nothing makes libtest report success, so the test is selected with
+# `--exact`, a `docs-check` test requires the name below to be an `#[ignore]` test of
+# `crates/docs-check/src/examples/lua.rs`, and the task requires the output to say one test
+# passed. A rename or a deleted test therefore fails here instead of running nothing.
+#
+# `AIRSL_NVIM` names the Neovim, `nvim` by default. A missing one fails the task with that
+# message and never skips it, and a Neovim older than 0.9 fails on `-l` instead.
+script_runner = "@duckscript"
+script = '''
+exec --fail-on-error cargo make native-load
+out = exec cargo test --workspace --exclude airsl-lua --lib -- --ignored --exact examples::lua::tests::every_neovim_example_readme_output_block_equals_what_it_prints
+echo ${out.stdout}
+echo ${out.stderr}
+if not eq ${out.code} 0
+    trigger_error "nvim-examples: the Neovim example test failed"
+end
+ran = contains ${out.stdout} "test result: ok. 1 passed"
+if not ${ran}
+    trigger_error "nvim-examples: no test passed; the test it selects by name was not found"
+end
+'''
 
 [tasks.examples]
 category = "Examples"
@@ -725,6 +764,11 @@ if is_empty ${crate}
     trigger_error "usage: cargo make dod-crate <crate-name>"
 end
 exec --fail-on-error cargo fmt -p ${crate} -- --check
+# The guards of `docs-check` run the Lua examples against the built native module, so it is
+# built, and loaded into both interpreters, before they run.
+if eq ${crate} docs-check
+    exec --fail-on-error cargo make native-load
+end
 if eq ${crate} airsl-lua
     exec --fail-on-error cargo clippy -p airsl-lua --features lua54 --all-targets -- -D warnings
     exec --fail-on-error cargo clippy -p airsl-lua --features luajit --all-targets -- -D warnings

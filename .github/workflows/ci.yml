@@ -139,6 +139,33 @@ jobs:
       - name: cargo make examples
         run: cargo make examples
 
+      # The one example `cargo make dod` cannot run, because it needs Neovim and a developer
+      # running the gate has none. It is a step in this job for the reason `cargo make examples`
+      # is: the target dir is already warm, `nvim-examples` runs the test with the same cargo
+      # selection as `dod`'s test step, so it reuses that `docs-check` build, and it rebuilds
+      # the module through `native-load`. Linux and macOS only; the Windows leg does not run it.
+      #
+      # `nvim -l` needs Neovim 0.9 or newer. apt's `neovim` follows the Ubuntu release of the
+      # runner image and is not guaranteed to reach that, so Ubuntu takes the official release
+      # archive instead, pinned to the version the example was written against and to its sha256,
+      # so a changed archive fails here rather than runs. Homebrew's is current and is not
+      # pinned, like the other Homebrew installs above.
+      - name: Install Neovim (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/nvim.tar.gz" https://github.com/neovim/neovim/releases/download/v0.11.6/nvim-linux-x86_64.tar.gz
+          echo "2fc90b962327f73a78afbfb8203fd19db8db9cdf4ee5e2bef84704339add89cc  $RUNNER_TEMP/nvim.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/nvim.tar.gz" -C "$RUNNER_TEMP"
+          echo "AIRSL_NVIM=$RUNNER_TEMP/nvim-linux-x86_64/bin/nvim" >> "$GITHUB_ENV"
+
+      - name: Install Neovim (macOS)
+        if: runner.os == 'macOS'
+        run: brew install neovim
+
+      - name: cargo make nvim-examples
+        if: runner.os != 'Windows'
+        run: cargo make nvim-examples
+
   rocks:
     name: Rocks (${{ matrix.os }})
     # `cargo make rocks` is outside the gate because it needs luarocks and the network, so

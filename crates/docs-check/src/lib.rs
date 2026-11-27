@@ -18,9 +18,10 @@
 //!
 //! Responsibilities:
 //!
-//! - `examples`: running each example and requiring its README's `## Output` block to equal what
-//!   it printed, and its marker files to be named in the expected lists; and keeping the `examples`
-//!   task of `Makefile.toml` from comparing output with README text.
+//! - `examples`: running each example, the Rust ones of `airsl` and the Lua ones of the native
+//!   module, and requiring its README's `## Output` block to equal what it printed, and its marker
+//!   files to be named in the expected lists; and keeping the `examples` task of `Makefile.toml`
+//!   from comparing output with README text.
 //! - `citations`: requiring the source paths, module paths and book include targets that prose
 //!   cites to exist, and refusing line-number citations.
 //! - `book_links`: requiring each address into the published book that a source file, `CLAUDE.md`
