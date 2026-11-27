@@ -379,6 +379,132 @@ args = ["deny", "check"]
 # Release
 # ---------------------------------------------------------------------------
 
+[tasks.rocks]
+category = "Release"
+description = "Build, pack and load both LuaRocks packages of the native module into target/rocks"
+# Deliberately not a dependency of `dod`, as `deny` and `examples` are not: it needs luarocks and
+# the network (luarocks fetches the build backend), which the gate must not. It reads
+# `AIRSL_LUAROCKS`, `AIRSL_LUA54` and `AIRSL_LUAJIT` for the three programs it runs, and
+# `AIRSL_LUA54_DIR` and `AIRSL_LUAJIT_DIR` when luarocks cannot find an interpreter by itself, as
+# Homebrew's luarocks cannot: it defaults to Lua 5.5.
+#
+# Every tool and rockspec is looked up before anything builds, so a missing one is reported at
+# once and not after the first package's compile. The rockspec is the one file the anchored
+# pattern finds: `<package>-*-1.rockspec` would take `airsstack-luajit-0.2.0-1.rockspec` for
+# `airsstack`. The task does not compare the version it reads with the workspace version, which
+# `docs-check` owns.
+#
+# `pack` writes into the working directory, so the task moves into `target/rocks/dist` for it and
+# back to the root after, which is also what makes the relative rockspec and `check.lua` paths
+# resolve for the next step. duckscript's `cd` answers empty and stays where it was when it cannot
+# change directory, so each answer is tested rather than let `pack` or `check.lua` run elsewhere.
+script_runner = "@duckscript"
+script = '''
+root = pwd
+
+# `${1}` is the variable naming the program, `${2}` its default, `${3}` what to install and `${4}`
+# what to set it to. `which` answers empty for a bare name and for a path alike when nothing runs,
+# which is what "missing" means here. Returns the program as typed.
+function find_tool
+    program = get_env ${1}
+    if is_empty ${program}
+        program = set ${2}
+    end
+    found = which ${program}
+    if is_empty ${found}
+        echo "rocks: `${program}` was not found; install ${3} or set ${1} to its ${4}"
+        exit 1
+    end
+    return ${program}
+end
+
+# `${1}` is the package. Returns its one rockspec, as the relative path the glob gave.
+function find_rockspec
+    package = set ${1}
+    dir = set crates/airsl-lua/rockspecs
+    files = glob_array ${dir}/${package}-[0-9]*-1.rockspec
+    n = array_length ${files}
+    if eq ${n} 0
+        echo "rocks: no `${package}-<version>-1.rockspec` in `${dir}`"
+        exit 1
+    end
+    if greater_than ${n} 1
+        names = array_join ${files} ", "
+        echo "rocks: ${n} files match `${package}-<version>-1.rockspec` in `${dir}` (${names}); docs-check allows one per package"
+        exit 1
+    end
+    rockspec = array_get ${files} 0
+    return ${rockspec}
+end
+
+# `${1}` is the package and `${2}` its rockspec. Returns the base name without `<package>-` and
+# `-1.rockspec`, the latter being 11 characters.
+function rockspec_version
+    name = basename ${2}
+    prefix = concat ${1} -
+    start = length ${prefix}
+    stop = length ${name}
+    stop = calc ${stop} - 11
+    version = substring ${name} ${start} ${stop}
+    return ${version}
+end
+
+function enter
+    entered = cd ${1}
+    if is_empty ${entered}
+        echo "rocks: could not change into `${1}`"
+        exit 1
+    end
+end
+
+# `${1}` is the package, `${2}` its rockspec, `${3}` its version, `${4}` the ABI, `${5}` the Lua
+# version luarocks is given, `${6}` the variable naming a `--lua-dir`, `${7}` luarocks, `${8}` the
+# interpreter that loads what was built and `${9}` the workspace root. A call to `enter` below
+# overwrites `${1}`, so each argument that is used after one is copied to a name first; `${6}`
+# is the exception, read with `get_env` before the first `enter`. Duckscript has one global
+# namespace, so `root = set ${9}` rebinds the caller's `root` (to the same value today).
+function build_package
+    package = set ${1}
+    rockspec = set ${2}
+    version = set ${3}
+    abi = set ${4}
+    lua_version = set ${5}
+    luarocks = set ${7}
+    interpreter = set ${8}
+    root = set ${9}
+    tree = set ${root}/target/rocks/${abi}
+    lua_dir = get_env ${6}
+    if is_empty ${lua_dir}
+        exec --fail-on-error ${luarocks} --lua-version ${lua_version} make --tree ${tree} ${rockspec}
+    else
+        exec --fail-on-error ${luarocks} --lua-version ${lua_version} --lua-dir ${lua_dir} make --tree ${tree} ${rockspec}
+    end
+
+    enter ${root}/target/rocks/dist
+    if is_empty ${lua_dir}
+        exec --fail-on-error ${luarocks} --lua-version ${lua_version} --tree ${tree} pack ${package} ${version}-1
+    else
+        exec --fail-on-error ${luarocks} --lua-version ${lua_version} --lua-dir ${lua_dir} --tree ${tree} pack ${package} ${version}-1
+    end
+
+    enter ${root}
+    exec --fail-on-error ${interpreter} crates/airsl-lua/lua/check.lua ${tree}/lib/lua/${lua_version} ${abi}
+end
+
+luarocks = find_tool AIRSL_LUAROCKS luarocks LuaRocks path
+lua54 = find_tool AIRSL_LUA54 lua5.4 "Lua 5.4" interpreter
+luajit = find_tool AIRSL_LUAJIT luajit LuaJIT interpreter
+rockspec_lua54 = find_rockspec airsstack
+rockspec_luajit = find_rockspec airsstack-luajit
+version_lua54 = rockspec_version airsstack ${rockspec_lua54}
+version_luajit = rockspec_version airsstack-luajit ${rockspec_luajit}
+
+mkdir ${root}/target/rocks/dist
+
+build_package airsstack ${rockspec_lua54} ${version_lua54} lua54 5.4 AIRSL_LUA54_DIR ${luarocks} ${lua54} ${root}
+build_package airsstack-luajit ${rockspec_luajit} ${version_luajit} luajit 5.1 AIRSL_LUAJIT_DIR ${luarocks} ${luajit} ${root}
+'''
+
 [tasks.publish-dry-run]
 category = "Release"
 description = "Validate both crates against what crates.io enforces, publishing nothing"
