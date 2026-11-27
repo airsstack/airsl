@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-26
 depends-on: [01]
 built-on: af7c0dcc7368
@@ -182,3 +182,19 @@ language surface under LuaJIT`.
 - `cargo check -p airsl --no-default-features --features lua54,module --lib` and
   `cargo check -p airsl --no-default-features --features luajit,module --lib` both exit 0.
 - `grep -rn "all-features" Makefile.toml crates/docs-check/src` finds no command use.
+
+## Review findings
+
+- Reviewer (28-reviewer-p03): SPEC COMPLIANT, no drift, blocking none; code 2🟡 2🔵, spec 0. DoD: `cargo make dod` → exit 0 (865/1/101/66 tests, 27 doctests); `cargo check -p airsl --no-default-features --features lua54,module --lib` and `… luajit,module --lib` → exit 0 each.
+- 🔵 `crates/airsl/src/lib.rs`:36 — the "Cargo features" section said `Engine` is `Send + Sync` twice — fixed — duplicate removed; `cargo make dod` → exit 0.
+- 🟡 `crates/airsl/src/sandbox/language_surface.rs`:91 — on LuaJIT the `Minimal` doc's "no `coroutine`" and "`utf8` is on every surface" are false (reviewer probe, mlua 0.12.0 `luajit,vendored`: "minimal: coroutine=table utf8=nil") — fixed — the `Minimal` doc (:72-74) and the comment (now :93) are scoped to Lua 5.4 and state what LuaJIT gives; `cargo make dod` → exit 0; `cargo check -p airsl --no-default-features --features luajit,module --lib` → exit 0.
+- 🔵 `crates/airsl/src/sandbox/language_surface.rs`:63 — remainder of the :91 finding: the `Restricted` doc still lists `utf8`/`coroutine` without the LuaJIT caveat — open — latent; no shipped build creates a `LanguageSurface` state under LuaJIT.
+- 🟡 `crates/airsl/src/sandbox/language_surface.rs`:105 — reverting the `cfg(feature = "luajit")` arms or the root mlua `features = ["serialize"]` reduction left `cargo make dod` green (plan Risks, bullet 3) — open at review; closed by plan 04 — `cargo make dod` now runs `cargo clippy -p airsl-lua --features luajit` and `cargo doc -p airsl-lua --features luajit` (`airsl-lua`'s `luajit` = `airsl/luajit`) and native-load → exit 0, ending "check.lua: ok (Lua 5.1, LuaJIT 2.1.1770848219)".
+- 🔵 `Makefile.toml`:34 — the comment states per-ABI runs of the native module as present fact before any exists — open at review; closed by plan 04, which adds the per-ABI clippy/doc/native-load runs (the comment is now at :37) — `cargo make dod` → exit 0 with both `check.lua: ok` lines.
+
+## Deviations
+
+- 2026-11-26: Task 1 — rustfmt reflowed the `.args([...])` list in `crates/docs-check/src/examples.rs` onto one line after `--all-features` was removed (applied with rustfmt on that file only). `cargo test -p docs-check examples` → 17 passed.
+- 2026-11-26: the review-fix coder (lib.rs, language_surface.rs) reported inline and wrote no handoff file. Its result: `cargo make dod` → exit 0; `cargo check -p airsl --no-default-features --features luajit,module --lib` → exit 0.
+- 2026-11-26: no behaviour departs from the plan. Recorded results: `cargo check -p airsl --no-default-features --lib` → exit 101 "No Lua feature enabled..."; Task 3 before the change → E0599 on `UTF8`/`COROUTINE` (3 errors), after → exit 0; `Cargo.lock` gains only `mlua_derive 0.12.0` (→ existing `syn 2.0.119`).
+- 2026-11-26: No commit was made: the execute skill commits only when the instruction to execute says so; the plan's per-task commit messages remain for the author.

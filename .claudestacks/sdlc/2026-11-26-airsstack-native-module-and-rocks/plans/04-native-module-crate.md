@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-26
 depends-on: [01, 02, 03]
 built-on: af7c0dcc7368
@@ -290,3 +290,32 @@ keep cargo-deny and dist clean with the native module`.
 - `cargo make dod` is green and its `test` step ends with both `check.lua: ok` lines.
 - A bare `cargo build` at the root exits 0.
 - `cargo make deny`, `dist plan` and `dist generate --check` exit 0.
+
+## Review findings
+
+- Reviewer (31-reviewer-p04): SPEC COMPLIANT-WITH-AMENDMENTS, blocking none; code 2🟡 10🔵, spec 2🔵 2❓. DoD: `cargo make dod` → exit 0 (865+101+66 tests, 27 doctests; test step ends with both `check.lua: ok` lines); bare `cargo build` → exit 0; `cargo make deny` → exit 0 "advisories ok, bans ok, licenses ok, sources ok"; `dist plan` → exit 0 (airsl-cli 0.2.0 only); `dist generate --check` → exit 0. Line numbers are as the reviewer cited them.
+- 🔵 `Makefile.toml`:94 — `test` description omitted the native-module load — fixed — description names it; `cargo make native-load` → exit 0; `cargo make dod-crate airsl-lua` → exit 0; `cargo make dod` → exit 0 ending "check.lua: ok (Lua 5.4)" and "check.lua: ok (Lua 5.1, LuaJIT 2.1.1770848219)".
+- 🔵 `Makefile.toml`:102-104 — `test-cargo` comment claimed it runs `native-load` (it is `test` that does); line 104 was 175 columns — fixed — rewritten: `test` is `test-cargo` plus `native-load`; `cargo make native-load` → exit 0; `cargo make dod-crate airsl-lua` → exit 0; `cargo make dod` → exit 0 ending "check.lua: ok (Lua 5.4)" and "check.lua: ok (Lua 5.1, LuaJIT 2.1.1770848219)".
+- 🔵 `Makefile.toml`:128 — a set `build.target`/`CARGO_BUILD_TARGET` moves the library to `native-build/<triple>/debug` — fixed — the comment says so and that the `cp` then fails with "Path does not exist"; `cargo make native-load` → exit 0; `cargo make dod-crate airsl-lua` → exit 0; `cargo make dod` → exit 0 ending "check.lua: ok (Lua 5.4)" and "check.lua: ok (Lua 5.1, LuaJIT 2.1.1770848219)".
+- 🔵 `Makefile.toml`:145 — duckscript `echo` adds a trailing space, one byte off the plan's Proof text (matches probe 233) — open — accepted; recorded under Deviations.
+- 🔵 `Makefile.toml`:149-150 — OS detected from two sources (`is_windows` and `CARGO_MAKE_RUST_TARGET_OS`) — fixed — read once from `CARGO_MAKE_RUST_TARGET_OS` (`eq ${target_os} windows`); `cargo make native-load` → exit 0; `cargo make dod-crate airsl-lua` → exit 0; `cargo make dod` → exit 0 ending "check.lua: ok (Lua 5.4)" and "check.lua: ok (Lua 5.1, LuaJIT 2.1.1770848219)".
+- 🔵 `Makefile.toml`:167-168 — interpreters resolved per ABI pass, so a missing `luajit` is reported only after the whole lua54 build and check — open — the plan's per-ABI order prescribes it.
+- 🔵 `Makefile.toml`:481 — `dod-crate airsl-lua` calls `exec cargo make native-load` — open — accepted (runs, exit 0); recorded under Deviations.
+- 🟡 `Cargo.toml`:6 — `default-members` is unguarded: no dod step, CI job or task runs a bare cargo command, so reverting it passes everything — open — no guard added.
+- 🔵 `crates/airsl-lua/build.rs`:9 — comment said `check.lua` fails if the link args are wrong; in fact the macOS link fails first ("Undefined symbols for architecture arm64") — fixed — comment says the cdylib link fails outright; `cargo make native-load` → exit 0; `cargo make dod-crate airsl-lua` → exit 0; `cargo make dod` → exit 0 ending "check.lua: ok (Lua 5.4)" and "check.lua: ok (Lua 5.1, LuaJIT 2.1.1770848219)".
+- 🔵 `crates/airsl-lua/src/entry.rs`:9 — `ModuleSet::open` was plain code — fixed — intra-doc link to `airsl::modules::ModuleSet::open`; `cargo doc` under `-D warnings` green, `cargo make native-load` → exit 0; `cargo make dod-crate airsl-lua` → exit 0; `cargo make dod` → exit 0 ending "check.lua: ok (Lua 5.4)" and "check.lua: ok (Lua 5.1, LuaJIT 2.1.1770848219)".
+- 🔵 `crates/airsl-lua/lua/check.lua`:12,24,46 — lines over 100 columns — fixed — rewrapped (`MODULES` now a local table), messages byte-identical (usage and both mismatch paths re-run by hand); `cargo make native-load` → exit 0; `cargo make dod-crate airsl-lua` → exit 0; `cargo make dod` → exit 0 ending "check.lua: ok (Lua 5.4)" and "check.lua: ok (Lua 5.1, LuaJIT 2.1.1770848219)".
+- 🔵 `crates/airsl-lua/lua/check.lua`:27 (now :29) — prepending keeps the default cpath, so a hand run with no `<dir>/airsstack.so` could load an installed rock — open — native-load's `cp` rules it out; only hand runs are exposed.
+- 🟡 `Makefile.toml`:136-168 + `crates/airsl-lua/lua/check.lua`:15-25 — never-skip for a missing interpreter and check.lua's usage/mismatch branches are proven by hand runs only; reverting one to a skip or pass keeps dod green — open — no automated guard.
+- 🔵 spec (plan Task 2, `Makefile.toml`:179, :363) — the four comments did not each carry the plan's three statements — fixed — the header, `test-cargo`, `examples` and `deny` comments each carry all three; `cargo make native-load` → exit 0; `cargo make dod-crate airsl-lua` → exit 0; `cargo make dod` → exit 0 ending "check.lua: ok (Lua 5.4)" and "check.lua: ok (Lua 5.1, LuaJIT 2.1.1770848219)".
+- ❓ spec (plan Task 3, `Makefile.toml`:473) — `dod-crate airsl-lua` runs `cargo fmt -p airsl-lua -- --check`, which the plan's "nothing more" list omits — open — needs a §9.3 read; not settled in this run.
+- ❓ spec (plan Task 2 / spec §5.6.2) — check.lua message texts the plan does not quote were not compared with §5.6.2 — open — every text the plan quotes matches observed output; the rest needs a spec read.
+- 🔵 spec (amendment hygiene) — deviations 1–3 were not recorded in the plan — fixed — recorded under Deviations below.
+
+## Deviations
+
+- 2026-11-26: the missing-interpreter message carries a trailing space after "interpreter", because duckscript's `echo` emits one (probe 233's recorded output has the same). Observed: `AIRSL_LUA54=nope-lua cargo make native-load` → exit 1, "native-load: `nope-lua` was not found; install Lua 5.4 or set AIRSL_LUA54 to its interpreter".
+- 2026-11-26: `native-load` picks the library file name from cargo-make's `CARGO_MAKE_RUST_TARGET_OS` (macos → .dylib, windows → .dll, else .so), a variable the plan did not name; after review it is the single OS source (`is_windows` dropped). macOS resolves correctly (`cargo make native-load` → exit 0); the Linux and Windows branches are untested (accepted risk R12).
+- 2026-11-26: `dod-crate airsl-lua` calls `cargo make native-load` through `exec`, because duckscript cannot invoke another task. `cargo make dod-crate airsl-lua` → exit 0, ending with both `check.lua: ok` lines.
+- 2026-11-26: `LuaRocks` is backticked in the `crates/airsl-lua/src/lib.rs` docs, because clippy's `doc_markdown` lint requires it under `-D warnings`.
+- 2026-11-26: No commit was made: the execute skill commits only when the instruction to execute says so; the plan's per-task commit messages remain for the author.

@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-26
 built-on: af7c0dcc7368
 ---
@@ -167,3 +167,22 @@ The rustdoc covers:
 - `cargo make dod` is green.
 - The grep `grep -rn "Box<dyn\|Arc<dyn" crates/airsl/src/modules/registry.rs` shows only the
   existing `// dyn:` seam (static-dispatch.md § DoD grep).
+
+## Review findings
+
+- Reviewer (25-reviewer-p02): SPEC COMPLIANT, blocking none; code 1🟡 6🔵, spec 0. DoD: `cargo make dod` → exit 0 (864+101+66+1 tests, 27 doctests); the `Box<dyn\|Arc<dyn` grep shows the same 4 seam hits as HEAD.
+- 🟡 `crates/airsl/src/modules/registry.rs`:469 — "in set order" was promised by docs and the test name, but the test sorted the keys, so a reversed install loop passed every test — fixed — new test `open_installs_modules_in_set_order` (Recorder stub logging into an `Arc<Mutex<Vec>>`, asserts the log equals `set.names()`); with the loop reversed → "14 passed; 1 failed" (`open_installs_modules_in_set_order ... FAILED`), restored → `cargo test -p airsl modules::` 266 passed; `cargo make dod` → exit 0.
+- 🔵 `crates/airsl/src/modules/registry.rs`:11 (and the type doc at :25) — `InstallContext` described as "what the engine tells a module", untrue for `ModuleSet::open` — fixed — reworded; `cargo make dod` → exit 0.
+- 🔵 `crates/airsl/src/modules/stdlib.rs`:10 — Non-responsibilities said the engine installs the modules — fixed — now points at `ModuleSet` (install and open); `cargo make dod` → exit 0.
+- 🔵 `crates/airsl/src/modules/stdlib.rs`:21 — doc line 113 columns and not a sentence — fixed — rewrapped and reworded; `cargo make dod` → exit 0.
+- 🔵 `crates/airsl/src/modules/mod.rs`:27 (and the overview at :5) — `stdlib` entry did not mention `standalone`; overview said every module is installed under the `airsstack` global — fixed — overview says the engine publishes the global and `open` hands the table back; entry mentions `standalone`; `cargo make dod` → exit 0.
+- 🔵 `crates/airsl/src/builder.rs`:246 — the `Error::ModuleInstall { module: root_table, .. }` mapping closure is written twice (here and in `ModuleSet::install`) and can drift — open — nit, left as is.
+- 🔵 `crates/airsl/src/modules/env.rs`:8 (pre-existing, outside the diff) — module doc says "per-engine overlay" but `env::overlay()` is a process-wide `OnceLock` — open — pre-existing, outside this plan's files.
+
+## Deviations
+
+- 2026-11-26: Task 1's test asserts the real confined refusal text "outside the granted read roots" (from "fs.read denied: `…` is outside the granted read roots: none are granted"); the message has no word "confined". Reviewer accepted it: under trusted the read succeeds and `unwrap_err` panics.
+- 2026-11-26: the open test's key check is unordered (sorted keys), because a Lua table has no order. Install order is proven instead by a separate test: the planned `open_returns_one_subtable_per_module_in_set_order` was split into `open_returns_one_subtable_per_module` (unordered keys) and `open_installs_modules_in_set_order` (Recorder stub; `Arc<Mutex<Vec>>` because `HostModule` is `Send + Sync`). Reversed loop → "14 passed; 1 failed"; restored → `cargo test -p airsl modules::` 266 passed.
+- 2026-11-26: the check that `open` never registers the `require` root is `require::root::answer(…).is_err()`, because `ROOT_KEY` is private and the task's file scope is limited. Reviewer accepted it: only `register` writes that key.
+- 2026-11-26: the Tasks 1–3 coder reported inline and wrote no handoff file. Its result: `cargo make dod` → exit 0; registry tests 14 passed; `--doc` 27 passed; stdlib tests 5 passed.
+- 2026-11-26: No commit was made: the execute skill commits only when the instruction to execute says so; the plan's per-task commit messages remain for the author.

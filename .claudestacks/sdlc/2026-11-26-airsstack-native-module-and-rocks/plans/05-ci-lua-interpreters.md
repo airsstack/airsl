@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-26
 depends-on: [04]
 built-on: af7c0dcc7368
@@ -141,3 +141,26 @@ Commit `ci: install Lua 5.4 and LuaJIT for the gate on every OS`.
 - `cargo make dod` is green locally.
 - On the pull request, the `dod` job is green on ubuntu-latest, macos-latest and windows-latest, and
   its `test` step prints both `check.lua: ok` lines on each.
+
+## Review findings
+
+- Reviewer (35-reviewer-p05-p06, shared with plan 06): plan 05 SPEC COMPLIANT; blocking `.github/workflows/ci.yml`:91 (fixed below). DoD: `cargo make dod` → exit 0, test step ends with "check.lua: ok (Lua 5.4)" and "check.lua: ok (Lua 5.1, LuaJIT 2.1.1770848219)"; PyYAML `safe_load` of ci.yml → exit 0; the ci.yml diff is 48 insertions, 0 deletions, all in `dod` before `cargo make dod`; msvc-lua.cmd pins (Lua SHA-256 4f18dd…29ae, LuaJIT 96f7b29…a0dc, ilammy 0b201ec…) match the probes by reading.
+- 🟡 `.github/workflows/ci.yml`:91 — `apt-get install` without `apt-get update` (the probed form ran update first; the plan text omitted it) — fixed — now `sudo apt-get update && sudo apt-get install -y lua5.4 luajit`; `yaml.safe_load` → exit 0; `cargo make dod` → exit 0.
+- 🔵 `.github/workflows/ci.yml`:101 — "Windows has no package that gives both interpreters" is an unprobed negative claim — fixed — the comment now gives the proven reason (the module links against MSVC-built lua54.dll / lua51.dll and import libs, which no Windows package provides); `yaml.safe_load` → exit 0.
+- 🔵 `.github/workflows/ci.yml`:103 (now :104) + `crates/airsl-lua/ci/msvc-lua.cmd`:6 — cite `build-rocks.yml`, which does not exist yet — open — true once plan 09 lands.
+- 🔵 `crates/airsl-lua/ci/msvc-lua.cmd` — CRLF with no `.gitattributes`; `git diff --check` flags all 121 lines and autocrlf=input would turn it to LF — open — `.gitattributes` is outside the plan's files; `file` → "with CRLF line terminators".
+- 🔵 `crates/airsl-lua/ci/msvc-lua.cmd`:28 — `where link` is satisfied by Git for Windows' coreutils `link.exe` — fixed — `where link` removed, `where cl` kept; `file` → CRLF kept. Runs only on Windows CI.
+- 🔵 `crates/airsl-lua/ci/msvc-lua.cmd`:61-62 — a `ren` failure reported "failed to compile Lua 5.4.8 with cl" — fixed — `set "STEP=rename lua.obj and luac.obj out of the *.obj glob"` before the two `ren` lines. Runs only on Windows CI.
+- 🔵 `crates/airsl-lua/ci/msvc-lua.cmd`:84-87 — the `rev-parse` compare cannot fail once `checkout <sha>` succeeded — open — harmless and redundant; left as is.
+- 🟡 `crates/airsl-lua/ci/msvc-lua.cmd` — the msvc pins are checked only on Windows CI — open — the plan accepts it (R12).
+
+## Deviations
+
+- 2026-11-26: LuaJIT is cloned in full (`git clone --branch v2.1`), then `git checkout <commit>` and a `rev-parse HEAD` compare, instead of the probe's `--depth 1`: a shallow clone of the branch loses the pinned commit once v2.1 moves. The clone-then-checkout form was not itself probed on a runner. Reviewer accepted it.
+- 2026-11-26: the Windows build step is `call crates\airsl-lua\ci\msvc-lua.cmd` (the plan says "running" it); `call` propagates the exit code on the step's last line.
+- 2026-11-26: `msvc-lua.cmd` is written with CRLF line endings (the repository has no `.gitattributes`), because cmd `goto`/labels are unreliable with bare LF. `file` → "with CRLF line terminators".
+- 2026-11-26: guards beyond the plan in `msvc-lua.cmd`: a `where cl` check (the `where link` check was dropped after review), a fresh work dir under `%RUNNER_TEMP%`, cl/msvcbuild output captured to a log and shown only on failure, and `luajit.exe`/`lua51.dll` existence checks after `msvcbuild.bat` (its exit code is not trusted alone). Read-verified only.
+- 2026-11-26: the Windows `$GITHUB_ENV` step uses `shell: bash` with single-quoted backslash paths (bash's builtin echo does not interpret `\l`/`\b`).
+- 2026-11-26: the Ubuntu step runs `sudo apt-get update` before the install, which the plan text omitted (review blocker, fixed). `yaml.safe_load` → exit 0; `cargo make dod` → exit 0.
+- 2026-11-26: no local run of the script or the workflow is possible (Windows/MSVC, CI only; R12). The Proof line "On the pull request, the `dod` job is green on ubuntu-latest, macos-latest and windows-latest, and its `test` step prints both `check.lua: ok` lines on each" is pending the first CI run: nothing has been pushed.
+- 2026-11-26: No commit was made: the execute skill commits only when the instruction to execute says so; the plan's per-task commit messages remain for the author.

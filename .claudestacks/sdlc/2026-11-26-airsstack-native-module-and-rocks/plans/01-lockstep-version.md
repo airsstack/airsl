@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-26
 built-on: af7c0dcc7368
 ---
@@ -84,3 +84,15 @@ is green. Commit `chore(workspace): take every published crate's version from th
 - `cargo make dod` is green.
 - `cargo metadata --format-version 1 --no-deps` shows both published members at the workspace
   version.
+
+## Review findings
+
+- Reviewer (12-reviewer-p01): SPEC COMPLIANT, blocking none. DoD: `cargo make dod` → exit 0 (fmt, clippy -D warnings, rustdoc -D warnings, 855+101+66+1 tests, 25 doctests).
+- 🔵 `Cargo.toml`:10 — the `[workspace.package]` comment names `airsl-lua` and says the CLI installs the rocks at its own version, which was not true at this commit (plan-mandated text) — open — `crates/airsl-lua` exists since plan 04; the CLI half becomes true with a later plan in this chain.
+- 🟡 `Cargo.toml` / `crates/*/Cargo.toml` — nothing guards the lockstep; a member going back to its own `version` fails no test, lint or DoD step — open — the plan's Risks accept it until plan 07's docs-check guard.
+- 🔵 `crates/airsl/src/version.rs`:27 (tests module) — removing the `#![expect(clippy::unwrap_used)]` is not in Task 1's text — open — accepted, no code change; recorded under Deviations.
+
+## Deviations
+
+- 2026-11-26: Task 1 named only the test deletion in `crates/airsl/src/version.rs`; the test module's `#![expect(clippy::unwrap_used, …)]` was removed as well, because no unwrap is left for it to cover. Keeping it fails clippy: "error: this lint expectation is unfulfilled --> crates/airsl/src/version.rs:29:9" (`-D unfulfilled-lint-expectations` implied by `-D warnings`; reproduced by the reviewer's probe on cargo 1.94.1, exit 101). With it removed, `cargo make dod` → exit 0.
+- 2026-11-26: No commit was made: the execute skill commits only when the instruction to execute says so; the plan's per-task commit messages remain for the author.

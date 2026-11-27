@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-26
 depends-on: [04]
 built-on: af7c0dcc7368
@@ -189,3 +189,21 @@ both rocks`.
 - Both rockspecs lint clean.
 - `cargo make rocks` packs and loads both rocks.
 - `cargo make dod` is green.
+
+## Review findings
+
+- Reviewer (35-reviewer-p05-p06, shared with plan 05): plan 06 SPEC COMPLIANT; its one blocker was in plan 05's `ci.yml`. DoD: `cargo make dod` → exit 0, test step ends with both `check.lua: ok` lines; `luarocks lint` on both rockspecs → exit 0 each, both byte-identical to the probe 235 sources (`cmp`); `cmp LICENSE crates/airsl-lua/doc/LICENSE` → identical; `cargo make rocks` → exit 0, packing airsstack-0.2.0-1.macosx-aarch64.rock + "check.lua: ok (Lua 5.4)" and airsstack-luajit-0.2.0-1.macosx-aarch64.rock + "check.lua: ok (Lua 5.1, LuaJIT 2.1.1770848219)"; the 3 tool refusals → exit 1 with the plan's exact text and no `Compiling` line.
+- 🔵 `Makefile.toml`:403 — `root = pwd` prints the root as a stray output line — open — the plan prescribes `pwd`; cosmetic.
+- 🔵 `Makefile.toml`:463 — the comment says every argument is copied to a name first, but `${6}` is read with `get_env` — fixed — the comment says `${6}` is read with `get_env` before the first `enter`; `cargo make rocks` → exit 0 (both `check.lua: ok` lines); `cargo make dod` → exit 0.
+- 🔵 `Makefile.toml`:459-470 — duckscript has one global namespace, so `root = set ${9}` rebinds the caller's `root`; the comment named only the `${1}` hazard — fixed — the comment names it (same value today); `cargo make rocks` → exit 0; `cargo make dod` → exit 0.
+- 🟡 `Makefile.toml` (`rocks`) — no CI or DoD step runs `cargo make rocks`; reverting the `cd` check is caught by nothing, the anchored glob and the named-variable fix only by a manual success run — open — the plan accepts it (the task is the test; R12).
+
+## Deviations
+
+- 2026-11-26: duckscript function arguments share one namespace: a nested call (`enter ${dir}`) overwrote the caller's `${1}`, and the first success run failed in `pack` with "Error: cannot find package .../target/rocks/dist 0.2.0-1". `build_package` therefore copies its arguments to named variables before any nested call and takes `<root>` as `${9}` (a comment says why). The reviewer's scratch duckscript probe confirmed the clobbering. `cargo make rocks` → exit 0.
+- 2026-11-26: `root = pwd` prints the directory (as in probe 247's raw output) and is not suppressed. The coder also reported `cd` echoing; the reviewer found that only `pwd` prints and an assigned `cd` prints nothing.
+- 2026-11-26: the `cd`-failure branch ("rocks: could not change into ...") was not provoked in the tree, as the plan says. The reviewer's scratch duckscript probe confirmed it prints that message and exits 1.
+- 2026-11-26: the Linux and Windows branches of `rocks` are unrun (macOS arm64 only; R12).
+- 2026-11-26: `luarocks make` fetched `luarocks-build-rust-mlua` 0.2.7-1 from luarocks.org into each tree during `cargo make rocks`.
+- 2026-11-26: Task 1's `cargo make dod` was deferred to the batch review (one cargo run at a time); the reviewer's run → exit 0.
+- 2026-11-26: No commit was made: the execute skill commits only when the instruction to execute says so; the plan's per-task commit messages remain for the author.
