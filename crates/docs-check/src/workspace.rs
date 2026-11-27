@@ -12,6 +12,7 @@
 //!   `README.md` under `crates/`.
 //! - Folding CRLF to LF, so a checkout that converted line endings reads the same as one that did
 //!   not.
+//! - Showing a TOML parse error on one line, so every guard that parses a manifest words it alike.
 //!
 //! Non-responsibilities: what any document says. Reading citations or output blocks belongs to the
 //! guards.
@@ -38,6 +39,17 @@ pub(crate) fn root() -> PathBuf {
 /// Folds CRLF to LF, so a checkout that converted line endings compares equal to one that did not.
 pub(crate) fn normalize(text: &str) -> String {
     text.replace("\r\n", "\n")
+}
+
+/// A TOML error on one line: the position line of its `Display`, then the reason, which is the
+/// last non-blank line after it. The source excerpt between them is left out. An error that shows
+/// one line is returned as it is.
+pub(crate) fn toml_error_line(display: &str) -> String {
+    let mut lines = display.lines();
+    let first = lines.next().unwrap_or_default();
+    lines
+        .rfind(|line| !line.trim().is_empty())
+        .map_or_else(|| first.to_owned(), |reason| format!("{first}: {reason}"))
 }
 
 /// The crate directories directly under `<root>/crates`, sorted.
@@ -92,6 +104,15 @@ mod tests {
         assert!(root.join("Cargo.toml").is_file(), "{}", root.display());
         assert!(root.join("CLAUDE.md").is_file(), "{}", root.display());
         assert!(root.join("crates").join("docs-check").is_dir());
+    }
+
+    #[test]
+    fn a_toml_error_shows_its_last_non_blank_line_as_the_reason() {
+        assert_eq!(
+            toml_error_line("at line 1\n  |\n1 | x\n  |\nthe reason\n  \n"),
+            "at line 1: the reason"
+        );
+        assert_eq!(toml_error_line("alone"), "alone");
     }
 
     #[test]

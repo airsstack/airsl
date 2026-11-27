@@ -28,6 +28,7 @@ The gate is [cargo-make](https://github.com/sagiegurari/cargo-make)
 ```bash
 cargo make dod          # the gate: fmt-check, clippy, rustdoc, tests, doctests — all warnings-as-errors
 cargo make dod-crate airsl   # the same five steps scoped to one crate, while iterating
+cargo make fmt-check    # the formatting step alone: fails on a diff, rewrites nothing
 cargo make rocks        # build, pack and load both LuaRocks packages (not part of dod, by design)
 cargo make fmt          # the only task that rewrites the tree
 cargo make clippy-fix   # apply machine-applicable clippy suggestions
@@ -42,16 +43,18 @@ doctests need their own run because `--all-targets` excludes them.
 
 The five steps keep their names, but a step can run more than one command, because the native
 module is a `cdylib` built against the interpreter's Lua (`mlua`'s `module` feature, which excludes
-`vendored` and `send`) and cannot share a Cargo build with the rest. So `clippy` and `doc` run the
-workspace without `airsl-lua`, then `airsl-lua` once with `--features lua54` and once with
-`--features luajit`. The `test` step runs `test-cargo` (the workspace without `airsl-lua`, plus a
-bare `cargo test --all-targets --no-run` that proves `default-members` still leaves it out), then
-`native-load`, then `native-refusals`. `native-load` builds the module per ABI, copies it to
-`target/native/<abi>/`, and runs `crates/airsl-lua/lua/check.lua` under the real interpreter, which
-is the module's test because a module-mode build cannot link a Rust test. `native-refusals` makes
-`native-load` and `check.lua` refuse a missing or mismatched interpreter and requires both a
-non-zero exit and the message, so a refusal that turned into a pass cannot leave `dod` green.
-Doctests (`test-doc`) skip `airsl-lua` too, since rustdoc cannot test a `cdylib`.
+`vendored` and `send`) and cannot share a Cargo build with the rest. So `cargo make clippy` and
+`cargo make doc` run the workspace without `airsl-lua`, then `airsl-lua` once with
+`--features lua54` and once with `--features luajit`. The `cargo make test` step runs
+`cargo make test-cargo` (the workspace without `airsl-lua`, plus a bare
+`cargo test --all-targets --no-run` that proves `default-members` still leaves it out), then
+`cargo make native-load`, then `cargo make native-refusals`. `native-load` builds the module per
+ABI, copies it to `target/native/<abi>/`, and runs `crates/airsl-lua/lua/check.lua` under the real
+interpreter, which is the module's test because a module-mode build cannot link a Rust test.
+`native-refusals` makes `native-load` and `check.lua` refuse a missing or mismatched interpreter and
+requires both a non-zero exit and the message, so a refusal that turned into a pass cannot leave
+`dod` green. Doctests (`cargo make test-doc`) skip `airsl-lua` too, since rustdoc cannot test a
+`cdylib`.
 
 `cargo make rocks` is outside `dod`: it needs the network and luarocks. It reads `AIRSL_LUAROCKS`
 for luarocks and `AIRSL_LUA54` and `AIRSL_LUAJIT` for the interpreters, and `AIRSL_LUA54_DIR` and
@@ -62,7 +65,7 @@ add `--exclude airsl-lua`. Bare `cargo build`, `test` and `check` already work, 
 `default-members`.
 
 The tests step also runs `crates/docs-check`, the unpublished member that guards the prose. It
-checks these six things and nothing else:
+checks these seven things and nothing else:
 
 - Each example README's `## Output` block equals what the example prints. Where Windows prints
   something else (a path that starts with a drive), the first block under a `### Windows`
@@ -100,6 +103,15 @@ checks these six things and nothing else:
   headings, derived as `mdbook` derives it. The site root and `index.html` resolve, and an anchor
   on them is checked against the first chapter listed; the generated `print.html` and `404.html`
   resolve; any other address must name a file of `install/`.
+- Every `cargo make` command written in a fenced code block or an inline code span of `CLAUDE.md`,
+  every `README.md` (the root one and each under `crates/`, the examples' included) or a chapter in
+  `book/src/` names a task that `Makefile.toml` declares. The task is the first word after `make`
+  that is not a flag; `-t` and `--task` name it, a flag that takes a value (`--profile ci`) is
+  skipped with its value, and `--list-all-steps` or `--help` names none. What follows the task is
+  ignored, and an indented code block is not read. And every task that `dod` lists in its
+  `dependencies`, and every task one of those lists in its own, is written as `cargo make <step>`
+  in a code block or code span of this file: the bare name would also be satisfied by the CLI's
+  `test` subcommand or `cargo test`.
 
 It does not check that a cited symbol is in the cited file, that the book's prose is true, or
 anything else written in backticks. `cargo make dod-crate docs-check` runs it alone.
