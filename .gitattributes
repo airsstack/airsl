@@ -1,0 +1,2 @@
+# cmd.exe labels and `goto` only work on CRLF line ends, so these files stay CRLF in every checkout.
+*.cmd text eol=crlf

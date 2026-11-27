@@ -61,7 +61,8 @@ pub enum LanguageSurface {
     Full,
 
     /// The default: `string`, `table`, `math`, `utf8`, `coroutine`, and the pure-computation parts
-    /// of `os`.
+    /// of `os`. That is the Lua 5.4 set; with the `luajit` feature `coroutine` comes with the base
+    /// library and `utf8` does not exist.
     ///
     /// Withholds `io`, `debug`, `package`, the chunk loaders, and the `os` functions that reach
     /// outside the process. Every side effect a script needs arrives through the `airsstack` host
@@ -90,10 +91,10 @@ impl LanguageSurface {
     pub(crate) fn libraries(self) -> StdLib {
         match self {
             Self::Full => StdLib::ALL_SAFE,
-            // On Lua 5.4 `utf8` is on every surface (LuaJIT has none). It needs no authority and hazards no determinism — it
-            // is arithmetic over an encoding — and without it `#s` counts bytes with no way to
-            // count characters, so a confined script cannot truncate text without risking a cut
-            // through the middle of one.
+            // On Lua 5.4 `utf8` is on every surface (LuaJIT has none). It needs no authority and
+            // hazards no determinism — it is arithmetic over an encoding — and without it `#s`
+            // counts bytes with no way to count characters, so a confined script cannot truncate
+            // text without risking a cut through the middle of one.
             #[cfg(not(feature = "luajit"))]
             Self::Restricted => {
                 StdLib::STRING

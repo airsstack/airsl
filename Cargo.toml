@@ -4,10 +4,12 @@ resolver = "3"
 # crates.io; the other two are the crates.io releases.
 members  = ["crates/airsl", "crates/airsl-cli", "crates/airsl-lua", "crates/docs-check"]
 # Bare `cargo build`/`test`/`check` leave out airsl-lua, whose `module` feature cannot share a build.
+# The gate's test step runs a bare `cargo test --all-targets --no-run`, so reverting this fails it.
 default-members = ["crates/airsl", "crates/airsl-cli", "crates/docs-check"]
 
 [workspace.package]
-# One number for airsl, airsl-cli and airsl-lua: the CLI installs the rocks at its own version.
+# One number for airsl, airsl-cli and airsl-lua, so the crates and the LuaRocks packages built
+# from one commit carry the same version.
 version       = "0.2.0"
 edition       = "2024"
 rust-version  = "1.94"

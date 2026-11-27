@@ -19,9 +19,10 @@
 #
 
 [config]
-# Every gate command already carries `--workspace`, so the task must run exactly
-# once from the workspace root. Without this, cargo-make re-runs each task once
-# per member crate — redundant full-workspace builds.
+# Every gate command selects its packages itself (`--workspace`, or `-p`, or a bare command
+# that resolves `default-members`), so the task must run exactly once from the workspace
+# root. Without this, cargo-make re-runs each task once per member crate — redundant
+# full-workspace builds.
 default_to_workspace = false
 # No implicit task graph. The gate is only what is written below, and a
 # built-in `build`/`test`/`ci-flow` inherited from cargo-make's core set would
@@ -91,8 +92,8 @@ unset_env RUSTDOCFLAGS
 
 [tasks.test]
 category = "Gate"
-description = "Unit, integration, example and bench targets, the prose guards in docs-check, and the native module loaded into real interpreters"
-dependencies = ["test-cargo", "native-load"]
+description = "Unit, integration, example and bench targets, the prose guards in docs-check, and the native module loaded into real interpreters, with its refusals checked"
+dependencies = ["test-cargo", "native-load", "native-refusals"]
 
 [tasks.test-cargo]
 category = "Gate"
@@ -104,12 +105,22 @@ description = "The cargo test run behind the test step"
 # run them; `dod` and `dod-crate docs-check` do. What they assert is listed in that crate's
 # module docs and in CLAUDE.md.
 #
-# The `test` step is this command plus `native-load`, which is what tests the native module: a
-# module-mode build cannot link a Rust test, so the module is loaded into real interpreters
-# instead. The five step names and their order stay, a step can run more than one command, and
-# `dod` needs `lua5.4` and `luajit` (or `AIRSL_LUA54` and `AIRSL_LUAJIT`) because of it.
-command = "cargo"
-args = ["test", "--workspace", "--exclude", "airsl-lua", "--all-targets"]
+# The `test` step is this command plus `native-load` and `native-refusals`, which are what test
+# the native module: a module-mode build cannot link a Rust test, so the module is loaded into
+# real interpreters instead. The five step names and their order stay, a step can run more than
+# one command, and `dod` needs `lua5.4` and `luajit` (or `AIRSL_LUA54` and `AIRSL_LUAJIT`)
+# because of it.
+#
+# `airsl-lua` is left out of the workspace run for the reason `clippy` gives. The second command is
+# a bare `cargo test --all-targets --no-run`, which selects the workspace's `default-members`
+# instead and compiles nothing the first did not already build. It is here because the bare form
+# is what a contributor runs, and a `default-members` that went back to including `airsl-lua`
+# would break that command while this step stayed green; with it, that line fails the step.
+script_runner = "@duckscript"
+script = '''
+exec --fail-on-error cargo test --workspace --exclude airsl-lua --all-targets
+exec --fail-on-error cargo test --all-targets --no-run
+'''
 
 [tasks.test-doc]
 category = "Gate"
@@ -137,20 +148,26 @@ description = "Build the native module per Lua ABI and load it into a real Lua 5
 # name a Lua `package.cpath` entry looks for.
 script_runner = "@duckscript"
 script = '''
-# `${1}` is the ABI, `${2}` the variable naming the interpreter, `${3}` its default program and
-# `${4}` what to call it in the message. `which` answers empty for a bare name and for a path
-# alike when nothing runs, which is what "missing" means here.
-function native_load
-    abi = set ${1}
-    program = get_env ${2}
+# `${1}` is the variable naming the interpreter, `${2}` its default program and `${3}` what to
+# call it in the message. `which` answers empty for a bare name and for a path alike when nothing
+# runs, which is what "missing" means here. Returns the program as typed.
+function find_interpreter
+    program = get_env ${1}
     if is_empty ${program}
-        program = set ${3}
+        program = set ${2}
     end
     found = which ${program}
     if is_empty ${found}
-        echo "native-load: `${program}` was not found; install ${4} or set ${2} to its interpreter"
+        echo "native-load: `${program}` was not found; install ${3} or set ${1} to its interpreter"
         exit 1
     end
+    return ${program}
+end
+
+# `${1}` is the ABI and `${2}` the interpreter that loads what was built.
+function native_load
+    abi = set ${1}
+    program = set ${2}
     exec --fail-on-error cargo build -p airsl-lua --features ${abi} --target-dir target/native-build
     target_os = get_env CARGO_MAKE_RUST_TARGET_OS
     if eq ${target_os} windows
@@ -169,8 +186,98 @@ function native_load
     exec --fail-on-error ${program} crates/airsl-lua/lua/check.lua target/native/${abi} ${abi}
 end
 
-native_load lua54 AIRSL_LUA54 lua5.4 "Lua 5.4"
-native_load luajit AIRSL_LUAJIT luajit LuaJIT
+# Both interpreters are looked up before either build, so a missing one is reported at once and
+# not after the first ABI's compile.
+lua54 = find_interpreter AIRSL_LUA54 lua5.4 "Lua 5.4"
+luajit = find_interpreter AIRSL_LUAJIT luajit LuaJIT
+native_load lua54 ${lua54}
+native_load luajit ${luajit}
+'''
+
+[tasks.native-refusals]
+category = "Gate"
+description = "Assert that native-load and check.lua refuse a missing or mismatched interpreter instead of passing"
+# `native-load` and `check.lua` each promise to fail, never to skip, when the interpreter is
+# missing or is not the one the ABI argument names, and a green `dod` only means something if
+# that promise holds. A refusal that went back to a pass would leave every other step green, so
+# this task provokes each one and requires both a non-zero exit and the message. Both
+# interpreters must already exist, which is true after `native-load`: inside `test` and
+# `dod-crate airsl-lua` this task runs after it, and run alone it assumes the same. It builds
+# nothing: every refusal here comes before any cargo command, and a refusal that built first
+# fails the check that no cargo output appears.
+#
+# The nested `cargo make` takes the missing interpreter through `--env`, which holds for that run
+# alone: a `set_env` here would stay set for the `native-load` that runs in this same process.
+script_runner = "@duckscript"
+script = '''
+# `${1}` is what was run, `${2}` its exit code and `${3}` everything it printed. A zero exit and
+# any cargo output both fail, the first because the run did not refuse, the second because it
+# refused only after building.
+function expect_refused_before_building
+    if eq ${2} 0
+        trigger_error "native-refusals: ${1} exited 0, but it must refuse"
+    end
+    built = contains ${3} Finished
+    compiled = contains ${3} Compiling
+    if ${built} or ${compiled}
+        echo ${3}
+        trigger_error "native-refusals: ${1} ran cargo before refusing"
+    end
+end
+
+# `${1}` is what was run, `${2}` its exit code, `${3}` everything it printed and `${4}` the text
+# it must contain.
+function expect_message
+    expect_refused_before_building ${1} ${2} ${3}
+    found = contains ${3} ${4}
+    if not ${found}
+        echo ${3}
+        trigger_error "native-refusals: ${1} did not print: ${4}"
+    end
+end
+
+# `${1}` is the variable naming the interpreter and `${2}` what to call it in the message. The
+# nested run is pointed at a program that does not exist.
+function expect_missing_interpreter
+    program = concat airsl-no-such- ${1}
+    out = exec cargo make --env ${1}=${program} native-load
+    message = concat "native-load: `" ${program} "` was not found; install " ${2}
+    message = concat ${message} " or set " ${1} " to its interpreter"
+    expect_message "native-load without ${2}" ${out.code} "${out.stdout}${out.stderr}" ${message}
+end
+
+lua54 = get_env AIRSL_LUA54
+if is_empty ${lua54}
+    lua54 = set lua5.4
+end
+luajit = get_env AIRSL_LUAJIT
+if is_empty ${luajit}
+    luajit = set luajit
+end
+check = set crates/airsl-lua/lua/check.lua
+usage = set "check.lua: usage: <interpreter> check.lua "
+usage = concat ${usage} "<directory holding the built airsstack library> <lua54|luajit>"
+
+expect_missing_interpreter AIRSL_LUA54 "Lua 5.4"
+expect_missing_interpreter AIRSL_LUAJIT LuaJIT
+
+out = exec ${lua54} ${check}
+output = set "${out.stdout}${out.stderr}"
+expect_message "check.lua with no arguments" ${out.code} ${output} ${usage}
+
+out = exec ${lua54} ${check} target/native nonsense
+output = set "${out.stdout}${out.stderr}"
+expect_message "check.lua with an unknown ABI" ${out.code} ${output} ${usage}
+
+out = exec ${lua54} ${check} target/native luajit
+output = set "${out.stdout}${out.stderr}"
+message = set "check.lua: this check is for luajit, but the interpreter is Lua 5.4 without jit"
+expect_message "check.lua for luajit under Lua 5.4" ${out.code} ${output} ${message}
+
+out = exec ${luajit} ${check} target/native lua54
+output = set "${out.stdout}${out.stderr}"
+message = set "check.lua: this check is for lua54, but the interpreter is Lua 5.1"
+expect_message "check.lua for lua54 under LuaJIT" ${out.code} ${output} ${message}
 '''
 
 # ---------------------------------------------------------------------------
@@ -577,8 +684,10 @@ description = "The gate scoped to one crate: cargo make dod-crate airsl"
 #
 # `airsl-lua` takes a branch of its own. It is a module-mode `cdylib`: `cargo test` cannot link
 # a Rust test for it and rustdoc cannot test a `cdylib`, so it runs clippy and rustdoc once per
-# Lua ABI, which is how `clippy` and `doc` run it in `dod`, and then `native-load`, whose
-# interpreter check is its test. It runs no `cargo test` and no doctests.
+# Lua ABI, which is how `clippy` and `doc` run it in `dod`, and then `native-load` and
+# `native-refusals`, whose interpreter checks are its test. It runs no `cargo test` and no
+# doctests. Formatting is checked first, for every crate: it is the gate's first step, and a
+# crate with no tests still has source to format.
 #
 # `airsl-cli` ships no `[lib]` target — every public item lives in `airsl` —
 # so `cargo test -p airsl-cli --doc` has nothing to doctest and fails outright
@@ -613,6 +722,7 @@ if eq ${crate} airsl-lua
     exec --fail-on-error cargo doc -p airsl-lua --no-deps --features luajit
     unset_env RUSTDOCFLAGS
     exec --fail-on-error cargo make native-load
+    exec --fail-on-error cargo make native-refusals
     exit 0
 end
 exec --fail-on-error cargo clippy -p ${crate} --all-targets -- -D warnings

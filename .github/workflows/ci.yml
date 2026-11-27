@@ -100,8 +100,8 @@ jobs:
 
       # The module links against an MSVC-built lua54.dll / lua51.dll and their import
       # libraries, which no Windows package provides, so both interpreters are built
-      # from source with MSVC. msvc-lua.cmd holds the build because the rock leg of
-      # build-rocks.yml needs the same interpreters, and the build needs the MSVC
+      # from source with MSVC. msvc-lua.cmd holds the build so that any job needing
+      # these interpreters builds the same ones, and the build needs the MSVC
       # environment this action sets up for the steps after it. The pin is the commit
       # the build was proven with.
       - name: Enter the MSVC developer environment

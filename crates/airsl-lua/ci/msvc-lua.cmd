@@ -2,20 +2,20 @@
 rem Builds the two Windows Lua interpreters the native module is checked against:
 rem Lua 5.4.8 into C:\lua54 and LuaJIT into C:\luajit, each with bin, lib and include.
 rem
-rem It is one script because the `dod` job of ci.yml and the Windows leg of
-rem build-rocks.yml must test the same interpreters; two copies of a build recipe
-rem drift, and a rock built against one interpreter would then be checked against another.
+rem It is one script because every job that needs these interpreters must test the same
+rem ones; two copies of a build recipe drift, and a module built against one interpreter
+rem would then be checked against another.
 rem
 rem It must run in an MSVC developer prompt (`cl` and `link` on PATH), which on a runner
-rem means after ilammy/msvc-dev-cmd. Nothing here installs luarocks; the rock leg
-rem downloads that zip itself.
+rem means after ilammy/msvc-dev-cmd. Nothing here installs luarocks.
 rem
 rem Every download is pinned, and every step stops the script on failure: a half-built
 rem interpreter that "mostly works" would turn a toolchain fault into a confusing
 rem native-load failure later. LuaJIT is pinned to a commit, not the moving v2.1 branch,
 rem so the interpreter does not change under a green build. The checkout is a full clone
 rem rather than a shallow one, because the pinned commit stops being the branch tip as
-rem soon as upstream moves on.
+rem soon as upstream moves on. `git checkout` of a full commit id either lands on that
+rem commit or fails, so no second check of HEAD follows it.
 
 setlocal EnableExtensions DisableDelayedExpansion
 
@@ -81,10 +81,6 @@ set "STEP=clone LuaJIT"
 git clone -q --branch v2.1 https://github.com/LuaJIT/LuaJIT.git luajit-src || goto :fail
 set "STEP=check out LuaJIT commit %LUAJIT_COMMIT%"
 git -C luajit-src checkout -q %LUAJIT_COMMIT% || goto :fail
-set "GOT="
-for /f %%c in ('git -C luajit-src rev-parse HEAD') do set "GOT=%%c"
-set "STEP=verify the LuaJIT checkout: expected %LUAJIT_COMMIT%, got %GOT%"
-if /i not "%GOT%"=="%LUAJIT_COMMIT%" goto :fail
 
 rem msvcbuild.bat builds the DLL flavour by default: luajit.exe plus lua51.dll, which is
 rem the name a LuaJIT-targeting module links against.

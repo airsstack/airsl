@@ -247,10 +247,7 @@ impl ModuleSet {
         policy: &Policy,
         root_table: &RootTable,
     ) -> Result<mlua::Table> {
-        let fail = |e: mlua::Error| Error::ModuleInstall {
-            module: root_table.to_string(),
-            reason: e.to_string(),
-        };
+        let fail = |e: mlua::Error| Error::root_table_install(root_table, &e);
 
         let context = InstallContext::new(policy, root_table);
         let root = lua.create_table().map_err(fail)?;

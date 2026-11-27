@@ -5,8 +5,8 @@
 //! have nothing to do with the script reading it, so "may read the environment" is almost never
 //! the authority anyone means, and this module has no way to express it.
 //!
-//! Responsibilities: [`Env`], installing `get`, `all` and `set`, and the per-engine overlay that
-//! `set` writes into.
+//! Responsibilities: [`Env`], installing `get`, `all` and `set`, and the process-wide overlay
+//! that `set` writes into.
 //!
 //! Non-responsibilities: deciding which names are allowed ([`crate::EnvGrant`]).
 
@@ -19,14 +19,15 @@ use crate::modules::{HostModule, InstallContext};
 use crate::sandbox::GrantSet;
 use crate::types::{EnvName, ModuleName};
 
-/// The environment as one engine's scripts see it.
+/// The environment as scripts see it: the real environment with the script-made changes on top.
 ///
 /// `set` writes here rather than into the process, and `get`, `all` and `proc.run` read here first.
 /// Two reasons, and the second is the one that matters: `std::env::set_var` is `unsafe` in Edition
 /// 2024 because it races every other thread reading the environment, and this crate forbids
 /// `unsafe` outright — but even with a safe way to do it, a sandboxed script silently changing the
 /// *host's* environment is not a capability anyone meant to grant. An overlay gives a script the
-/// behaviour it expects while keeping the blast radius inside the engine.
+/// behaviour it expects while keeping the changes out of the process's own environment. It is one
+/// overlay for the whole process (see [`overlay`]), so every engine sees what any engine set.
 #[derive(Debug, Default)]
 pub(crate) struct Overlay {
     entries: RwLock<BTreeMap<EnvName, Option<String>>>,
