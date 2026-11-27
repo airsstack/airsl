@@ -35,6 +35,9 @@ use crate::types::{EventName, ModuleName, RootTable};
 /// Build one with [`Engine::builder`]. The sandbox policy is required, so an engine cannot be
 /// constructed without deciding what scripts are allowed to reach.
 ///
+/// An `Engine` is `Send + Sync` with the default `send` feature; see the crate's "Cargo features"
+/// section.
+///
 /// # Examples
 ///
 /// ```

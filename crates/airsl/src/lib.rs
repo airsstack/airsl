@@ -28,6 +28,21 @@
 //! negotiated against the host's ceiling and run through an [`ExtensionHost`] that owns the
 //! resulting engines.
 //!
+//! # Cargo features
+//!
+//! The features choose how the embedded Lua is built; each forwards to the `mlua` feature of the
+//! same name.
+//!
+//! - The default is `lua54`, `vendored` and `send`: Lua 5.4 compiled from C source and linked
+//!   statically.
+//! - `lua54,module` and `luajit,module` are the two other supported sets. They are for the native
+//!   module build only, which loads into a Lua interpreter the host already runs.
+//! - The Lua features are not additive: a build names exactly one of `lua54` and `luajit`, so
+//!   `--all-features` does not build.
+//! - `default-features = false` without `lua54` or `luajit` does not build; `mlua` stops with "No
+//!   Lua feature enabled". A dependent that turns the defaults off must name a Lua feature.
+//! - [`Engine`] is `Send + Sync` only with `send`.
+//!
 //! Supported targets are Linux, macOS, and `x86_64-pc-windows-msvc`. Where a platform difference
 //! exists it is decided in one place rather than restated here: `src/paths/rules.rs` holds the
 //! lexical rules (what a path spells like, `/`- vs `\`-separated, which spellings are refused), and

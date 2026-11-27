@@ -28,6 +28,14 @@ name = "notes-module-setup"
 path = "examples/notes-module/setup.rs"
 test = true
 
+[features]
+default  = ["lua54", "vendored", "send"]
+lua54    = ["mlua/lua54"]
+luajit   = ["mlua/luajit"]
+vendored = ["mlua/vendored"]
+send     = ["mlua/send"]
+module   = ["mlua/module"]
+
 [dependencies]
 mlua       = { workspace = true }
 serde      = { workspace = true }

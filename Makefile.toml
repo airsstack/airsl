@@ -29,9 +29,10 @@ min_version = "0.37.0"
 [env]
 CARGO_TERM_COLOR = "always"
 
-# `--all-features` below is carried for forward-safety: neither crate in this
-# workspace declares Cargo `[features]`, so today it equals the default build.
-# It stays in every command so the gate stays correct the day a feature is added.
+# No command below passes `--all-features`: `airsl` forwards mlua's mutually
+# exclusive Lua features (`lua54`, `luajit`), so an all-features build is a
+# compile error by construction. Coverage is the default build plus the per-ABI
+# runs of the native module.
 
 # ---------------------------------------------------------------------------
 # The gate
@@ -62,7 +63,6 @@ args = [
   "clippy",
   "--workspace",
   "--all-targets",
-  "--all-features",
   "--",
   "-D",
   "warnings",
@@ -74,7 +74,7 @@ description = "Build rustdoc with warnings promoted to errors"
 # Plain `cargo doc` prints rustdoc warnings and still exits 0; RUSTDOCFLAGS is
 # the only thing that makes this step a gate rather than a report.
 command = "cargo"
-args = ["doc", "--workspace", "--all-features", "--no-deps"]
+args = ["doc", "--workspace", "--no-deps"]
 
 [tasks.doc.env]
 RUSTDOCFLAGS = "-D warnings"
@@ -89,13 +89,13 @@ description = "Unit, integration, example and bench targets, plus the prose guar
 # do not run them; `dod` and `dod-crate docs-check` do. What they assert is listed in that crate's
 # module docs and in CLAUDE.md.
 command = "cargo"
-args = ["test", "--workspace", "--all-targets", "--all-features"]
+args = ["test", "--workspace", "--all-targets"]
 
 [tasks.test-doc]
 category = "Gate"
 description = "Doctests — excluded by --all-targets, so they need their own run"
 command = "cargo"
-args = ["test", "--workspace", "--all-features", "--doc"]
+args = ["test", "--workspace", "--doc"]
 
 # ---------------------------------------------------------------------------
 # Examples
@@ -359,7 +359,6 @@ args = [
   "clippy",
   "--workspace",
   "--all-targets",
-  "--all-features",
   "--fix",
   "--allow-dirty",
 ]
@@ -397,18 +396,18 @@ if is_empty ${crate}
     trigger_error "usage: cargo make dod-crate <crate-name>"
 end
 exec --fail-on-error cargo fmt -p ${crate} -- --check
-exec --fail-on-error cargo clippy -p ${crate} --all-targets --all-features -- -D warnings
+exec --fail-on-error cargo clippy -p ${crate} --all-targets -- -D warnings
 # RUSTDOCFLAGS is set on the environment for this one step and cleared right
 # after — it must not leak into the two `cargo test` steps below, which never
 # wanted it.
 set_env RUSTDOCFLAGS "-D warnings"
-exec --fail-on-error cargo doc -p ${crate} --all-features --no-deps
+exec --fail-on-error cargo doc -p ${crate} --no-deps
 unset_env RUSTDOCFLAGS
-exec --fail-on-error cargo test -p ${crate} --all-targets --all-features
+exec --fail-on-error cargo test -p ${crate} --all-targets
 lib_path = set crates/${crate}/src/lib.rs
 has_lib = is_file ${lib_path}
 if ${has_lib}
-    exec --fail-on-error cargo test -p ${crate} --all-features --doc
+    exec --fail-on-error cargo test -p ${crate} --doc
 else
     echo "doctest step skipped: ${crate} has no library target (no ${lib_path})"
 end

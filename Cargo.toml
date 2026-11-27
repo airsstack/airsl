@@ -14,13 +14,13 @@ homepage      = "https://airsstack.github.io/airsl/"
 authors       = ["rstlix0x0 <rstlix.dev@gmail.com>"]
 
 [workspace.dependencies]
-# Embedded Lua runtime. `vendored` compiles Lua 5.4 from the C sources shipped by
-# `lua-src`, so no system Lua and no pkg-config are involved — but a C compiler is
-# required to build this workspace and every crate that depends on `airsl`.
-# `serialize` bridges Lua values through serde.
-# Lua 5.4 (not 5.1/LuaJIT) because only 5.3+ distinguishes integers from floats,
-# which the JSON that host programs exchange with scripts depends on.
-mlua       = { version = "0.12", features = ["lua54", "vendored", "serialize", "send"] }
+# Embedded Lua runtime. `serialize` bridges Lua values through serde and is the only mlua feature
+# fixed here: `airsl`'s own features choose the Lua version, vendoring and `send`, so a build can
+# pick LuaJIT or a host-provided Lua instead. The default is Lua 5.4 with `vendored`, which compiles
+# Lua from the C sources shipped by `lua-src` (no system Lua, no pkg-config), so the default build
+# needs a C compiler. Lua 5.4 is airsl's engine because only 5.3+ distinguishes integers from
+# floats, which the JSON that host programs exchange with scripts depends on.
+mlua       = { version = "0.12", features = ["serialize"] }
 # Serialization
 serde      = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
