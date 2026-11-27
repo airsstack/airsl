@@ -1,0 +1,81 @@
+Question B4: luarocks pack of an installed rust-mlua rock -> exact binary rock file name and contents; install of that binary rock into a fresh tree with cargo absent from PATH; are build_dependencies fetched for a binary rock?
+Versions: luarocks 3.12.2 (/opt/homebrew/bin/luarocks, runs on Lua 5.4), Lua 5.4.8 (/opt/homebrew/bin/lua5.4), LuaJIT 2.1.1770848219 (/opt/homebrew/opt/luajit), cargo 1.94.1 / rustc 1.94.1, mlua =0.12.0 (mlua-sys 0.11.0), luarocks-build-rust-mlua 0.2.7-1, macOS Darwin 25.3.0 arm64 (arch macosx-aarch64).
+Date: 2026-11-26. Probe agent B.
+S = /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B (scratch; deleted after recording). Raw output below is unedited; paths appear in full.
+Inputs: $S/tree-54 (airsstack 0.0.1-1 from 21 attempt 1) and $S/tree-jit (airsstack-luajit 0.0.1-1 from 22). cwd = $S/server.
+
+$ luarocks pack airsstack --tree $S/tree-54   (cwd=$S/server)
+Packed: /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server/airsstack-0.0.1-1.macosx-aarch64.rock
+exit=0
+$ luarocks --lua-version 5.1 --lua-dir $LJ pack airsstack-luajit --tree $S/tree-jit
+Packed: /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/server/airsstack-luajit-0.0.1-1.macosx-aarch64.rock
+exit=0
+$ ls
+airsstack-0.0.1-1.macosx-aarch64.rock
+airsstack-luajit-0.0.1-1.macosx-aarch64.rock
+$ unzip -l airsstack-0.0.1-1.macosx-aarch64.rock
+Archive:  airsstack-0.0.1-1.macosx-aarch64.rock
+  Length      Date    Time    Name
+---------  ---------- -----   ----
+      422  11-26-2026 13:11   airsstack-0.0.1-1.rockspec
+        0  11-26-2026 13:16   lib/
+   525168  11-26-2026 13:16   lib/airsstack.so
+      168  11-26-2026 13:11   rock_manifest
+---------                     -------
+   525758                     4 files
+$ unzip -p airsstack-0.0.1-1.macosx-aarch64.rock rock_manifest
+rock_manifest = {
+   ["airsstack-0.0.1-1.rockspec"] = "f3fe798ecf8f924492a82ce140e3389e",
+   lib = {
+      ["airsstack.so"] = "43ad9575878185b8e99a1668e43e2f61"
+   }
+}
+$ unzip -l airsstack-luajit-0.0.1-1.macosx-aarch64.rock
+Archive:  airsstack-luajit-0.0.1-1.macosx-aarch64.rock
+  Length      Date    Time    Name
+---------  ---------- -----   ----
+      478  11-26-2026 13:14   airsstack-luajit-0.0.1-1.rockspec
+        0  11-26-2026 13:16   lib/
+   542400  11-26-2026 13:16   lib/airsstack.so
+      175  11-26-2026 13:14   rock_manifest
+---------                     -------
+   543053                     4 files
+$ unzip -p airsstack-luajit-0.0.1-1.macosx-aarch64.rock rock_manifest
+rock_manifest = {
+   ["airsstack-luajit-0.0.1-1.rockspec"] = "808796d1da67210d6dc02a6e5f4fe6d9",
+   lib = {
+      ["airsstack.so"] = "9acb615138b6b4bf351f2f243e60a0f4"
+   }
+}
+$ env PATH=/usr/bin:/bin:/opt/homebrew/bin sh -c "command -v cargo"
+exit=1
+$ env PATH=/usr/bin:/bin:/opt/homebrew/bin luarocks install --tree $S/tree-bin54 ./airsstack-0.0.1-1.macosx-aarch64.rock
+
+airsstack 0.0.1-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack 0.0.1-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-bin54 (license: MIT)
+
+exit=0
+$ find $S/tree-bin54 -type f | sort
+tree-bin54/lib/lua/5.4/airsstack.so
+tree-bin54/lib/luarocks/rocks-5.4/airsstack/0.0.1-1/airsstack-0.0.1-1.rockspec
+tree-bin54/lib/luarocks/rocks-5.4/airsstack/0.0.1-1/rock_manifest
+tree-bin54/lib/luarocks/rocks-5.4/manifest
+$ env PATH=/usr/bin:/bin:/opt/homebrew/bin lua5.4 (with tree-bin54 cpath) -e require
+table	42
+exit=0
+$ env PATH=/usr/bin:/bin:/opt/homebrew/bin luarocks --lua-version 5.1 --lua-dir $LJ install --tree $S/tree-binjit ./airsstack-luajit-0.0.1-1.macosx-aarch64.rock
+
+airsstack-luajit 0.0.1-1 depends on lua 5.1 (5.1-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack-luajit 0.0.1-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-binjit (license: MIT)
+
+exit=0
+table	42	true
+exit=0
+
+=== findings
+- File names: airsstack-0.0.1-1.macosx-aarch64.rock and airsstack-luajit-0.0.1-1.macosx-aarch64.rock (<package>-<version>-<rev>.<arch>.rock; arch says nothing about Lua 5.4 vs LuaJIT).
+- Contents: <package>-<ver>.rockspec, lib/airsstack.so, rock_manifest (md5 per file).
+- With cargo hidden (command -v cargo exit=1) both binary rocks install (exit 0) and load (lua5.4: 'table 42'; luajit: 'table 42 true').
+- build_dependencies are NOT fetched for a binary rock: tree-bin54 holds only airsstack (no luarocks-build-rust-mlua, no network line in the output).

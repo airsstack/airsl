@@ -1,0 +1,73 @@
+# CI probe: the rocks task's lookups (spec §5.6.5, S19) in cargo-make's @duckscript: probe 237's Makefile plus the
+# two interpreter lookups, in the spec's order (luarocks, Lua 5.4, LuaJIT, then each package's rockspec).
+[config]
+skip_core_tasks = true
+
+# Control: the spec's old pattern <package>-*-1.rockspec.
+[tasks.old-glob]
+script_runner = "@duckscript"
+script = '''
+dir = get_env PROBE_DIR
+files = glob_array ${dir}/airsstack-*-1.rockspec
+n = array_length ${files}
+joined = array_join ${files} " "
+echo "old airsstack-*-1.rockspec -> ${n}: ${joined}"
+'''
+
+[tasks.rocks-lookup]
+script_runner = "@duckscript"
+script = '''
+luarocks = get_env AIRSL_LUAROCKS
+if is_empty ${luarocks}
+    luarocks = set luarocks
+end
+found = which ${luarocks}
+echo "which ${luarocks} -> [${found}]"
+if is_empty ${found}
+    echo "rocks: `${luarocks}` was not found; install LuaRocks or set AIRSL_LUAROCKS to its path"
+    exit 1
+end
+lua54 = get_env AIRSL_LUA54
+if is_empty ${lua54}
+    lua54 = set lua5.4
+end
+found = which ${lua54}
+echo "which ${lua54} -> [${found}]"
+if is_empty ${found}
+    echo "rocks: `${lua54}` was not found; install Lua 5.4 or set AIRSL_LUA54 to its interpreter"
+    exit 1
+end
+luajit = get_env AIRSL_LUAJIT
+if is_empty ${luajit}
+    luajit = set luajit
+end
+found = which ${luajit}
+echo "which ${luajit} -> [${found}]"
+if is_empty ${found}
+    echo "rocks: `${luajit}` was not found; install LuaJIT or set AIRSL_LUAJIT to its interpreter"
+    exit 1
+end
+dir = get_env PROBE_DIR
+packages = array airsstack airsstack-luajit
+for package in ${packages}
+    files = glob_array ${dir}/${package}-[0-9]*-1.rockspec
+    n = array_length ${files}
+    if eq ${n} 0
+        echo "rocks: no `${package}-<version>-1.rockspec` in `${dir}`"
+        exit 1
+    end
+    if greater_than ${n} 1
+        names = array_join ${files} ", "
+        echo "rocks: ${n} files match `${package}-<version>-1.rockspec` in `${dir}` (${names}); docs-check allows one per package"
+        exit 1
+    end
+    rockspec = array_get ${files} 0
+    name = basename ${rockspec}
+    prefix = concat ${package} -
+    start = length ${prefix}
+    stop = length ${name}
+    stop = calc ${stop} - 11
+    version = substring ${name} ${start} ${stop}
+    echo "${package}: rockspec ${rockspec} version [${version}]"
+end
+'''

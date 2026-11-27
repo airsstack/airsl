@@ -1,0 +1,134 @@
+# Probe 180 — clap: `airsl lua setup --native --lua <LUA>` refusals and help
+Question (P1): exact stderr + exit code clap prints for a bad/absent/repeated `--lua` value,
+`--lua` without `--native` (`requires = "native"`), and how `--help`/`-h` render the possible values.
+Source: 180-clap-lua-flag/ (Cargo.toml, Cargo.lock, src/main.rs) — mirrors R/crates/airsl-cli/src/cli.rs
+`Cli { #[command(subcommand)] command }` -> `Command::Lua(LuaCommand)` -> `LuaCommand::Setup { dir }`
+plus `#[arg(long)] native: bool` and `#[arg(long, value_enum, requires = "native")] lua: Option<LuaAbi>`
+with `#[value(name = "5.4")] Lua54`, `#[value(name = "luajit")] LuaJit`.
+Versions: clap 4.6.6, clap_builder 4.6.6, clap_derive 4.6.4, clap_lex 1.1.0 (all = R/Cargo.lock),
+features ["derive"] + defaults (as R/Cargo.toml).
+Toolchain: cargo 1.94.1 (29ea6fb6a 2026-03-24) / rustc 1.94.1 (e408947bf 2026-03-25) (R pins channel 1.94).
+Commands: CARGO_BUILD_JOBS=2 cargo +1.94 build; then ./target/debug/airsl <args>; stdout and stderr captured separately (stderr not a TTY, so no colour).
+Date: 2026-11-26T07:13Z
+Raw output (stdout lines follow the $ line; '--- stderr:' then '--- exit:'):
+
+$ airsl lua setup --native --lua 5.1
+--- stderr:
+error: invalid value '5.1' for '--lua <LUA>'
+  [possible values: 5.4, luajit]
+
+  tip: a similar value exists: '5.4'
+
+For more information, try '--help'.
+--- exit: 2
+
+$ airsl lua setup --native --lua 5.3
+--- stderr:
+error: invalid value '5.3' for '--lua <LUA>'
+  [possible values: 5.4, luajit]
+
+  tip: a similar value exists: '5.4'
+
+For more information, try '--help'.
+--- exit: 2
+
+$ airsl lua setup --native --lua LuaJIT
+--- stderr:
+error: invalid value 'LuaJIT' for '--lua <LUA>'
+  [possible values: 5.4, luajit]
+
+For more information, try '--help'.
+--- exit: 2
+
+$ airsl lua setup --lua 5.4
+--- stderr:
+error: the following required arguments were not provided:
+  --native
+
+Usage: airsl lua setup --native --lua <LUA> [DIR]
+
+For more information, try '--help'.
+--- exit: 2
+
+$ airsl lua setup --native --lua 5.4 --lua luajit
+--- stderr:
+error: the argument '--lua <LUA>' cannot be used multiple times
+
+Usage: airsl lua setup [OPTIONS] [DIR]
+
+For more information, try '--help'.
+--- exit: 2
+
+$ airsl lua setup --native --lua
+--- stderr:
+error: a value is required for '--lua <LUA>' but none was supplied
+  [possible values: 5.4, luajit]
+
+For more information, try '--help'.
+--- exit: 2
+
+$ airsl lua setup --native --lua=
+--- stderr:
+error: a value is required for '--lua <LUA>' but none was supplied
+  [possible values: 5.4, luajit]
+
+For more information, try '--help'.
+--- exit: 2
+
+$ airsl lua setup --native --lua 5.4
+Cli { command: Lua(Setup { dir: ".", native: true, lua: Some(Lua54) }) }
+--- stderr:
+--- exit: 0
+
+$ airsl lua setup --native --lua luajit proj
+Cli { command: Lua(Setup { dir: "proj", native: true, lua: Some(LuaJit) }) }
+--- stderr:
+--- exit: 0
+
+$ airsl lua setup
+Cli { command: Lua(Setup { dir: ".", native: false, lua: None }) }
+--- stderr:
+--- exit: 0
+
+$ airsl lua setup --help
+Write a description of the built-in modules and add it to the language server's settings
+
+Usage: airsl lua setup [OPTIONS] [DIR]
+
+Arguments:
+  [DIR]
+          Project directory to set up. Defaults to the working directory
+          
+          [default: .]
+
+Options:
+      --native
+          Also install the native module with LuaRocks
+
+      --lua <LUA>
+          The Lua to install the native module for, instead of the one luarocks targets
+
+          Possible values:
+          - 5.4:    Lua 5.4 (PUC-Rio)
+          - luajit: LuaJIT 2.1 (the Lua 5.1 ABI)
+
+  -h, --help
+          Print help (see a summary with '-h')
+--- stderr:
+--- exit: 0
+
+$ airsl lua setup -h
+Write a description of the built-in modules and add it to the language server's settings
+
+Usage: airsl lua setup [OPTIONS] [DIR]
+
+Arguments:
+  [DIR]  Project directory to set up. Defaults to the working directory [default: .]
+
+Options:
+      --native     Also install the native module with LuaRocks
+      --lua <LUA>  The Lua to install the native module for, instead of the one luarocks targets [possible values: 5.4, luajit]
+  -h, --help       Print help (see more with '--help')
+--- stderr:
+--- exit: 0
+

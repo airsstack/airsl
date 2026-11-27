@@ -1,0 +1,289 @@
+# Probe 190 — dist 0.33.1: rocks build as a second `global-artifacts-jobs` entry, rocks upload as a `publish-jobs` entry
+Question (P14): in a copy of R, set global-artifacts-jobs = ["./airsl-cli-smoke", "./build-rocks"] (stub reusable workflow,
+`on: workflow_call: inputs: plan`), publish-jobs = ["./publish-rocks"] (stub), precise-builds = true. Exit codes of
+`dist generate --check` / `dist generate` / `dist plan`; does `host` need both global jobs (so a failed rock build blocks the
+GitHub release), and does publish-rocks run after host?
+Copy: S/probes-M/p14-repo = rsync of R's working tree at 9d054c4 + uncommitted edits (minus target/, .git, .claudestacks, book/book),
+then `git init` + one baseline commit (R is a worktree; its .git file was NOT copied, so the copy cannot touch R's git state).
+Kept: 190-dist-rocks-global-job/{dist-workspace.toml.diff, airsl-cli-release.yml.diff, .github/workflows/build-rocks.yml, publish-rocks.yml}.
+Versions: cargo-dist 0.33.1 (`dist --version`), cargo 1.94.1 / rustc 1.94.1 (R/rust-toolchain.toml channel 1.94), macOS 26.3.1 arm64.
+S=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad
+Every command ran under zsh `setopt pipefail`; each `$ ...` line is followed by raw output and `[exit N]`.
+Reading of the generated workflow (lines of the regenerated .github/workflows/airsl-cli-release.yml in the copy, shown below):
+ custom-build-rocks: needs [plan, build-local-artifacts], no `if` (runs on PRs too, since build-local-artifacts runs under
+   pr-run-mode = "upload"); host: needs [..., custom-airsl-cli-smoke, custom-build-rocks] and its `if` requires
+   custom-build-rocks to be 'skipped' or 'success' -> a failed rock build stops host (no GitHub release, no publish);
+ custom-publish-rocks: needs [plan, host] (after `gh release create`), skipped for prereleases unless publish_prereleases;
+   announce needs custom-publish-rocks 'skipped' or 'success'.
+ host's "Download GitHub Artifacts" step takes `pattern: artifacts-*` and `gh release create ... artifacts/*` — any artifact the
+   rocks job uploads under a name matching artifacts-* is attached to the GitHub release; another name is not.
+ Not provable locally: that publish-rocks can download build-rocks' artifacts in the same run (needs a GitHub Actions run).
+Date: 2026-11-26T07:25Z
+
+$ dist --version   (cwd=S/probes-M/p14-repo)
+cargo-dist 0.33.1
+[exit 0]
+
+=== baseline (R's config, unchanged)
+$ dist generate --check   (cwd=S/probes-M/p14-repo)
+[exit 0]
+
+=== after: two global-artifacts-jobs, publish-jobs, precise-builds; stub reusable workflows added
+$ git diff dist-workspace.toml   (cwd=S/probes-M/p14-repo)
+diff --git a/dist-workspace.toml b/dist-workspace.toml
+index a33e189..1560123 100644
+--- a/dist-workspace.toml
++++ b/dist-workspace.toml
+@@ -28,11 +28,15 @@ github-attestations = true
+ # dist builds and publishes but never runs what it built. This hook runs after
+ # every archive is built and `host` waits for it, so an archive that fails its
+ # smoke test is never published. See .github/workflows/airsl-cli-smoke.yml.
+-global-artifacts-jobs = ["./airsl-cli-smoke"]
++global-artifacts-jobs = ["./airsl-cli-smoke", "./build-rocks"]
+ # Pull requests build and smoke-test every archive too, publishing nothing. The
+ # gate in ci.yml never builds musl or this profile, so without this a change that
+ # breaks a release target would first fail on the release tag itself.
+ pr-run-mode = "upload"
++# probe M: build only the packages dist ships
++precise-builds = true
++# probe M: upload the rocks after the GitHub release exists
++publish-jobs = ["./publish-rocks"]
+ 
+ # dist's defaults name fixed images (macos-14, ubuntu-22.04, windows-2022). GitHub retires
+ # those, and the macos-14 retirement broke every release. The `-latest` labels move with GitHub
+[exit 0]
+
+$ cat .github/workflows/build-rocks.yml   (cwd=S/probes-M/p14-repo)
+name: build-rocks (probe M stub)
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+jobs:
+  stub:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "build-rocks stub"
+[exit 0]
+
+$ dist generate --check   (cwd=S/probes-M/p14-repo)
+  × /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-
+  │ ba456a144f29/scratchpad/probes-M/p14-repo/.github/workflows/airsl-cli-release.yml has out of date contents and
+  │ needs to be regenerated:
+  │ --- /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-
+  │ ba456a144f29/scratchpad/probes-M/p14-repo/.github/workflows/airsl-cli-release.yml
+  │ +++ /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-
+  │ ba456a144f29/scratchpad/probes-M/p14-repo/.github/workflows/airsl-cli-release.yml
+  │ @@ -232,6 +232,15 @@
+  │      with:
+  │        plan: ${{ needs.plan.outputs.val }}
+  │      secrets: inherit
+  │ +
+  │ +  custom-build-rocks:
+  │ +    needs:
+  │ +      - plan
+  │ +      - build-local-artifacts
+  │ +    uses: ./.github/workflows/build-rocks.yml
+  │ +    with:
+  │ +      plan: ${{ needs.plan.outputs.val }}
+  │ +    secrets: inherit
+  │    # Determines if we should publish/announce
+  │    host:
+  │      needs:
+  │ @@ -239,8 +248,9 @@
+  │        - build-local-artifacts
+  │        - build-global-artifacts
+  │        - custom-airsl-cli-smoke
+  │ +      - custom-build-rocks
+  │      # Only run if we're "publishing", and only if plan, local and global didn't fail (skipped is fine)
+  │ -    if: ${{ always() && needs.plan.result == 'success' && needs.plan.outputs.publishing == 'true' &&
+  │ (needs.build-global-artifacts.result == 'skipped' || needs.build-global-artifacts.result == 'success') &&
+  │ (needs.custom-airsl-cli-smoke.result == 'skipped' || needs.custom-airsl-cli-smoke.result == 'success') &&
+  │ (needs.build-local-artifacts.result == 'skipped' || needs.build-local-artifacts.result == 'success') }}
+  │ +    if: ${{ always() && needs.plan.result == 'success' && needs.plan.outputs.publishing == 'true' &&
+  │ (needs.build-global-artifacts.result == 'skipped' || needs.build-global-artifacts.result == 'success') &&
+  │ (needs.custom-airsl-cli-smoke.result == 'skipped' || needs.custom-airsl-cli-smoke.result == 'success') &&
+  │ (needs.custom-build-rocks.result == 'skipped' || needs.custom-build-rocks.result == 'success') && (needs.build-
+  │ local-artifacts.result == 'skipped' || needs.build-local-artifacts.result == 'success') }}
+  │      env:
+  │        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  │      runs-on: "ubuntu-latest"
+  │ @@ -300,14 +310,29 @@
+  │ 
+  │            gh release create "${{ needs.plan.outputs.tag }}" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title
+  │ "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.txt" artifacts/*
+  │ 
+  │ +  custom-publish-rocks:
+  │ +    needs:
+  │ +      - plan
+  │ +      - host
+  │ +    if: ${{ !fromJson(needs.plan.outputs.val).announcement_is_prerelease ||
+  │ fromJson(needs.plan.outputs.val).publish_prereleases }}
+  │ +    uses: ./.github/workflows/publish-rocks.yml
+  │ +    with:
+  │ +      plan: ${{ needs.plan.outputs.val }}
+  │ +    secrets: inherit
+  │ +    # publish jobs get escalated permissions
+  │ +    permissions:
+  │ +      "id-token": "write"
+  │ +      "packages": "write"
+  │ +
+  │    announce:
+  │      needs:
+  │        - plan
+  │        - host
+  │ +      - custom-publish-rocks
+  │      # use "always() && ..." to allow us to wait for all publish jobs while
+  │      # still allowing individual publish jobs to skip themselves (for prereleases).
+  │      # "host" however must run to completion, no skipping allowed!
+  │ -    if: ${{ always() && needs.host.result == 'success' }}
+  │ +    if: ${{ always() && needs.host.result == 'success' && (needs.custom-publish-rocks.result == 'skipped' ||
+  │ needs.custom-publish-rocks.result == 'success') }}
+  │      runs-on: "ubuntu-latest"
+  │      env:
+  │        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  │ 
+  help: run 'dist init' to update the file
+        ('allow-dirty' in Cargo.toml to ignore out of date contents)
+
+[exit 255]
+
+$ dist generate   (cwd=S/probes-M/p14-repo)
+generated Github CI to /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/p14-repo/.github/workflows/airsl-cli-release.yml
+[exit 0]
+
+$ git status --short   (cwd=S/probes-M/p14-repo)
+ M .github/workflows/airsl-cli-release.yml
+ M dist-workspace.toml
+?? .github/workflows/build-rocks.yml
+?? .github/workflows/publish-rocks.yml
+[exit 0]
+
+$ dist generate --check   (cwd=S/probes-M/p14-repo)
+[exit 0]
+
+$ dist plan > /dev/null   (cwd=S/probes-M/p14-repo)
+  note: Forcing needs_coherence=true, because pr-run-mode="upload" is set.
+        If this causes you problems, let us know here:
+          https://github.com/axodotdev/cargo-dist/issues/1554
+
+[exit 0]
+
+$ dist plan --output-format=json | python3 -c "import sys,json; d=json.load(sys.stdin); print(\"ci.github keys:\", sorted(d[\"ci\"][\"github\"].keys())); print(\"artifacts:\", len(d[\"artifacts\"]))"   (cwd=S/probes-M/p14-repo)
+  note: Forcing needs_coherence=true, because pr-run-mode="upload" is set.
+        If this causes you problems, let us know here:
+          https://github.com/axodotdev/cargo-dist/issues/1554
+
+ci.github keys: ['artifacts_matrix', 'pr_run_mode']
+artifacts: 19
+[exit 0]
+
+$ dist plan --output-format=json 2>/dev/null | python3 -c "import sys,json; m=json.load(sys.stdin)[\"ci\"][\"github\"][\"artifacts_matrix\"][\"include\"]; [print(e[\"targets\"], e[\"build_args\"] if \"build_args\" in e else \"\", e[\"dist_args\"]) for e in m]"   (cwd=S/probes-M/p14-repo)
+['aarch64-apple-darwin']  --artifacts=local --target=aarch64-apple-darwin
+['aarch64-unknown-linux-gnu']  --artifacts=local --target=aarch64-unknown-linux-gnu
+['aarch64-unknown-linux-musl']  --artifacts=local --target=aarch64-unknown-linux-musl
+['x86_64-apple-darwin']  --artifacts=local --target=x86_64-apple-darwin
+['x86_64-pc-windows-msvc']  --artifacts=local --target=x86_64-pc-windows-msvc
+['x86_64-unknown-linux-gnu']  --artifacts=local --target=x86_64-unknown-linux-gnu
+['x86_64-unknown-linux-musl']  --artifacts=local --target=x86_64-unknown-linux-musl
+[exit 0]
+
+$ git diff --stat   (cwd=S/probes-M/p14-repo)
+ .github/workflows/airsl-cli-release.yml | 29 +++++++++++++++++++++++++++--
+ dist-workspace.toml                     |  6 +++++-
+ 2 files changed, 32 insertions(+), 3 deletions(-)
+[exit 0]
+
+$ sed -n 227,260p .github/workflows/airsl-cli-release.yml   (cwd=S/probes-M/p14-repo)
+  custom-airsl-cli-smoke:
+    needs:
+      - plan
+      - build-local-artifacts
+    uses: ./.github/workflows/airsl-cli-smoke.yml
+    with:
+      plan: ${{ needs.plan.outputs.val }}
+    secrets: inherit
+
+  custom-build-rocks:
+    needs:
+      - plan
+      - build-local-artifacts
+    uses: ./.github/workflows/build-rocks.yml
+    with:
+      plan: ${{ needs.plan.outputs.val }}
+    secrets: inherit
+  # Determines if we should publish/announce
+  host:
+    needs:
+      - plan
+      - build-local-artifacts
+      - build-global-artifacts
+      - custom-airsl-cli-smoke
+      - custom-build-rocks
+    # Only run if we're "publishing", and only if plan, local and global didn't fail (skipped is fine)
+    if: ${{ always() && needs.plan.result == 'success' && needs.plan.outputs.publishing == 'true' && (needs.build-global-artifacts.result == 'skipped' || needs.build-global-artifacts.result == 'success') && (needs.custom-airsl-cli-smoke.result == 'skipped' || needs.custom-airsl-cli-smoke.result == 'success') && (needs.custom-build-rocks.result == 'skipped' || needs.custom-build-rocks.result == 'success') && (needs.build-local-artifacts.result == 'skipped' || needs.build-local-artifacts.result == 'success') }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    runs-on: "ubuntu-latest"
+    outputs:
+      val: ${{ steps.host.outputs.manifest }}
+    steps:
+      - uses: actions/checkout@v6
+[exit 0]
+
+$ sed -n 290,340p .github/workflows/airsl-cli-release.yml   (cwd=S/probes-M/p14-repo)
+      # Create a GitHub Release while uploading all files to it
+      - name: "Download GitHub Artifacts"
+        uses: actions/download-artifact@v8
+        with:
+          pattern: artifacts-*
+          path: artifacts
+          merge-multiple: true
+      - name: Cleanup
+        run: |
+          # Remove the granular manifests
+          rm -f artifacts/*-dist-manifest.json
+      - name: Create GitHub Release
+        env:
+          PRERELEASE_FLAG: "${{ fromJson(steps.host.outputs.manifest).announcement_is_prerelease && '--prerelease' || '' }}"
+          ANNOUNCEMENT_TITLE: "${{ fromJson(steps.host.outputs.manifest).announcement_title }}"
+          ANNOUNCEMENT_BODY: "${{ fromJson(steps.host.outputs.manifest).announcement_github_body }}"
+          RELEASE_COMMIT: "${{ github.sha }}"
+        run: |
+          # Write and read notes from a file to avoid quoting breaking things
+          echo "$ANNOUNCEMENT_BODY" > $RUNNER_TEMP/notes.txt
+
+          gh release create "${{ needs.plan.outputs.tag }}" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.txt" artifacts/*
+
+  custom-publish-rocks:
+    needs:
+      - plan
+      - host
+    if: ${{ !fromJson(needs.plan.outputs.val).announcement_is_prerelease || fromJson(needs.plan.outputs.val).publish_prereleases }}
+    uses: ./.github/workflows/publish-rocks.yml
+    with:
+      plan: ${{ needs.plan.outputs.val }}
+    secrets: inherit
+    # publish jobs get escalated permissions
+    permissions:
+      "id-token": "write"
+      "packages": "write"
+
+  announce:
+    needs:
+      - plan
+      - host
+      - custom-publish-rocks
+    # use "always() && ..." to allow us to wait for all publish jobs while
+    # still allowing individual publish jobs to skip themselves (for prereleases).
+    # "host" however must run to completion, no skipping allowed!
+    if: ${{ always() && needs.host.result == 'success' && (needs.custom-publish-rocks.result == 'skipped' || needs.custom-publish-rocks.result == 'success') }}
+    runs-on: "ubuntu-latest"
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+[exit 0]
+

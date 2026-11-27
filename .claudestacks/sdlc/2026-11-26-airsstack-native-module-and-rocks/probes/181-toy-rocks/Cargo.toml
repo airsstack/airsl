@@ -1,0 +1,17 @@
+[package]
+name = "airsstack"
+version = "0.0.2"
+edition = "2024"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+lua54 = ["mlua/lua54"]
+luajit = ["mlua/luajit"]
+
+[dependencies]
+mlua = { version = "=0.12.0", features = ["module"] }
+
+[workspace]

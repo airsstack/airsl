@@ -1,0 +1,37 @@
+# Probe 238 — the shapes a member manifest's `[package] version` can take, read through `toml::Value` as docs-check will read them
+question: plan-set review finding 3 (spec §5.6.3): with the workspace's toml (1.2.2+spec-1.1.0, Cargo.lock:844-845; features std,
+  serde, parse as Cargo.toml:48), how do `version.workspace = true` and `version = { workspace = true }` read (the same?), and what
+  does `Value` give for a manifest with no `version` key, no `[package]` table (an empty file, `[lib]` only, `package` as a string),
+  and a version that is a string, an empty string, an integer, a float, a boolean, a date, an array, `{ workspace = false }`, or a
+  table with an extra key? Which of the four member messages does the classification in src/main.rs pick for each? What does
+  `type_str()` name each type (the spec's type words are mapped from it)?
+versions: rustc/cargo 1.94.1 (the repository's rust-toolchain.toml, copied into the probe crate); toml 1.2.2+spec-1.1.0 (cargo tree
+  below); macOS 26.3.1 arm64. Built offline from the local registry cache with CARGO_BUILD_JOBS=2.
+sources: 238-member-version-shapes/ (Cargo.toml, rust-toolchain.toml, src/main.rs). The first build used `{}` on a `Value`, which
+  toml 1.2.2 without its `display` feature refuses (E0277 "`Value` doesn't implement `std::fmt::Display`"), as the workspace
+  comment at Cargo.toml:44-45 says ("the `display` default feature (TOML serialization) is dropped"); the source now uses `{:?}`. Built in a scratch copy; target/ deleted.
+date: 2026-11-26
+--- raw output ---
+$ cargo --version   (rust-toolchain.toml copied from the repository)
+cargo 1.94.1 (29ea6fb6a 2026-03-24)
+$ CARGO_BUILD_JOBS=2 cargo run --offline --quiet
+dotted key           -> ok: inherits
+inline table         -> ok: inherits
+string               -> SETS-OWN (string "0.2.0")
+empty string         -> SETS-OWN (string "")
+no version key       -> NO-VERSION
+no [package]         -> NO-PACKAGE (manifest.get("package") = None)
+empty file           -> NO-PACKAGE (manifest.get("package") = None)
+package is a string  -> NO-PACKAGE (manifest.get("package") = Some("string"))
+integer              -> WRONG-TYPE (type_str = "integer", value = Integer(1))
+float                -> WRONG-TYPE (type_str = "float", value = Float(0.2))
+workspace = false    -> WRONG-TYPE (type_str = "table", value = Table({"workspace": Boolean(false)}))
+extra key            -> WRONG-TYPE (type_str = "table", value = Table({"path": String("x"), "workspace": Boolean(true)}))
+array                -> WRONG-TYPE (type_str = "array", value = Array([String("0.2.0")]))
+date                 -> WRONG-TYPE (type_str = "datetime", value = Datetime(Datetime { date: Some(Date { year: 2026, month: 11, day: 26 }), time: None, offset: None }))
+boolean              -> WRONG-TYPE (type_str = "boolean", value = Boolean(true))
+invalid TOML         -> is not valid TOML: TOML parse error at line 1, column 9
+[exit 0]
+$ cargo tree --offline --depth 1
+p238 v0.0.0 (<scratch>/p238)
+└── toml v1.2.2+spec-1.1.0

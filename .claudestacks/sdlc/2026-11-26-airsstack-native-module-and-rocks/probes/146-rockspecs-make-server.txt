@@ -1,0 +1,296 @@
+question: draft 7.2 #7: the real rockspecs (146-rockspecs-make-server/*.rockspec, written per the draft; source.url points at the git copy, tag airsl-cli-v0.0.0) -- lint, 'luarocks make' from the copy's root for Lua 5.4 and LuaJIT (--lua-version 5.1 --lua-dir $(brew --prefix luajit)), require under each interpreter, then a local server with both rockspecs + 'luarocks pack' src rocks + binary rocks, 'luarocks-admin make_manifest', manifest-5.4 / manifest-5.1 routing (manifests kept in 146-rockspecs-make-server/).
+commands: each `$ ...` line below, run in the stated cwd, followed by its raw output and `[exit N]`
+versions: rustc 1.94.1 (e408947bf 2026-03-25), cargo 1.94.1 (29ea6fb6a 2026-03-24) via R/rust-toolchain.toml channel 1.94; mlua 0.12.0, mlua-sys 0.11.0, mlua_derive 0.12.0, syn 2.0.119 (copy's Cargo.lock); cargo-deny 0.20.2; cargo-dist 0.33.1; luarocks 3.12.2 (/opt/homebrew/bin/luarocks, runs on Lua 5.4); Lua 5.4.8 (/opt/homebrew/bin/lua5.4); LuaJIT 2.1.1770848219 (/opt/homebrew/opt/luajit); luarocks-build-rust-mlua 0.2.7-1; macOS 26.3.1 arm64
+setup: S=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad; copy = S/probes-L/repo = rsync of R at 9d054c4 (minus target/, .git, .claudestacks, book/book), with the draft's feature table applied: root mlua features ["serialize"], members += crates/airsl-lua; crates/airsl [features] default=[lua54,vendored,send], lua54/luajit/vendored/send/module -> mlua/*; crates/airsl-lua cdylib (lib name airsstack, airsl path dep default-features=false + module, features lua54/luajit, build.rs dynamic_lookup, lib.rs `mod entry;`, entry.rs #[mlua::lua_module]); probe-only `ModuleSet::open` added to crates/airsl/src/modules/registry.rs so the toy installs airsl's real Json module. Sources and diffs: 140-lua-module-private-mod/. Env: CARGO_BUILD_JOBS=2, CARGO_TARGET_DIR=S/probes-L/target (luarocks' backend passes --target-dir=target, i.e. S/probes-L/repo/target). Every command ran under zsh `setopt pipefail`, so [exit N] is the pipeline's real status.
+date: 2026-11-26 (probe agent L)
+--- raw output ---
+=== rockspecs (crates/airsl-lua/rockspecs/, copied byte for byte into 14x-*/)
+$ luarocks lint crates/airsl-lua/rockspecs/airsstack-0.0.0-1.rockspec; luarocks lint crates/airsl-lua/rockspecs/airsstack-luajit-0.0.0-1.rockspec   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+[exit 0]
+
+=== (1) Lua 5.4
+$ luarocks --lua-version 5.4 make --tree /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/tree-54 crates/airsl-lua/rockspecs/airsstack-0.0.0-1.rockspec 2>&1 | grep -v '^ *\(Compiling\|Checking\)'   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+Missing dependencies for airsstack 0.0.0-1:
+   luarocks-build-rust-mlua 0.2.7 (not installed)
+
+airsstack 0.0.0-1 depends on luarocks-build-rust-mlua 0.2.7 (not installed)
+Installing https://luarocks.org/luarocks-build-rust-mlua-0.2.7-1.src.rock
+
+
+No existing manifest. Attempting to rebuild...
+    Finished `release` profile [optimized] target(s) in 31.85s
+luarocks-build-rust-mlua 0.2.7-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/tree-54 (license: MIT)
+
+
+airsstack 0.0.0-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+airsstack 0.0.0-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/tree-54 (license: Apache-2.0)
+
+[exit 0]
+
+=== (1b) Lua 5.4 again with a logging cargo wrapper first on PATH (bin/cargo: echo args, exec real cargo)
+$ PATH=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/bin:$PATH luarocks --lua-version 5.4 make --tree /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/tree-54 crates/airsl-lua/rockspecs/airsstack-0.0.0-1.rockspec 2>&1 | grep -v '^ *\(Compiling\|Checking\)'   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+
+airsstack 0.0.0-1 depends on luarocks-build-rust-mlua 0.2.7 (0.2.7-1 installed: success)
+
+airsstack 0.0.0-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+CARGO-WRAPPER cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo args=build --release --package airsl-lua --locked --target-dir=target --features lua54
+    Finished `release` profile [optimized] target(s) in 0.19s
+airsstack 0.0.0-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/tree-54 (license: Apache-2.0)
+
+[exit 0]
+
+=== (2) LuaJIT
+$ PATH=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/bin:$PATH luarocks --lua-version 5.1 --lua-dir $(brew --prefix luajit) make --tree /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/tree-jit crates/airsl-lua/rockspecs/airsstack-luajit-0.0.0-1.rockspec 2>&1 | grep -v '^ *\(Compiling\|Checking\)'   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+Missing dependencies for airsstack-luajit 0.0.0-1:
+   luarocks-build-rust-mlua 0.2.7 (not installed)
+
+airsstack-luajit 0.0.0-1 depends on luarocks-build-rust-mlua 0.2.7 (not installed)
+Installing https://luarocks.org/luarocks-build-rust-mlua-0.2.7-1.src.rock
+
+
+No existing manifest. Attempting to rebuild...
+CARGO-WRAPPER cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo args=build --release --package airsl-lua --locked --target-dir=target --features luajit
+    Finished `release` profile [optimized] target(s) in 13.47s
+luarocks-build-rust-mlua 0.2.7-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/tree-jit (license: MIT)
+
+
+airsstack-luajit 0.0.0-1 depends on lua 5.1 (5.1-1 provided by VM: success)
+airsstack-luajit 0.0.0-1 depends on luajit >= 2.1 (2.1.1770848219-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack-luajit 0.0.0-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/tree-jit (license: Apache-2.0)
+
+Missing dependencies for airsstack-luajit 0.0.0-1:
+   lua 5.1 (not installed)
+   luajit >= 2.1 (not installed)
+[exit 0]
+
+=== (3) require under each interpreter
+$ find tree-54/lib/lua tree-jit/lib/lua -type f   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L)
+tree-54/lib/lua/5.4/airsstack.so
+tree-jit/lib/lua/5.1/airsstack.so
+[exit 0]
+
+$ eval "$(luarocks --lua-version 5.4 --tree /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/tree-54 path)"; lua5.4 -e 'local m=require("airsstack"); print(_VERSION, package.searchpath("airsstack", package.cpath), m.version, m.json.encode({observed_at=1700000000}))'   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L)
+Lua 5.4	/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/tree-54/lib/lua/5.4/airsstack.so	0.2.0	{"observed_at":1700000000}
+[exit 0]
+
+$ eval "$(luarocks --lua-version 5.1 --lua-dir $(brew --prefix luajit) --tree /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/tree-jit path)"; luajit -e 'local m=require("airsstack"); print(_VERSION, jit.version, package.searchpath("airsstack", package.cpath), m.version, m.json.encode({observed_at=1700000000}))'   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L)
+Lua 5.1	LuaJIT 2.1.1770848219	/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/tree-jit/lib/lua/5.1/airsstack.so	0.2.0	{"observed_at":1700000000}
+[exit 0]
+
+$ luarocks --lua-version 5.1 --lua-dir $(brew --prefix luajit) --tree /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/tree-jit list; luarocks --lua-version 5.4 --tree /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/tree-54 list   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L)
+
+Rocks installed for Lua 5.1 in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/tree-jit
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+airsstack-luajit
+   0.0.0-1 (installed) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/tree-jit/lib/luarocks/rocks-5.1
+
+
+Rocks installed for Lua 5.4 in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/tree-54
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+airsstack
+   0.0.0-1 (installed) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/tree-54/lib/luarocks/rocks-5.4
+
+luarocks-build-rust-mlua
+   0.2.7-1 (installed) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/tree-54/lib/luarocks/rocks-5.4
+
+[exit 0]
+
+=== (4) local server: rockspecs + luarocks pack src rocks + binary rocks, make_manifest
+$ cp /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/crates/airsl-lua/rockspecs/*.rockspec . && luarocks pack airsstack-0.0.0-1.rockspec 2>&1 && luarocks pack airsstack-luajit-0.0.0-1.rockspec 2>&1   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/server)
+Cloning into 'repo'...
+warning: --depth is ignored in local clones; use file:// instead.
+done.
+Note: switching to 'ca325524d6b9b7821f39ba387b7e0ecbcde60618'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+Packed: /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/server/airsstack-0.0.0-1.src.rock
+Cloning into 'repo'...
+warning: --depth is ignored in local clones; use file:// instead.
+done.
+Note: switching to 'ca325524d6b9b7821f39ba387b7e0ecbcde60618'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+Packed: /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/server/airsstack-luajit-0.0.0-1.src.rock
+[exit 0]
+
+$ luarocks --lua-version 5.4 --tree /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/tree-54 pack airsstack 0.0.0-1 2>&1   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/server)
+Packed: /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/server/airsstack-0.0.0-1.macosx-aarch64.rock
+[exit 0]
+
+$ luarocks --lua-version 5.1 --lua-dir /opt/homebrew/opt/luajit --tree /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/tree-jit pack airsstack-luajit 0.0.0-1 2>&1   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/server)
+Packed: /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/server/airsstack-luajit-0.0.0-1.macosx-aarch64.rock
+[exit 0]
+
+$ ls -1; unzip -l airsstack-0.0.0-1.src.rock | tail -4; unzip -l airsstack-0.0.0-1.macosx-aarch64.rock; unzip -l airsstack-luajit-0.0.0-1.macosx-aarch64.rock   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/server)
+airsstack-0.0.0-1.macosx-aarch64.rock
+airsstack-0.0.0-1.rockspec
+airsstack-0.0.0-1.src.rock
+airsstack-luajit-0.0.0-1.macosx-aarch64.rock
+airsstack-luajit-0.0.0-1.rockspec
+airsstack-luajit-0.0.0-1.src.rock
+      546  11-26-2026 13:56   repo/rust-toolchain.toml
+    13664  11-26-2026 13:56   repo/CLAUDE.md
+---------                     -------
+  1714873                     275 files
+Archive:  airsstack-0.0.0-1.macosx-aarch64.rock
+  Length      Date    Time    Name
+---------  ---------- -----   ----
+      693  11-26-2026 13:56   airsstack-0.0.0-1.rockspec
+        0  11-26-2026 13:56   doc/
+    11357  11-26-2026 13:56   doc/LICENSE
+    18145  11-26-2026 13:56   doc/CHANGELOG.md
+     4180  11-26-2026 13:56   doc/README.md
+    13664  11-26-2026 13:56   doc/CLAUDE.md
+        0  11-26-2026 13:56   lib/
+   637024  11-26-2026 13:56   lib/airsstack.so
+      413  11-26-2026 13:56   rock_manifest
+---------                     -------
+   685476                     9 files
+Archive:  airsstack-luajit-0.0.0-1.macosx-aarch64.rock
+  Length      Date    Time    Name
+---------  ---------- -----   ----
+      720  11-26-2026 13:56   airsstack-luajit-0.0.0-1.rockspec
+        0  11-26-2026 13:56   doc/
+    11357  11-26-2026 13:56   doc/LICENSE
+    18145  11-26-2026 13:56   doc/CHANGELOG.md
+     4180  11-26-2026 13:56   doc/README.md
+    13664  11-26-2026 13:56   doc/CLAUDE.md
+        0  11-26-2026 13:56   lib/
+   653840  11-26-2026 13:56   lib/airsstack.so
+      420  11-26-2026 13:56   rock_manifest
+---------                     -------
+   702326                     9 files
+[exit 0]
+
+$ luarocks-admin make_manifest /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/server 2>&1; ls -1   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/server)
+Making manifest for /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/server
+Generating index.html for /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/server
+airsstack-0.0.0-1.macosx-aarch64.rock
+airsstack-0.0.0-1.rockspec
+airsstack-0.0.0-1.src.rock
+airsstack-luajit-0.0.0-1.macosx-aarch64.rock
+airsstack-luajit-0.0.0-1.rockspec
+airsstack-luajit-0.0.0-1.src.rock
+index.html
+manifest
+manifest-5.1
+manifest-5.2
+manifest-5.3
+manifest-5.4
+[exit 0]
+
+$ cat manifest-5.4   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/server)
+commands = {}
+modules = {}
+repository = {
+   airsstack = {
+      ["0.0.0-1"] = {
+         {
+            arch = "macosx-aarch64"
+         },
+         {
+            arch = "rockspec"
+         },
+         {
+            arch = "src"
+         }
+      }
+   }
+}
+[exit 0]
+
+$ cat manifest-5.1   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/server)
+commands = {}
+modules = {}
+repository = {
+   ["airsstack-luajit"] = {
+      ["0.0.0-1"] = {
+         {
+            arch = "macosx-aarch64"
+         },
+         {
+            arch = "rockspec"
+         },
+         {
+            arch = "src"
+         }
+      }
+   }
+}
+[exit 0]
+
+$ luarocks --lua-version 5.4 search --only-server file:///private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/server airsstack 2>&1   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/server)
+
+airsstack - Search results for Lua 5.4:
+=======================================
+
+
+Rockspecs and source rocks:
+---------------------------
+
+airsstack
+   0.0.0-1 (rockspec) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/server
+   0.0.0-1 (src) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/server
+
+
+Binary and pure-Lua rocks:
+--------------------------
+
+airsstack
+   0.0.0-1 (macosx-aarch64) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/server
+
+[exit 0]
+
+$ luarocks --lua-version 5.1 --lua-dir /opt/homebrew/opt/luajit search --only-server file:///private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/server airsstack 2>&1   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/server)
+
+airsstack - Search results for Lua 5.1:
+=======================================
+
+
+Rockspecs and source rocks:
+---------------------------
+
+airsstack-luajit
+   0.0.0-1 (rockspec) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/server
+   0.0.0-1 (src) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/server
+
+
+Binary and pure-Lua rocks:
+--------------------------
+
+airsstack-luajit
+   0.0.0-1 (macosx-aarch64) - /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/server
+
+[exit 0]
+

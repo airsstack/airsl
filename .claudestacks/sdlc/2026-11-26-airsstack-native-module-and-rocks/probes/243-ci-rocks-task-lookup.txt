@@ -1,0 +1,1799 @@
+# Probe 243 — the rocks task's lookups (probe 237, spec §5.6.5) under cargo-make 0.37.24 on GitHub-hosted ubuntu-latest, macos-latest and windows-latest
+question: R14: does the rocks task's @duckscript (probe 237's Makefile plus the Lua 5.4 and LuaJIT lookups, in the spec's order)
+  print the same lines and fail the same way on Linux and Windows as on macOS? Cases, each run as `cargo make <task>` with cwd a
+  tree holding Makefile.toml and crates/airsl-lua/rockspecs, and PROBE_DIR=crates/airsl-lua/rockspecs (the task's own relative
+  directory): old-glob control; all three tools found (an existing absolute path); a leftover rockspec; an empty directory; names
+  that do not split; luarocks unset (default `luarocks`), a missing bare name, a missing `/no/such/luarocks`, an existing bare name
+  (`cargo-make`); Lua 5.4 and LuaJIT unset and missing; on Windows also the existing path without `.exe`, with `/` separators, and a
+  missing `C:\no\such\luarocks.exe`. The variables are set by the runner (step `env:`), not by a shell.
+answer: HOLDS on all three, every message as the spec writes it, each refusal "[cargo-make] ERROR - Error while running duckscript:
+  Source: Unknown Line: <n> - Exit with error code: 1", "[cargo-make] WARN - Build Failed." and the step's "Process completed with
+  exit code 1"; every found case succeeds with "version [0.2.0]" for both packages. Linux and macOS print the same lines apart from
+  the tool's path. Windows differences, none a design choice:
+  - glob_array returns `\`-separated paths for the `/` pattern: "airsstack: rockspec crates\airsl-lua\rockspecs\airsstack-0.2.0-1.rockspec
+    version [0.2.0]" (basename and the cut still give 0.2.0), and the leftover message lists "(crates\airsl-lua\rockspecs\airsstack-0.1.0-1.rockspec,
+    crates\airsl-lua\rockspecs\airsstack-0.2.0-1.rockspec)" while its `in `crates/airsl-lua/rockspecs`` keeps the variable's `/`.
+  - which finds an absolute path without `.exe` ("which C:\Users\runneradmin\.cargo\bin\cargo-make -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe]"),
+    a `/`-separated one ("which C:/Users/runneradmin/.cargo/bin/cargo-make.exe -> [C:/Users/runneradmin/.cargo/bin\cargo-make.exe]")
+    and a bare name on PATH ("which cargo-make -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe]"); a missing drive path answers
+    empty ("which C:\no\such\luarocks.exe -> []") and prints the message.
+  No runner image ships luarocks, lua5.4 or luajit: the unset cases print "which luarocks -> []", "which lua5.4 -> []",
+  "which luajit -> []" on all three. The duckscript line numbers differ from probe 237's because the script is longer.
+tool versions: cargo-make 0.37.24 on all three ("cargo make --version" in each log below), installed by taiki-e/install-action@v2
+  (SHA 893d6ee8d714b6c7dfe2bcd94e5759e9a7958a7e) from the release zips cargo-make-v0.37.24-x86_64-unknown-linux-musl.zip,
+  -aarch64-apple-darwin.zip, -x86_64-pc-windows-msvc.zip (logged). The Windows tool-path step ran under pwsh; the case steps ran
+  `cargo make` under each runner's default shell (bash; pwsh on Windows), which only starts it.
+run: https://github.com/airsstack/airsl/actions/runs/45829615242 (attempt 1, conclusion success; the case steps are
+  continue-on-error, so a refusal shows as outcome "failure" in the "outcomes" step); sources 242-ci-probe-src/probe/Makefile.toml,
+  probe/setup-cases.sh, .github/workflows/probe.yml job `rocks`, head 9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c.
+jobs: rocks ubuntu https://github.com/airsstack/airsl/actions/runs/45829615242/job/139942663191 ; rocks macos https://github.com/airsstack/airsl/actions/runs/45829615242/job/139942663125 ; rocks windows https://github.com/airsstack/airsl/actions/runs/45829615242/job/139942663132
+runner images: ubuntu-26.04 20261116.202.1, macos-26-arm64 20261117.0516.1, windows-2025-vs2026 20261116.315.1.
+branch: probe-ci-rocks-version, as probe 242 (deleted after the probe).
+date: 2026-11-26; logs fetched with: gh api --allow-escape-sequences repos/airsstack/airsl/actions/jobs/<id>/logs (byte for byte
+  below each marker).
+# --- raw job log: rocks (ubuntu-latest) (139942663191) ---
+﻿2026-11-26T13:29:25.3967844Z Current runner version: '2.338.2'
+2026-11-26T13:29:25.3993562Z ##[group]Runner Image Provisioner
+2026-11-26T13:29:25.3994529Z Hosted Compute Agent
+2026-11-26T13:29:25.3995178Z Version: 20261111.635
+2026-11-26T13:29:25.3995870Z Commit: b8a594ea514ff44cadb5342986c68b1eac6e22ed
+2026-11-26T13:29:25.3996712Z Build Date: 2026-11-11T01:49:01Z
+2026-11-26T13:29:25.3997439Z Worker ID: {fcf58d18-09e4-4726-947b-c1718347384b}
+2026-11-26T13:29:25.3998100Z Region: eastus2
+2026-11-26T13:29:25.3998704Z Cloud: Azure
+2026-11-26T13:29:25.3999285Z ##[endgroup]
+2026-11-26T13:29:25.4000740Z ##[group]Operating System
+2026-11-26T13:29:25.4001419Z Ubuntu
+2026-11-26T13:29:25.4001924Z 26.04.1
+2026-11-26T13:29:25.4002433Z LTS
+2026-11-26T13:29:25.4002922Z ##[endgroup]
+2026-11-26T13:29:25.4003727Z ##[group]Runner Image
+2026-11-26T13:29:25.4004633Z Image: ubuntu-26.04
+2026-11-26T13:29:25.4005197Z Version: 20261116.202.1
+2026-11-26T13:29:25.4006441Z Included Software: https://github.com/actions/runner-images/blob/ubuntu26/20261116.202/images/ubuntu/Ubuntu2604-Readme.md
+2026-11-26T13:29:25.4007931Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261116.202
+2026-11-26T13:29:25.4008847Z ##[endgroup]
+2026-11-26T13:29:25.4009851Z ##[group]GITHUB_TOKEN Permissions
+2026-11-26T13:29:25.4012298Z Contents: read
+2026-11-26T13:29:25.4012865Z Metadata: read
+2026-11-26T13:29:25.4013667Z ##[endgroup]
+2026-11-26T13:29:25.4015744Z Secret source: Actions
+2026-11-26T13:29:25.4016654Z Cache mode: write
+2026-11-26T13:29:25.4017569Z Prepare workflow directory
+2026-11-26T13:29:25.4325950Z Prepare all required actions
+2026-11-26T13:29:25.4373678Z Getting action download info
+2026-11-26T13:29:25.6347933Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-11-26T13:29:25.7151837Z Download action repository 'taiki-e/install-action@v2' (SHA:893d6ee8d714b6c7dfe2bcd94e5759e9a7958a7e)
+2026-11-26T13:29:26.0458480Z Complete job name: rocks (ubuntu-latest)
+2026-11-26T13:29:26.1307953Z ##[group]Run actions/checkout@v5
+2026-11-26T13:29:26.1308764Z with:
+2026-11-26T13:29:26.1309412Z   repository: airsstack/airsl
+2026-11-26T13:29:26.1313063Z   token: ***
+2026-11-26T13:29:26.1313697Z   ssh-strict: true
+2026-11-26T13:29:26.1314287Z   ssh-user: git
+2026-11-26T13:29:26.1314786Z   persist-credentials: true
+2026-11-26T13:29:26.1315321Z   clean: true
+2026-11-26T13:29:26.1315827Z   sparse-checkout-cone-mode: true
+2026-11-26T13:29:26.1316400Z   fetch-depth: 1
+2026-11-26T13:29:26.1316955Z   fetch-tags: false
+2026-11-26T13:29:26.1317449Z   show-progress: true
+2026-11-26T13:29:26.1317951Z   lfs: false
+2026-11-26T13:29:26.1318421Z   submodules: false
+2026-11-26T13:29:26.1318916Z   set-safe-directory: true
+2026-11-26T13:29:26.1319500Z   allow-unsafe-pr-checkout: false
+2026-11-26T13:29:26.1320231Z ##[endgroup]
+2026-11-26T13:29:26.3738566Z Syncing repository: airsstack/airsl
+2026-11-26T13:29:26.3741554Z ##[group]Getting Git version info
+2026-11-26T13:29:26.3742975Z Working directory is '/home/runner/work/airsl/airsl'
+2026-11-26T13:29:26.3745701Z [command]/usr/bin/git version
+2026-11-26T13:29:26.3772718Z git version 2.56.1
+2026-11-26T13:29:26.3791158Z ##[endgroup]
+2026-11-26T13:29:26.3810863Z Temporarily overriding HOME='/home/runner/work/_temp/210d1020-2530-48f9-8c6b-7f7404520550' before making global git config changes
+2026-11-26T13:29:26.3813316Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T13:29:26.3815473Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/airsl/airsl
+2026-11-26T13:29:26.3897214Z Deleting the contents of '/home/runner/work/airsl/airsl'
+2026-11-26T13:29:26.3899840Z ##[group]Initializing the repository
+2026-11-26T13:29:26.3902227Z [command]/usr/bin/git init /home/runner/work/airsl/airsl
+2026-11-26T13:29:26.3997436Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-26T13:29:26.3999773Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-26T13:29:26.4001645Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-26T13:29:26.4003351Z hint: call:
+2026-11-26T13:29:26.4006010Z hint:
+2026-11-26T13:29:26.4007339Z hint: 	git config --global init.defaultBranch <name>
+2026-11-26T13:29:26.4008440Z hint:
+2026-11-26T13:29:26.4009496Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-26T13:29:26.4011068Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-26T13:29:26.4012347Z hint:
+2026-11-26T13:29:26.4013143Z hint: 	git branch -m <name>
+2026-11-26T13:29:26.4014777Z hint:
+2026-11-26T13:29:26.4016028Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-26T13:29:26.4018065Z Initialized empty Git repository in /home/runner/work/airsl/airsl/.git/
+2026-11-26T13:29:26.4027416Z [command]/usr/bin/git remote add origin https://github.com/airsstack/airsl
+2026-11-26T13:29:26.4096473Z ##[endgroup]
+2026-11-26T13:29:26.4099113Z ##[group]Disabling automatic garbage collection
+2026-11-26T13:29:26.4107943Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-26T13:29:26.4145934Z ##[endgroup]
+2026-11-26T13:29:26.4147552Z ##[group]Setting up auth
+2026-11-26T13:29:26.4152628Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T13:29:26.4193684Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T13:29:26.4675162Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T13:29:26.4709809Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T13:29:26.4942080Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T13:29:26.4976494Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T13:29:26.5187899Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-26T13:29:26.5223074Z ##[endgroup]
+2026-11-26T13:29:26.5224502Z ##[group]Fetching the repository
+2026-11-26T13:29:26.5231871Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c:refs/remotes/origin/probe-ci-rocks-version
+2026-11-26T13:29:26.8455296Z From https://github.com/airsstack/airsl
+2026-11-26T13:29:26.8458273Z  * [new ref]         9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c -> origin/probe-ci-rocks-version
+2026-11-26T13:29:26.8462997Z ##[endgroup]
+2026-11-26T13:29:26.8465206Z ##[group]Determining the checkout info
+2026-11-26T13:29:26.8467515Z ##[endgroup]
+2026-11-26T13:29:26.8469299Z [command]/usr/bin/git sparse-checkout disable
+2026-11-26T13:29:26.8546436Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-26T13:29:26.8575992Z ##[group]Checking out the ref
+2026-11-26T13:29:26.8579777Z [command]/usr/bin/git checkout --progress --force -B probe-ci-rocks-version refs/remotes/origin/probe-ci-rocks-version
+2026-11-26T13:29:26.8641015Z Switched to a new branch 'probe-ci-rocks-version'
+2026-11-26T13:29:26.8646684Z branch 'probe-ci-rocks-version' set up to track 'origin/probe-ci-rocks-version'.
+2026-11-26T13:29:26.8652662Z ##[endgroup]
+2026-11-26T13:29:26.8688621Z [command]/usr/bin/git log -1 --format=%H
+2026-11-26T13:29:26.8708989Z 9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c
+2026-11-26T13:29:26.9167603Z ##[group]Run taiki-e/install-action@v2
+2026-11-26T13:29:26.9169007Z with:
+2026-11-26T13:29:26.9170091Z   tool: cargo-make@0.37.24
+2026-11-26T13:29:26.9171364Z   checksum: true
+2026-11-26T13:29:26.9172508Z   fallback: cargo-binstall
+2026-11-26T13:29:26.9173878Z ##[endgroup]
+2026-11-26T13:29:26.9278367Z ##[start-action display=Run bail() {;id=__taiki-e_install-action.__run]
+2026-11-26T13:29:26.9355756Z ##[group]Run bail() {
+2026-11-26T13:29:26.9356962Z [36;1mbail() {[0m
+2026-11-26T13:29:26.9358265Z [36;1m  printf '::error::install-action: %s\n' "$*"[0m
+2026-11-26T13:29:26.9359710Z [36;1m  exit 1[0m
+2026-11-26T13:29:26.9360742Z [36;1m}[0m
+2026-11-26T13:29:26.9362367Z [36;1m# If /bin/sh is dash, environment variable containing % is not imported, but is fine[0m
+2026-11-26T13:29:26.9364831Z [36;1m# because it also means that it will not be exposed to subprocess.[0m
+2026-11-26T13:29:26.9366713Z [36;1mif /usr/bin/env | grep -Eq '^BASH_FUNC_'; then[0m
+2026-11-26T13:29:26.9369110Z [36;1m  bail 'bash function injection via BASH_FUNC_ environment variable is not allowed for security reasons'[0m
+2026-11-26T13:29:26.9371276Z [36;1mfi[0m
+2026-11-26T13:29:26.9372351Z [36;1mif ! command -v bash >/dev/null; then[0m
+2026-11-26T13:29:26.9373953Z [36;1m  if grep -Eq '^ID=alpine' /etc/os-release; then[0m
+2026-11-26T13:29:26.9375957Z [36;1m    printf '::group::Install packages required for install-action (bash)\n'[0m
+2026-11-26T13:29:26.9377785Z [36;1m    # NB: sync with apk_install in main.sh[0m
+2026-11-26T13:29:26.9379256Z [36;1m    if command -v sudo >/dev/null; then[0m
+2026-11-26T13:29:26.9380672Z [36;1m      sudo apk --no-cache add bash[0m
+2026-11-26T13:29:26.9382141Z [36;1m    elif command -v doas >/dev/null; then[0m
+2026-11-26T13:29:26.9383698Z [36;1m      doas apk --no-cache add bash[0m
+2026-11-26T13:29:26.9384985Z [36;1m    else[0m
+2026-11-26T13:29:26.9386359Z [36;1m      apk --no-cache add bash[0m
+2026-11-26T13:29:26.9387606Z [36;1m    fi[0m
+2026-11-26T13:29:26.9388646Z [36;1m    printf '::endgroup::\n'[0m
+2026-11-26T13:29:26.9389901Z [36;1m  else[0m
+2026-11-26T13:29:26.9390991Z [36;1m    bail 'this action requires bash'[0m
+2026-11-26T13:29:26.9392295Z [36;1m  fi[0m
+2026-11-26T13:29:26.9393268Z [36;1mfi[0m
+2026-11-26T13:29:26.9394746Z [36;1mbash --noprofile --norc "${GITHUB_ACTION_PATH:?}/main.sh"[0m
+2026-11-26T13:29:26.9400589Z shell: /usr/bin/env -u ENV -u BASH_ENV -u CDPATH -u SHELLOPTS -u BASHOPTS /bin/sh -eu {0}
+2026-11-26T13:29:26.9402413Z env:
+2026-11-26T13:29:26.9403611Z   INPUT_TOOL: cargo-make@0.37.24
+2026-11-26T13:29:26.9404820Z   INPUT_CHECKSUM: true
+2026-11-26T13:29:26.9405969Z   INPUT_FALLBACK: cargo-binstall
+2026-11-26T13:29:26.9415125Z   DEFAULT_GITHUB_TOKEN: ***
+2026-11-26T13:29:26.9416407Z   ACTION_USER_AGENT: taiki-e/install-action (v2)
+2026-11-26T13:29:26.9417752Z   RUNNER_OS: Linux
+2026-11-26T13:29:26.9418772Z   RUNNER_ARCH: X64
+2026-11-26T13:29:26.9419803Z ##[endgroup]
+2026-11-26T13:29:26.9615014Z info: host platform: x86_64_linux
+2026-11-26T13:29:26.9743537Z info: installing cargo-make@0.37.24
+2026-11-26T13:29:26.9926200Z info: downloading https://github.com/sagiegurari/cargo-make/releases/download/0.37.24/cargo-make-v0.37.24-x86_64-unknown-linux-musl.zip
+2026-11-26T13:29:27.1242852Z info: verifying sha256 checksum for cargo-make-v0.37.24-x86_64-unknown-linux-musl.zip
+2026-11-26T13:29:27.3387440Z info: cargo-make installed at /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:27.3390150Z + cargo-make make --version
+2026-11-26T13:29:27.3400112Z cargo-make 0.37.24
+2026-11-26T13:29:27.3401296Z 
+2026-11-26T13:29:27.3430870Z ##[end-action id=__taiki-e_install-action.__run;outcome=success;conclusion=success;duration_ms=414]
+2026-11-26T13:29:27.3445082Z ##[start-action display=Run Set-StrictMode -Version Latest;id=__taiki-e_install-action.__run_2]
+2026-11-26T13:29:27.3459909Z ##[end-action id=__taiki-e_install-action.__run_2;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-11-26T13:29:27.3548472Z ##[group]Run cargo make --version
+2026-11-26T13:29:27.3549688Z [36;1mcargo make --version[0m
+2026-11-26T13:29:27.3551076Z [36;1mecho "TOOL=$(command -v cargo-make)" >> "$GITHUB_ENV"[0m
+2026-11-26T13:29:27.3552635Z [36;1mecho "TOOL=$(command -v cargo-make)"[0m
+2026-11-26T13:29:27.3578176Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T13:29:27.3579701Z ##[endgroup]
+2026-11-26T13:29:27.4420074Z cargo-make 0.37.24
+2026-11-26T13:29:27.4429700Z TOOL=/home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:27.4528275Z ##[group]Run bash probe/setup-cases.sh
+2026-11-26T13:29:27.4529546Z [36;1mbash probe/setup-cases.sh[0m
+2026-11-26T13:29:27.4553243Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T13:29:27.4554808Z env:
+2026-11-26T13:29:27.4555838Z   TOOL: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:27.4557093Z ##[endgroup]
+2026-11-26T13:29:27.4805342Z $ ls work/real/crates/airsl-lua/rockspecs
+2026-11-26T13:29:27.4825653Z airsstack-0.2.0-1.rockspec
+2026-11-26T13:29:27.4827220Z airsstack-luajit-0.2.0-1.rockspec
+2026-11-26T13:29:27.4828982Z $ ls work/leftover/crates/airsl-lua/rockspecs
+2026-11-26T13:29:27.4849085Z airsstack-0.1.0-1.rockspec
+2026-11-26T13:29:27.4850428Z airsstack-0.2.0-1.rockspec
+2026-11-26T13:29:27.4851751Z airsstack-luajit-0.2.0-1.rockspec
+2026-11-26T13:29:27.4853479Z $ ls work/empty/crates/airsl-lua/rockspecs
+2026-11-26T13:29:27.4874246Z $ ls work/malformed/crates/airsl-lua/rockspecs
+2026-11-26T13:29:27.4893634Z airsstack-0.2.0.rockspec
+2026-11-26T13:29:27.4895419Z airsstack-luajit-0.2.0.rockspec
+2026-11-26T13:29:27.4896722Z airsstack.rockspec
+2026-11-26T13:29:27.4975168Z ##[group]Run cargo make old-glob
+2026-11-26T13:29:27.4976348Z [36;1mcargo make old-glob[0m
+2026-11-26T13:29:27.4998909Z shell: /usr/bin/bash -e {0}
+2026-11-26T13:29:27.5000065Z env:
+2026-11-26T13:29:27.5001036Z   TOOL: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:27.5002303Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:27.5003749Z ##[endgroup]
+2026-11-26T13:29:27.5195326Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:27.6685282Z [cargo-make] INFO - 
+2026-11-26T13:29:27.6687362Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:27.6689356Z [cargo-make] INFO - Task: old-glob
+2026-11-26T13:29:27.6691130Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:27.6693102Z [cargo-make] INFO - Running Task: old-glob
+2026-11-26T13:29:27.6709780Z old airsstack-*-1.rockspec -> 2: crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec 
+2026-11-26T13:29:27.6713672Z [cargo-make] INFO - ==================Time Summary==================
+2026-11-26T13:29:27.6716021Z [cargo-make] INFO - [Setup Env]:                49.83%     0.15 seconds
+2026-11-26T13:29:27.6718034Z [cargo-make] INFO - [Setup Env - Rust]:         37.71%     0.11 seconds
+2026-11-26T13:29:27.6719760Z [cargo-make] INFO - [Setup Env - Crate Info]:   9.76%      0.03 seconds
+2026-11-26T13:29:27.6721504Z [cargo-make] INFO - [Setup Env - Git]:          2.02%      0.01 seconds
+2026-11-26T13:29:27.6723237Z [cargo-make] INFO - old-glob:                   0.67%      0.00 seconds
+2026-11-26T13:29:27.6725176Z [cargo-make] INFO - [Load Makefiles]:           0.00%      0.00 seconds
+2026-11-26T13:29:27.6727099Z [cargo-make] INFO - [Setup Env - Duckscript]:   0.00%      0.00 seconds
+2026-11-26T13:29:27.6728868Z [cargo-make] INFO - [Setup Env - CI]:           0.00%      0.00 seconds
+2026-11-26T13:29:27.6730675Z [cargo-make] INFO - [Setup Env - Project]:      0.00%      0.00 seconds
+2026-11-26T13:29:27.6732473Z [cargo-make] INFO - [Setup Env - Vars]:         0.00%      0.00 seconds
+2026-11-26T13:29:27.6734354Z [cargo-make] INFO - ================================================
+2026-11-26T13:29:27.6735938Z [cargo-make] INFO - Build Done in 0.15 seconds.
+2026-11-26T13:29:27.6818848Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:27.6820067Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:27.6843922Z shell: /usr/bin/bash -e {0}
+2026-11-26T13:29:27.6844985Z env:
+2026-11-26T13:29:27.6845914Z   TOOL: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:27.6847139Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:27.6848448Z   AIRSL_LUAROCKS: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:27.6849877Z   AIRSL_LUA54: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:27.6851275Z   AIRSL_LUAJIT: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:27.6852645Z ##[endgroup]
+2026-11-26T13:29:27.7032593Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:27.7536980Z [cargo-make] INFO - 
+2026-11-26T13:29:27.7539193Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:27.7541630Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:27.7543611Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:27.7545571Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:27.7555381Z which /home/runner/.cargo/bin/cargo-make -> [/home/runner/.cargo/bin/cargo-make] 
+2026-11-26T13:29:27.7558717Z which /home/runner/.cargo/bin/cargo-make -> [/home/runner/.cargo/bin/cargo-make] 
+2026-11-26T13:29:27.7561775Z which /home/runner/.cargo/bin/cargo-make -> [/home/runner/.cargo/bin/cargo-make] 
+2026-11-26T13:29:27.7565270Z airsstack: rockspec crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec version [0.2.0] 
+2026-11-26T13:29:27.7569554Z airsstack-luajit: rockspec crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec version [0.2.0] 
+2026-11-26T13:29:27.7572793Z [cargo-make] INFO - ==================Time Summary==================
+2026-11-26T13:29:27.7575484Z [cargo-make] INFO - [Setup Env]:                49.00%     0.05 seconds
+2026-11-26T13:29:27.7577869Z [cargo-make] INFO - [Setup Env - Crate Info]:   23.00%     0.02 seconds
+2026-11-26T13:29:27.7579646Z [cargo-make] INFO - [Setup Env - Rust]:         20.00%     0.02 seconds
+2026-11-26T13:29:27.7581417Z [cargo-make] INFO - [Setup Env - Git]:          5.00%      0.01 seconds
+2026-11-26T13:29:27.7583140Z [cargo-make] INFO - rocks-lookup:               3.00%      0.00 seconds
+2026-11-26T13:29:27.7585034Z [cargo-make] INFO - [Load Makefiles]:           0.00%      0.00 seconds
+2026-11-26T13:29:27.7586775Z [cargo-make] INFO - [Setup Env - Duckscript]:   0.00%      0.00 seconds
+2026-11-26T13:29:27.7588560Z [cargo-make] INFO - [Setup Env - CI]:           0.00%      0.00 seconds
+2026-11-26T13:29:27.7590317Z [cargo-make] INFO - [Setup Env - Project]:      0.00%      0.00 seconds
+2026-11-26T13:29:27.7592109Z [cargo-make] INFO - [Setup Env - Vars]:         0.00%      0.00 seconds
+2026-11-26T13:29:27.7594026Z [cargo-make] INFO - ================================================
+2026-11-26T13:29:27.7595584Z [cargo-make] INFO - Build Done in 0.05 seconds.
+2026-11-26T13:29:27.7678342Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:27.7679568Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:27.7703631Z shell: /usr/bin/bash -e {0}
+2026-11-26T13:29:27.7704870Z env:
+2026-11-26T13:29:27.7705868Z   TOOL: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:27.7707295Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:27.7708726Z   AIRSL_LUAROCKS: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:27.7710287Z   AIRSL_LUA54: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:27.7711836Z   AIRSL_LUAJIT: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:27.7713107Z ##[endgroup]
+2026-11-26T13:29:27.7893690Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:27.8401163Z [cargo-make] INFO - 
+2026-11-26T13:29:27.8403109Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:27.8405114Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:27.8406713Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:27.8425429Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:27.8443602Z which /home/runner/.cargo/bin/cargo-make -> [/home/runner/.cargo/bin/cargo-make] 
+2026-11-26T13:29:27.8446543Z which /home/runner/.cargo/bin/cargo-make -> [/home/runner/.cargo/bin/cargo-make] 
+2026-11-26T13:29:27.8448751Z which /home/runner/.cargo/bin/cargo-make -> [/home/runner/.cargo/bin/cargo-make] 
+2026-11-26T13:29:27.8458152Z rocks: 2 files match `airsstack-<version>-1.rockspec` in `crates/airsl-lua/rockspecs` (crates/airsl-lua/rockspecs/airsstack-0.1.0-1.rockspec, crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec); docs-check allows one per package 
+2026-11-26T13:29:27.8462282Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 45 - Exit with error code: 1
+2026-11-26T13:29:27.8464650Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:27.8476177Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:27.8568123Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:27.8569333Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:27.8591771Z shell: /usr/bin/bash -e {0}
+2026-11-26T13:29:27.8592833Z env:
+2026-11-26T13:29:27.8593988Z   TOOL: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:27.8595372Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:27.8596682Z   AIRSL_LUAROCKS: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:27.8598093Z   AIRSL_LUA54: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:27.8599447Z   AIRSL_LUAJIT: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:27.8600670Z ##[endgroup]
+2026-11-26T13:29:27.8774583Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:27.9281518Z [cargo-make] INFO - 
+2026-11-26T13:29:27.9283270Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:27.9285122Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:27.9286771Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:27.9288649Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:27.9298866Z which /home/runner/.cargo/bin/cargo-make -> [/home/runner/.cargo/bin/cargo-make] 
+2026-11-26T13:29:27.9301636Z which /home/runner/.cargo/bin/cargo-make -> [/home/runner/.cargo/bin/cargo-make] 
+2026-11-26T13:29:27.9304369Z which /home/runner/.cargo/bin/cargo-make -> [/home/runner/.cargo/bin/cargo-make] 
+2026-11-26T13:29:27.9307098Z rocks: no `airsstack-<version>-1.rockspec` in `crates/airsl-lua/rockspecs` 
+2026-11-26T13:29:27.9309793Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 40 - Exit with error code: 1
+2026-11-26T13:29:27.9312619Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:27.9316738Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:27.9392166Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:27.9393573Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:27.9416858Z shell: /usr/bin/bash -e {0}
+2026-11-26T13:29:27.9417947Z env:
+2026-11-26T13:29:27.9418883Z   TOOL: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:27.9420206Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:27.9421657Z   AIRSL_LUAROCKS: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:27.9423157Z   AIRSL_LUA54: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:27.9424677Z   AIRSL_LUAJIT: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:27.9425897Z ##[endgroup]
+2026-11-26T13:29:27.9602716Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:28.0107747Z [cargo-make] INFO - 
+2026-11-26T13:29:28.0109834Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:28.0112072Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:28.0114317Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:28.0116822Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:28.0128758Z which /home/runner/.cargo/bin/cargo-make -> [/home/runner/.cargo/bin/cargo-make] 
+2026-11-26T13:29:28.0132204Z which /home/runner/.cargo/bin/cargo-make -> [/home/runner/.cargo/bin/cargo-make] 
+2026-11-26T13:29:28.0135595Z which /home/runner/.cargo/bin/cargo-make -> [/home/runner/.cargo/bin/cargo-make] 
+2026-11-26T13:29:28.0139048Z rocks: no `airsstack-<version>-1.rockspec` in `crates/airsl-lua/rockspecs` 
+2026-11-26T13:29:28.0141729Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 40 - Exit with error code: 1
+2026-11-26T13:29:28.0144428Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:28.0147795Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:28.0223710Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:28.0224887Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:28.0248064Z shell: /usr/bin/bash -e {0}
+2026-11-26T13:29:28.0249106Z env:
+2026-11-26T13:29:28.0250005Z   TOOL: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:28.0251165Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:28.0252434Z   AIRSL_LUA54: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:28.0253991Z   AIRSL_LUAJIT: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:28.0255184Z ##[endgroup]
+2026-11-26T13:29:28.0434154Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:28.0965384Z [cargo-make] INFO - 
+2026-11-26T13:29:28.0967799Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:28.0970188Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:28.0972218Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:28.0974495Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:28.0986592Z which luarocks -> [] 
+2026-11-26T13:29:28.0989135Z rocks: `luarocks` was not found; install LuaRocks or set AIRSL_LUAROCKS to its path 
+2026-11-26T13:29:28.0992424Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 11 - Exit with error code: 1
+2026-11-26T13:29:28.0995666Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:28.0999521Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:28.1078978Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:28.1080276Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:28.1104398Z shell: /usr/bin/bash -e {0}
+2026-11-26T13:29:28.1105436Z env:
+2026-11-26T13:29:28.1106596Z   TOOL: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:28.1108217Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:28.1109567Z   AIRSL_LUAROCKS: nope-luarocks
+2026-11-26T13:29:28.1110742Z ##[endgroup]
+2026-11-26T13:29:28.1292728Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:28.1809336Z [cargo-make] INFO - 
+2026-11-26T13:29:28.1811062Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:28.1812586Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:28.1814464Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:28.1816477Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:28.1833950Z which nope-luarocks -> [] 
+2026-11-26T13:29:28.1836277Z rocks: `nope-luarocks` was not found; install LuaRocks or set AIRSL_LUAROCKS to its path 
+2026-11-26T13:29:28.1840562Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 11 - Exit with error code: 1
+2026-11-26T13:29:28.1842797Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:28.1850993Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:28.1927364Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:28.1928615Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:28.1952455Z shell: /usr/bin/bash -e {0}
+2026-11-26T13:29:28.1953719Z env:
+2026-11-26T13:29:28.1955174Z   TOOL: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:28.1956460Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:28.1957668Z   AIRSL_LUAROCKS: /no/such/luarocks
+2026-11-26T13:29:28.1958842Z ##[endgroup]
+2026-11-26T13:29:28.2137676Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:28.2644665Z [cargo-make] INFO - 
+2026-11-26T13:29:28.2646288Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:28.2648094Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:28.2649827Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:28.2651680Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:28.2662063Z which /no/such/luarocks -> [] 
+2026-11-26T13:29:28.2664611Z rocks: `/no/such/luarocks` was not found; install LuaRocks or set AIRSL_LUAROCKS to its path 
+2026-11-26T13:29:28.2667614Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 11 - Exit with error code: 1
+2026-11-26T13:29:28.2669997Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:28.2673195Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:28.2747922Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:28.2749086Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:28.2773570Z shell: /usr/bin/bash -e {0}
+2026-11-26T13:29:28.2774799Z env:
+2026-11-26T13:29:28.2775745Z   TOOL: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:28.2776996Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:28.2778220Z   AIRSL_LUAROCKS: cargo-make
+2026-11-26T13:29:28.2779363Z   AIRSL_LUA54: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:28.2780886Z   AIRSL_LUAJIT: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:28.2782108Z ##[endgroup]
+2026-11-26T13:29:28.2960843Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:28.3486802Z [cargo-make] INFO - 
+2026-11-26T13:29:28.3488683Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:28.3490299Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:28.3491794Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:28.3494275Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:28.3510725Z which cargo-make -> [/home/runner/.cargo/bin/cargo-make] 
+2026-11-26T13:29:28.3514386Z which /home/runner/.cargo/bin/cargo-make -> [/home/runner/.cargo/bin/cargo-make] 
+2026-11-26T13:29:28.3517538Z which /home/runner/.cargo/bin/cargo-make -> [/home/runner/.cargo/bin/cargo-make] 
+2026-11-26T13:29:28.3524855Z airsstack: rockspec crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec version [0.2.0] 
+2026-11-26T13:29:28.3528973Z airsstack-luajit: rockspec crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec version [0.2.0] 
+2026-11-26T13:29:28.3533525Z [cargo-make] INFO - ==================Time Summary==================
+2026-11-26T13:29:28.3535425Z [cargo-make] INFO - [Setup Env]:                48.60%     0.05 seconds
+2026-11-26T13:29:28.3538030Z [cargo-make] INFO - [Setup Env - Crate Info]:   22.43%     0.02 seconds
+2026-11-26T13:29:28.3540081Z [cargo-make] INFO - [Setup Env - Rust]:         19.63%     0.02 seconds
+2026-11-26T13:29:28.3542009Z [cargo-make] INFO - [Setup Env - Git]:          5.61%      0.01 seconds
+2026-11-26T13:29:28.3543977Z [cargo-make] INFO - rocks-lookup:               3.74%      0.00 seconds
+2026-11-26T13:29:28.3545643Z [cargo-make] INFO - [Load Makefiles]:           0.00%      0.00 seconds
+2026-11-26T13:29:28.3547288Z [cargo-make] INFO - [Setup Env - Duckscript]:   0.00%      0.00 seconds
+2026-11-26T13:29:28.3548980Z [cargo-make] INFO - [Setup Env - CI]:           0.00%      0.00 seconds
+2026-11-26T13:29:28.3550655Z [cargo-make] INFO - [Setup Env - Project]:      0.00%      0.00 seconds
+2026-11-26T13:29:28.3552322Z [cargo-make] INFO - [Setup Env - Vars]:         0.00%      0.00 seconds
+2026-11-26T13:29:28.3554254Z [cargo-make] INFO - ================================================
+2026-11-26T13:29:28.3555711Z [cargo-make] INFO - Build Done in 0.06 seconds.
+2026-11-26T13:29:28.3630324Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:28.3631497Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:28.3654715Z shell: /usr/bin/bash -e {0}
+2026-11-26T13:29:28.3655815Z env:
+2026-11-26T13:29:28.3656793Z   TOOL: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:28.3658187Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:28.3659618Z   AIRSL_LUAROCKS: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:28.3661020Z   AIRSL_LUAJIT: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:28.3662267Z ##[endgroup]
+2026-11-26T13:29:28.3846558Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:28.4359141Z [cargo-make] INFO - 
+2026-11-26T13:29:28.4360257Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:28.4361084Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:28.4361758Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:28.4362799Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:28.4385091Z which /home/runner/.cargo/bin/cargo-make -> [/home/runner/.cargo/bin/cargo-make] 
+2026-11-26T13:29:28.4394539Z which lua5.4 -> [] 
+2026-11-26T13:29:28.4396861Z rocks: `lua5.4` was not found; install Lua 5.4 or set AIRSL_LUA54 to its interpreter 
+2026-11-26T13:29:28.4397992Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 21 - Exit with error code: 1
+2026-11-26T13:29:28.4398663Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:28.4400262Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:28.4440044Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:28.4440528Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:28.4460788Z shell: /usr/bin/bash -e {0}
+2026-11-26T13:29:28.4461397Z env:
+2026-11-26T13:29:28.4461763Z   TOOL: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:28.4462218Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:28.4462693Z   AIRSL_LUAROCKS: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:28.4463180Z   AIRSL_LUA54: nope-lua5.4
+2026-11-26T13:29:28.4463713Z ##[endgroup]
+2026-11-26T13:29:28.4625385Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:28.5147046Z [cargo-make] INFO - 
+2026-11-26T13:29:28.5148058Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:28.5149053Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:28.5149842Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:28.5150408Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:28.5163909Z which /home/runner/.cargo/bin/cargo-make -> [/home/runner/.cargo/bin/cargo-make] 
+2026-11-26T13:29:28.5166833Z which nope-lua5.4 -> [] 
+2026-11-26T13:29:28.5168134Z rocks: `nope-lua5.4` was not found; install Lua 5.4 or set AIRSL_LUA54 to its interpreter 
+2026-11-26T13:29:28.5171188Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 21 - Exit with error code: 1
+2026-11-26T13:29:28.5172063Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:28.5177098Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:28.5218181Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:28.5218685Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:28.5239506Z shell: /usr/bin/bash -e {0}
+2026-11-26T13:29:28.5239906Z env:
+2026-11-26T13:29:28.5240297Z   TOOL: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:28.5240784Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:28.5241251Z   AIRSL_LUAROCKS: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:28.5241761Z   AIRSL_LUA54: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:28.5242180Z ##[endgroup]
+2026-11-26T13:29:28.5407701Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:28.5915878Z [cargo-make] INFO - 
+2026-11-26T13:29:28.5916931Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:28.5917760Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:28.5918544Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:28.5919137Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:28.5932747Z which /home/runner/.cargo/bin/cargo-make -> [/home/runner/.cargo/bin/cargo-make] 
+2026-11-26T13:29:28.5934923Z which /home/runner/.cargo/bin/cargo-make -> [/home/runner/.cargo/bin/cargo-make] 
+2026-11-26T13:29:28.5937568Z which luajit -> [] 
+2026-11-26T13:29:28.5939211Z rocks: `luajit` was not found; install LuaJIT or set AIRSL_LUAJIT to its interpreter 
+2026-11-26T13:29:28.5942184Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 31 - Exit with error code: 1
+2026-11-26T13:29:28.5943246Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:28.5948111Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:28.5992020Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:28.5992511Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:28.6013149Z shell: /usr/bin/bash -e {0}
+2026-11-26T13:29:28.6013777Z env:
+2026-11-26T13:29:28.6014141Z   TOOL: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:28.6014666Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:28.6015154Z   AIRSL_LUAROCKS: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:28.6015653Z   AIRSL_LUA54: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:28.6016087Z   AIRSL_LUAJIT: nope-luajit
+2026-11-26T13:29:28.6016451Z ##[endgroup]
+2026-11-26T13:29:28.6186836Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:28.6702063Z [cargo-make] INFO - 
+2026-11-26T13:29:28.6702926Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:28.6703980Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:28.6704576Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:28.6705278Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:28.6718649Z which /home/runner/.cargo/bin/cargo-make -> [/home/runner/.cargo/bin/cargo-make] 
+2026-11-26T13:29:28.6721153Z which /home/runner/.cargo/bin/cargo-make -> [/home/runner/.cargo/bin/cargo-make] 
+2026-11-26T13:29:28.6723847Z which nope-luajit -> [] 
+2026-11-26T13:29:28.6725634Z rocks: `nope-luajit` was not found; install LuaJIT or set AIRSL_LUAJIT to its interpreter 
+2026-11-26T13:29:28.6728632Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 31 - Exit with error code: 1
+2026-11-26T13:29:28.6729347Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:28.6734440Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:28.6803341Z ##[group]Run echo "old_glob: success"
+2026-11-26T13:29:28.6804128Z [36;1mecho "old_glob: success"[0m
+2026-11-26T13:29:28.6804555Z [36;1mecho "found_all: success"[0m
+2026-11-26T13:29:28.6804936Z [36;1mecho "leftover: failure"[0m
+2026-11-26T13:29:28.6805374Z [36;1mecho "empty: failure"[0m
+2026-11-26T13:29:28.6805751Z [36;1mecho "malformed: failure"[0m
+2026-11-26T13:29:28.6806161Z [36;1mecho "luarocks_default: failure"[0m
+2026-11-26T13:29:28.6806628Z [36;1mecho "luarocks_bare_missing: failure"[0m
+2026-11-26T13:29:28.6807056Z [36;1mecho "luarocks_path_missing: failure"[0m
+2026-11-26T13:29:28.6807518Z [36;1mecho "luarocks_bare_found: success"[0m
+2026-11-26T13:29:28.6807933Z [36;1mecho "lua54_default: failure"[0m
+2026-11-26T13:29:28.6808336Z [36;1mecho "lua54_missing: failure"[0m
+2026-11-26T13:29:28.6808804Z [36;1mecho "luajit_default: failure"[0m
+2026-11-26T13:29:28.6809190Z [36;1mecho "luajit_missing: failure"[0m
+2026-11-26T13:29:28.6809703Z [36;1mecho "win_path_noext: skipped"[0m
+2026-11-26T13:29:28.6810099Z [36;1mecho "win_drive_missing: skipped"[0m
+2026-11-26T13:29:28.6810561Z [36;1mecho "win_fwd_slash: skipped"[0m
+2026-11-26T13:29:28.6830578Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T13:29:28.6831040Z env:
+2026-11-26T13:29:28.6831382Z   TOOL: /home/runner/.cargo/bin/cargo-make
+2026-11-26T13:29:28.6831838Z ##[endgroup]
+2026-11-26T13:29:28.6869720Z old_glob: success
+2026-11-26T13:29:28.6870294Z found_all: success
+2026-11-26T13:29:28.6870813Z leftover: failure
+2026-11-26T13:29:28.6871246Z empty: failure
+2026-11-26T13:29:28.6871788Z malformed: failure
+2026-11-26T13:29:28.6872249Z luarocks_default: failure
+2026-11-26T13:29:28.6872730Z luarocks_bare_missing: failure
+2026-11-26T13:29:28.6873279Z luarocks_path_missing: failure
+2026-11-26T13:29:28.6873918Z luarocks_bare_found: success
+2026-11-26T13:29:28.6874437Z lua54_default: failure
+2026-11-26T13:29:28.6874933Z lua54_missing: failure
+2026-11-26T13:29:28.6875549Z luajit_default: failure
+2026-11-26T13:29:28.6875929Z luajit_missing: failure
+2026-11-26T13:29:28.6876279Z win_path_noext: skipped
+2026-11-26T13:29:28.6876646Z win_drive_missing: skipped
+2026-11-26T13:29:28.6877002Z win_fwd_slash: skipped
+2026-11-26T13:29:28.6995878Z Post job cleanup.
+2026-11-26T13:29:28.7865765Z [command]/usr/bin/git version
+2026-11-26T13:29:28.7901167Z git version 2.56.1
+2026-11-26T13:29:28.7934285Z Temporarily overriding HOME='/home/runner/work/_temp/60509131-43ff-46ee-a4d2-b88d6c407623' before making global git config changes
+2026-11-26T13:29:28.7936111Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T13:29:28.7940816Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/airsl/airsl
+2026-11-26T13:29:28.7976901Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T13:29:28.8008595Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T13:29:28.8256230Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T13:29:28.8268477Z http.https://github.com/.extraheader
+2026-11-26T13:29:28.8280140Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-26T13:29:28.8319454Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T13:29:28.8555020Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T13:29:28.8585228Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T13:29:28.8928789Z Cleaning up orphan processes
+
+# --- raw job log: rocks (macos-latest) (139942663125) ---
+﻿2026-11-26T13:29:28.6970150Z Current runner version: '2.338.2'
+2026-11-26T13:29:28.6985370Z ##[group]Runner Image Provisioner
+2026-11-26T13:29:28.6985910Z Hosted Compute Agent
+2026-11-26T13:29:28.6986290Z Version: 20261111.635
+2026-11-26T13:29:28.6986710Z Commit: b8a594ea514ff44cadb5342986c68b1eac6e22ed
+2026-11-26T13:29:28.6987190Z Build Date: 2026-11-11T01:49:01Z
+2026-11-26T13:29:28.6987660Z Worker ID: {041ce6e3-a38c-4fae-8570-f72409aa9882}
+2026-11-26T13:29:28.6988160Z Region: westus
+2026-11-26T13:29:28.6988580Z Cloud: MacCloud
+2026-11-26T13:29:28.6988940Z ##[endgroup]
+2026-11-26T13:29:28.6989790Z ##[group]Operating System
+2026-11-26T13:29:28.6990170Z macOS
+2026-11-26T13:29:28.6990490Z 26.7.2
+2026-11-26T13:29:28.6990810Z 25G332
+2026-11-26T13:29:28.6991140Z ##[endgroup]
+2026-11-26T13:29:28.6991490Z ##[group]Runner Image
+2026-11-26T13:29:28.6991860Z Image: macos-26-arm64
+2026-11-26T13:29:28.6992380Z Version: 20261117.0516.1
+2026-11-26T13:29:28.6993260Z Included Software: https://github.com/actions/runner-images/blob/macos-26-arm64/20261117.0516/images/macos/macos-26-arm64-Readme.md
+2026-11-26T13:29:28.6994360Z Image Release: https://github.com/actions/runner-images/releases/tag/macos-26-arm64%2F20261117.0516
+2026-11-26T13:29:28.6995020Z ##[endgroup]
+2026-11-26T13:29:28.6995730Z ##[group]GITHUB_TOKEN Permissions
+2026-11-26T13:29:28.6996740Z Contents: read
+2026-11-26T13:29:28.6997100Z Metadata: read
+2026-11-26T13:29:28.6997450Z ##[endgroup]
+2026-11-26T13:29:28.6998820Z Secret source: Actions
+2026-11-26T13:29:28.6999420Z Cache mode: write
+2026-11-26T13:29:28.6999860Z Prepare workflow directory
+2026-11-26T13:29:28.7229970Z Prepare all required actions
+2026-11-26T13:29:28.7264890Z Getting action download info
+2026-11-26T13:29:29.1521990Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-11-26T13:29:30.0934780Z Download action repository 'taiki-e/install-action@v2' (SHA:893d6ee8d714b6c7dfe2bcd94e5759e9a7958a7e)
+2026-11-26T13:29:31.0152660Z Complete job name: rocks (macos-latest)
+2026-11-26T13:29:31.1021490Z ##[group]Run actions/checkout@v5
+2026-11-26T13:29:31.1022220Z with:
+2026-11-26T13:29:31.1022590Z   repository: airsstack/airsl
+2026-11-26T13:29:31.1028250Z   token: ***
+2026-11-26T13:29:31.1028650Z   ssh-strict: true
+2026-11-26T13:29:31.1029000Z   ssh-user: git
+2026-11-26T13:29:31.1029460Z   persist-credentials: true
+2026-11-26T13:29:31.1029870Z   clean: true
+2026-11-26T13:29:31.1030240Z   sparse-checkout-cone-mode: true
+2026-11-26T13:29:31.1030700Z   fetch-depth: 1
+2026-11-26T13:29:31.1031060Z   fetch-tags: false
+2026-11-26T13:29:31.1031450Z   show-progress: true
+2026-11-26T13:29:31.1031880Z   lfs: false
+2026-11-26T13:29:31.1032230Z   submodules: false
+2026-11-26T13:29:31.1032600Z   set-safe-directory: true
+2026-11-26T13:29:31.1033050Z   allow-unsafe-pr-checkout: false
+2026-11-26T13:29:31.1034160Z ##[endgroup]
+2026-11-26T13:29:31.6465750Z Syncing repository: airsstack/airsl
+2026-11-26T13:29:31.6467690Z ##[group]Getting Git version info
+2026-11-26T13:29:31.6468510Z Working directory is '/Users/runner/work/airsl/airsl'
+2026-11-26T13:29:31.6486690Z [command]/opt/homebrew/bin/git version
+2026-11-26T13:29:31.7217710Z git version 2.56.1
+2026-11-26T13:29:31.7259680Z ##[endgroup]
+2026-11-26T13:29:31.7268860Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/ebb3e3b7-e257-4c57-84a1-5f72ed28dc55/.gitconfig'
+2026-11-26T13:29:31.7271150Z Temporarily overriding HOME='/Users/runner/work/_temp/ebb3e3b7-e257-4c57-84a1-5f72ed28dc55' before making global git config changes
+2026-11-26T13:29:31.7273980Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T13:29:31.7275690Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/airsl/airsl
+2026-11-26T13:29:31.7373060Z Deleting the contents of '/Users/runner/work/airsl/airsl'
+2026-11-26T13:29:31.7375650Z ##[group]Initializing the repository
+2026-11-26T13:29:31.7381060Z [command]/opt/homebrew/bin/git init /Users/runner/work/airsl/airsl
+2026-11-26T13:29:31.7607290Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-26T13:29:31.7610060Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-26T13:29:31.7611610Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-26T13:29:31.7613030Z hint: call:
+2026-11-26T13:29:31.7613870Z hint:
+2026-11-26T13:29:31.7615100Z hint: 	git config --global init.defaultBranch <name>
+2026-11-26T13:29:31.7616550Z hint:
+2026-11-26T13:29:31.7617690Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-26T13:29:31.7619290Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-26T13:29:31.7621080Z hint:
+2026-11-26T13:29:31.7622000Z hint: 	git branch -m <name>
+2026-11-26T13:29:31.7623090Z hint:
+2026-11-26T13:29:31.7624260Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-26T13:29:31.7626110Z Initialized empty Git repository in /Users/runner/work/airsl/airsl/.git/
+2026-11-26T13:29:31.7673150Z [command]/opt/homebrew/bin/git remote add origin https://github.com/airsstack/airsl
+2026-11-26T13:29:31.7773510Z ##[endgroup]
+2026-11-26T13:29:31.7776150Z ##[group]Disabling automatic garbage collection
+2026-11-26T13:29:31.7777630Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+2026-11-26T13:29:31.7856180Z ##[endgroup]
+2026-11-26T13:29:31.7858170Z ##[group]Setting up auth
+2026-11-26T13:29:31.7861560Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T13:29:31.7939520Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T13:29:31.8931020Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T13:29:31.9000560Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T13:29:31.9881520Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T13:29:31.9951470Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T13:29:32.0828590Z [command]/opt/homebrew/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-26T13:29:32.0899390Z ##[endgroup]
+2026-11-26T13:29:32.0900800Z ##[group]Fetching the repository
+2026-11-26T13:29:32.0905890Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c:refs/remotes/origin/probe-ci-rocks-version
+2026-11-26T13:29:32.5317720Z From https://github.com/airsstack/airsl
+2026-11-26T13:29:32.5322200Z  * [new ref]         9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c -> origin/probe-ci-rocks-version
+2026-11-26T13:29:32.5330830Z ##[endgroup]
+2026-11-26T13:29:32.5333760Z ##[group]Determining the checkout info
+2026-11-26T13:29:32.5337430Z ##[endgroup]
+2026-11-26T13:29:32.5340430Z [command]/opt/homebrew/bin/git sparse-checkout disable
+2026-11-26T13:29:32.5437000Z [command]/opt/homebrew/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-26T13:29:32.5522110Z ##[group]Checking out the ref
+2026-11-26T13:29:32.5530530Z [command]/opt/homebrew/bin/git checkout --progress --force -B probe-ci-rocks-version refs/remotes/origin/probe-ci-rocks-version
+2026-11-26T13:29:32.5688950Z Switched to a new branch 'probe-ci-rocks-version'
+2026-11-26T13:29:32.5699460Z branch 'probe-ci-rocks-version' set up to track 'origin/probe-ci-rocks-version'.
+2026-11-26T13:29:32.5703170Z ##[endgroup]
+2026-11-26T13:29:32.5807180Z [command]/opt/homebrew/bin/git log -1 --format=%H
+2026-11-26T13:29:32.5881610Z 9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c
+2026-11-26T13:29:32.6228510Z ##[group]Run taiki-e/install-action@v2
+2026-11-26T13:29:32.6229610Z with:
+2026-11-26T13:29:32.6230170Z   tool: cargo-make@0.37.24
+2026-11-26T13:29:32.6230810Z   checksum: true
+2026-11-26T13:29:32.6231400Z   fallback: cargo-binstall
+2026-11-26T13:29:32.6232040Z ##[endgroup]
+2026-11-26T13:29:32.6314320Z ##[start-action display=Run bail() {;id=__taiki-e_install-action.__run]
+2026-11-26T13:29:32.6369040Z ##[group]Run bail() {
+2026-11-26T13:29:32.6369690Z [36;1mbail() {[0m
+2026-11-26T13:29:32.6370350Z [36;1m  printf '::error::install-action: %s\n' "$*"[0m
+2026-11-26T13:29:32.6371110Z [36;1m  exit 1[0m
+2026-11-26T13:29:32.6371730Z [36;1m}[0m
+2026-11-26T13:29:32.6372650Z [36;1m# If /bin/sh is dash, environment variable containing % is not imported, but is fine[0m
+2026-11-26T13:29:32.6373920Z [36;1m# because it also means that it will not be exposed to subprocess.[0m
+2026-11-26T13:29:32.6374950Z [36;1mif /usr/bin/env | grep -Eq '^BASH_FUNC_'; then[0m
+2026-11-26T13:29:32.6376310Z [36;1m  bail 'bash function injection via BASH_FUNC_ environment variable is not allowed for security reasons'[0m
+2026-11-26T13:29:32.6377540Z [36;1mfi[0m
+2026-11-26T13:29:32.6378140Z [36;1mif ! command -v bash >/dev/null; then[0m
+2026-11-26T13:29:32.6378980Z [36;1m  if grep -Eq '^ID=alpine' /etc/os-release; then[0m
+2026-11-26T13:29:32.6380040Z [36;1m    printf '::group::Install packages required for install-action (bash)\n'[0m
+2026-11-26T13:29:32.6381100Z [36;1m    # NB: sync with apk_install in main.sh[0m
+2026-11-26T13:29:32.6381900Z [36;1m    if command -v sudo >/dev/null; then[0m
+2026-11-26T13:29:32.6382690Z [36;1m      sudo apk --no-cache add bash[0m
+2026-11-26T13:29:32.6383490Z [36;1m    elif command -v doas >/dev/null; then[0m
+2026-11-26T13:29:32.6384280Z [36;1m      doas apk --no-cache add bash[0m
+2026-11-26T13:29:32.6385000Z [36;1m    else[0m
+2026-11-26T13:29:32.6385600Z [36;1m      apk --no-cache add bash[0m
+2026-11-26T13:29:32.6386280Z [36;1m    fi[0m
+2026-11-26T13:29:32.6386910Z [36;1m    printf '::endgroup::\n'[0m
+2026-11-26T13:29:32.6387650Z [36;1m  else[0m
+2026-11-26T13:29:32.6388240Z [36;1m    bail 'this action requires bash'[0m
+2026-11-26T13:29:32.6389020Z [36;1m  fi[0m
+2026-11-26T13:29:32.6389570Z [36;1mfi[0m
+2026-11-26T13:29:32.6390430Z [36;1mbash --noprofile --norc "${GITHUB_ACTION_PATH:?}/main.sh"[0m
+2026-11-26T13:29:32.6395950Z shell: /usr/bin/env -u ENV -u BASH_ENV -u CDPATH -u SHELLOPTS -u BASHOPTS /bin/sh -eu {0}
+2026-11-26T13:29:32.6397050Z env:
+2026-11-26T13:29:32.6397660Z   INPUT_TOOL: cargo-make@0.37.24
+2026-11-26T13:29:32.6398390Z   INPUT_CHECKSUM: true
+2026-11-26T13:29:32.6399030Z   INPUT_FALLBACK: cargo-binstall
+2026-11-26T13:29:32.6404890Z   DEFAULT_GITHUB_TOKEN: ***
+2026-11-26T13:29:32.6405660Z   ACTION_USER_AGENT: taiki-e/install-action (v2)
+2026-11-26T13:29:32.6406490Z   RUNNER_OS: macOS
+2026-11-26T13:29:32.6407170Z   RUNNER_ARCH: ARM64
+2026-11-26T13:29:32.6425640Z ##[endgroup]
+2026-11-26T13:29:32.6851460Z info: host platform: aarch64_macos
+2026-11-26T13:29:32.6858160Z info: cargo is located at /opt/homebrew/opt/rustup/bin/cargo
+2026-11-26T13:29:32.7118060Z info: installing cargo-make@0.37.24
+2026-11-26T13:29:32.7406570Z info: adding '/Users/runner/.install-action/bin' to PATH
+2026-11-26T13:29:32.7466040Z info: downloading https://github.com/sagiegurari/cargo-make/releases/download/0.37.24/cargo-make-v0.37.24-aarch64-apple-darwin.zip
+2026-11-26T13:29:33.0719280Z info: verifying sha256 checksum for cargo-make-v0.37.24-aarch64-apple-darwin.zip
+2026-11-26T13:29:33.2360380Z info: cargo-make installed at /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:33.2379580Z + cargo-make make --version
+2026-11-26T13:29:33.2445530Z cargo-make 0.37.24
+2026-11-26T13:29:33.2452080Z 
+2026-11-26T13:29:33.2478730Z ##[end-action id=__taiki-e_install-action.__run;outcome=success;conclusion=success;duration_ms=615]
+2026-11-26T13:29:33.2488130Z ##[start-action display=Run Set-StrictMode -Version Latest;id=__taiki-e_install-action.__run_2]
+2026-11-26T13:29:33.2497260Z ##[end-action id=__taiki-e_install-action.__run_2;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-11-26T13:29:33.2572090Z ##[group]Run cargo make --version
+2026-11-26T13:29:33.2573300Z [36;1mcargo make --version[0m
+2026-11-26T13:29:33.2574020Z [36;1mecho "TOOL=$(command -v cargo-make)" >> "$GITHUB_ENV"[0m
+2026-11-26T13:29:33.2574990Z [36;1mecho "TOOL=$(command -v cargo-make)"[0m
+2026-11-26T13:29:33.2626860Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T13:29:33.2629230Z ##[endgroup]
+2026-11-26T13:29:33.4792650Z cargo-make 0.37.24
+2026-11-26T13:29:33.4821700Z TOOL=/Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:33.4932130Z ##[group]Run bash probe/setup-cases.sh
+2026-11-26T13:29:33.4932910Z [36;1mbash probe/setup-cases.sh[0m
+2026-11-26T13:29:33.4967500Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T13:29:33.4968210Z env:
+2026-11-26T13:29:33.4968760Z   TOOL: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:33.4969410Z ##[endgroup]
+2026-11-26T13:29:33.5837950Z $ ls work/real/crates/airsl-lua/rockspecs
+2026-11-26T13:29:33.6137120Z airsstack-0.2.0-1.rockspec
+2026-11-26T13:29:33.6137930Z airsstack-luajit-0.2.0-1.rockspec
+2026-11-26T13:29:33.6138700Z $ ls work/leftover/crates/airsl-lua/rockspecs
+2026-11-26T13:29:33.6163020Z airsstack-0.1.0-1.rockspec
+2026-11-26T13:29:33.6163800Z airsstack-0.2.0-1.rockspec
+2026-11-26T13:29:33.6164490Z airsstack-luajit-0.2.0-1.rockspec
+2026-11-26T13:29:33.6165220Z $ ls work/empty/crates/airsl-lua/rockspecs
+2026-11-26T13:29:33.6189440Z $ ls work/malformed/crates/airsl-lua/rockspecs
+2026-11-26T13:29:33.6212390Z airsstack-0.2.0.rockspec
+2026-11-26T13:29:33.6213860Z airsstack-luajit-0.2.0.rockspec
+2026-11-26T13:29:33.6214830Z airsstack.rockspec
+2026-11-26T13:29:33.6287790Z ##[group]Run cargo make old-glob
+2026-11-26T13:29:33.6288480Z [36;1mcargo make old-glob[0m
+2026-11-26T13:29:33.6324640Z shell: /bin/bash -e {0}
+2026-11-26T13:29:33.6325190Z env:
+2026-11-26T13:29:33.6325720Z   TOOL: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:33.6326700Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:33.6327380Z ##[endgroup]
+2026-11-26T13:29:33.6874330Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:34.2680820Z [cargo-make] INFO - 
+2026-11-26T13:29:34.2681430Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:34.2681860Z [cargo-make] INFO - Task: old-glob
+2026-11-26T13:29:34.2682340Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:34.2682710Z [cargo-make] INFO - Running Task: old-glob
+2026-11-26T13:29:34.2707120Z old airsstack-*-1.rockspec -> 2: crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec 
+2026-11-26T13:29:34.2708500Z [cargo-make] INFO - ==================Time Summary==================
+2026-11-26T13:29:34.2709700Z [cargo-make] INFO - [Setup Env]:                49.91%     0.58 seconds
+2026-11-26T13:29:34.2711470Z [cargo-make] INFO - [Setup Env - Rust]:         39.48%     0.46 seconds
+2026-11-26T13:29:34.2712130Z [cargo-make] INFO - [Setup Env - Crate Info]:   5.26%      0.06 seconds
+2026-11-26T13:29:34.2713830Z [cargo-make] INFO - [Setup Env - Git]:          5.09%      0.06 seconds
+2026-11-26T13:29:34.2715080Z [cargo-make] INFO - old-glob:                   0.17%      0.00 seconds
+2026-11-26T13:29:34.2719510Z [cargo-make] INFO - [Load Makefiles]:           0.09%      0.00 seconds
+2026-11-26T13:29:34.2720170Z [cargo-make] INFO - [Setup Env - Duckscript]:   0.00%      0.00 seconds
+2026-11-26T13:29:34.2721340Z [cargo-make] INFO - [Setup Env - CI]:           0.00%      0.00 seconds
+2026-11-26T13:29:34.2722010Z [cargo-make] INFO - [Setup Env - Project]:      0.00%      0.00 seconds
+2026-11-26T13:29:34.2722780Z [cargo-make] INFO - [Setup Env - Vars]:         0.00%      0.00 seconds
+2026-11-26T13:29:34.2723430Z [cargo-make] INFO - ================================================
+2026-11-26T13:29:34.2724940Z [cargo-make] INFO - Build Done in 0.58 seconds.
+2026-11-26T13:29:34.2769420Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:34.2769920Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:34.2811580Z shell: /bin/bash -e {0}
+2026-11-26T13:29:34.2811830Z env:
+2026-11-26T13:29:34.2812130Z   TOOL: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:34.2812460Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:34.2812830Z   AIRSL_LUAROCKS: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:34.2813210Z   AIRSL_LUA54: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:34.2813540Z   AIRSL_LUAJIT: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:34.2813840Z ##[endgroup]
+2026-11-26T13:29:34.3911220Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:34.5844100Z [cargo-make] INFO - 
+2026-11-26T13:29:34.5952710Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:34.6054340Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:34.6154600Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:34.6257120Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:34.6362490Z which /Users/runner/.install-action/bin/cargo-make -> [/Users/runner/.install-action/bin/cargo-make] 
+2026-11-26T13:29:34.6465560Z which /Users/runner/.install-action/bin/cargo-make -> [/Users/runner/.install-action/bin/cargo-make] 
+2026-11-26T13:29:34.6567550Z which /Users/runner/.install-action/bin/cargo-make -> [/Users/runner/.install-action/bin/cargo-make] 
+2026-11-26T13:29:34.6668650Z airsstack: rockspec crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec version [0.2.0] 
+2026-11-26T13:29:34.6773140Z airsstack-luajit: rockspec crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec version [0.2.0] 
+2026-11-26T13:29:34.6871710Z [cargo-make] INFO - ==================Time Summary==================
+2026-11-26T13:29:34.6955020Z [cargo-make] INFO - [Setup Env]:                49.87%     0.19 seconds
+2026-11-26T13:29:34.6967430Z [cargo-make] INFO - [Setup Env - Rust]:         23.08%     0.09 seconds
+2026-11-26T13:29:34.6971020Z [cargo-make] INFO - [Setup Env - Crate Info]:   15.92%     0.06 seconds
+2026-11-26T13:29:34.6971600Z [cargo-make] INFO - [Setup Env - Git]:          10.61%     0.04 seconds
+2026-11-26T13:29:34.6972190Z [cargo-make] INFO - rocks-lookup:               0.53%      0.00 seconds
+2026-11-26T13:29:34.6972840Z [cargo-make] INFO - [Load Makefiles]:           0.00%      0.00 seconds
+2026-11-26T13:29:34.6973410Z [cargo-make] INFO - [Setup Env - Duckscript]:   0.00%      0.00 seconds
+2026-11-26T13:29:34.6975710Z [cargo-make] INFO - [Setup Env - CI]:           0.00%      0.00 seconds
+2026-11-26T13:29:34.6977230Z [cargo-make] INFO - [Setup Env - Project]:      0.00%      0.00 seconds
+2026-11-26T13:29:34.6980390Z [cargo-make] INFO - [Setup Env - Vars]:         0.00%      0.00 seconds
+2026-11-26T13:29:34.6981810Z [cargo-make] INFO - ================================================
+2026-11-26T13:29:34.6982950Z [cargo-make] INFO - Build Done in 0.19 seconds.
+2026-11-26T13:29:34.7070280Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:34.7070650Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:34.7119900Z shell: /bin/bash -e {0}
+2026-11-26T13:29:34.7120270Z env:
+2026-11-26T13:29:34.7120620Z   TOOL: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:34.7120970Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:34.7121490Z   AIRSL_LUAROCKS: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:34.7121870Z   AIRSL_LUA54: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:34.7122290Z   AIRSL_LUAJIT: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:34.7122580Z ##[endgroup]
+2026-11-26T13:29:34.8003350Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:35.0367870Z [cargo-make] INFO - 
+2026-11-26T13:29:35.0470280Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:35.0644180Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:35.0766830Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:35.0869060Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:35.0969670Z which /Users/runner/.install-action/bin/cargo-make -> [/Users/runner/.install-action/bin/cargo-make] 
+2026-11-26T13:29:35.1072270Z which /Users/runner/.install-action/bin/cargo-make -> [/Users/runner/.install-action/bin/cargo-make] 
+2026-11-26T13:29:35.1172720Z which /Users/runner/.install-action/bin/cargo-make -> [/Users/runner/.install-action/bin/cargo-make] 
+2026-11-26T13:29:35.1275880Z rocks: 2 files match `airsstack-<version>-1.rockspec` in `crates/airsl-lua/rockspecs` (crates/airsl-lua/rockspecs/airsstack-0.1.0-1.rockspec, crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec); docs-check allows one per package 
+2026-11-26T13:29:35.1378390Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 45 - Exit with error code: 1
+2026-11-26T13:29:35.1479020Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:35.1595200Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:35.1741090Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:35.1742060Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:35.1845310Z shell: /bin/bash -e {0}
+2026-11-26T13:29:35.1845620Z env:
+2026-11-26T13:29:35.1845880Z   TOOL: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:35.1846200Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:35.1846540Z   AIRSL_LUAROCKS: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:35.1846940Z   AIRSL_LUA54: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:35.1847320Z   AIRSL_LUAJIT: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:35.1847640Z ##[endgroup]
+2026-11-26T13:29:35.2954370Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:35.5355440Z [cargo-make] INFO - 
+2026-11-26T13:29:35.5457410Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:35.5559390Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:35.5661830Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:35.5764920Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:35.5838440Z which /Users/runner/.install-action/bin/cargo-make -> [/Users/runner/.install-action/bin/cargo-make] 
+2026-11-26T13:29:35.5887160Z which /Users/runner/.install-action/bin/cargo-make -> [/Users/runner/.install-action/bin/cargo-make] 
+2026-11-26T13:29:35.5955170Z which /Users/runner/.install-action/bin/cargo-make -> [/Users/runner/.install-action/bin/cargo-make] 
+2026-11-26T13:29:35.6059490Z rocks: no `airsstack-<version>-1.rockspec` in `crates/airsl-lua/rockspecs` 
+2026-11-26T13:29:35.6161400Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 40 - Exit with error code: 1
+2026-11-26T13:29:35.6162390Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:35.6165100Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:35.6220020Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:35.6220430Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:35.6262600Z shell: /bin/bash -e {0}
+2026-11-26T13:29:35.6263660Z env:
+2026-11-26T13:29:35.6263940Z   TOOL: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:35.6264260Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:35.6264600Z   AIRSL_LUAROCKS: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:35.6264980Z   AIRSL_LUA54: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:35.6265420Z   AIRSL_LUAJIT: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:35.6265770Z ##[endgroup]
+2026-11-26T13:29:35.7149000Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:35.9088530Z [cargo-make] INFO - 
+2026-11-26T13:29:35.9178800Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:35.9216250Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:35.9241640Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:35.9242560Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:35.9243150Z which /Users/runner/.install-action/bin/cargo-make -> [/Users/runner/.install-action/bin/cargo-make] 
+2026-11-26T13:29:35.9243870Z which /Users/runner/.install-action/bin/cargo-make -> [/Users/runner/.install-action/bin/cargo-make] 
+2026-11-26T13:29:35.9244530Z which /Users/runner/.install-action/bin/cargo-make -> [/Users/runner/.install-action/bin/cargo-make] 
+2026-11-26T13:29:35.9245860Z rocks: no `airsstack-<version>-1.rockspec` in `crates/airsl-lua/rockspecs` 
+2026-11-26T13:29:35.9246450Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 40 - Exit with error code: 1
+2026-11-26T13:29:35.9247080Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:35.9248640Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:35.9338630Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:35.9338980Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:35.9373160Z shell: /bin/bash -e {0}
+2026-11-26T13:29:35.9373380Z env:
+2026-11-26T13:29:35.9373600Z   TOOL: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:35.9373870Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:35.9374140Z   AIRSL_LUA54: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:35.9374480Z   AIRSL_LUAJIT: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:35.9374770Z ##[endgroup]
+2026-11-26T13:29:36.0221800Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:36.2827970Z [cargo-make] INFO - 
+2026-11-26T13:29:36.2852200Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:36.2854810Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:36.2855440Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:36.2856090Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:36.2856800Z which luarocks -> [] 
+2026-11-26T13:29:36.2857410Z rocks: `luarocks` was not found; install LuaRocks or set AIRSL_LUAROCKS to its path 
+2026-11-26T13:29:36.2858310Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 11 - Exit with error code: 1
+2026-11-26T13:29:36.2859140Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:36.2861660Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:36.2914730Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:36.2915600Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:36.2995730Z shell: /bin/bash -e {0}
+2026-11-26T13:29:36.2996320Z env:
+2026-11-26T13:29:36.2997020Z   TOOL: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:36.2998080Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:36.2998370Z   AIRSL_LUAROCKS: nope-luarocks
+2026-11-26T13:29:36.2998680Z ##[endgroup]
+2026-11-26T13:29:36.3947660Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:36.6197990Z [cargo-make] INFO - 
+2026-11-26T13:29:36.6300450Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:36.6401130Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:36.6501580Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:36.6603070Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:36.6704060Z which nope-luarocks -> [] 
+2026-11-26T13:29:36.6804750Z rocks: `nope-luarocks` was not found; install LuaRocks or set AIRSL_LUAROCKS to its path 
+2026-11-26T13:29:36.6906170Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 11 - Exit with error code: 1
+2026-11-26T13:29:36.7006680Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:36.7089960Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:36.7156350Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:36.7156670Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:36.7204180Z shell: /bin/bash -e {0}
+2026-11-26T13:29:36.7204410Z env:
+2026-11-26T13:29:36.7204660Z   TOOL: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:36.7204990Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:36.7205260Z   AIRSL_LUAROCKS: /no/such/luarocks
+2026-11-26T13:29:36.7205500Z ##[endgroup]
+2026-11-26T13:29:36.8005590Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:37.0109000Z [cargo-make] INFO - 
+2026-11-26T13:29:37.0211790Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:37.0314190Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:37.0415790Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:37.0517370Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:37.0622180Z which /no/such/luarocks -> [] 
+2026-11-26T13:29:37.0725200Z rocks: `/no/such/luarocks` was not found; install LuaRocks or set AIRSL_LUAROCKS to its path 
+2026-11-26T13:29:37.0827360Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 11 - Exit with error code: 1
+2026-11-26T13:29:37.0896780Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:37.0932890Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:37.1029410Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:37.1030450Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:37.1072500Z shell: /bin/bash -e {0}
+2026-11-26T13:29:37.1072790Z env:
+2026-11-26T13:29:37.1073030Z   TOOL: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:37.1073340Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:37.1073560Z   AIRSL_LUAROCKS: cargo-make
+2026-11-26T13:29:37.1073880Z   AIRSL_LUA54: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:37.1074210Z   AIRSL_LUAJIT: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:37.1074510Z ##[endgroup]
+2026-11-26T13:29:37.1891470Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:37.3667850Z [cargo-make] INFO - 
+2026-11-26T13:29:37.3770210Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:37.3871500Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:37.3972900Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:37.4074010Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:37.4149080Z which cargo-make -> [/Users/runner/.install-action/bin/cargo-make] 
+2026-11-26T13:29:37.4149790Z which /Users/runner/.install-action/bin/cargo-make -> [/Users/runner/.install-action/bin/cargo-make] 
+2026-11-26T13:29:37.4150600Z which /Users/runner/.install-action/bin/cargo-make -> [/Users/runner/.install-action/bin/cargo-make] 
+2026-11-26T13:29:37.4152570Z airsstack: rockspec crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec version [0.2.0] 
+2026-11-26T13:29:37.4154430Z airsstack-luajit: rockspec crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec version [0.2.0] 
+2026-11-26T13:29:37.4155980Z [cargo-make] INFO - ==================Time Summary==================
+2026-11-26T13:29:37.4157210Z [cargo-make] INFO - [Setup Env]:                50.14%     0.17 seconds
+2026-11-26T13:29:37.4158310Z [cargo-make] INFO - [Setup Env - Rust]:         21.20%     0.07 seconds
+2026-11-26T13:29:37.4159530Z [cargo-make] INFO - [Setup Env - Crate Info]:   16.91%     0.06 seconds
+2026-11-26T13:29:37.4160680Z [cargo-make] INFO - [Setup Env - Git]:          11.46%     0.04 seconds
+2026-11-26T13:29:37.4161930Z [cargo-make] INFO - rocks-lookup:               0.29%      0.00 seconds
+2026-11-26T13:29:37.4163220Z [cargo-make] INFO - [Load Makefiles]:           0.00%      0.00 seconds
+2026-11-26T13:29:37.4164500Z [cargo-make] INFO - [Setup Env - Duckscript]:   0.00%      0.00 seconds
+2026-11-26T13:29:37.4266600Z [cargo-make] INFO - [Setup Env - CI]:           0.00%      0.00 seconds
+2026-11-26T13:29:37.4356540Z [cargo-make] INFO - [Setup Env - Project]:      0.00%      0.00 seconds
+2026-11-26T13:29:37.4357180Z [cargo-make] INFO - [Setup Env - Vars]:         0.00%      0.00 seconds
+2026-11-26T13:29:37.4357620Z [cargo-make] INFO - ================================================
+2026-11-26T13:29:37.4358080Z [cargo-make] INFO - Build Done in 0.18 seconds.
+2026-11-26T13:29:37.4425240Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:37.4426050Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:37.4490470Z shell: /bin/bash -e {0}
+2026-11-26T13:29:37.4491080Z env:
+2026-11-26T13:29:37.4491620Z   TOOL: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:37.4492520Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:37.4493380Z   AIRSL_LUAROCKS: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:37.4494240Z   AIRSL_LUAJIT: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:37.4495010Z ##[endgroup]
+2026-11-26T13:29:37.5667210Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:37.8194900Z [cargo-make] INFO - 
+2026-11-26T13:29:37.8195440Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:37.8195720Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:37.8196010Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:37.8196350Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:37.8197120Z which /Users/runner/.install-action/bin/cargo-make -> [/Users/runner/.install-action/bin/cargo-make] 
+2026-11-26T13:29:37.8202090Z which lua5.4 -> [] 
+2026-11-26T13:29:37.8202670Z rocks: `lua5.4` was not found; install Lua 5.4 or set AIRSL_LUA54 to its interpreter 
+2026-11-26T13:29:37.8203220Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 21 - Exit with error code: 1
+2026-11-26T13:29:37.8203620Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:37.8204710Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:37.8480510Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:37.8480860Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:37.8512610Z shell: /bin/bash -e {0}
+2026-11-26T13:29:37.8512820Z env:
+2026-11-26T13:29:37.8513070Z   TOOL: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:37.8513400Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:37.8513690Z   AIRSL_LUAROCKS: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:37.8513970Z   AIRSL_LUA54: nope-lua5.4
+2026-11-26T13:29:37.8514130Z ##[endgroup]
+2026-11-26T13:29:37.9180300Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:38.1341480Z [cargo-make] INFO - 
+2026-11-26T13:29:38.1444520Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:38.1547580Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:38.1649880Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:38.1752590Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:38.1867080Z which /Users/runner/.install-action/bin/cargo-make -> [/Users/runner/.install-action/bin/cargo-make] 
+2026-11-26T13:29:38.1969250Z which nope-lua5.4 -> [] 
+2026-11-26T13:29:38.2078990Z rocks: `nope-lua5.4` was not found; install Lua 5.4 or set AIRSL_LUA54 to its interpreter 
+2026-11-26T13:29:38.2181590Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 21 - Exit with error code: 1
+2026-11-26T13:29:38.2264880Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:38.2266820Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:38.2302100Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:38.2302400Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:38.2338300Z shell: /bin/bash -e {0}
+2026-11-26T13:29:38.2338560Z env:
+2026-11-26T13:29:38.2338890Z   TOOL: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:38.2339180Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:38.2339500Z   AIRSL_LUAROCKS: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:38.2339880Z   AIRSL_LUA54: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:38.2340230Z ##[endgroup]
+2026-11-26T13:29:38.3256160Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:38.5215540Z [cargo-make] INFO - 
+2026-11-26T13:29:38.5331010Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:38.5432380Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:38.5534550Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:38.5635360Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:38.5699480Z which /Users/runner/.install-action/bin/cargo-make -> [/Users/runner/.install-action/bin/cargo-make] 
+2026-11-26T13:29:38.5741460Z which /Users/runner/.install-action/bin/cargo-make -> [/Users/runner/.install-action/bin/cargo-make] 
+2026-11-26T13:29:38.5782110Z which luajit -> [] 
+2026-11-26T13:29:38.5836590Z rocks: `luajit` was not found; install LuaJIT or set AIRSL_LUAJIT to its interpreter 
+2026-11-26T13:29:38.5881680Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 31 - Exit with error code: 1
+2026-11-26T13:29:38.5899080Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:38.5903610Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:38.5948200Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:38.5948560Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:38.5988030Z shell: /bin/bash -e {0}
+2026-11-26T13:29:38.5988260Z env:
+2026-11-26T13:29:38.5988520Z   TOOL: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:38.5988830Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:38.5989210Z   AIRSL_LUAROCKS: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:38.5989580Z   AIRSL_LUA54: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:38.5989870Z   AIRSL_LUAJIT: nope-luajit
+2026-11-26T13:29:38.5990080Z ##[endgroup]
+2026-11-26T13:29:38.6693820Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:38.9101720Z [cargo-make] INFO - 
+2026-11-26T13:29:38.9119870Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:38.9120360Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:38.9120690Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:38.9121210Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:38.9121770Z which /Users/runner/.install-action/bin/cargo-make -> [/Users/runner/.install-action/bin/cargo-make] 
+2026-11-26T13:29:38.9122430Z which /Users/runner/.install-action/bin/cargo-make -> [/Users/runner/.install-action/bin/cargo-make] 
+2026-11-26T13:29:38.9122900Z which nope-luajit -> [] 
+2026-11-26T13:29:38.9123610Z rocks: `nope-luajit` was not found; install LuaJIT or set AIRSL_LUAJIT to its interpreter 
+2026-11-26T13:29:38.9124280Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 31 - Exit with error code: 1
+2026-11-26T13:29:38.9124790Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:38.9126230Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:38.9174720Z ##[group]Run echo "old_glob: success"
+2026-11-26T13:29:38.9175070Z [36;1mecho "old_glob: success"[0m
+2026-11-26T13:29:38.9175290Z [36;1mecho "found_all: success"[0m
+2026-11-26T13:29:38.9175520Z [36;1mecho "leftover: failure"[0m
+2026-11-26T13:29:38.9175750Z [36;1mecho "empty: failure"[0m
+2026-11-26T13:29:38.9176010Z [36;1mecho "malformed: failure"[0m
+2026-11-26T13:29:38.9176540Z [36;1mecho "luarocks_default: failure"[0m
+2026-11-26T13:29:38.9176830Z [36;1mecho "luarocks_bare_missing: failure"[0m
+2026-11-26T13:29:38.9177080Z [36;1mecho "luarocks_path_missing: failure"[0m
+2026-11-26T13:29:38.9177420Z [36;1mecho "luarocks_bare_found: success"[0m
+2026-11-26T13:29:38.9177710Z [36;1mecho "lua54_default: failure"[0m
+2026-11-26T13:29:38.9177920Z [36;1mecho "lua54_missing: failure"[0m
+2026-11-26T13:29:38.9178150Z [36;1mecho "luajit_default: failure"[0m
+2026-11-26T13:29:38.9178400Z [36;1mecho "luajit_missing: failure"[0m
+2026-11-26T13:29:38.9178700Z [36;1mecho "win_path_noext: skipped"[0m
+2026-11-26T13:29:38.9178970Z [36;1mecho "win_drive_missing: skipped"[0m
+2026-11-26T13:29:38.9179280Z [36;1mecho "win_fwd_slash: skipped"[0m
+2026-11-26T13:29:38.9214220Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T13:29:38.9214530Z env:
+2026-11-26T13:29:38.9214740Z   TOOL: /Users/runner/.install-action/bin/cargo-make
+2026-11-26T13:29:38.9215000Z ##[endgroup]
+2026-11-26T13:29:38.9620330Z old_glob: success
+2026-11-26T13:29:38.9620760Z found_all: success
+2026-11-26T13:29:38.9620950Z leftover: failure
+2026-11-26T13:29:38.9621160Z empty: failure
+2026-11-26T13:29:38.9621350Z malformed: failure
+2026-11-26T13:29:38.9621540Z luarocks_default: failure
+2026-11-26T13:29:38.9621740Z luarocks_bare_missing: failure
+2026-11-26T13:29:38.9621950Z luarocks_path_missing: failure
+2026-11-26T13:29:38.9622160Z luarocks_bare_found: success
+2026-11-26T13:29:38.9622410Z lua54_default: failure
+2026-11-26T13:29:38.9622950Z lua54_missing: failure
+2026-11-26T13:29:38.9623280Z luajit_default: failure
+2026-11-26T13:29:38.9623490Z luajit_missing: failure
+2026-11-26T13:29:38.9623700Z win_path_noext: skipped
+2026-11-26T13:29:38.9623920Z win_drive_missing: skipped
+2026-11-26T13:29:38.9624090Z win_fwd_slash: skipped
+2026-11-26T13:29:38.9729680Z Post job cleanup.
+2026-11-26T13:29:39.1306750Z [command]/opt/homebrew/bin/git version
+2026-11-26T13:29:39.1430380Z git version 2.56.1
+2026-11-26T13:29:39.1496330Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/6b598cef-3d85-460d-83af-81382c6365e7/.gitconfig'
+2026-11-26T13:29:39.1500400Z Temporarily overriding HOME='/Users/runner/work/_temp/6b598cef-3d85-460d-83af-81382c6365e7' before making global git config changes
+2026-11-26T13:29:39.1501760Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T13:29:39.1504940Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/airsl/airsl
+2026-11-26T13:29:39.1582590Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T13:29:39.1665350Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T13:29:39.2629230Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T13:29:39.2691070Z http.https://github.com/.extraheader
+2026-11-26T13:29:39.2708550Z [command]/opt/homebrew/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-26T13:29:39.2833430Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T13:29:39.4429760Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T13:29:39.4733700Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T13:29:39.6189760Z Cleaning up orphan processes
+
+# --- raw job log: rocks (windows-latest) (139942663132) ---
+﻿2026-11-26T13:29:26.4463232Z Current runner version: '2.338.2'
+2026-11-26T13:29:26.4489417Z ##[group]Runner Image Provisioner
+2026-11-26T13:29:26.4490305Z Hosted Compute Agent
+2026-11-26T13:29:26.4490917Z Version: 20261111.635
+2026-11-26T13:29:26.4491587Z Commit: b8a594ea514ff44cadb5342986c68b1eac6e22ed
+2026-11-26T13:29:26.4492357Z Build Date: 2026-11-11T01:49:01Z
+2026-11-26T13:29:26.4493150Z Worker ID: {f09be2f1-23c3-43b3-b1db-fa83e0d5d303}
+2026-11-26T13:29:26.4493923Z Region: westus
+2026-11-26T13:29:26.4494479Z Cloud: Azure
+2026-11-26T13:29:26.4495033Z ##[endgroup]
+2026-11-26T13:29:26.4496368Z ##[group]Operating System
+2026-11-26T13:29:26.4497050Z Microsoft Windows Server 2025
+2026-11-26T13:29:26.4497731Z 10.0.26100
+2026-11-26T13:29:26.4498240Z Datacenter
+2026-11-26T13:29:26.4498782Z ##[endgroup]
+2026-11-26T13:29:26.4499361Z ##[group]Runner Image
+2026-11-26T13:29:26.4499973Z Image: windows-2025-vs2026
+2026-11-26T13:29:26.4500586Z Version: 20261116.315.1
+2026-11-26T13:29:26.4502204Z Included Software: https://github.com/actions/runner-images/blob/win25-vs2026/20261116.315/images/windows/Windows2025-VS2026-Readme.md
+2026-11-26T13:29:26.4504492Z Image Release: https://github.com/actions/runner-images/releases/tag/win25-vs2026%2F20261116.315
+2026-11-26T13:29:26.4505590Z ##[endgroup]
+2026-11-26T13:29:26.4506733Z ##[group]GITHUB_TOKEN Permissions
+2026-11-26T13:29:26.4508585Z Contents: read
+2026-11-26T13:29:26.4509227Z Metadata: read
+2026-11-26T13:29:26.4509769Z ##[endgroup]
+2026-11-26T13:29:26.4511801Z Secret source: Actions
+2026-11-26T13:29:26.4512790Z Cache mode: write
+2026-11-26T13:29:26.4513461Z Prepare workflow directory
+2026-11-26T13:29:26.4885334Z Prepare all required actions
+2026-11-26T13:29:26.4952706Z Getting action download info
+2026-11-26T13:29:26.8465143Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-11-26T13:29:26.9846717Z Download action repository 'taiki-e/install-action@v2' (SHA:893d6ee8d714b6c7dfe2bcd94e5759e9a7958a7e)
+2026-11-26T13:29:27.6244246Z Complete job name: rocks (windows-latest)
+2026-11-26T13:29:27.7981076Z ##[group]Run actions/checkout@v5
+2026-11-26T13:29:27.7982203Z with:
+2026-11-26T13:29:27.7982718Z   repository: airsstack/airsl
+2026-11-26T13:29:27.7988276Z   token: ***
+2026-11-26T13:29:27.7988867Z   ssh-strict: true
+2026-11-26T13:29:27.7989419Z   ssh-user: git
+2026-11-26T13:29:27.7989980Z   persist-credentials: true
+2026-11-26T13:29:27.7990600Z   clean: true
+2026-11-26T13:29:27.7991193Z   sparse-checkout-cone-mode: true
+2026-11-26T13:29:27.7991856Z   fetch-depth: 1
+2026-11-26T13:29:27.7992441Z   fetch-tags: false
+2026-11-26T13:29:27.7993014Z   show-progress: true
+2026-11-26T13:29:27.7993543Z   lfs: false
+2026-11-26T13:29:27.7994023Z   submodules: false
+2026-11-26T13:29:27.7994548Z   set-safe-directory: true
+2026-11-26T13:29:27.7995151Z   allow-unsafe-pr-checkout: false
+2026-11-26T13:29:27.7996046Z ##[endgroup]
+2026-11-26T13:29:27.9546384Z Syncing repository: airsstack/airsl
+2026-11-26T13:29:27.9548209Z ##[group]Getting Git version info
+2026-11-26T13:29:27.9548969Z Working directory is 'D:\a\airsl\airsl'
+2026-11-26T13:29:28.0459807Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-11-26T13:29:28.3685786Z git version 2.56.1.windows.1
+2026-11-26T13:29:28.3742585Z ##[endgroup]
+2026-11-26T13:29:28.3762275Z Temporarily overriding HOME='D:\a\_temp\3d0aeb8a-05a8-44d8-988f-592a855d9549' before making global git config changes
+2026-11-26T13:29:28.3764836Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T13:29:28.3772868Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\airsl\airsl
+2026-11-26T13:29:28.4545700Z Deleting the contents of 'D:\a\airsl\airsl'
+2026-11-26T13:29:28.4550550Z ##[group]Initializing the repository
+2026-11-26T13:29:28.4577456Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\airsl\airsl
+2026-11-26T13:29:28.5648434Z Initialized empty Git repository in D:/a/airsl/airsl/.git/
+2026-11-26T13:29:28.5714655Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/airsstack/airsl
+2026-11-26T13:29:28.6772225Z ##[endgroup]
+2026-11-26T13:29:28.6775376Z ##[group]Disabling automatic garbage collection
+2026-11-26T13:29:28.6869709Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-11-26T13:29:28.7228922Z ##[endgroup]
+2026-11-26T13:29:28.7230738Z ##[group]Setting up auth
+2026-11-26T13:29:28.7248380Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T13:29:28.7676017Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-11-26T13:29:32.3180832Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T13:29:32.3577959Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-11-26T13:29:32.9211085Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T13:29:32.9589833Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-11-26T13:29:33.4990306Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-11-26T13:29:33.5386849Z ##[endgroup]
+2026-11-26T13:29:33.5387572Z ##[group]Fetching the repository
+2026-11-26T13:29:33.5406256Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c:refs/remotes/origin/probe-ci-rocks-version
+2026-11-26T13:29:34.5870277Z From https://github.com/airsstack/airsl
+2026-11-26T13:29:34.5874694Z  * [new ref]         9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c -> origin/probe-ci-rocks-version
+2026-11-26T13:29:34.5927448Z ##[endgroup]
+2026-11-26T13:29:34.5928210Z ##[group]Determining the checkout info
+2026-11-26T13:29:34.5930438Z ##[endgroup]
+2026-11-26T13:29:34.5944061Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-11-26T13:29:34.6513678Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-11-26T13:29:34.6931625Z ##[group]Checking out the ref
+2026-11-26T13:29:34.6941881Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force -B probe-ci-rocks-version refs/remotes/origin/probe-ci-rocks-version
+2026-11-26T13:29:34.7677580Z Switched to a new branch 'probe-ci-rocks-version'
+2026-11-26T13:29:34.7700401Z branch 'probe-ci-rocks-version' set up to track 'origin/probe-ci-rocks-version'.
+2026-11-26T13:29:34.7744598Z ##[endgroup]
+2026-11-26T13:29:34.8195896Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-11-26T13:29:34.8548279Z 9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c
+2026-11-26T13:29:34.9087762Z ##[group]Run taiki-e/install-action@v2
+2026-11-26T13:29:34.9088168Z with:
+2026-11-26T13:29:34.9088395Z   tool: cargo-make@0.37.24
+2026-11-26T13:29:34.9088665Z   checksum: true
+2026-11-26T13:29:34.9088921Z   fallback: cargo-binstall
+2026-11-26T13:29:34.9089177Z ##[endgroup]
+2026-11-26T13:29:34.9187141Z ##[start-action display=Run bail() {;id=__taiki-e_install-action.__run]
+2026-11-26T13:29:34.9196356Z ##[end-action id=__taiki-e_install-action.__run;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-11-26T13:29:34.9202676Z ##[start-action display=Run Set-StrictMode -Version Latest;id=__taiki-e_install-action.__run_2]
+2026-11-26T13:29:34.9368313Z ##[group]Run Set-StrictMode -Version Latest
+2026-11-26T13:29:34.9368781Z [36;1mSet-StrictMode -Version Latest[0m
+2026-11-26T13:29:34.9369293Z [36;1m$remove_env = @('ENV','BASH_ENV','CDPATH','SHELLOPTS','BASHOPTS','BASH_FUNC_*')[0m
+2026-11-26T13:29:34.9370642Z [36;1mforeach ($name in $remove_env) {[0m
+2026-11-26T13:29:34.9371106Z [36;1m  if (Test-Path "Env:$name") { Remove-Item "Env:\$name" }[0m
+2026-11-26T13:29:34.9371501Z [36;1m}[0m
+2026-11-26T13:29:34.9371722Z [36;1mfor ($i=1; $i -le 10; $i++) {[0m
+2026-11-26T13:29:34.9372083Z [36;1m  $prev_err_action = $ErrorActionPreference[0m
+2026-11-26T13:29:34.9372478Z [36;1m  $ErrorActionPreference = "Continue"[0m
+2026-11-26T13:29:34.9372920Z [36;1m  & bash --noprofile --norc "$env:GITHUB_ACTION_PATH\main.sh"[0m
+2026-11-26T13:29:34.9373343Z [36;1m  $code = $LASTEXITCODE[0m
+2026-11-26T13:29:34.9373687Z [36;1m  $ErrorActionPreference = "$prev_err_action"[0m
+2026-11-26T13:29:34.9374154Z [36;1m  if (Test-Path "$env:USERPROFILE\.install-action\init") {[0m
+2026-11-26T13:29:34.9374666Z [36;1m    # If bash started successfully, main.sh creates init file.[0m
+2026-11-26T13:29:34.9375192Z [36;1m    Remove-Item "$env:USERPROFILE\.install-action\init" -Force[0m
+2026-11-26T13:29:34.9375622Z [36;1m    exit $code[0m
+2026-11-26T13:29:34.9375859Z [36;1m  }[0m
+2026-11-26T13:29:34.9376079Z [36;1m  if ($i -lt 10) {[0m
+2026-11-26T13:29:34.9376972Z [36;1m    Write-Output "::warning::install-action: installation failed due to bash startup failure (<https://github.com/actions/partner-runner-images/issues/169>); retrying..."[0m
+2026-11-26T13:29:34.9377871Z [36;1m  }[0m
+2026-11-26T13:29:34.9378058Z [36;1m}[0m
+2026-11-26T13:29:34.9378958Z [36;1mWrite-Output "::error::install-action: installation failed due to bash startup failure (<https://github.com/actions/partner-runner-images/issues/169>); this maybe resolved by re-running job"[0m
+2026-11-26T13:29:34.9379915Z [36;1mexit 1[0m
+2026-11-26T13:29:35.0346691Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-11-26T13:29:35.0347429Z env:
+2026-11-26T13:29:35.0347818Z   INPUT_TOOL: cargo-make@0.37.24
+2026-11-26T13:29:35.0348338Z   INPUT_CHECKSUM: true
+2026-11-26T13:29:35.0348779Z   INPUT_FALLBACK: cargo-binstall
+2026-11-26T13:29:35.0354633Z   DEFAULT_GITHUB_TOKEN: ***
+2026-11-26T13:29:35.0355211Z   ACTION_USER_AGENT: taiki-e/install-action (v2)
+2026-11-26T13:29:35.0355814Z   RUNNER_OS: Windows
+2026-11-26T13:29:35.0356220Z   RUNNER_ARCH: X64
+2026-11-26T13:29:35.0356598Z ##[endgroup]
+2026-11-26T13:29:35.6862520Z info: host platform: x86_64_windows
+2026-11-26T13:29:35.7571542Z info: cargo is located at /c/Users/runneradmin/.cargo/bin/cargo
+2026-11-26T13:29:36.3457356Z info: installing cargo-make@0.37.24
+2026-11-26T13:29:36.7583436Z info: downloading https://github.com/sagiegurari/cargo-make/releases/download/0.37.24/cargo-make-v0.37.24-x86_64-pc-windows-msvc.zip
+2026-11-26T13:29:37.1226589Z info: verifying sha256 checksum for cargo-make-v0.37.24-x86_64-pc-windows-msvc.zip
+2026-11-26T13:29:37.5809879Z info: cargo-make installed at /c/Users/runneradmin/.cargo/bin/cargo-make.exe
+2026-11-26T13:29:37.5908846Z + cargo-make make --version
+2026-11-26T13:29:37.6211438Z cargo-make 0.37.24
+2026-11-26T13:29:37.6245688Z 
+2026-11-26T13:29:37.6924208Z ##[end-action id=__taiki-e_install-action.__run_2;outcome=success;conclusion=success;duration_ms=2771]
+2026-11-26T13:29:37.7100886Z ##[group]Run cargo make --version
+2026-11-26T13:29:37.7101293Z [36;1mcargo make --version[0m
+2026-11-26T13:29:37.7101614Z [36;1m$t = (Get-Command cargo-make).Source[0m
+2026-11-26T13:29:37.7101978Z [36;1m"TOOL=$t" >> $env:GITHUB_ENV[0m
+2026-11-26T13:29:37.7102372Z [36;1m"TOOL_NOEXT=$($t -replace '\.exe$','')" >> $env:GITHUB_ENV[0m
+2026-11-26T13:29:37.7102839Z [36;1m"TOOL_FWD=$($t -replace '\\','/')" >> $env:GITHUB_ENV[0m
+2026-11-26T13:29:37.7103392Z [36;1m"TOOL=$t"; "TOOL_NOEXT=$($t -replace '\.exe$','')"; "TOOL_FWD=$($t -replace '\\','/')"[0m
+2026-11-26T13:29:37.7174160Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-11-26T13:29:37.7174622Z ##[endgroup]
+2026-11-26T13:29:39.0476536Z cargo-make 0.37.24
+2026-11-26T13:29:39.1719281Z TOOL=C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:39.1722521Z TOOL_NOEXT=C:\Users\runneradmin\.cargo\bin\cargo-make
+2026-11-26T13:29:39.1725041Z TOOL_FWD=C:/Users/runneradmin/.cargo/bin/cargo-make.exe
+2026-11-26T13:29:39.2539073Z ##[group]Run bash probe/setup-cases.sh
+2026-11-26T13:29:39.2539495Z [36;1mbash probe/setup-cases.sh[0m
+2026-11-26T13:29:39.2555643Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-26T13:29:39.2556094Z env:
+2026-11-26T13:29:39.2556345Z   TOOL: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:39.2556738Z   TOOL_NOEXT: C:\Users\runneradmin\.cargo\bin\cargo-make
+2026-11-26T13:29:39.2557136Z   TOOL_FWD: C:/Users/runneradmin/.cargo/bin/cargo-make.exe
+2026-11-26T13:29:39.2557504Z ##[endgroup]
+2026-11-26T13:29:39.6066279Z $ ls work/real/crates/airsl-lua/rockspecs
+2026-11-26T13:29:39.6371018Z airsstack-0.2.0-1.rockspec
+2026-11-26T13:29:39.6371460Z airsstack-luajit-0.2.0-1.rockspec
+2026-11-26T13:29:39.6378624Z $ ls work/leftover/crates/airsl-lua/rockspecs
+2026-11-26T13:29:39.6554085Z airsstack-0.1.0-1.rockspec
+2026-11-26T13:29:39.6554600Z airsstack-0.2.0-1.rockspec
+2026-11-26T13:29:39.6555249Z airsstack-luajit-0.2.0-1.rockspec
+2026-11-26T13:29:39.6563620Z $ ls work/empty/crates/airsl-lua/rockspecs
+2026-11-26T13:29:39.6747880Z $ ls work/malformed/crates/airsl-lua/rockspecs
+2026-11-26T13:29:39.6921672Z airsstack-0.2.0.rockspec
+2026-11-26T13:29:39.6922179Z airsstack-luajit-0.2.0.rockspec
+2026-11-26T13:29:39.6922662Z airsstack.rockspec
+2026-11-26T13:29:39.7130459Z ##[group]Run cargo make old-glob
+2026-11-26T13:29:39.7130826Z [36;1mcargo make old-glob[0m
+2026-11-26T13:29:39.7200868Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-11-26T13:29:39.7201278Z env:
+2026-11-26T13:29:39.7201541Z   TOOL: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:39.7201957Z   TOOL_NOEXT: C:\Users\runneradmin\.cargo\bin\cargo-make
+2026-11-26T13:29:39.7221891Z   TOOL_FWD: C:/Users/runneradmin/.cargo/bin/cargo-make.exe
+2026-11-26T13:29:39.7222354Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:39.7222691Z ##[endgroup]
+2026-11-26T13:29:40.0685257Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:46.2961519Z [cargo-make] INFO - 
+2026-11-26T13:29:46.2961948Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:46.2962583Z [cargo-make] INFO - Task: old-glob
+2026-11-26T13:29:46.2963008Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:46.2964683Z [cargo-make] INFO - Running Task: old-glob
+2026-11-26T13:29:46.2990636Z old airsstack-*-1.rockspec -> 2: crates\airsl-lua\rockspecs\airsstack-0.2.0-1.rockspec crates\airsl-lua\rockspecs\airsstack-luajit-0.2.0-1.rockspec 
+2026-11-26T13:29:46.2994422Z [cargo-make] INFO - ==================Time Summary==================
+2026-11-26T13:29:46.2995319Z [cargo-make] INFO - [Setup Env]:                49.99%     6.22 seconds
+2026-11-26T13:29:46.2996130Z [cargo-make] INFO - [Setup Env - Rust]:         47.07%     5.86 seconds
+2026-11-26T13:29:46.2996795Z [cargo-make] INFO - [Setup Env - Git]:          1.82%      0.23 seconds
+2026-11-26T13:29:46.2997315Z [cargo-make] INFO - [Setup Env - Crate Info]:   1.08%      0.14 seconds
+2026-11-26T13:29:46.2997806Z [cargo-make] INFO - old-glob:                   0.02%      0.00 seconds
+2026-11-26T13:29:46.2998307Z [cargo-make] INFO - [Load Makefiles]:           0.01%      0.00 seconds
+2026-11-26T13:29:46.2998812Z [cargo-make] INFO - [Setup Env - Duckscript]:   0.00%      0.00 seconds
+2026-11-26T13:29:46.2999431Z [cargo-make] INFO - [Setup Env - CI]:           0.00%      0.00 seconds
+2026-11-26T13:29:46.3000576Z [cargo-make] INFO - [Setup Env - Project]:      0.00%      0.00 seconds
+2026-11-26T13:29:46.3001179Z [cargo-make] INFO - [Setup Env - Vars]:         0.00%      0.00 seconds
+2026-11-26T13:29:46.3001649Z [cargo-make] INFO - ================================================
+2026-11-26T13:29:46.3002038Z [cargo-make] INFO - Build Done in 6.23 seconds.
+2026-11-26T13:29:46.4300283Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:46.4300726Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:46.4371770Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-11-26T13:29:46.4372216Z env:
+2026-11-26T13:29:46.4372519Z   TOOL: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:46.4372987Z   TOOL_NOEXT: C:\Users\runneradmin\.cargo\bin\cargo-make
+2026-11-26T13:29:46.4373455Z   TOOL_FWD: C:/Users/runneradmin/.cargo/bin/cargo-make.exe
+2026-11-26T13:29:46.4373881Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:46.4374320Z   AIRSL_LUAROCKS: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:46.4374851Z   AIRSL_LUA54: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:46.4375354Z   AIRSL_LUAJIT: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:46.4375763Z ##[endgroup]
+2026-11-26T13:29:46.7837137Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:47.1267739Z [cargo-make] INFO - 
+2026-11-26T13:29:47.1268298Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:47.1268854Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:47.1269314Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:47.1272859Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:47.1293293Z which C:\Users\runneradmin\.cargo\bin\cargo-make.exe -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe] 
+2026-11-26T13:29:47.1296044Z which C:\Users\runneradmin\.cargo\bin\cargo-make.exe -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe] 
+2026-11-26T13:29:47.1298686Z which C:\Users\runneradmin\.cargo\bin\cargo-make.exe -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe] 
+2026-11-26T13:29:47.1303462Z airsstack: rockspec crates\airsl-lua\rockspecs\airsstack-0.2.0-1.rockspec version [0.2.0] 
+2026-11-26T13:29:47.1307376Z airsstack-luajit: rockspec crates\airsl-lua\rockspecs\airsstack-luajit-0.2.0-1.rockspec version [0.2.0] 
+2026-11-26T13:29:47.1311656Z [cargo-make] INFO - ==================Time Summary==================
+2026-11-26T13:29:47.1312476Z [cargo-make] INFO - [Setup Env]:                49.78%     0.34 seconds
+2026-11-26T13:29:47.1313142Z [cargo-make] INFO - [Setup Env - Git]:          26.86%     0.18 seconds
+2026-11-26T13:29:47.1313696Z [cargo-make] INFO - [Setup Env - Rust]:         11.39%     0.08 seconds
+2026-11-26T13:29:47.1314246Z [cargo-make] INFO - [Setup Env - Crate Info]:   11.24%     0.08 seconds
+2026-11-26T13:29:47.1314791Z [cargo-make] INFO - rocks-lookup:               0.58%      0.00 seconds
+2026-11-26T13:29:47.1315335Z [cargo-make] INFO - [Load Makefiles]:           0.15%      0.00 seconds
+2026-11-26T13:29:47.1316081Z [cargo-make] INFO - [Setup Env - Duckscript]:   0.00%      0.00 seconds
+2026-11-26T13:29:47.1316958Z [cargo-make] INFO - [Setup Env - CI]:           0.00%      0.00 seconds
+2026-11-26T13:29:47.1317560Z [cargo-make] INFO - [Setup Env - Project]:      0.00%      0.00 seconds
+2026-11-26T13:29:47.1318176Z [cargo-make] INFO - [Setup Env - Vars]:         0.00%      0.00 seconds
+2026-11-26T13:29:47.1318762Z [cargo-make] INFO - ================================================
+2026-11-26T13:29:47.1319260Z [cargo-make] INFO - Build Done in 0.35 seconds.
+2026-11-26T13:29:47.2616336Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:47.2616719Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:47.2688888Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-11-26T13:29:47.2689337Z env:
+2026-11-26T13:29:47.2689626Z   TOOL: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:47.2690086Z   TOOL_NOEXT: C:\Users\runneradmin\.cargo\bin\cargo-make
+2026-11-26T13:29:47.2690558Z   TOOL_FWD: C:/Users/runneradmin/.cargo/bin/cargo-make.exe
+2026-11-26T13:29:47.2690982Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:47.2691424Z   AIRSL_LUAROCKS: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:47.2691950Z   AIRSL_LUA54: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:47.2693183Z   AIRSL_LUAJIT: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:47.2693603Z ##[endgroup]
+2026-11-26T13:29:47.6117970Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:47.9556856Z [cargo-make] INFO - 
+2026-11-26T13:29:47.9557235Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:47.9557647Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:47.9557992Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:47.9558788Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:47.9577673Z which C:\Users\runneradmin\.cargo\bin\cargo-make.exe -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe] 
+2026-11-26T13:29:47.9580155Z which C:\Users\runneradmin\.cargo\bin\cargo-make.exe -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe] 
+2026-11-26T13:29:47.9582449Z which C:\Users\runneradmin\.cargo\bin\cargo-make.exe -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe] 
+2026-11-26T13:29:47.9589548Z rocks: 2 files match `airsstack-<version>-1.rockspec` in `crates/airsl-lua/rockspecs` (crates\airsl-lua\rockspecs\airsstack-0.1.0-1.rockspec, crates\airsl-lua\rockspecs\airsstack-0.2.0-1.rockspec); docs-check allows one per package 
+2026-11-26T13:29:47.9592098Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 45 - Exit with error code: 1
+2026-11-26T13:29:47.9593327Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:48.0773277Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:48.0954377Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:48.0954767Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:48.1023574Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-11-26T13:29:48.1023981Z env:
+2026-11-26T13:29:48.1024243Z   TOOL: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:48.1024667Z   TOOL_NOEXT: C:\Users\runneradmin\.cargo\bin\cargo-make
+2026-11-26T13:29:48.1025094Z   TOOL_FWD: C:/Users/runneradmin/.cargo/bin/cargo-make.exe
+2026-11-26T13:29:48.1025481Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:48.1025894Z   AIRSL_LUAROCKS: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:48.1026379Z   AIRSL_LUA54: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:48.1026843Z   AIRSL_LUAJIT: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:48.1027213Z ##[endgroup]
+2026-11-26T13:29:48.4382927Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:48.7790218Z [cargo-make] INFO - 
+2026-11-26T13:29:48.7790812Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:48.7791509Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:48.7792119Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:48.7792956Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:48.7812392Z which C:\Users\runneradmin\.cargo\bin\cargo-make.exe -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe] 
+2026-11-26T13:29:48.7814835Z which C:\Users\runneradmin\.cargo\bin\cargo-make.exe -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe] 
+2026-11-26T13:29:48.7817940Z which C:\Users\runneradmin\.cargo\bin\cargo-make.exe -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe] 
+2026-11-26T13:29:48.7821337Z rocks: no `airsstack-<version>-1.rockspec` in `crates/airsl-lua/rockspecs` 
+2026-11-26T13:29:48.7824045Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 40 - Exit with error code: 1
+2026-11-26T13:29:48.7825371Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:48.9160808Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:48.9329093Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:48.9329495Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:48.9400749Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-11-26T13:29:48.9401210Z env:
+2026-11-26T13:29:48.9401502Z   TOOL: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:48.9401961Z   TOOL_NOEXT: C:\Users\runneradmin\.cargo\bin\cargo-make
+2026-11-26T13:29:48.9402426Z   TOOL_FWD: C:/Users/runneradmin/.cargo/bin/cargo-make.exe
+2026-11-26T13:29:48.9403038Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:48.9403481Z   AIRSL_LUAROCKS: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:48.9404006Z   AIRSL_LUA54: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:48.9404517Z   AIRSL_LUAJIT: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:48.9404929Z ##[endgroup]
+2026-11-26T13:29:49.2682952Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:49.6039002Z [cargo-make] INFO - 
+2026-11-26T13:29:49.6039465Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:49.6039879Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:49.6040242Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:49.6042242Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:49.6061335Z which C:\Users\runneradmin\.cargo\bin\cargo-make.exe -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe] 
+2026-11-26T13:29:49.6063856Z which C:\Users\runneradmin\.cargo\bin\cargo-make.exe -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe] 
+2026-11-26T13:29:49.6066354Z which C:\Users\runneradmin\.cargo\bin\cargo-make.exe -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe] 
+2026-11-26T13:29:49.6070315Z rocks: no `airsstack-<version>-1.rockspec` in `crates/airsl-lua/rockspecs` 
+2026-11-26T13:29:49.6071914Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 40 - Exit with error code: 1
+2026-11-26T13:29:49.6073144Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:49.7197703Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:49.7366999Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:49.7367406Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:49.7439613Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-11-26T13:29:49.7440165Z env:
+2026-11-26T13:29:49.7440572Z   TOOL: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:49.7441127Z   TOOL_NOEXT: C:\Users\runneradmin\.cargo\bin\cargo-make
+2026-11-26T13:29:49.7441696Z   TOOL_FWD: C:/Users/runneradmin/.cargo/bin/cargo-make.exe
+2026-11-26T13:29:49.7442231Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:49.7442786Z   AIRSL_LUA54: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:49.7443391Z   AIRSL_LUAJIT: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:49.7443905Z ##[endgroup]
+2026-11-26T13:29:50.0819480Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:50.4346948Z [cargo-make] INFO - 
+2026-11-26T13:29:50.4347321Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:50.4347762Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:50.4348099Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:50.4351085Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:50.4453733Z which luarocks -> [] 
+2026-11-26T13:29:50.4454428Z rocks: `luarocks` was not found; install LuaRocks or set AIRSL_LUAROCKS to its path 
+2026-11-26T13:29:50.4456893Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 11 - Exit with error code: 1
+2026-11-26T13:29:50.4457836Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:50.5603310Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:50.5767550Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:50.5767961Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:50.5838502Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-11-26T13:29:50.5838958Z env:
+2026-11-26T13:29:50.5839255Z   TOOL: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:50.5839729Z   TOOL_NOEXT: C:\Users\runneradmin\.cargo\bin\cargo-make
+2026-11-26T13:29:50.5840202Z   TOOL_FWD: C:/Users/runneradmin/.cargo/bin/cargo-make.exe
+2026-11-26T13:29:50.5840626Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:50.5840974Z   AIRSL_LUAROCKS: nope-luarocks
+2026-11-26T13:29:50.5841266Z ##[endgroup]
+2026-11-26T13:29:50.9062958Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:51.2425526Z [cargo-make] INFO - 
+2026-11-26T13:29:51.2426206Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:51.2426626Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:51.2427023Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:51.2428133Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:51.2524112Z which nope-luarocks -> [] 
+2026-11-26T13:29:51.2525300Z rocks: `nope-luarocks` was not found; install LuaRocks or set AIRSL_LUAROCKS to its path 
+2026-11-26T13:29:51.2527423Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 11 - Exit with error code: 1
+2026-11-26T13:29:51.2528695Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:51.3630248Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:51.3797861Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:51.3798261Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:51.3868527Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-11-26T13:29:51.3868945Z env:
+2026-11-26T13:29:51.3869238Z   TOOL: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:51.3869667Z   TOOL_NOEXT: C:\Users\runneradmin\.cargo\bin\cargo-make
+2026-11-26T13:29:51.3870104Z   TOOL_FWD: C:/Users/runneradmin/.cargo/bin/cargo-make.exe
+2026-11-26T13:29:51.3870494Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:51.3870812Z   AIRSL_LUAROCKS: /no/such/luarocks
+2026-11-26T13:29:51.3871104Z ##[endgroup]
+2026-11-26T13:29:51.7116681Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:52.0521990Z [cargo-make] INFO - 
+2026-11-26T13:29:52.0522347Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:52.0522729Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:52.0523139Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:52.0525273Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:52.0544658Z which /no/such/luarocks -> [] 
+2026-11-26T13:29:52.0545252Z rocks: `/no/such/luarocks` was not found; install LuaRocks or set AIRSL_LUAROCKS to its path 
+2026-11-26T13:29:52.0547557Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 11 - Exit with error code: 1
+2026-11-26T13:29:52.0548738Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:52.1669972Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:52.1840503Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:52.1841130Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:52.1931950Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-11-26T13:29:52.1932403Z env:
+2026-11-26T13:29:52.1932697Z   TOOL: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:52.1933162Z   TOOL_NOEXT: C:\Users\runneradmin\.cargo\bin\cargo-make
+2026-11-26T13:29:52.1933637Z   TOOL_FWD: C:/Users/runneradmin/.cargo/bin/cargo-make.exe
+2026-11-26T13:29:52.1934064Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:52.1934408Z   AIRSL_LUAROCKS: cargo-make
+2026-11-26T13:29:52.1934795Z   AIRSL_LUA54: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:52.1935323Z   AIRSL_LUAJIT: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:52.1935747Z ##[endgroup]
+2026-11-26T13:29:52.5083791Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:52.8465588Z [cargo-make] INFO - 
+2026-11-26T13:29:52.8466215Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:52.8466826Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:52.8467205Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:52.8469028Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:52.8561951Z which cargo-make -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe] 
+2026-11-26T13:29:52.8564609Z which C:\Users\runneradmin\.cargo\bin\cargo-make.exe -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe] 
+2026-11-26T13:29:52.8567038Z which C:\Users\runneradmin\.cargo\bin\cargo-make.exe -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe] 
+2026-11-26T13:29:52.8573177Z airsstack: rockspec crates\airsl-lua\rockspecs\airsstack-0.2.0-1.rockspec version [0.2.0] 
+2026-11-26T13:29:52.8576835Z airsstack-luajit: rockspec crates\airsl-lua\rockspecs\airsstack-luajit-0.2.0-1.rockspec version [0.2.0] 
+2026-11-26T13:29:52.8580680Z [cargo-make] INFO - ==================Time Summary==================
+2026-11-26T13:29:52.8581902Z [cargo-make] INFO - [Setup Env]:                49.19%     0.34 seconds
+2026-11-26T13:29:52.8582718Z [cargo-make] INFO - [Setup Env - Git]:          27.38%     0.19 seconds
+2026-11-26T13:29:52.8583489Z [cargo-make] INFO - [Setup Env - Rust]:         11.27%     0.08 seconds
+2026-11-26T13:29:52.8584296Z [cargo-make] INFO - [Setup Env - Crate Info]:   10.40%     0.07 seconds
+2026-11-26T13:29:52.8585429Z [cargo-make] INFO - rocks-lookup:               1.61%      0.01 seconds
+2026-11-26T13:29:52.8586193Z [cargo-make] INFO - [Load Makefiles]:           0.15%      0.00 seconds
+2026-11-26T13:29:52.8586953Z [cargo-make] INFO - [Setup Env - Duckscript]:   0.00%      0.00 seconds
+2026-11-26T13:29:52.8587707Z [cargo-make] INFO - [Setup Env - CI]:           0.00%      0.00 seconds
+2026-11-26T13:29:52.8588468Z [cargo-make] INFO - [Setup Env - Project]:      0.00%      0.00 seconds
+2026-11-26T13:29:52.8589590Z [cargo-make] INFO - [Setup Env - Vars]:         0.00%      0.00 seconds
+2026-11-26T13:29:52.8590340Z [cargo-make] INFO - ================================================
+2026-11-26T13:29:52.8590979Z [cargo-make] INFO - Build Done in 0.35 seconds.
+2026-11-26T13:29:52.9894306Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:52.9894699Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:52.9963212Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-11-26T13:29:52.9963597Z env:
+2026-11-26T13:29:52.9963847Z   TOOL: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:52.9964247Z   TOOL_NOEXT: C:\Users\runneradmin\.cargo\bin\cargo-make
+2026-11-26T13:29:52.9964653Z   TOOL_FWD: C:/Users/runneradmin/.cargo/bin/cargo-make.exe
+2026-11-26T13:29:52.9965018Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:52.9965408Z   AIRSL_LUAROCKS: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:52.9965857Z   AIRSL_LUAJIT: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:52.9966209Z ##[endgroup]
+2026-11-26T13:29:53.3356776Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:53.6710663Z [cargo-make] INFO - 
+2026-11-26T13:29:53.6711191Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:53.6711882Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:53.6712278Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:53.6714003Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:53.6731984Z which C:\Users\runneradmin\.cargo\bin\cargo-make.exe -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe] 
+2026-11-26T13:29:53.6816834Z which lua5.4 -> [] 
+2026-11-26T13:29:53.6817352Z rocks: `lua5.4` was not found; install Lua 5.4 or set AIRSL_LUA54 to its interpreter 
+2026-11-26T13:29:53.6819495Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 21 - Exit with error code: 1
+2026-11-26T13:29:53.6820342Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:53.7914062Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:53.8093000Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:53.8093399Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:53.8174622Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-11-26T13:29:53.8175214Z env:
+2026-11-26T13:29:53.8175588Z   TOOL: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:53.8176189Z   TOOL_NOEXT: C:\Users\runneradmin\.cargo\bin\cargo-make
+2026-11-26T13:29:53.8176806Z   TOOL_FWD: C:/Users/runneradmin/.cargo/bin/cargo-make.exe
+2026-11-26T13:29:53.8177952Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:53.8178557Z   AIRSL_LUAROCKS: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:53.8179153Z   AIRSL_LUA54: nope-lua5.4
+2026-11-26T13:29:53.8179515Z ##[endgroup]
+2026-11-26T13:29:54.1449330Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:54.4863233Z [cargo-make] INFO - 
+2026-11-26T13:29:54.4863667Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:54.4864462Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:54.4864826Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:54.4866697Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:54.4886298Z which C:\Users\runneradmin\.cargo\bin\cargo-make.exe -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe] 
+2026-11-26T13:29:54.4966345Z which nope-lua5.4 -> [] 
+2026-11-26T13:29:54.4967162Z rocks: `nope-lua5.4` was not found; install Lua 5.4 or set AIRSL_LUA54 to its interpreter 
+2026-11-26T13:29:54.4969124Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 21 - Exit with error code: 1
+2026-11-26T13:29:54.4970091Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:54.6076603Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:54.6247987Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:54.6248387Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:54.6319806Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-11-26T13:29:54.6320197Z env:
+2026-11-26T13:29:54.6320455Z   TOOL: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:54.6320857Z   TOOL_NOEXT: C:\Users\runneradmin\.cargo\bin\cargo-make
+2026-11-26T13:29:54.6321317Z   TOOL_FWD: C:/Users/runneradmin/.cargo/bin/cargo-make.exe
+2026-11-26T13:29:54.6321696Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:54.6322078Z   AIRSL_LUAROCKS: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:54.6322536Z   AIRSL_LUA54: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:54.6322888Z ##[endgroup]
+2026-11-26T13:29:54.9571964Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:55.3111070Z [cargo-make] INFO - 
+2026-11-26T13:29:55.3111589Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:55.3112219Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:55.3112748Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:55.3113711Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:55.3131951Z which C:\Users\runneradmin\.cargo\bin\cargo-make.exe -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe] 
+2026-11-26T13:29:55.3134392Z which C:\Users\runneradmin\.cargo\bin\cargo-make.exe -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe] 
+2026-11-26T13:29:55.3213668Z which luajit -> [] 
+2026-11-26T13:29:55.3214516Z rocks: `luajit` was not found; install LuaJIT or set AIRSL_LUAJIT to its interpreter 
+2026-11-26T13:29:55.3217089Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 31 - Exit with error code: 1
+2026-11-26T13:29:55.3217938Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:55.4310162Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:55.4468516Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:55.4468888Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:55.4538848Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-11-26T13:29:55.4539280Z env:
+2026-11-26T13:29:55.4539548Z   TOOL: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:55.4539981Z   TOOL_NOEXT: C:\Users\runneradmin\.cargo\bin\cargo-make
+2026-11-26T13:29:55.4540412Z   TOOL_FWD: C:/Users/runneradmin/.cargo/bin/cargo-make.exe
+2026-11-26T13:29:55.4540797Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:55.4541200Z   AIRSL_LUAROCKS: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:55.4541679Z   AIRSL_LUA54: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:55.4542067Z   AIRSL_LUAJIT: nope-luajit
+2026-11-26T13:29:55.4542333Z ##[endgroup]
+2026-11-26T13:29:55.7753156Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:56.1062448Z [cargo-make] INFO - 
+2026-11-26T13:29:56.1062907Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:56.1063273Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:56.1065319Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:56.1065961Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:56.1082999Z which C:\Users\runneradmin\.cargo\bin\cargo-make.exe -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe] 
+2026-11-26T13:29:56.1085368Z which C:\Users\runneradmin\.cargo\bin\cargo-make.exe -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe] 
+2026-11-26T13:29:56.1164850Z which nope-luajit -> [] 
+2026-11-26T13:29:56.1165698Z rocks: `nope-luajit` was not found; install LuaJIT or set AIRSL_LUAJIT to its interpreter 
+2026-11-26T13:29:56.1167987Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 31 - Exit with error code: 1
+2026-11-26T13:29:56.1168959Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:56.2259273Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:56.2417991Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:56.2418460Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:56.2487200Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-11-26T13:29:56.2487714Z env:
+2026-11-26T13:29:56.2488074Z   TOOL: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:56.2488605Z   TOOL_NOEXT: C:\Users\runneradmin\.cargo\bin\cargo-make
+2026-11-26T13:29:56.2489592Z   TOOL_FWD: C:/Users/runneradmin/.cargo/bin/cargo-make.exe
+2026-11-26T13:29:56.2490113Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:56.2490590Z   AIRSL_LUAROCKS: C:\Users\runneradmin\.cargo\bin\cargo-make
+2026-11-26T13:29:56.2491170Z   AIRSL_LUA54: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:56.2491737Z   AIRSL_LUAJIT: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:56.2492204Z ##[endgroup]
+2026-11-26T13:29:56.5662139Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:56.9295822Z [cargo-make] INFO - 
+2026-11-26T13:29:56.9296461Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:56.9297226Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:56.9297916Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:56.9298636Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:56.9317792Z which C:\Users\runneradmin\.cargo\bin\cargo-make -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe] 
+2026-11-26T13:29:56.9320913Z which C:\Users\runneradmin\.cargo\bin\cargo-make.exe -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe] 
+2026-11-26T13:29:56.9323425Z which C:\Users\runneradmin\.cargo\bin\cargo-make.exe -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe] 
+2026-11-26T13:29:56.9330365Z airsstack: rockspec crates\airsl-lua\rockspecs\airsstack-0.2.0-1.rockspec version [0.2.0] 
+2026-11-26T13:29:56.9335324Z airsstack-luajit: rockspec crates\airsl-lua\rockspecs\airsstack-luajit-0.2.0-1.rockspec version [0.2.0] 
+2026-11-26T13:29:56.9340382Z [cargo-make] INFO - ==================Time Summary==================
+2026-11-26T13:29:56.9341321Z [cargo-make] INFO - [Setup Env]:                49.72%     0.36 seconds
+2026-11-26T13:29:56.9342073Z [cargo-make] INFO - [Setup Env - Git]:          26.86%     0.20 seconds
+2026-11-26T13:29:56.9342628Z [cargo-make] INFO - [Setup Env - Rust]:         11.57%     0.08 seconds
+2026-11-26T13:29:56.9343155Z [cargo-make] INFO - [Setup Env - Crate Info]:   11.16%     0.08 seconds
+2026-11-26T13:29:56.9343703Z [cargo-make] INFO - rocks-lookup:               0.55%      0.00 seconds
+2026-11-26T13:29:56.9344432Z [cargo-make] INFO - [Load Makefiles]:           0.14%      0.00 seconds
+2026-11-26T13:29:56.9345602Z [cargo-make] INFO - [Setup Env - Duckscript]:   0.00%      0.00 seconds
+2026-11-26T13:29:56.9346558Z [cargo-make] INFO - [Setup Env - CI]:           0.00%      0.00 seconds
+2026-11-26T13:29:56.9347080Z [cargo-make] INFO - [Setup Env - Project]:      0.00%      0.00 seconds
+2026-11-26T13:29:56.9347684Z [cargo-make] INFO - [Setup Env - Vars]:         0.00%      0.00 seconds
+2026-11-26T13:29:56.9348186Z [cargo-make] INFO - ================================================
+2026-11-26T13:29:56.9348631Z [cargo-make] INFO - Build Done in 0.37 seconds.
+2026-11-26T13:29:57.0691387Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:57.0691887Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:57.0761099Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-11-26T13:29:57.0761494Z env:
+2026-11-26T13:29:57.0761751Z   TOOL: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:57.0762145Z   TOOL_NOEXT: C:\Users\runneradmin\.cargo\bin\cargo-make
+2026-11-26T13:29:57.0762544Z   TOOL_FWD: C:/Users/runneradmin/.cargo/bin/cargo-make.exe
+2026-11-26T13:29:57.0762906Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:57.0763216Z   AIRSL_LUAROCKS: C:\no\such\luarocks.exe
+2026-11-26T13:29:57.0763509Z ##[endgroup]
+2026-11-26T13:29:57.3996818Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:57.7349060Z [cargo-make] INFO - 
+2026-11-26T13:29:57.7349420Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:57.7349804Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:57.7350212Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:57.7351500Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:57.7368269Z which C:\no\such\luarocks.exe -> [] 
+2026-11-26T13:29:57.7368983Z rocks: `C:\no\such\luarocks.exe` was not found; install LuaRocks or set AIRSL_LUAROCKS to its path 
+2026-11-26T13:29:57.7371428Z [cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 11 - Exit with error code: 1
+2026-11-26T13:29:57.7372349Z [cargo-make] WARN - Build Failed.
+2026-11-26T13:29:57.8460921Z ##[error]Process completed with exit code 1.
+2026-11-26T13:29:57.8621190Z ##[group]Run cargo make rocks-lookup
+2026-11-26T13:29:57.8621559Z [36;1mcargo make rocks-lookup[0m
+2026-11-26T13:29:57.8690200Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-11-26T13:29:57.8690596Z env:
+2026-11-26T13:29:57.8690855Z   TOOL: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:57.8691254Z   TOOL_NOEXT: C:\Users\runneradmin\.cargo\bin\cargo-make
+2026-11-26T13:29:57.8691672Z   TOOL_FWD: C:/Users/runneradmin/.cargo/bin/cargo-make.exe
+2026-11-26T13:29:57.8692037Z   PROBE_DIR: crates/airsl-lua/rockspecs
+2026-11-26T13:29:57.8692410Z   AIRSL_LUAROCKS: C:/Users/runneradmin/.cargo/bin/cargo-make.exe
+2026-11-26T13:29:57.8692863Z   AIRSL_LUA54: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:57.8693302Z   AIRSL_LUAJIT: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:57.8693659Z ##[endgroup]
+2026-11-26T13:29:58.1984576Z [cargo-make] INFO - cargo make 0.37.24
+2026-11-26T13:29:58.5511787Z [cargo-make] INFO - 
+2026-11-26T13:29:58.5512228Z [cargo-make] INFO - Build File: Makefile.toml
+2026-11-26T13:29:58.5512575Z [cargo-make] INFO - Task: rocks-lookup
+2026-11-26T13:29:58.5512872Z [cargo-make] INFO - Profile: development
+2026-11-26T13:29:58.5515465Z [cargo-make] INFO - Running Task: rocks-lookup
+2026-11-26T13:29:58.5535646Z which C:/Users/runneradmin/.cargo/bin/cargo-make.exe -> [C:/Users/runneradmin/.cargo/bin\cargo-make.exe] 
+2026-11-26T13:29:58.5538085Z which C:\Users\runneradmin\.cargo\bin\cargo-make.exe -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe] 
+2026-11-26T13:29:58.5540900Z which C:\Users\runneradmin\.cargo\bin\cargo-make.exe -> [C:\Users\runneradmin\.cargo\bin\cargo-make.exe] 
+2026-11-26T13:29:58.5546045Z airsstack: rockspec crates\airsl-lua\rockspecs\airsstack-0.2.0-1.rockspec version [0.2.0] 
+2026-11-26T13:29:58.5549832Z airsstack-luajit: rockspec crates\airsl-lua\rockspecs\airsstack-luajit-0.2.0-1.rockspec version [0.2.0] 
+2026-11-26T13:29:58.5553747Z [cargo-make] INFO - ==================Time Summary==================
+2026-11-26T13:29:58.5554359Z [cargo-make] INFO - [Setup Env]:                49.86%     0.35 seconds
+2026-11-26T13:29:58.5554832Z [cargo-make] INFO - [Setup Env - Git]:          26.28%     0.18 seconds
+2026-11-26T13:29:58.5555294Z [cargo-make] INFO - [Setup Env - Crate Info]:   11.79%     0.08 seconds
+2026-11-26T13:29:58.5555770Z [cargo-make] INFO - [Setup Env - Rust]:         11.51%     0.08 seconds
+2026-11-26T13:29:58.5556507Z [cargo-make] INFO - rocks-lookup:               0.43%      0.00 seconds
+2026-11-26T13:29:58.5556986Z [cargo-make] INFO - [Load Makefiles]:           0.14%      0.00 seconds
+2026-11-26T13:29:58.5557643Z [cargo-make] INFO - [Setup Env - Duckscript]:   0.00%      0.00 seconds
+2026-11-26T13:29:58.5558414Z [cargo-make] INFO - [Setup Env - CI]:           0.00%      0.00 seconds
+2026-11-26T13:29:58.5558889Z [cargo-make] INFO - [Setup Env - Project]:      0.00%      0.00 seconds
+2026-11-26T13:29:58.5559361Z [cargo-make] INFO - [Setup Env - Vars]:         0.00%      0.00 seconds
+2026-11-26T13:29:58.5559801Z [cargo-make] INFO - ================================================
+2026-11-26T13:29:58.5560514Z [cargo-make] INFO - Build Done in 0.36 seconds.
+2026-11-26T13:29:58.6814451Z ##[group]Run echo "old_glob: success"
+2026-11-26T13:29:58.6814869Z [36;1mecho "old_glob: success"[0m
+2026-11-26T13:29:58.6815179Z [36;1mecho "found_all: success"[0m
+2026-11-26T13:29:58.6815486Z [36;1mecho "leftover: failure"[0m
+2026-11-26T13:29:58.6815811Z [36;1mecho "empty: failure"[0m
+2026-11-26T13:29:58.6816094Z [36;1mecho "malformed: failure"[0m
+2026-11-26T13:29:58.6816406Z [36;1mecho "luarocks_default: failure"[0m
+2026-11-26T13:29:58.6816755Z [36;1mecho "luarocks_bare_missing: failure"[0m
+2026-11-26T13:29:58.6817121Z [36;1mecho "luarocks_path_missing: failure"[0m
+2026-11-26T13:29:58.6817477Z [36;1mecho "luarocks_bare_found: success"[0m
+2026-11-26T13:29:58.6817814Z [36;1mecho "lua54_default: failure"[0m
+2026-11-26T13:29:58.6818126Z [36;1mecho "lua54_missing: failure"[0m
+2026-11-26T13:29:58.6818436Z [36;1mecho "luajit_default: failure"[0m
+2026-11-26T13:29:58.6818763Z [36;1mecho "luajit_missing: failure"[0m
+2026-11-26T13:29:58.6819102Z [36;1mecho "win_path_noext: success"[0m
+2026-11-26T13:29:58.6819471Z [36;1mecho "win_drive_missing: failure"[0m
+2026-11-26T13:29:58.6819798Z [36;1mecho "win_fwd_slash: success"[0m
+2026-11-26T13:29:58.6834934Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-26T13:29:58.6835359Z env:
+2026-11-26T13:29:58.6835600Z   TOOL: C:\Users\runneradmin\.cargo\bin\cargo-make.exe
+2026-11-26T13:29:58.6835982Z   TOOL_NOEXT: C:\Users\runneradmin\.cargo\bin\cargo-make
+2026-11-26T13:29:58.6836362Z   TOOL_FWD: C:/Users/runneradmin/.cargo/bin/cargo-make.exe
+2026-11-26T13:29:58.6836685Z ##[endgroup]
+2026-11-26T13:29:58.7195963Z old_glob: success
+2026-11-26T13:29:58.7196504Z found_all: success
+2026-11-26T13:29:58.7196950Z leftover: failure
+2026-11-26T13:29:58.7197447Z empty: failure
+2026-11-26T13:29:58.7197956Z malformed: failure
+2026-11-26T13:29:58.7198502Z luarocks_default: failure
+2026-11-26T13:29:58.7199010Z luarocks_bare_missing: failure
+2026-11-26T13:29:58.7199637Z luarocks_path_missing: failure
+2026-11-26T13:29:58.7200788Z luarocks_bare_found: success
+2026-11-26T13:29:58.7201273Z lua54_default: failure
+2026-11-26T13:29:58.7201730Z lua54_missing: failure
+2026-11-26T13:29:58.7202056Z luajit_default: failure
+2026-11-26T13:29:58.7202402Z luajit_missing: failure
+2026-11-26T13:29:58.7202722Z win_path_noext: success
+2026-11-26T13:29:58.7203043Z win_drive_missing: failure
+2026-11-26T13:29:58.7203381Z win_fwd_slash: success
+2026-11-26T13:29:58.7477084Z Post job cleanup.
+2026-11-26T13:29:58.9365897Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-11-26T13:29:58.9760061Z git version 2.56.1.windows.1
+2026-11-26T13:29:58.9849166Z Temporarily overriding HOME='D:\a\_temp\0f558504-266e-4882-875d-61accee20db2' before making global git config changes
+2026-11-26T13:29:58.9850465Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T13:29:58.9863913Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\airsl\airsl
+2026-11-26T13:29:59.0276505Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T13:29:59.0672564Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-11-26T13:29:59.6305519Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T13:29:59.6638585Z http.https://github.com/.extraheader
+2026-11-26T13:29:59.6694191Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-11-26T13:29:59.7075914Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-11-26T13:30:00.2782173Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T13:30:00.3160050Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-11-26T13:30:00.8962330Z Cleaning up orphan processes
+

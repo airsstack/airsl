@@ -1,0 +1,22 @@
+Q: D2 — the same glibc-floor probe for linux x86_64 under docker --platform linux/amd64 (emulated on the arm64 host).
+Date: 2026-11-26.
+SKIPPED: emulated build overloaded the host; x86_64 glibc floor to be proven on a real CI runner.
+(The coordinator stopped the run: host load ~14, OrbStack ~425% CPU, while this and two other containers ran in parallel.)
+Rust's documented floor for x86_64 (probes/60-glibc-linux-aarch64/rust-1.94.1-platform-support.md):
+42:`x86_64-unknown-linux-gnu` | 64-bit Linux (kernel 3.2+, glibc 2.17+)
+Only what ran before the stop is recorded below (image digests, toolchain, ldd); no .so was produced, nothing was loaded.
+
+### date: 2026-11-26T06:16:09Z  host: Darwin arm64  docker: 29.8.2
+### image quay.io/pypa/manylinux2014_x86_64@sha256:8a79ff36ce155d8f242dc8013d73c5e8bbe937defb15de7d7afb342c1ab537f4 : arch=amd64
+### image docker.io/library/rust:1-bookworm@sha256:30a9c647e188457aac6e0bd3f9d73ae725dc3f36e57a2808ba3dde653c7c6db8 : arch=amd64
+### image docker.io/library/debian:bullseye@sha256:c0a2ad73611131275b0e9a2e7544cfe3725f4268d4085d8c6f61fdd55aef7917 : arch=amd64
+### image docker.io/library/ubuntu:22.04@sha256:b682e31336cc8e0a73ed91ab32b7a95e32591c5ff09994490a20accf9b3600f9 : arch=amd64
+
+### step 1: build in quay.io/pypa/manylinux2014_x86_64
+== ml-amd64 toolchain
+x86_64
+rustc 1.94.1 (e408947bf 2026-03-25)
+cargo 1.94.1 (29ea6fb6a 2026-03-24)
+cc (GCC) 10.2.1 20210130 (Red Hat 10.2.1-11)
+== ml-amd64 ldd --version
+ldd (GNU libc) 2.17

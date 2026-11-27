@@ -1,0 +1,31 @@
+# probe 233: the native-load task form — @duckscript, interpreter lookup, copy failure, --target-dir.
+[config]
+skip_core_tasks = true
+
+[tasks.native-load]
+script_runner = "@duckscript"
+script = '''
+program = get_env AIRSL_LUA54
+if is_empty ${program}
+    program = set lua5.4
+end
+found = which ${program}
+echo "which ${program} -> [${found}]"
+if is_empty ${found}
+    echo "native-load: `${program}` was not found; install Lua 5.4 or set AIRSL_LUA54 to its interpreter"
+    exit 1
+end
+exec --fail-on-error cargo build --quiet --manifest-path toy/Cargo.toml --target-dir target/native-build
+mkdir target/native/lua54
+from = get_env PROBE_FROM
+if is_empty ${from}
+    from = set target/native-build/debug/libairsstack.dylib
+end
+copied = cp ${from} target/native/lua54/airsstack.so
+echo "cp ${from} -> ${copied}"
+if not ${copied}
+    echo "native-load: could not copy `${from}` to `target/native/lua54/airsstack.so`"
+    exit 1
+end
+exec --fail-on-error ${program} -e "print(_VERSION, io.open('target/native/lua54/airsstack.so') ~= nil)"
+'''

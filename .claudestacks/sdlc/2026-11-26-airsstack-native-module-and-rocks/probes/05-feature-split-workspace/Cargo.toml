@@ -1,0 +1,29 @@
+[workspace]
+resolver = "3"
+members  = ["crates/hostlib", "crates/cli", "crates/native"]
+
+[workspace.package]
+edition      = "2024"
+rust-version = "1.94"
+
+[workspace.dependencies]
+# No features here: each crate picks its Lua and its linking mode.
+mlua = { version = "=0.12.0" }
+
+# Copied from the airsl root Cargo.toml.
+[workspace.lints.rust]
+unsafe_code        = "forbid"
+missing_docs       = "warn"
+unreachable_pub    = "warn"
+unused_must_use    = "deny"
+
+[workspace.lints.clippy]
+pedantic           = { level = "warn", priority = -1 }
+nursery            = { level = "warn", priority = -1 }
+unwrap_used        = "deny"
+expect_used        = "warn"
+panic              = "deny"
+todo               = "warn"
+dbg_macro          = "deny"
+missing_errors_doc = "warn"
+missing_panics_doc = "warn"

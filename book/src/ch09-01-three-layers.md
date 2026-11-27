@@ -24,6 +24,9 @@ difference between the integer `3` and the float `3.0`. Older versions treat the
 number. Without that difference, JSON output could not be the same byte for byte from one run to the
 next.
 
+`airsl` always runs Lua 5.4. The native module for stock Lua also runs on LuaJIT, and
+[Running Scripts in Stock Lua](ch01-05-stock-lua.md) lists what differs there.
+
 ## 2. Policy
 
 A policy is three separate answers:

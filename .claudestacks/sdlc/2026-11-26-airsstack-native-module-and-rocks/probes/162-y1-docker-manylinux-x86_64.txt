@@ -1,0 +1,475 @@
+# Probe 162 -- y1-docker-manylinux-x86_64
+# question: Y1: can a job run directly in container: quay.io/pypa/manylinux2014_<arch> with actions/checkout (node in glibc 2.17), or must it docker run? Inside manylinux2014: Lua 5.4.8 + LuaJIT v2.1 from source, luarocks 3.12.2 from source per interpreter, luarocks make + pack both real-shaped rockspecs (crates/airsl-lua/rockspecs/), binary rock names, max GLIBC of each packed .so, unzip -l of each rock.
+# run: https://github.com/airsstack/airsl/actions/runs/45773840390 (run id 45773840390, attempt 1), job id 139752616714: https://github.com/airsstack/airsl/actions/runs/45773840390/job/139752616714
+# job: y1-docker (x86_64, ubuntu-latest) | runner label: ubuntu-latest | started 2026-11-26T07:14:29Z | head 64c02e9c3a4d5993e45ffe694f57b0c72eb7b458
+# runner image: ubuntu-26.04 20261111.635 (from the log's Runner Image group)
+# branch: probe/ci-toolchain-2026-11-26 (throwaway orphan, deleted after the probe); sources: 160-ci-probe-src/
+# date: 2026-11-26 (probe agent Y); log fetched with: gh api repos/airsstack/airsl/actions/jobs/139752616714/logs (byte for byte below this header)
+# --- raw job log ---
+﻿2026-11-26T07:14:30.5237736Z Current runner version: '2.338.2'
+2026-11-26T07:14:30.5275563Z ##[group]Runner Image Provisioner
+2026-11-26T07:14:30.5277040Z Hosted Compute Agent
+2026-11-26T07:14:30.5278138Z Version: 20261111.635
+2026-11-26T07:14:30.5279955Z Commit: b8a594ea514ff44cadb5342986c68b1eac6e22ed
+2026-11-26T07:14:30.5281305Z Build Date: 2026-11-11T01:49:01Z
+2026-11-26T07:14:30.5282518Z Worker ID: {0dc305dc-88ea-461d-9dfa-1c20c4870411}
+2026-11-26T07:14:30.5284120Z Region: eastus
+2026-11-26T07:14:30.5285196Z Cloud: Azure
+2026-11-26T07:14:30.5286268Z ##[endgroup]
+2026-11-26T07:14:30.5288739Z ##[group]Operating System
+2026-11-26T07:14:30.5289931Z Ubuntu
+2026-11-26T07:14:30.5290816Z 26.04.1
+2026-11-26T07:14:30.5291749Z LTS
+2026-11-26T07:14:30.5292782Z ##[endgroup]
+2026-11-26T07:14:30.5293925Z ##[group]Runner Image
+2026-11-26T07:14:30.5295106Z Image: ubuntu-26.04
+2026-11-26T07:14:30.5296197Z Version: 20261116.202.1
+2026-11-26T07:14:30.5298406Z Included Software: https://github.com/actions/runner-images/blob/ubuntu26/20261116.202/images/ubuntu/Ubuntu2604-Readme.md
+2026-11-26T07:14:30.5301213Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261116.202
+2026-11-26T07:14:30.5302981Z ##[endgroup]
+2026-11-26T07:14:30.5305258Z ##[group]GITHUB_TOKEN Permissions
+2026-11-26T07:14:30.5308328Z Contents: read
+2026-11-26T07:14:30.5309426Z Metadata: read
+2026-11-26T07:14:30.5310262Z ##[endgroup]
+2026-11-26T07:14:30.5314209Z Secret source: Actions
+2026-11-26T07:14:30.5315896Z Cache mode: write
+2026-11-26T07:14:30.5317284Z Prepare workflow directory
+2026-11-26T07:14:30.5938673Z Prepare all required actions
+2026-11-26T07:14:30.6016691Z Getting action download info
+2026-11-26T07:14:30.7481532Z Download action repository 'actions/checkout@v6' (SHA:d23441a48e516b6c34aea4fa41551a30e30af803)
+2026-11-26T07:14:30.9412315Z Complete job name: y1-docker (x86_64, ubuntu-latest)
+2026-11-26T07:14:31.0598780Z ##[group]Run actions/checkout@v6
+2026-11-26T07:14:31.0600217Z with:
+2026-11-26T07:14:31.0600788Z   repository: airsstack/airsl
+2026-11-26T07:14:31.0605529Z   token: ***
+2026-11-26T07:14:31.0606056Z   ssh-strict: true
+2026-11-26T07:14:31.0606619Z   ssh-user: git
+2026-11-26T07:14:31.0607218Z   persist-credentials: true
+2026-11-26T07:14:31.0607794Z   clean: true
+2026-11-26T07:14:31.0608330Z   sparse-checkout-cone-mode: true
+2026-11-26T07:14:31.0609011Z   fetch-depth: 1
+2026-11-26T07:14:31.0609586Z   fetch-tags: false
+2026-11-26T07:14:31.0610055Z   show-progress: true
+2026-11-26T07:14:31.0610640Z   lfs: false
+2026-11-26T07:14:31.0611162Z   submodules: false
+2026-11-26T07:14:31.0611678Z   set-safe-directory: true
+2026-11-26T07:14:31.0612331Z   allow-unsafe-pr-checkout: false
+2026-11-26T07:14:31.0613346Z ##[endgroup]
+2026-11-26T07:14:31.3432678Z Syncing repository: airsstack/airsl
+2026-11-26T07:14:31.3436509Z ##[group]Getting Git version info
+2026-11-26T07:14:31.3438262Z Working directory is '/home/runner/work/airsl/airsl'
+2026-11-26T07:14:31.3440888Z [command]/usr/bin/git version
+2026-11-26T07:14:31.3442294Z git version 2.56.1
+2026-11-26T07:14:31.3480821Z ##[endgroup]
+2026-11-26T07:14:31.3496649Z Temporarily overriding HOME='/home/runner/work/_temp/b73a58ce-c39d-4f7d-a32a-c6652981a991' before making global git config changes
+2026-11-26T07:14:31.3499573Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T07:14:31.3504219Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/airsl/airsl
+2026-11-26T07:14:31.3580885Z Deleting the contents of '/home/runner/work/airsl/airsl'
+2026-11-26T07:14:31.3588331Z ##[group]Determining repository object format
+2026-11-26T07:14:31.3592500Z ##[endgroup]
+2026-11-26T07:14:31.3596422Z ##[group]Initializing the repository
+2026-11-26T07:14:31.3599477Z [command]/usr/bin/git init /home/runner/work/airsl/airsl
+2026-11-26T07:14:31.3712402Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-26T07:14:31.3716143Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-26T07:14:31.3719181Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-26T07:14:31.3722027Z hint: call:
+2026-11-26T07:14:31.3723338Z hint:
+2026-11-26T07:14:31.3730266Z hint: 	git config --global init.defaultBranch <name>
+2026-11-26T07:14:31.3733116Z hint:
+2026-11-26T07:14:31.3736173Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-26T07:14:31.3740406Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-26T07:14:31.3744461Z hint:
+2026-11-26T07:14:31.3746842Z hint: 	git branch -m <name>
+2026-11-26T07:14:31.3749039Z hint:
+2026-11-26T07:14:31.3751714Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-26T07:14:31.3756537Z Initialized empty Git repository in /home/runner/work/airsl/airsl/.git/
+2026-11-26T07:14:31.3763259Z [command]/usr/bin/git remote add origin https://github.com/airsstack/airsl
+2026-11-26T07:14:31.3832664Z ##[endgroup]
+2026-11-26T07:14:31.3835845Z ##[group]Disabling automatic garbage collection
+2026-11-26T07:14:31.3838711Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-26T07:14:31.3871362Z ##[endgroup]
+2026-11-26T07:14:31.3874900Z ##[group]Setting up auth
+2026-11-26T07:14:31.3877169Z Removing SSH command configuration
+2026-11-26T07:14:31.3881372Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T07:14:31.3931084Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T07:14:31.4413255Z Removing HTTP extra header
+2026-11-26T07:14:31.4423285Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T07:14:31.4464846Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T07:14:31.4749679Z Removing includeIf entries pointing to credentials config files
+2026-11-26T07:14:31.4758938Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T07:14:31.4802708Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T07:14:31.5105192Z [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-e8555581-a3a3-4a6b-a109-89ef8c8a0086.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-26T07:14:31.5151694Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/airsl/airsl/.git.path /home/runner/work/_temp/git-credentials-e8555581-a3a3-4a6b-a109-89ef8c8a0086.config
+2026-11-26T07:14:31.5188527Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/airsl/airsl/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-e8555581-a3a3-4a6b-a109-89ef8c8a0086.config
+2026-11-26T07:14:31.5230214Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-e8555581-a3a3-4a6b-a109-89ef8c8a0086.config
+2026-11-26T07:14:31.5269152Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-e8555581-a3a3-4a6b-a109-89ef8c8a0086.config
+2026-11-26T07:14:31.5313192Z ##[endgroup]
+2026-11-26T07:14:31.5316164Z ##[group]Fetching the repository
+2026-11-26T07:14:31.5322541Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +64c02e9c3a4d5993e45ffe694f57b0c72eb7b458:refs/remotes/origin/probe/ci-toolchain-2026-11-26
+2026-11-26T07:14:31.7553056Z From https://github.com/airsstack/airsl
+2026-11-26T07:14:31.7555825Z  * [new ref]         64c02e9c3a4d5993e45ffe694f57b0c72eb7b458 -> origin/probe/ci-toolchain-2026-11-26
+2026-11-26T07:14:31.7565221Z [command]/usr/bin/git branch --list --remote origin/probe/ci-toolchain-2026-11-26
+2026-11-26T07:14:31.7591450Z   origin/probe/ci-toolchain-2026-11-26
+2026-11-26T07:14:31.7601223Z [command]/usr/bin/git rev-parse refs/remotes/origin/probe/ci-toolchain-2026-11-26
+2026-11-26T07:14:31.7624381Z 64c02e9c3a4d5993e45ffe694f57b0c72eb7b458
+2026-11-26T07:14:31.7630802Z ##[endgroup]
+2026-11-26T07:14:31.7632402Z ##[group]Determining the checkout info
+2026-11-26T07:14:31.7634599Z ##[endgroup]
+2026-11-26T07:14:31.7636045Z [command]/usr/bin/git sparse-checkout disable
+2026-11-26T07:14:31.7690028Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-26T07:14:31.7721203Z ##[group]Checking out the ref
+2026-11-26T07:14:31.7725720Z [command]/usr/bin/git checkout --progress --force -B probe/ci-toolchain-2026-11-26 refs/remotes/origin/probe/ci-toolchain-2026-11-26
+2026-11-26T07:14:31.7799094Z Switched to a new branch 'probe/ci-toolchain-2026-11-26'
+2026-11-26T07:14:31.7805769Z branch 'probe/ci-toolchain-2026-11-26' set up to track 'origin/probe/ci-toolchain-2026-11-26'.
+2026-11-26T07:14:31.7811288Z ##[endgroup]
+2026-11-26T07:14:31.7854780Z [command]/usr/bin/git log -1 --format=%H
+2026-11-26T07:14:31.7880359Z 64c02e9c3a4d5993e45ffe694f57b0c72eb7b458
+2026-11-26T07:14:31.8177525Z ##[group]Run echo "runner=ubuntu-latest ImageOS=$ImageOS ImageVersion=$ImageVersion"; uname -m; docker version --format '{{.Server.Version}}'
+2026-11-26T07:14:31.8181713Z [36;1mecho "runner=ubuntu-latest ImageOS=$ImageOS ImageVersion=$ImageVersion"; uname -m; docker version --format '{{.Server.Version}}'[0m
+2026-11-26T07:14:31.8184580Z [36;1mI=quay.io/pypa/manylinux2014_x86_64[0m
+2026-11-26T07:14:31.8186614Z [36;1mdocker pull -q $I; echo "image: $(docker image inspect --format '{{index .RepoDigests 0}}' $I)"[0m
+2026-11-26T07:14:31.8188654Z [36;1mmkdir -p $RUNNER_TEMP/out[0m
+2026-11-26T07:14:31.8190554Z [36;1mdocker run --rm -v $PWD:/src:ro -v $RUNNER_TEMP/out:/out $I bash /src/ci/y1-manylinux.sh /src /out[0m
+2026-11-26T07:14:31.8192727Z [36;1mecho "docker exit=$?"; ls -la $RUNNER_TEMP/out[0m
+2026-11-26T07:14:31.8230437Z shell: /usr/bin/bash --noprofile --norc {0}
+2026-11-26T07:14:31.8231662Z ##[endgroup]
+2026-11-26T07:14:31.8317465Z runner=ubuntu-latest ImageOS=ubuntu26 ImageVersion=20261116.202.1
+2026-11-26T07:14:31.8340633Z x86_64
+2026-11-26T07:14:31.9337057Z 29.4.2
+2026-11-26T07:14:47.2747545Z quay.io/pypa/manylinux2014_x86_64:latest
+2026-11-26T07:14:47.3392093Z image: quay.io/pypa/manylinux2014_x86_64@sha256:8a79ff36ce155d8f242dc8013d73c5e8bbe937defb15de7d7afb342c1ab537f4
+2026-11-26T07:14:50.5644087Z == host: x86_64; ldd (GNU libc) 2.17; CentOS Linux release 7.9.2009 (Core)
+2026-11-26T07:14:50.5711546Z == tools: gcc (GCC) 10.2.1 20210130 (Red Hat 10.2.1-11); GNU Make 3.82; git=git version 2.56.1; unzip=/usr/bin/unzip; zip=absent
+2026-11-26T07:14:57.4443943Z yum install unzip zip exit=0
+2026-11-26T07:14:57.4456240Z Package unzip-6.0-24.el7_9.x86_64 already installed and latest version
+2026-11-26T07:14:57.4475117Z after: unzip=/usr/bin/unzip zip=/usr/bin/zip
+2026-11-26T07:14:57.4512561Z python for zip listing: /opt/python/cp315-cp315/bin/python3
+2026-11-26T07:15:05.8902105Z rustup exit=0
+2026-11-26T07:15:05.9020583Z rustc 1.94.1 (e408947bf 2026-03-25)
+2026-11-26T07:15:05.9113128Z cargo 1.94.1 (29ea6fb6a 2026-03-24)
+2026-11-26T07:15:08.3463240Z lua-5.4.8.tar.gz sha256: 4f18ddae154e793e46eeab727c59ef1c0c0c2b744e7b94219710d76f530629ae
+2026-11-26T07:15:13.8146593Z lua make exit=0
+2026-11-26T07:15:13.8328162Z lua install exit=0
+2026-11-26T07:15:14.2840232Z luajit commit 96f7b297326e9fd454b7186c6858b2773f94a0dc 2026-11-19T21:21:11+01:00
+2026-11-26T07:15:42.2339906Z luajit make exit=0
+2026-11-26T07:15:42.2346932Z LINK      luajit
+2026-11-26T07:15:42.2349497Z OK        Successfully built LuaJIT
+2026-11-26T07:15:42.2350549Z ==== Successfully built LuaJIT 2.1 ====
+2026-11-26T07:15:42.2914957Z luajit install exit=0
+2026-11-26T07:15:42.2924169Z ==== Installing LuaJIT 2.1.1795119671 to /opt/luajit ====
+2026-11-26T07:15:42.2924800Z ==== Successfully installed LuaJIT 2.1.1795119671 to /opt/luajit ====
+2026-11-26T07:15:42.2944818Z /opt/lua54/bin:
+2026-11-26T07:15:42.2945480Z lua
+2026-11-26T07:15:42.2945664Z luac
+2026-11-26T07:15:42.2945773Z 
+2026-11-26T07:15:42.2945862Z /opt/luajit/bin:
+2026-11-26T07:15:42.2946098Z luajit
+2026-11-26T07:15:42.2946296Z luajit-2.1.1795119671
+2026-11-26T07:15:42.2946583Z 
+2026-11-26T07:15:42.2946701Z /opt/luajit/include:
+2026-11-26T07:15:42.2946919Z luajit-2.1
+2026-11-26T07:15:42.2959718Z Lua 5.4.8  Copyright (C) 1994-2025 Lua.org, PUC-Rio
+2026-11-26T07:15:42.2970876Z LuaJIT 2.1.1795119671 -- Copyright (C) 2005-2026 Mike Pall. https://luajit.org/
+2026-11-26T07:15:42.6560046Z luarocks-3.12.2.tar.gz sha256: b0e0c85205841ddd7be485f53d6125766d18a81d226588d2366931e9a1484492
+2026-11-26T07:15:42.7450723Z luarocks(54) configure exit=0
+2026-11-26T07:15:42.7459261Z [1;36mDone configuring.[0m
+2026-11-26T07:15:42.7459733Z 
+2026-11-26T07:15:42.7460204Z LuaRocks will be installed at......: [1;32m/opt/lr54[0m
+2026-11-26T07:15:42.7460704Z LuaRocks will install rocks at.....: [1;32m/opt/lr54[0m
+2026-11-26T07:15:42.7461216Z LuaRocks configuration directory...: [1;32m/opt/lr54/etc/luarocks[0m
+2026-11-26T07:15:42.7462216Z Using Lua from.....................: [1;32m/opt/lua54[0m
+2026-11-26T07:15:42.7462670Z 
+2026-11-26T07:15:42.7462962Z * Type [1mmake[0m and [1mmake install[0m:
+2026-11-26T07:15:42.7463485Z   to install to /opt/lr54 as usual.
+2026-11-26T07:15:42.7464268Z * Type [1mmake bootstrap[0m:
+2026-11-26T07:15:42.7464790Z   to install LuaRocks into /opt/lr54 as a rock.
+2026-11-26T07:15:42.7465192Z 
+2026-11-26T07:15:43.1748998Z luarocks(54) make+install exit=0
+2026-11-26T07:15:43.1756027Z do \
+2026-11-26T07:15:43.1756689Z    install -m 644 "$f" '/opt/lr54/share/lua/5.4'/`echo $f | sed 's,^src/,,'`; \
+2026-11-26T07:15:43.1757461Z done
+2026-11-26T07:15:43.2733819Z luarocks(jit) configure exit=0
+2026-11-26T07:15:43.2740732Z 
+2026-11-26T07:15:43.2741593Z LuaRocks will be installed at......: [1;32m/opt/lrjit[0m
+2026-11-26T07:15:43.2742407Z LuaRocks will install rocks at.....: [1;32m/opt/lrjit[0m
+2026-11-26T07:15:43.2742957Z LuaRocks configuration directory...: [1;32m/opt/lrjit/etc/luarocks[0m
+2026-11-26T07:15:43.2743674Z Using Lua from.....................: [1;32m/opt/luajit[0m
+2026-11-26T07:15:43.2744367Z Lua include directory..............: [1;32m/opt/luajit/include/luajit-2.1[0m
+2026-11-26T07:15:43.2744680Z 
+2026-11-26T07:15:43.2744841Z * Type [1mmake[0m and [1mmake install[0m:
+2026-11-26T07:15:43.2745134Z   to install to /opt/lrjit as usual.
+2026-11-26T07:15:43.2745433Z * Type [1mmake bootstrap[0m:
+2026-11-26T07:15:43.2745752Z   to install LuaRocks into /opt/lrjit as a rock.
+2026-11-26T07:15:43.2745985Z 
+2026-11-26T07:15:43.7272547Z luarocks(jit) make+install exit=0
+2026-11-26T07:15:43.7280837Z do \
+2026-11-26T07:15:43.7281479Z    install -m 644 "$f" '/opt/lrjit/share/lua/5.1'/`echo $f | sed 's,^src/,,'`; \
+2026-11-26T07:15:43.7282204Z done
+2026-11-26T07:15:43.7787458Z === (54) /opt/lr54/bin/luarocks  --version: /opt/lr54/bin/luarocks 3.12.2
+2026-11-26T07:15:44.0220200Z config lua_version=5.4  arch=linux-x86_64  LUA=/opt/lua54/bin/lua  INCDIR=/opt/lua54/include
+2026-11-26T07:15:56.4388175Z Missing dependencies for airsstack 0.0.0-1:
+2026-11-26T07:15:56.4388985Z    luarocks-build-rust-mlua 0.2.7 (not installed)
+2026-11-26T07:15:56.4389329Z 
+2026-11-26T07:15:56.4389812Z airsstack 0.0.0-1 depends on luarocks-build-rust-mlua 0.2.7 (not installed)
+2026-11-26T07:15:56.4391938Z Installing https://luarocks.org/luarocks-build-rust-mlua-0.2.7-1.src.rock
+2026-11-26T07:15:56.4392425Z 
+2026-11-26T07:15:56.4392430Z 
+2026-11-26T07:15:56.4392590Z No existing manifest. Attempting to rebuild...
+2026-11-26T07:15:56.4392983Z     Updating crates.io index
+2026-11-26T07:15:56.4393475Z     Finished `release` profile [optimized] target(s) in 11.12s
+2026-11-26T07:15:56.4394345Z luarocks-build-rust-mlua 0.2.7-1 is now installed in /tmp/tree-54 (license: MIT)
+2026-11-26T07:15:56.4394788Z 
+2026-11-26T07:15:56.4394996Z 
+2026-11-26T07:15:56.4395720Z airsstack 0.0.0-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+2026-11-26T07:15:56.4397077Z airsstack 0.0.0-1 is now installed in /tmp/tree-54 (license: Apache-2.0)
+2026-11-26T07:15:56.4398383Z 
+2026-11-26T07:15:56.4398751Z make exit=0
+2026-11-26T07:15:56.4412218Z /tmp/tree-54/lib/lua/5.4/airsstack.so
+2026-11-26T07:15:56.4999248Z host: Lua 5.4
+2026-11-26T07:15:56.5004422Z require("airsstack").ok = true  json = [2,2.0]
+2026-11-26T07:15:56.5007896Z require exit=0
+2026-11-26T07:15:56.6231995Z Packed: /tmp/pack-54/airsstack-0.0.0-1.linux-x86_64.rock
+2026-11-26T07:15:56.6232951Z pack exit=0
+2026-11-26T07:15:56.6252163Z total 316
+2026-11-26T07:15:56.6252558Z drwxr-xr-x 2 root root   4096 Nov 26 07:15 .
+2026-11-26T07:15:56.6253228Z drwxrwxrwt 1 root root   4096 Nov 26 07:15 ..
+2026-11-26T07:15:56.6253975Z -rw-r--r-- 1 root root 313823 Nov 26 07:15 airsstack-0.0.0-1.linux-x86_64.rock
+2026-11-26T07:15:56.6268795Z == rock file: airsstack-0.0.0-1.linux-x86_64.rock
+2026-11-26T07:15:56.6285270Z Archive:  /tmp/pack-54/airsstack-0.0.0-1.linux-x86_64.rock
+2026-11-26T07:15:56.6285667Z   Length      Date    Time    Name
+2026-11-26T07:15:56.6285973Z ---------  ---------- -----   ----
+2026-11-26T07:15:56.6286541Z       581  11-26-2026 07:15   airsstack-0.0.0-1.rockspec
+2026-11-26T07:15:56.6286885Z         0  11-26-2026 07:15   lib/
+2026-11-26T07:15:56.6287201Z    754432  11-26-2026 07:15   lib/airsstack.so
+2026-11-26T07:15:56.6287602Z       168  11-26-2026 07:15   rock_manifest
+2026-11-26T07:15:56.6287983Z ---------                     -------
+2026-11-26T07:15:56.6288306Z    755181                     4 files
+2026-11-26T07:15:56.8651440Z -- /tmp/x/lib/airsstack.so
+2026-11-26T07:15:56.8687793Z max GLIBC: GLIBC_2.14
+2026-11-26T07:15:56.8722954Z all GLIBC: GLIBC_2.2.5 GLIBC_2.3 GLIBC_2.3.4 GLIBC_2.14 
+2026-11-26T07:15:56.8754204Z NEEDED: libgcc_s.so.1 librt.so.1 libpthread.so.0 libc.so.6 ld-linux-x86-64.so.2 
+2026-11-26T07:15:56.9167034Z === (jit) /opt/lrjit/bin/luarocks  --version: /opt/lrjit/bin/luarocks 3.12.2
+2026-11-26T07:15:57.1485962Z config lua_version=5.1  arch=linux-x86_64  LUA=/opt/luajit/bin/luajit  INCDIR=/opt/luajit/include/luajit-2.1
+2026-11-26T07:15:58.7143113Z Missing dependencies for airsstack-luajit 0.0.0-1:
+2026-11-26T07:15:58.7143942Z    luarocks-build-rust-mlua 0.2.7 (not installed)
+2026-11-26T07:15:58.7144404Z 
+2026-11-26T07:15:58.7144925Z airsstack-luajit 0.0.0-1 depends on luarocks-build-rust-mlua 0.2.7 (not installed)
+2026-11-26T07:15:58.7146034Z Installing https://luarocks.org/luarocks-build-rust-mlua-0.2.7-1.src.rock
+2026-11-26T07:15:58.7146615Z 
+2026-11-26T07:15:58.7146622Z 
+2026-11-26T07:15:58.7146870Z No existing manifest. Attempting to rebuild...
+2026-11-26T07:15:58.7147377Z 
+2026-11-26T07:15:58.7148655Z Error: Failed initializing build back-end for build type 'rust-mlua': module 'luarocks.build.rust-mlua' not found:Failed loading module luarocks.build.rust-mlua in LuaRocks rock luarocks-build-rust-mlua 0.2.7-1
+2026-11-26T07:15:58.7150330Z 	no field package.preload['luarocks.build.rust-mlua']
+2026-11-26T07:15:58.7151112Z 	no file '/opt/lrjit/share/lua/5.1/luarocks/build/rust-mlua.lua'
+2026-11-26T07:15:58.7151807Z 	no file './luarocks/build/rust-mlua.lua'
+2026-11-26T07:15:58.7152596Z 	no file '/opt/luajit/share/luajit-2.1/luarocks/build/rust-mlua.lua'
+2026-11-26T07:15:58.7153327Z 	no file '/usr/local/share/lua/5.1/luarocks/build/rust-mlua.lua'
+2026-11-26T07:15:58.7154278Z 	no file '/usr/local/share/lua/5.1/luarocks/build/rust-mlua/init.lua'
+2026-11-26T07:15:58.7154719Z 	no file '/opt/luajit/share/lua/5.1/luarocks/build/rust-mlua.lua'
+2026-11-26T07:15:58.7155166Z 	no file '/opt/luajit/share/lua/5.1/luarocks/build/rust-mlua/init.lua'
+2026-11-26T07:15:58.7155621Z 	no file '/root/.luarocks/share/lua/5.1/luarocks/build/rust-mlua.lua'
+2026-11-26T07:15:58.7156075Z 	no file '/root/.luarocks/share/lua/5.1/luarocks/build/rust-mlua/init.lua'
+2026-11-26T07:15:58.7156532Z 	no file '/opt/lrjit/share/lua/5.1/luarocks/build/rust-mlua/init.lua'
+2026-11-26T07:15:58.7156907Z 	no file './luarocks/build/rust-mlua.so'
+2026-11-26T07:15:58.7157244Z 	no file '/usr/local/lib/lua/5.1/luarocks/build/rust-mlua.so'
+2026-11-26T07:15:58.7157965Z 	no file '/opt/luajit/lib/lua/5.1/luarocks/build/rust-mlua.so'
+2026-11-26T07:15:58.7158338Z 	no file '/usr/local/lib/lua/5.1/loadall.so'
+2026-11-26T07:15:58.7158699Z 	no file '/root/.luarocks/lib/lua/5.1/luarocks/build/rust-mlua.so'
+2026-11-26T07:15:58.7159106Z 	no file '/opt/lrjit/lib/lua/5.1/luarocks/build/rust-mlua.so'
+2026-11-26T07:15:58.7159426Z 	no file './luarocks.so'
+2026-11-26T07:15:58.7159673Z 	no file '/usr/local/lib/lua/5.1/luarocks.so'
+2026-11-26T07:15:58.7159975Z 	no file '/opt/luajit/lib/lua/5.1/luarocks.so'
+2026-11-26T07:15:58.7160279Z 	no file '/usr/local/lib/lua/5.1/loadall.so'
+2026-11-26T07:15:58.7160584Z 	no file '/root/.luarocks/lib/lua/5.1/luarocks.so'
+2026-11-26T07:15:58.7160907Z 	no file '/opt/lrjit/lib/lua/5.1/luarocks.so'
+2026-11-26T07:15:58.7161333Z luarocks-build-rust-mlua 0.2.7-1 is now installed in /tmp/tree-jit (license: MIT)
+2026-11-26T07:15:58.7161659Z 
+2026-11-26T07:15:58.7161663Z 
+2026-11-26T07:15:58.7238758Z airsstack-luajit 0.0.0-1 depends on lua 5.1 (5.1-1 provided by VM: success)
+2026-11-26T07:15:58.7239918Z airsstack-luajit 0.0.0-1 depends on luajit >= 2.1 (2.1.1795119671-1 provided by VM: success)
+2026-11-26T07:15:58.7241038Z make exit=1
+2026-11-26T07:15:58.7740476Z host: Lua 5.1 / LuaJIT 2.1.1795119671
+2026-11-26T07:15:58.7741109Z require failed: module 'airsstack' not found:
+2026-11-26T07:15:58.7741551Z 	no field package.preload['airsstack']
+2026-11-26T07:15:58.7741927Z 	no file '/tmp/tree-jit/share/lua/5.1/airsstack.lua'
+2026-11-26T07:15:58.7742457Z 	no file '/tmp/tree-jit/share/lua/5.1/airsstack/init.lua'
+2026-11-26T07:15:58.7743055Z 	no file '/opt/lrjit/share/lua/5.1/airsstack.lua'
+2026-11-26T07:15:58.7743873Z 	no file './airsstack.lua'
+2026-11-26T07:15:58.7744398Z 	no file '/opt/luajit/share/luajit-2.1/airsstack.lua'
+2026-11-26T07:15:58.7745025Z 	no file '/usr/local/share/lua/5.1/airsstack.lua'
+2026-11-26T07:15:58.7745692Z 	no file '/usr/local/share/lua/5.1/airsstack/init.lua'
+2026-11-26T07:15:58.7746300Z 	no file '/opt/luajit/share/lua/5.1/airsstack.lua'
+2026-11-26T07:15:58.7746801Z 	no file '/opt/luajit/share/lua/5.1/airsstack/init.lua'
+2026-11-26T07:15:58.7747192Z 	no file '/root/.luarocks/share/lua/5.1/airsstack.lua'
+2026-11-26T07:15:58.7747582Z 	no file '/root/.luarocks/share/lua/5.1/airsstack/init.lua'
+2026-11-26T07:15:58.7747967Z 	no file '/opt/lrjit/share/lua/5.1/airsstack/init.lua'
+2026-11-26T07:15:58.7748315Z 	no file '/tmp/tree-jit/lib/lua/5.1/airsstack.so'
+2026-11-26T07:15:58.7748627Z 	no file './airsstack.so'
+2026-11-26T07:15:58.7748893Z 	no file '/usr/local/lib/lua/5.1/airsstack.so'
+2026-11-26T07:15:58.7749215Z 	no file '/opt/luajit/lib/lua/5.1/airsstack.so'
+2026-11-26T07:15:58.7749537Z 	no file '/usr/local/lib/lua/5.1/loadall.so'
+2026-11-26T07:15:58.7749865Z 	no file '/root/.luarocks/lib/lua/5.1/airsstack.so'
+2026-11-26T07:15:58.7750209Z 	no file '/opt/lrjit/lib/lua/5.1/airsstack.so'
+2026-11-26T07:15:58.7750511Z require exit=1
+2026-11-26T07:15:58.8341261Z 
+2026-11-26T07:15:58.8341771Z Error: cannot find package airsstack-luajit
+2026-11-26T07:15:58.8342452Z Use 'list' to find installed rocks.
+2026-11-26T07:15:58.8345718Z pack exit=1
+2026-11-26T07:15:58.8364665Z total 8
+2026-11-26T07:15:58.8365043Z drwxr-xr-x 2 root root 4096 Nov 26 07:15 .
+2026-11-26T07:15:58.8365375Z drwxrwxrwt 1 root root 4096 Nov 26 07:15 ..
+2026-11-26T07:15:58.8382645Z == rock file: *.rock
+2026-11-26T07:15:58.8400879Z unzip:  cannot find or open /tmp/pack-jit/*.rock, /tmp/pack-jit/*.rock.zip or /tmp/pack-jit/*.rock.ZIP.
+2026-11-26T07:15:58.8401345Z 
+2026-11-26T07:15:58.8401448Z No zipfiles found.
+2026-11-26T07:15:58.9741770Z Traceback (most recent call last):
+2026-11-26T07:15:58.9747849Z   File "<frozen runpy>", line 201, in _run_module_as_main
+2026-11-26T07:15:58.9748420Z   File "<frozen runpy>", line 87, in _run_code
+2026-11-26T07:15:58.9749101Z   File "/opt/python/cp315-cp315/lib/python3.15/zipfile/__main__.py", line 4, in <module>
+2026-11-26T07:15:58.9749748Z     main()
+2026-11-26T07:15:58.9750026Z     ~~~~^^
+2026-11-26T07:15:58.9750560Z   File "/opt/python/cp315-cp315/lib/python3.15/zipfile/__init__.py", line 2406, in main
+2026-11-26T07:15:58.9751727Z     with ZipFile(src, 'r', metadata_encoding=encoding) as zf:
+2026-11-26T07:15:58.9752290Z          ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-26T07:15:58.9753014Z   File "/opt/python/cp315-cp315/lib/python3.15/zipfile/__init__.py", line 1487, in __init__
+2026-11-26T07:15:58.9753979Z     self.fp = io.open(file, filemode)
+2026-11-26T07:15:58.9754395Z               ~~~~~~~^^^^^^^^^^^^^^^^
+2026-11-26T07:15:58.9754992Z FileNotFoundError: [Errno 2] No such file or directory: '/tmp/pack-jit/*.rock'
+2026-11-26T07:15:58.9869308Z cp: cannot stat ‘/tmp/pack-jit/*.rock’: No such file or directory
+2026-11-26T07:15:58.9870173Z === (jit-sys) preinstall backend into /opt/lrjit
+2026-11-26T07:16:00.3507165Z Installing https://luarocks.org/luarocks-build-rust-mlua-0.2.7-1.src.rock
+2026-11-26T07:16:00.3733295Z 
+2026-11-26T07:16:00.3733308Z 
+2026-11-26T07:16:00.5028621Z No existing manifest. Attempting to rebuild...
+2026-11-26T07:16:00.5538860Z luarocks-build-rust-mlua 0.2.7-1 is now installed in /opt/lrjit (license: MIT)
+2026-11-26T07:16:00.5539458Z 
+2026-11-26T07:16:00.5540053Z install exit=0
+2026-11-26T07:16:00.5567570Z /opt/lrjit/share/lua/5.1/luarocks/build/rust-mlua.lua
+2026-11-26T07:16:00.5977077Z === (jit-sys) /opt/lrjit/bin/luarocks  --version: /opt/lrjit/bin/luarocks 3.12.2
+2026-11-26T07:16:00.8206630Z config lua_version=5.1  arch=linux-x86_64  LUA=/opt/luajit/bin/luajit  INCDIR=/opt/luajit/include/luajit-2.1
+2026-11-26T07:16:05.0427172Z     Finished `release` profile [optimized] target(s) in 4.07s
+2026-11-26T07:16:05.0427911Z 
+2026-11-26T07:16:05.0428593Z airsstack-luajit 0.0.0-1 depends on luarocks-build-rust-mlua 0.2.7 (0.2.7-1 installed: success)
+2026-11-26T07:16:05.0429299Z 
+2026-11-26T07:16:05.0429750Z airsstack-luajit 0.0.0-1 depends on lua 5.1 (5.1-1 provided by VM: success)
+2026-11-26T07:16:05.0430864Z airsstack-luajit 0.0.0-1 depends on luajit >= 2.1 (2.1.1795119671-1 provided by VM: success)
+2026-11-26T07:16:05.0431660Z No existing manifest. Attempting to rebuild...
+2026-11-26T07:16:05.0432186Z airsstack-luajit 0.0.0-1 is now installed in /tmp/tree-jit-sys (license: Apache-2.0)
+2026-11-26T07:16:05.0432820Z 
+2026-11-26T07:16:05.0432968Z make exit=0
+2026-11-26T07:16:05.0449535Z /tmp/tree-jit-sys/lib/lua/5.1/airsstack.so
+2026-11-26T07:16:05.1007179Z host: Lua 5.1 / LuaJIT 2.1.1795119671
+2026-11-26T07:16:05.1007763Z require("airsstack").ok = true  json = [2,2]
+2026-11-26T07:16:05.1008401Z require exit=0
+2026-11-26T07:16:05.2244153Z Packed: /tmp/pack-jit-sys/airsstack-luajit-0.0.0-1.linux-x86_64.rock
+2026-11-26T07:16:05.2246303Z pack exit=0
+2026-11-26T07:16:05.2263699Z total 320
+2026-11-26T07:16:05.2264177Z drwxr-xr-x 2 root root   4096 Nov 26 07:16 .
+2026-11-26T07:16:05.2264599Z drwxrwxrwt 1 root root   4096 Nov 26 07:16 ..
+2026-11-26T07:16:05.2265149Z -rw-r--r-- 1 root root 317952 Nov 26 07:16 airsstack-luajit-0.0.0-1.linux-x86_64.rock
+2026-11-26T07:16:05.2279199Z == rock file: airsstack-luajit-0.0.0-1.linux-x86_64.rock
+2026-11-26T07:16:05.2295420Z Archive:  /tmp/pack-jit-sys/airsstack-luajit-0.0.0-1.linux-x86_64.rock
+2026-11-26T07:16:05.2296559Z   Length      Date    Time    Name
+2026-11-26T07:16:05.2297240Z ---------  ---------- -----   ----
+2026-11-26T07:16:05.2297936Z       608  11-26-2026 07:16   airsstack-luajit-0.0.0-1.rockspec
+2026-11-26T07:16:05.2298818Z         0  11-26-2026 07:16   lib/
+2026-11-26T07:16:05.2299565Z    765336  11-26-2026 07:16   lib/airsstack.so
+2026-11-26T07:16:05.2299992Z       175  11-26-2026 07:16   rock_manifest
+2026-11-26T07:16:05.2300545Z ---------                     -------
+2026-11-26T07:16:05.2301151Z    766119                     4 files
+2026-11-26T07:16:05.2801398Z -- /tmp/x/lib/airsstack.so
+2026-11-26T07:16:05.2836974Z max GLIBC: GLIBC_2.14
+2026-11-26T07:16:05.2870498Z all GLIBC: GLIBC_2.2.5 GLIBC_2.3 GLIBC_2.3.4 GLIBC_2.14 
+2026-11-26T07:16:05.2904179Z NEEDED: libgcc_s.so.1 librt.so.1 libpthread.so.0 libc.so.6 ld-linux-x86-64.so.2 
+2026-11-26T07:16:05.3323366Z === (jit-via54) /opt/lr54/bin/luarocks --lua-version 5.1 --lua-dir /opt/luajit --version: /opt/lr54/bin/luarocks 3.12.2
+2026-11-26T07:16:05.5703727Z config lua_version=5.1  arch=linux-x86_64  LUA=/opt/luajit/bin/luajit  INCDIR=/opt/luajit/include/luajit-2.1
+2026-11-26T07:16:07.3023910Z Missing dependencies for airsstack-luajit 0.0.0-1:
+2026-11-26T07:16:07.3025672Z    luarocks-build-rust-mlua 0.2.7 (not installed)
+2026-11-26T07:16:07.3026575Z 
+2026-11-26T07:16:07.3027276Z airsstack-luajit 0.0.0-1 depends on luarocks-build-rust-mlua 0.2.7 (not installed)
+2026-11-26T07:16:07.3028485Z Installing https://luarocks.org/luarocks-build-rust-mlua-0.2.7-1.src.rock
+2026-11-26T07:16:07.3028846Z 
+2026-11-26T07:16:07.3028851Z 
+2026-11-26T07:16:07.3028978Z No existing manifest. Attempting to rebuild...
+2026-11-26T07:16:07.3029357Z     Finished `release` profile [optimized] target(s) in 0.03s
+2026-11-26T07:16:07.3029854Z luarocks-build-rust-mlua 0.2.7-1 is now installed in /tmp/tree-jit-via54 (license: MIT)
+2026-11-26T07:16:07.3030198Z 
+2026-11-26T07:16:07.3030227Z 
+2026-11-26T07:16:07.3030436Z airsstack-luajit 0.0.0-1 depends on lua 5.1 (5.1-1 provided by VM: success)
+2026-11-26T07:16:07.3031288Z airsstack-luajit 0.0.0-1 depends on luajit >= 2.1 (2.1.1795119671-1 provided by VM: success)
+2026-11-26T07:16:07.3031795Z No existing manifest. Attempting to rebuild...
+2026-11-26T07:16:07.3032256Z airsstack-luajit 0.0.0-1 is now installed in /tmp/tree-jit-via54 (license: Apache-2.0)
+2026-11-26T07:16:07.3032605Z 
+2026-11-26T07:16:07.3032736Z Missing dependencies for airsstack-luajit 0.0.0-1:
+2026-11-26T07:16:07.3033058Z    lua 5.1 (not installed)
+2026-11-26T07:16:07.3033289Z    luajit >= 2.1 (not installed)
+2026-11-26T07:16:07.3033784Z make exit=0
+2026-11-26T07:16:07.3051420Z /tmp/tree-jit-via54/lib/lua/5.1/airsstack.so
+2026-11-26T07:16:07.3638794Z host: Lua 5.1 / LuaJIT 2.1.1795119671
+2026-11-26T07:16:07.3639330Z require("airsstack").ok = true  json = [2,2]
+2026-11-26T07:16:07.3639653Z require exit=0
+2026-11-26T07:16:07.4888052Z Packed: /tmp/pack-jit-via54/airsstack-luajit-0.0.0-1.linux-x86_64.rock
+2026-11-26T07:16:07.4889219Z pack exit=0
+2026-11-26T07:16:07.4906799Z total 320
+2026-11-26T07:16:07.4907508Z drwxr-xr-x 2 root root   4096 Nov 26 07:16 .
+2026-11-26T07:16:07.4908161Z drwxrwxrwt 1 root root   4096 Nov 26 07:16 ..
+2026-11-26T07:16:07.4908972Z -rw-r--r-- 1 root root 317952 Nov 26 07:16 airsstack-luajit-0.0.0-1.linux-x86_64.rock
+2026-11-26T07:16:07.4924937Z == rock file: airsstack-luajit-0.0.0-1.linux-x86_64.rock
+2026-11-26T07:16:07.4940945Z Archive:  /tmp/pack-jit-via54/airsstack-luajit-0.0.0-1.linux-x86_64.rock
+2026-11-26T07:16:07.4941695Z   Length      Date    Time    Name
+2026-11-26T07:16:07.4942029Z ---------  ---------- -----   ----
+2026-11-26T07:16:07.4942386Z       608  11-26-2026 07:16   airsstack-luajit-0.0.0-1.rockspec
+2026-11-26T07:16:07.4942745Z         0  11-26-2026 07:16   lib/
+2026-11-26T07:16:07.4943072Z    765336  11-26-2026 07:16   lib/airsstack.so
+2026-11-26T07:16:07.4944204Z       175  11-26-2026 07:16   rock_manifest
+2026-11-26T07:16:07.4944779Z ---------                     -------
+2026-11-26T07:16:07.4945285Z    766119                     4 files
+2026-11-26T07:16:07.5455213Z -- /tmp/x/lib/airsstack.so
+2026-11-26T07:16:07.5489237Z max GLIBC: GLIBC_2.14
+2026-11-26T07:16:07.5523370Z all GLIBC: GLIBC_2.2.5 GLIBC_2.3 GLIBC_2.3.4 GLIBC_2.14 
+2026-11-26T07:16:07.5557209Z NEEDED: libgcc_s.so.1 librt.so.1 libpthread.so.0 libc.so.6 ld-linux-x86-64.so.2 
+2026-11-26T07:16:07.5595062Z total 628
+2026-11-26T07:16:07.5595469Z drwxr-xr-x 2 1001 1001   4096 Nov 26 07:16 .
+2026-11-26T07:16:07.5596017Z drwxr-xr-x 1 root root   4096 Nov 26 07:14 ..
+2026-11-26T07:16:07.5596707Z -rw-r--r-- 1 root root 313823 Nov 26 07:15 airsstack-0.0.0-1.linux-x86_64.rock
+2026-11-26T07:16:07.5597636Z -rw-r--r-- 1 root root 317952 Nov 26 07:16 airsstack-luajit-0.0.0-1.linux-x86_64.rock
+2026-11-26T07:16:08.2018427Z docker exit=0
+2026-11-26T07:16:08.2058691Z total 628
+2026-11-26T07:16:08.2059245Z drwxr-xr-x 2 runner runner   4096 Nov 26 07:16 .
+2026-11-26T07:16:08.2059826Z drwxr-xr-x 5 runner runner   4096 Nov 26 07:14 ..
+2026-11-26T07:16:08.2060752Z -rw-r--r-- 1 root   root   313823 Nov 26 07:15 airsstack-0.0.0-1.linux-x86_64.rock
+2026-11-26T07:16:08.2061725Z -rw-r--r-- 1 root   root   317952 Nov 26 07:16 airsstack-luajit-0.0.0-1.linux-x86_64.rock
+2026-11-26T07:16:08.2199610Z Post job cleanup.
+2026-11-26T07:16:08.3076909Z [command]/usr/bin/git version
+2026-11-26T07:16:08.3124630Z git version 2.56.1
+2026-11-26T07:16:08.3173271Z Temporarily overriding HOME='/home/runner/work/_temp/feef8ef5-3348-4670-affa-32c14c782e08' before making global git config changes
+2026-11-26T07:16:08.3174730Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T07:16:08.3181169Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/airsl/airsl
+2026-11-26T07:16:08.3217844Z Removing SSH command configuration
+2026-11-26T07:16:08.3225425Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T07:16:08.3265558Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T07:16:08.3572740Z Removing HTTP extra header
+2026-11-26T07:16:08.3578910Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T07:16:08.3623239Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T07:16:08.3944249Z Removing includeIf entries pointing to credentials config files
+2026-11-26T07:16:08.3958399Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T07:16:08.3987997Z includeif.gitdir:/home/runner/work/airsl/airsl/.git.path
+2026-11-26T07:16:08.3988954Z includeif.gitdir:/home/runner/work/airsl/airsl/.git/worktrees/*.path
+2026-11-26T07:16:08.3989919Z includeif.gitdir:/github/workspace/.git.path
+2026-11-26T07:16:08.3990701Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-11-26T07:16:08.3999110Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/airsl/airsl/.git.path
+2026-11-26T07:16:08.4025857Z /home/runner/work/_temp/git-credentials-e8555581-a3a3-4a6b-a109-89ef8c8a0086.config
+2026-11-26T07:16:08.4038271Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/airsl/airsl/.git.path /home/runner/work/_temp/git-credentials-e8555581-a3a3-4a6b-a109-89ef8c8a0086.config
+2026-11-26T07:16:08.4076311Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/airsl/airsl/.git/worktrees/*.path
+2026-11-26T07:16:08.4100074Z /home/runner/work/_temp/git-credentials-e8555581-a3a3-4a6b-a109-89ef8c8a0086.config
+2026-11-26T07:16:08.4110688Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/airsl/airsl/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-e8555581-a3a3-4a6b-a109-89ef8c8a0086.config
+2026-11-26T07:16:08.4146178Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+2026-11-26T07:16:08.4168763Z /github/runner_temp/git-credentials-e8555581-a3a3-4a6b-a109-89ef8c8a0086.config
+2026-11-26T07:16:08.4178329Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-e8555581-a3a3-4a6b-a109-89ef8c8a0086.config
+2026-11-26T07:16:08.4211727Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-11-26T07:16:08.4234987Z /github/runner_temp/git-credentials-e8555581-a3a3-4a6b-a109-89ef8c8a0086.config
+2026-11-26T07:16:08.4243321Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-e8555581-a3a3-4a6b-a109-89ef8c8a0086.config
+2026-11-26T07:16:08.4278659Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T07:16:08.4550518Z Removing credentials config '/home/runner/work/_temp/git-credentials-e8555581-a3a3-4a6b-a109-89ef8c8a0086.config'
+2026-11-26T07:16:08.4720802Z Cleaning up orphan processes

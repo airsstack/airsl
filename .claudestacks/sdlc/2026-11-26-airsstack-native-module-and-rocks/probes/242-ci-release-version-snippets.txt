@@ -1,0 +1,1360 @@
+# Probe 242 — the release jobs' version reads (probes 236 and 241) on GitHub-hosted ubuntu-latest, macos-latest and windows-latest
+question: R14: do the shell/jq snippets of the release jobs give, on the runners' own bash and jq, the same output as locally under
+  bash 3.2.57 / jq 1.7.1 (probe 241 for publish-rocks' tag read, probe 236 (c) and (e) for build-rocks' app_version read and file
+  test), every refusal included? Does build-rocks' `version` job, written as spec §5.6.6 writes it (bash, set -euo pipefail, env
+  PLAN from a job output, version to $GITHUB_OUTPUT), run on ubuntu-latest, and do the legs name both rockspecs from
+  needs.version.outputs.version in each leg's shell (bash on Linux and macOS, cmd on Windows)?
+answer: HOLDS, no difference. snippets: on all three runners the tag read is byte-identical to probe 241's cases and the app_version
+  read to probe 236 (c)'s (compared with diff after stripping the log timestamps: no output); files.sh gives probe 236 (e)'s lines.
+  version job: "found crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec", "found …/airsstack-luajit-0.2.0-1.rockspec",
+  "wrote version=0.2.0". legs: bash "found crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec; pack airsstack 0.2.0-1" (Linux,
+  macOS); cmd "found crates\airsl-lua\rockspecs\airsstack-0.2.0-1.rockspec; pack airsstack 0.2.0-1" (Windows; cmd's ";" is
+  echoed text), and the same for airsstack-luajit. Every job concluded success.
+tool versions (printed in the logs below): ubuntu-26.04 GNU bash 5.3.9(1)-release (x86_64-pc-linux-gnu), jq-1.8.1, /usr/bin/bash,
+  /usr/bin/jq (snippets and version jobs); macos-26-arm64 GNU bash 3.2.57(1)-release (arm64-apple-darwin25), jq-1.8.2,
+  /bin/bash, /opt/homebrew/bin/jq; windows-2025-vs2026 GNU bash 5.3.15(2)-release (x86_64-pc-cygwin) (Git Bash, `shell: bash`),
+  jq-1.8.2 at /c/ProgramData/Chocolatey/bin/jq; the Windows leg ran under `shell: cmd`.
+run: https://github.com/airsstack/airsl/actions/runs/45829615242 (attempt 1, conclusion success); workflow
+  242-ci-probe-src/.github/workflows/probe.yml at head 9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c, trigger push.
+jobs: snippets ubuntu https://github.com/airsstack/airsl/actions/runs/45829615242/job/139942662552 ; snippets macos https://github.com/airsstack/airsl/actions/runs/45829615242/job/139942663103 ; snippets windows https://github.com/airsstack/airsl/actions/runs/45829615242/job/139942663244 ; plan https://github.com/airsstack/airsl/actions/runs/45829615242/job/139942663062 ;
+  version https://github.com/airsstack/airsl/actions/runs/45829615242/job/139942726581 ; legs ubuntu https://github.com/airsstack/airsl/actions/runs/45829615242/job/139942784302 ; legs macos https://github.com/airsstack/airsl/actions/runs/45829615242/job/139942784385 ; legs windows https://github.com/airsstack/airsl/actions/runs/45829615242/job/139942784312
+runner images: snippets ubuntu-26.04 20261122.9.1, macos-26-arm64 20261123.0526.1, windows-2025-vs2026 20261116.315.1; plan,
+  version and legs ubuntu-26.04 20261116.202.1, legs macos-26-arm64 20261117.0516.1, legs windows-2025-vs2026 20261116.315.1.
+actions: actions/checkout@v5 (SHA fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09), the major ci.yml uses.
+setup: fixtures are probe 241's tag.sh, plan-tag.json, plan-pr.json and run.sh (as probe/run-tag.sh),
+  probe 236's app-version.sh and files.sh unchanged, new drivers run-app.sh and run-files.sh with probe 236 (c)/(e)'s cases, and
+  probe 235's two real rockspecs at crates/airsl-lua/rockspecs/. The plan job hands plan-pr.json on as output `val`, the form of
+  airsl-cli-release.yml's plan job; dist was not run. .gitattributes keeps *.sh and *.json LF for Git Bash. No tokens, no
+  artifacts (the run's artifact list: total_count 0).
+branch: probe-ci-rocks-version (throwaway, a fresh repository with only the files of 242-ci-probe-src, pushed to origin as that one
+  ref, deleted after the probe; see the end of this file).
+date: 2026-11-26; logs fetched with: gh api --allow-escape-sequences repos/airsstack/airsl/actions/jobs/<id>/logs (byte for byte
+  below each marker).
+# --- raw job log: snippets (ubuntu-latest) (139942662552) ---
+﻿2026-11-26T13:29:25.1494471Z Current runner version: '2.338.2'
+2026-11-26T13:29:25.1529699Z ##[group]Runner Image Provisioner
+2026-11-26T13:29:25.1531286Z Hosted Compute Agent
+2026-11-26T13:29:25.1532359Z Version: 20261111.635
+2026-11-26T13:29:25.1533461Z Commit: b8a594ea514ff44cadb5342986c68b1eac6e22ed
+2026-11-26T13:29:25.1534749Z Build Date: 2026-11-11T01:49:01Z
+2026-11-26T13:29:25.1536065Z Worker ID: {affe465e-eb6d-4ed5-bdbb-4f4fe69b91a3}
+2026-11-26T13:29:25.1537294Z Region: eastus
+2026-11-26T13:29:25.1538312Z Cloud: Azure
+2026-11-26T13:29:25.1539214Z ##[endgroup]
+2026-11-26T13:29:25.1542050Z ##[group]Operating System
+2026-11-26T13:29:25.1543177Z Ubuntu
+2026-11-26T13:29:25.1544055Z 26.04.1
+2026-11-26T13:29:25.1545288Z LTS
+2026-11-26T13:29:25.1546228Z ##[endgroup]
+2026-11-26T13:29:25.1547309Z ##[group]Runner Image
+2026-11-26T13:29:25.1548368Z Image: ubuntu-26.04
+2026-11-26T13:29:25.1549383Z Version: 20261122.9.1
+2026-11-26T13:29:25.1551648Z Included Software: https://github.com/actions/runner-images/blob/ubuntu26/20261122.9/images/ubuntu/Ubuntu2604-Readme.md
+2026-11-26T13:29:25.1554601Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261122.9
+2026-11-26T13:29:25.1556345Z ##[endgroup]
+2026-11-26T13:29:25.1558211Z ##[group]GITHUB_TOKEN Permissions
+2026-11-26T13:29:25.1561399Z Contents: read
+2026-11-26T13:29:25.1562491Z Metadata: read
+2026-11-26T13:29:25.1563392Z ##[endgroup]
+2026-11-26T13:29:25.1566462Z Secret source: Actions
+2026-11-26T13:29:25.1568074Z Cache mode: write
+2026-11-26T13:29:25.1569573Z Prepare workflow directory
+2026-11-26T13:29:25.2160366Z Prepare all required actions
+2026-11-26T13:29:25.2232805Z Getting action download info
+2026-11-26T13:29:25.4342761Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-11-26T13:29:25.6084358Z Complete job name: snippets (ubuntu-latest)
+2026-11-26T13:29:25.7223120Z ##[group]Run actions/checkout@v5
+2026-11-26T13:29:25.7224011Z with:
+2026-11-26T13:29:25.7224459Z   repository: airsstack/airsl
+2026-11-26T13:29:25.7228466Z   token: ***
+2026-11-26T13:29:25.7228907Z   ssh-strict: true
+2026-11-26T13:29:25.7229343Z   ssh-user: git
+2026-11-26T13:29:25.7229797Z   persist-credentials: true
+2026-11-26T13:29:25.7230285Z   clean: true
+2026-11-26T13:29:25.7230893Z   sparse-checkout-cone-mode: true
+2026-11-26T13:29:25.7231415Z   fetch-depth: 1
+2026-11-26T13:29:25.7231850Z   fetch-tags: false
+2026-11-26T13:29:25.7232298Z   show-progress: true
+2026-11-26T13:29:25.7232746Z   lfs: false
+2026-11-26T13:29:25.7233162Z   submodules: false
+2026-11-26T13:29:25.7233611Z   set-safe-directory: true
+2026-11-26T13:29:25.7234129Z   allow-unsafe-pr-checkout: false
+2026-11-26T13:29:25.7235280Z ##[endgroup]
+2026-11-26T13:29:25.9744843Z Syncing repository: airsstack/airsl
+2026-11-26T13:29:25.9749124Z ##[group]Getting Git version info
+2026-11-26T13:29:25.9751226Z Working directory is '/home/runner/work/airsl/airsl'
+2026-11-26T13:29:25.9776089Z [command]/usr/bin/git version
+2026-11-26T13:29:25.9826428Z git version 2.56.1
+2026-11-26T13:29:25.9852450Z ##[endgroup]
+2026-11-26T13:29:25.9868616Z Temporarily overriding HOME='/home/runner/work/_temp/c5aa082c-9662-4276-b7e7-191c31b0249e' before making global git config changes
+2026-11-26T13:29:25.9871994Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T13:29:25.9874639Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/airsl/airsl
+2026-11-26T13:29:25.9935378Z Deleting the contents of '/home/runner/work/airsl/airsl'
+2026-11-26T13:29:25.9941995Z ##[group]Initializing the repository
+2026-11-26T13:29:25.9943259Z [command]/usr/bin/git init /home/runner/work/airsl/airsl
+2026-11-26T13:29:26.0036418Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-26T13:29:26.0038658Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-26T13:29:26.0041198Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-26T13:29:26.0043147Z hint: call:
+2026-11-26T13:29:26.0044650Z hint:
+2026-11-26T13:29:26.0046123Z hint: 	git config --global init.defaultBranch <name>
+2026-11-26T13:29:26.0047859Z hint:
+2026-11-26T13:29:26.0049406Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-26T13:29:26.0051909Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-26T13:29:26.0053832Z hint:
+2026-11-26T13:29:26.0055082Z hint: 	git branch -m <name>
+2026-11-26T13:29:26.0056373Z hint:
+2026-11-26T13:29:26.0057920Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-26T13:29:26.0060243Z Initialized empty Git repository in /home/runner/work/airsl/airsl/.git/
+2026-11-26T13:29:26.0064007Z [command]/usr/bin/git remote add origin https://github.com/airsstack/airsl
+2026-11-26T13:29:26.0111920Z ##[endgroup]
+2026-11-26T13:29:26.0113587Z ##[group]Disabling automatic garbage collection
+2026-11-26T13:29:26.0115964Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-26T13:29:26.0182136Z ##[endgroup]
+2026-11-26T13:29:26.0183525Z ##[group]Setting up auth
+2026-11-26T13:29:26.0184872Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T13:29:26.0223473Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T13:29:26.0704086Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T13:29:26.0734915Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T13:29:26.1030800Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T13:29:26.1073641Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T13:29:26.1342214Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-26T13:29:26.1383079Z ##[endgroup]
+2026-11-26T13:29:26.1384847Z ##[group]Fetching the repository
+2026-11-26T13:29:26.1395339Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c:refs/remotes/origin/probe-ci-rocks-version
+2026-11-26T13:29:26.3431678Z From https://github.com/airsstack/airsl
+2026-11-26T13:29:26.3435406Z  * [new ref]         9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c -> origin/probe-ci-rocks-version
+2026-11-26T13:29:26.3437573Z ##[endgroup]
+2026-11-26T13:29:26.3438535Z ##[group]Determining the checkout info
+2026-11-26T13:29:26.3440010Z ##[endgroup]
+2026-11-26T13:29:26.3446661Z [command]/usr/bin/git sparse-checkout disable
+2026-11-26T13:29:26.3498583Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-26T13:29:26.3528876Z ##[group]Checking out the ref
+2026-11-26T13:29:26.3533818Z [command]/usr/bin/git checkout --progress --force -B probe-ci-rocks-version refs/remotes/origin/probe-ci-rocks-version
+2026-11-26T13:29:26.3611360Z Switched to a new branch 'probe-ci-rocks-version'
+2026-11-26T13:29:26.3617301Z branch 'probe-ci-rocks-version' set up to track 'origin/probe-ci-rocks-version'.
+2026-11-26T13:29:26.3622889Z ##[endgroup]
+2026-11-26T13:29:26.3669371Z [command]/usr/bin/git log -1 --format=%H
+2026-11-26T13:29:26.3694379Z 9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c
+2026-11-26T13:29:26.3930193Z ##[group]Run echo "\$ bash --version | head -1; jq --version; command -v bash jq"
+2026-11-26T13:29:26.3931516Z [36;1mecho "\$ bash --version | head -1; jq --version; command -v bash jq"[0m
+2026-11-26T13:29:26.3932497Z [36;1mbash --version | head -1; jq --version; command -v bash jq[0m
+2026-11-26T13:29:26.3970087Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T13:29:26.3971003Z ##[endgroup]
+2026-11-26T13:29:26.4049950Z $ bash --version | head -1; jq --version; command -v bash jq
+2026-11-26T13:29:26.4076930Z GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)
+2026-11-26T13:29:26.4092686Z jq-1.8.1
+2026-11-26T13:29:26.4094950Z /usr/bin/bash
+2026-11-26T13:29:26.4095766Z /usr/bin/jq
+2026-11-26T13:29:26.4145188Z ##[group]Run bash probe/run-tag.sh probe
+2026-11-26T13:29:26.4145920Z [36;1mbash probe/run-tag.sh probe[0m
+2026-11-26T13:29:26.4176919Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T13:29:26.4177676Z ##[endgroup]
+2026-11-26T13:29:26.4273202Z $ PLAN=<plan-tag.json> bash tag.sh
+2026-11-26T13:29:26.4317739Z version=0.2.0
+2026-11-26T13:29:26.4320465Z [exit 0]
+2026-11-26T13:29:26.4349798Z $ PLAN=<plan-pr.json> bash tag.sh
+2026-11-26T13:29:26.4394916Z publish-rocks: the release tag v0.2.0 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T13:29:26.4396808Z [exit 1]
+2026-11-26T13:29:26.4399052Z $ PLAN='{"announcement_tag":"airsl-cli-v0.0.0","announcement_is_prerelease":false,"publish_prereleases":false,"artifacts":{}}' bash tag.sh
+2026-11-26T13:29:26.4442089Z version=0.0.0
+2026-11-26T13:29:26.4444479Z [exit 0]
+2026-11-26T13:29:26.4487389Z $ PLAN='{"announcement_tag":null}' bash tag.sh
+2026-11-26T13:29:26.4488372Z publish-rocks: the release plan names no tag; nothing was uploaded
+2026-11-26T13:29:26.4489704Z [exit 1]
+2026-11-26T13:29:26.4490801Z $ PLAN='{}' bash tag.sh
+2026-11-26T13:29:26.4532619Z publish-rocks: the release plan names no tag; nothing was uploaded
+2026-11-26T13:29:26.4534826Z [exit 1]
+2026-11-26T13:29:26.4535677Z $ PLAN='' bash tag.sh
+2026-11-26T13:29:26.4579505Z publish-rocks: the release plan names no tag; nothing was uploaded
+2026-11-26T13:29:26.4581266Z [exit 1]
+2026-11-26T13:29:26.4581839Z $ PLAN='{"announcement_tag":""}' bash tag.sh
+2026-11-26T13:29:26.4625322Z publish-rocks: the release plan names no tag; nothing was uploaded
+2026-11-26T13:29:26.4627004Z [exit 1]
+2026-11-26T13:29:26.4627693Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2"}' bash tag.sh
+2026-11-26T13:29:26.4671354Z publish-rocks: the release tag airsl-cli-v0.2 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T13:29:26.4673005Z [exit 1]
+2026-11-26T13:29:26.4673741Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2.0-rc.1"}' bash tag.sh
+2026-11-26T13:29:26.4717041Z publish-rocks: the release tag airsl-cli-v0.2.0-rc.1 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T13:29:26.4718791Z [exit 1]
+2026-11-26T13:29:26.4719488Z $ PLAN='{"announcement_tag":"airsl-v0.2.0"}' bash tag.sh
+2026-11-26T13:29:26.4763210Z publish-rocks: the release tag airsl-v0.2.0 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T13:29:26.4764906Z [exit 1]
+2026-11-26T13:29:26.4765544Z $ PLAN='{"announcement_tag":5}' bash tag.sh
+2026-11-26T13:29:26.4808959Z publish-rocks: the release tag 5 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T13:29:26.4810846Z [exit 1]
+2026-11-26T13:29:26.4811603Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2.0\n"}' bash tag.sh
+2026-11-26T13:29:26.4854617Z version=0.2.0
+2026-11-26T13:29:26.4856904Z [exit 0]
+2026-11-26T13:29:26.4857576Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2.0
+2026-11-26T13:29:26.4858545Z "}' bash tag.sh
+2026-11-26T13:29:26.4896293Z jq: parse error: Invalid string: control characters from U+0000 through U+001F must be escaped at line 2, column 1
+2026-11-26T13:29:26.4901409Z publish-rocks: could not read the release plan: jq exit status 5; nothing was uploaded
+2026-11-26T13:29:26.4903175Z [exit 1]
+2026-11-26T13:29:26.4903802Z $ PLAN='not json' bash tag.sh
+2026-11-26T13:29:26.4941591Z jq: parse error: Invalid numeric literal at line 1, column 4
+2026-11-26T13:29:26.4946617Z publish-rocks: could not read the release plan: jq exit status 5; nothing was uploaded
+2026-11-26T13:29:26.4948385Z [exit 1]
+2026-11-26T13:29:26.5007833Z ##[group]Run bash probe/run-app.sh probe
+2026-11-26T13:29:26.5008638Z [36;1mbash probe/run-app.sh probe[0m
+2026-11-26T13:29:26.5040720Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T13:29:26.5041668Z ##[endgroup]
+2026-11-26T13:29:26.5134417Z $ PLAN=<plan-tag.json> bash app-version.sh
+2026-11-26T13:29:26.5177593Z version=0.2.0
+2026-11-26T13:29:26.5179815Z [exit 0]
+2026-11-26T13:29:26.5208001Z $ PLAN=<plan-pr.json> bash app-version.sh
+2026-11-26T13:29:26.5251325Z version=0.2.0
+2026-11-26T13:29:26.5253475Z [exit 0]
+2026-11-26T13:29:26.5254430Z $ PLAN='{"releases":[]}' bash app-version.sh
+2026-11-26T13:29:26.5297578Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T13:29:26.5299183Z [exit 1]
+2026-11-26T13:29:26.5375664Z $ PLAN='{}' bash app-version.sh
+2026-11-26T13:29:26.5377711Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T13:29:26.5379592Z [exit 1]
+2026-11-26T13:29:26.5381289Z $ PLAN='' bash app-version.sh
+2026-11-26T13:29:26.5390844Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T13:29:26.5392694Z [exit 1]
+2026-11-26T13:29:26.5394198Z $ PLAN='{"releases":[{"app_name":"airsl","app_version":"0.2.0"},{"app_name":"airsl-cli","app_version":"0.2.0"}]}' bash app-version.sh
+2026-11-26T13:29:26.5437734Z version=0.2.0
+2026-11-26T13:29:26.5439819Z [exit 0]
+2026-11-26T13:29:26.5440902Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":"0.2"}]}' bash app-version.sh
+2026-11-26T13:29:26.5483982Z build-rocks: the release plan's airsl-cli version 0.2 is not <major>.<minor>.<patch>
+2026-11-26T13:29:26.5485952Z [exit 1]
+2026-11-26T13:29:26.5487010Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":"0.2.0"},{"app_name":"airsl-cli","app_version":"0.3.0"}]}' bash app-version.sh
+2026-11-26T13:29:26.5529572Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T13:29:26.5531702Z [exit 1]
+2026-11-26T13:29:26.5532271Z $ PLAN='not json' bash app-version.sh
+2026-11-26T13:29:26.5570834Z jq: parse error: Invalid numeric literal at line 1, column 4
+2026-11-26T13:29:26.5575648Z build-rocks: could not read the release plan: jq exit status 5
+2026-11-26T13:29:26.5577535Z [exit 1]
+2026-11-26T13:29:26.5630330Z ##[group]Run bash probe/run-files.sh probe .
+2026-11-26T13:29:26.5631424Z [36;1mbash probe/run-files.sh probe .[0m
+2026-11-26T13:29:26.5663177Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T13:29:26.5663913Z ##[endgroup]
+2026-11-26T13:29:26.5729117Z $ bash files.sh <checkout> 0.2.0
+2026-11-26T13:29:26.5743865Z found crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec
+2026-11-26T13:29:26.5745312Z found crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec
+2026-11-26T13:29:26.5746707Z [exit 0]
+2026-11-26T13:29:26.5747374Z $ bash files.sh <checkout> 0.3.0
+2026-11-26T13:29:26.5759604Z build-rocks: crates/airsl-lua/rockspecs/airsstack-0.3.0-1.rockspec is missing
+2026-11-26T13:29:26.5761654Z [exit 1]
+2026-11-26T13:29:26.5925188Z Post job cleanup.
+2026-11-26T13:29:26.6785594Z [command]/usr/bin/git version
+2026-11-26T13:29:26.6829450Z git version 2.56.1
+2026-11-26T13:29:26.6869275Z Temporarily overriding HOME='/home/runner/work/_temp/11a0cc83-c3b6-4782-9fbe-d6c092f8f5dd' before making global git config changes
+2026-11-26T13:29:26.6872213Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T13:29:26.6882401Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/airsl/airsl
+2026-11-26T13:29:26.6914013Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T13:29:26.6951384Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T13:29:26.7284160Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T13:29:26.7313951Z http.https://github.com/.extraheader
+2026-11-26T13:29:26.7325691Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-26T13:29:26.7392621Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T13:29:26.7704688Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T13:29:26.7771588Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T13:29:26.8221913Z Cleaning up orphan processes
+
+# --- raw job log: snippets (macos-latest) (139942663103) ---
+﻿2026-11-26T13:29:30.2391680Z Current runner version: '2.338.2'
+2026-11-26T13:29:30.2419670Z ##[group]Runner Image Provisioner
+2026-11-26T13:29:30.2420380Z Hosted Compute Agent
+2026-11-26T13:29:30.2420750Z Version: 20261111.635
+2026-11-26T13:29:30.2421160Z Commit: b8a594ea514ff44cadb5342986c68b1eac6e22ed
+2026-11-26T13:29:30.2421630Z Build Date: 2026-11-11T01:49:01Z
+2026-11-26T13:29:30.2422070Z Worker ID: {91649037-dc83-4209-bf48-0916a074085f}
+2026-11-26T13:29:30.2422520Z Region: westus
+2026-11-26T13:29:30.2422870Z Cloud: MacCloud
+2026-11-26T13:29:30.2423210Z ##[endgroup]
+2026-11-26T13:29:30.2424190Z ##[group]Operating System
+2026-11-26T13:29:30.2424580Z macOS
+2026-11-26T13:29:30.2425000Z 26.7.2
+2026-11-26T13:29:30.2425390Z 25G332
+2026-11-26T13:29:30.2426510Z ##[endgroup]
+2026-11-26T13:29:30.2427780Z ##[group]Runner Image
+2026-11-26T13:29:30.2428860Z Image: macos-26-arm64
+2026-11-26T13:29:30.2429970Z Version: 20261123.0526.1
+2026-11-26T13:29:30.2432490Z Included Software: https://github.com/actions/runner-images/blob/macos-26-arm64/20261123.0526/images/macos/macos-26-arm64-Readme.md
+2026-11-26T13:29:30.2435670Z Image Release: https://github.com/actions/runner-images/releases/tag/macos-26-arm64%2F20261123.0526
+2026-11-26T13:29:30.2436510Z ##[endgroup]
+2026-11-26T13:29:30.2437420Z ##[group]GITHUB_TOKEN Permissions
+2026-11-26T13:29:30.2439310Z Contents: read
+2026-11-26T13:29:30.2439900Z Metadata: read
+2026-11-26T13:29:30.2440290Z ##[endgroup]
+2026-11-26T13:29:30.2442050Z Secret source: Actions
+2026-11-26T13:29:30.2442620Z Cache mode: write
+2026-11-26T13:29:30.2443080Z Prepare workflow directory
+2026-11-26T13:29:30.3060310Z Prepare all required actions
+2026-11-26T13:29:30.3146270Z Getting action download info
+2026-11-26T13:29:30.7493830Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-11-26T13:29:31.1862310Z Complete job name: snippets (macos-latest)
+2026-11-26T13:29:31.2810390Z ##[group]Run actions/checkout@v5
+2026-11-26T13:29:31.2811130Z with:
+2026-11-26T13:29:31.2811470Z   repository: airsstack/airsl
+2026-11-26T13:29:31.2815040Z   token: ***
+2026-11-26T13:29:31.2815390Z   ssh-strict: true
+2026-11-26T13:29:31.2815720Z   ssh-user: git
+2026-11-26T13:29:31.2816080Z   persist-credentials: true
+2026-11-26T13:29:31.2818550Z   clean: true
+2026-11-26T13:29:31.2819840Z   sparse-checkout-cone-mode: true
+2026-11-26T13:29:31.2821560Z   fetch-depth: 1
+2026-11-26T13:29:31.2822020Z   fetch-tags: false
+2026-11-26T13:29:31.2822400Z   show-progress: true
+2026-11-26T13:29:31.2822820Z   lfs: false
+2026-11-26T13:29:31.2823170Z   submodules: false
+2026-11-26T13:29:31.2823610Z   set-safe-directory: true
+2026-11-26T13:29:31.2824030Z   allow-unsafe-pr-checkout: false
+2026-11-26T13:29:31.2825230Z ##[endgroup]
+2026-11-26T13:29:31.6968110Z Syncing repository: airsstack/airsl
+2026-11-26T13:29:31.6969640Z ##[group]Getting Git version info
+2026-11-26T13:29:31.6970320Z Working directory is '/Users/runner/work/airsl/airsl'
+2026-11-26T13:29:31.6971230Z [command]/opt/homebrew/bin/git version
+2026-11-26T13:29:31.7274230Z git version 2.56.1
+2026-11-26T13:29:31.7289270Z ##[endgroup]
+2026-11-26T13:29:31.7302220Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/6ed77f4e-12df-4eea-a89a-0020af869b8b/.gitconfig'
+2026-11-26T13:29:31.7309800Z Temporarily overriding HOME='/Users/runner/work/_temp/6ed77f4e-12df-4eea-a89a-0020af869b8b' before making global git config changes
+2026-11-26T13:29:31.7311490Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T13:29:31.7315010Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/airsl/airsl
+2026-11-26T13:29:31.7443090Z Deleting the contents of '/Users/runner/work/airsl/airsl'
+2026-11-26T13:29:31.7445510Z ##[group]Initializing the repository
+2026-11-26T13:29:31.7449370Z [command]/opt/homebrew/bin/git init /Users/runner/work/airsl/airsl
+2026-11-26T13:29:31.7703400Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-26T13:29:31.7705680Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-26T13:29:31.7707500Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-26T13:29:31.7708060Z hint: call:
+2026-11-26T13:29:31.7708440Z hint:
+2026-11-26T13:29:31.7709030Z hint: 	git config --global init.defaultBranch <name>
+2026-11-26T13:29:31.7709610Z hint:
+2026-11-26T13:29:31.7710170Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-26T13:29:31.7710930Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-26T13:29:31.7711500Z hint:
+2026-11-26T13:29:31.7711880Z hint: 	git branch -m <name>
+2026-11-26T13:29:31.7712310Z hint:
+2026-11-26T13:29:31.7712890Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-26T13:29:31.7715070Z Initialized empty Git repository in /Users/runner/work/airsl/airsl/.git/
+2026-11-26T13:29:31.7723840Z [command]/opt/homebrew/bin/git remote add origin https://github.com/airsstack/airsl
+2026-11-26T13:29:31.7828020Z ##[endgroup]
+2026-11-26T13:29:31.7828760Z ##[group]Disabling automatic garbage collection
+2026-11-26T13:29:31.7829420Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+2026-11-26T13:29:31.7918940Z ##[endgroup]
+2026-11-26T13:29:31.7919550Z ##[group]Setting up auth
+2026-11-26T13:29:31.7927220Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T13:29:31.7998440Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T13:29:31.9169610Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T13:29:31.9260780Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T13:29:32.0427440Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T13:29:32.0454950Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T13:29:32.1711340Z [command]/opt/homebrew/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-26T13:29:32.1871290Z ##[endgroup]
+2026-11-26T13:29:32.1893840Z ##[group]Fetching the repository
+2026-11-26T13:29:32.1900560Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c:refs/remotes/origin/probe-ci-rocks-version
+2026-11-26T13:29:32.6209990Z From https://github.com/airsstack/airsl
+2026-11-26T13:29:32.6213040Z  * [new ref]         9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c -> origin/probe-ci-rocks-version
+2026-11-26T13:29:32.6214740Z ##[endgroup]
+2026-11-26T13:29:32.6215460Z ##[group]Determining the checkout info
+2026-11-26T13:29:32.6216140Z ##[endgroup]
+2026-11-26T13:29:32.6216640Z [command]/opt/homebrew/bin/git sparse-checkout disable
+2026-11-26T13:29:32.6282450Z [command]/opt/homebrew/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-26T13:29:32.6352950Z ##[group]Checking out the ref
+2026-11-26T13:29:32.6360940Z [command]/opt/homebrew/bin/git checkout --progress --force -B probe-ci-rocks-version refs/remotes/origin/probe-ci-rocks-version
+2026-11-26T13:29:32.6578160Z Switched to a new branch 'probe-ci-rocks-version'
+2026-11-26T13:29:32.6579660Z branch 'probe-ci-rocks-version' set up to track 'origin/probe-ci-rocks-version'.
+2026-11-26T13:29:32.6581410Z ##[endgroup]
+2026-11-26T13:29:32.6665140Z [command]/opt/homebrew/bin/git log -1 --format=%H
+2026-11-26T13:29:32.6733340Z 9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c
+2026-11-26T13:29:32.6938410Z ##[group]Run echo "\$ bash --version | head -1; jq --version; command -v bash jq"
+2026-11-26T13:29:32.6939830Z [36;1mecho "\$ bash --version | head -1; jq --version; command -v bash jq"[0m
+2026-11-26T13:29:32.6941280Z [36;1mbash --version | head -1; jq --version; command -v bash jq[0m
+2026-11-26T13:29:32.6980290Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T13:29:32.6981110Z ##[endgroup]
+2026-11-26T13:29:32.7472120Z $ bash --version | head -1; jq --version; command -v bash jq
+2026-11-26T13:29:32.7536350Z GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)
+2026-11-26T13:29:32.7615000Z jq-1.8.2
+2026-11-26T13:29:32.7618840Z /bin/bash
+2026-11-26T13:29:32.7619400Z /opt/homebrew/bin/jq
+2026-11-26T13:29:32.7686490Z ##[group]Run bash probe/run-tag.sh probe
+2026-11-26T13:29:32.7687190Z [36;1mbash probe/run-tag.sh probe[0m
+2026-11-26T13:29:32.7719740Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T13:29:32.7720450Z ##[endgroup]
+2026-11-26T13:29:32.8330980Z $ PLAN=<plan-tag.json> bash tag.sh
+2026-11-26T13:29:32.8483140Z version=0.2.0
+2026-11-26T13:29:32.8483850Z [exit 0]
+2026-11-26T13:29:32.8530710Z $ PLAN=<plan-pr.json> bash tag.sh
+2026-11-26T13:29:32.8638830Z publish-rocks: the release tag v0.2.0 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T13:29:32.8640710Z [exit 1]
+2026-11-26T13:29:32.8644290Z $ PLAN='{"announcement_tag":"airsl-cli-v0.0.0","announcement_is_prerelease":false,"publish_prereleases":false,"artifacts":{}}' bash tag.sh
+2026-11-26T13:29:32.8754210Z version=0.0.0
+2026-11-26T13:29:32.8755760Z [exit 0]
+2026-11-26T13:29:32.8756820Z $ PLAN='{"announcement_tag":null}' bash tag.sh
+2026-11-26T13:29:32.8842790Z publish-rocks: the release plan names no tag; nothing was uploaded
+2026-11-26T13:29:32.8844880Z [exit 1]
+2026-11-26T13:29:32.8845380Z $ PLAN='{}' bash tag.sh
+2026-11-26T13:29:32.8922160Z publish-rocks: the release plan names no tag; nothing was uploaded
+2026-11-26T13:29:32.8923090Z [exit 1]
+2026-11-26T13:29:32.8923500Z $ PLAN='' bash tag.sh
+2026-11-26T13:29:32.8996750Z publish-rocks: the release plan names no tag; nothing was uploaded
+2026-11-26T13:29:32.8997800Z [exit 1]
+2026-11-26T13:29:32.8998330Z $ PLAN='{"announcement_tag":""}' bash tag.sh
+2026-11-26T13:29:32.9070560Z publish-rocks: the release plan names no tag; nothing was uploaded
+2026-11-26T13:29:32.9071580Z [exit 1]
+2026-11-26T13:29:32.9072170Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2"}' bash tag.sh
+2026-11-26T13:29:32.9151490Z publish-rocks: the release tag airsl-cli-v0.2 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T13:29:32.9153110Z [exit 1]
+2026-11-26T13:29:32.9153680Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2.0-rc.1"}' bash tag.sh
+2026-11-26T13:29:32.9311330Z publish-rocks: the release tag airsl-cli-v0.2.0-rc.1 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T13:29:32.9312960Z [exit 1]
+2026-11-26T13:29:32.9313540Z $ PLAN='{"announcement_tag":"airsl-v0.2.0"}' bash tag.sh
+2026-11-26T13:29:32.9420690Z publish-rocks: the release tag airsl-v0.2.0 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T13:29:32.9422040Z [exit 1]
+2026-11-26T13:29:32.9422610Z $ PLAN='{"announcement_tag":5}' bash tag.sh
+2026-11-26T13:29:32.9548910Z publish-rocks: the release tag 5 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T13:29:32.9551510Z [exit 1]
+2026-11-26T13:29:32.9552340Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2.0\n"}' bash tag.sh
+2026-11-26T13:29:32.9699490Z version=0.2.0
+2026-11-26T13:29:32.9720170Z [exit 0]
+2026-11-26T13:29:32.9729500Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2.0
+2026-11-26T13:29:32.9906440Z "}' bash tag.sh
+2026-11-26T13:29:32.9908480Z jq: parse error: Invalid string: control characters from U+0000 through U+001F must be escaped at line 2, column 1
+2026-11-26T13:29:32.9913150Z publish-rocks: could not read the release plan: jq exit status 5; nothing was uploaded
+2026-11-26T13:29:32.9916370Z [exit 1]
+2026-11-26T13:29:32.9918510Z $ PLAN='not json' bash tag.sh
+2026-11-26T13:29:33.0064740Z jq: parse error: Invalid numeric literal at line 1, column 4
+2026-11-26T13:29:33.0068870Z publish-rocks: could not read the release plan: jq exit status 5; nothing was uploaded
+2026-11-26T13:29:33.0070580Z [exit 1]
+2026-11-26T13:29:33.0246690Z ##[group]Run bash probe/run-app.sh probe
+2026-11-26T13:29:33.0258600Z [36;1mbash probe/run-app.sh probe[0m
+2026-11-26T13:29:33.0290350Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T13:29:33.0291010Z ##[endgroup]
+2026-11-26T13:29:33.0800360Z $ PLAN=<plan-tag.json> bash app-version.sh
+2026-11-26T13:29:33.0978130Z version=0.2.0
+2026-11-26T13:29:33.1001520Z [exit 0]
+2026-11-26T13:29:33.1052190Z $ PLAN=<plan-pr.json> bash app-version.sh
+2026-11-26T13:29:33.1188120Z version=0.2.0
+2026-11-26T13:29:33.1197570Z [exit 0]
+2026-11-26T13:29:33.1198000Z $ PLAN='{"releases":[]}' bash app-version.sh
+2026-11-26T13:29:33.1295800Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T13:29:33.1297320Z [exit 1]
+2026-11-26T13:29:33.1297730Z $ PLAN='{}' bash app-version.sh
+2026-11-26T13:29:33.1476170Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T13:29:33.1477870Z [exit 1]
+2026-11-26T13:29:33.1479070Z $ PLAN='' bash app-version.sh
+2026-11-26T13:29:33.1562770Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T13:29:33.1563940Z [exit 1]
+2026-11-26T13:29:33.1565000Z $ PLAN='{"releases":[{"app_name":"airsl","app_version":"0.2.0"},{"app_name":"airsl-cli","app_version":"0.2.0"}]}' bash app-version.sh
+2026-11-26T13:29:33.1657450Z version=0.2.0
+2026-11-26T13:29:33.1659310Z [exit 0]
+2026-11-26T13:29:33.1662980Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":"0.2"}]}' bash app-version.sh
+2026-11-26T13:29:33.1733810Z build-rocks: the release plan's airsl-cli version 0.2 is not <major>.<minor>.<patch>
+2026-11-26T13:29:33.1736590Z [exit 1]
+2026-11-26T13:29:33.1740500Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":"0.2.0"},{"app_name":"airsl-cli","app_version":"0.3.0"}]}' bash app-version.sh
+2026-11-26T13:29:33.1821580Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T13:29:33.1822700Z [exit 1]
+2026-11-26T13:29:33.1823110Z $ PLAN='not json' bash app-version.sh
+2026-11-26T13:29:33.1887870Z jq: parse error: Invalid numeric literal at line 1, column 4
+2026-11-26T13:29:33.1893730Z build-rocks: could not read the release plan: jq exit status 5
+2026-11-26T13:29:33.1896460Z [exit 1]
+2026-11-26T13:29:33.1955500Z ##[group]Run bash probe/run-files.sh probe .
+2026-11-26T13:29:33.1956140Z [36;1mbash probe/run-files.sh probe .[0m
+2026-11-26T13:29:33.2041110Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T13:29:33.2042090Z ##[endgroup]
+2026-11-26T13:29:33.2415330Z $ bash files.sh <checkout> 0.2.0
+2026-11-26T13:29:33.2449540Z found crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec
+2026-11-26T13:29:33.2450600Z found crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec
+2026-11-26T13:29:33.2451380Z [exit 0]
+2026-11-26T13:29:33.2451790Z $ bash files.sh <checkout> 0.3.0
+2026-11-26T13:29:33.2477350Z build-rocks: crates/airsl-lua/rockspecs/airsstack-0.3.0-1.rockspec is missing
+2026-11-26T13:29:33.2478670Z [exit 1]
+2026-11-26T13:29:33.2623860Z Post job cleanup.
+2026-11-26T13:29:33.3638190Z [command]/opt/homebrew/bin/git version
+2026-11-26T13:29:33.3840460Z git version 2.56.1
+2026-11-26T13:29:33.3900850Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/e2b7211b-d904-4ab7-a60a-6ddf2f6becb5/.gitconfig'
+2026-11-26T13:29:33.3936500Z Temporarily overriding HOME='/Users/runner/work/_temp/e2b7211b-d904-4ab7-a60a-6ddf2f6becb5' before making global git config changes
+2026-11-26T13:29:33.3939990Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T13:29:33.3955480Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/airsl/airsl
+2026-11-26T13:29:33.4127720Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T13:29:33.4273470Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T13:29:33.5768530Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T13:29:33.5882190Z http.https://github.com/.extraheader
+2026-11-26T13:29:33.5901920Z [command]/opt/homebrew/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-26T13:29:33.6026640Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T13:29:33.6990920Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T13:29:33.7242900Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T13:29:33.8224260Z Cleaning up orphan processes
+
+# --- raw job log: snippets (windows-latest) (139942663244) ---
+﻿2026-11-26T13:29:25.7753905Z Current runner version: '2.338.2'
+2026-11-26T13:29:25.7775510Z ##[group]Runner Image Provisioner
+2026-11-26T13:29:25.7776053Z Hosted Compute Agent
+2026-11-26T13:29:25.7776392Z Version: 20261111.635
+2026-11-26T13:29:25.7776758Z Commit: b8a594ea514ff44cadb5342986c68b1eac6e22ed
+2026-11-26T13:29:25.7777137Z Build Date: 2026-11-11T01:49:01Z
+2026-11-26T13:29:25.7777515Z Worker ID: {b5143186-60c1-42c1-bd1a-5af1b0b7406e}
+2026-11-26T13:29:25.7777884Z Region: westus2
+2026-11-26T13:29:25.7778163Z Cloud: Azure
+2026-11-26T13:29:25.7778460Z ##[endgroup]
+2026-11-26T13:29:25.7779225Z ##[group]Operating System
+2026-11-26T13:29:25.7779552Z Microsoft Windows Server 2025
+2026-11-26T13:29:25.7779895Z 10.0.26100
+2026-11-26T13:29:25.7780170Z Datacenter
+2026-11-26T13:29:25.7780454Z ##[endgroup]
+2026-11-26T13:29:25.7780736Z ##[group]Runner Image
+2026-11-26T13:29:25.7781056Z Image: windows-2025-vs2026
+2026-11-26T13:29:25.7781368Z Version: 20261116.315.1
+2026-11-26T13:29:25.7782294Z Included Software: https://github.com/actions/runner-images/blob/win25-vs2026/20261116.315/images/windows/Windows2025-VS2026-Readme.md
+2026-11-26T13:29:25.7783552Z Image Release: https://github.com/actions/runner-images/releases/tag/win25-vs2026%2F20261116.315
+2026-11-26T13:29:25.7784079Z ##[endgroup]
+2026-11-26T13:29:25.7784715Z ##[group]GITHUB_TOKEN Permissions
+2026-11-26T13:29:25.7785922Z Contents: read
+2026-11-26T13:29:25.7786217Z Metadata: read
+2026-11-26T13:29:25.7786490Z ##[endgroup]
+2026-11-26T13:29:25.7787938Z Secret source: Actions
+2026-11-26T13:29:25.7788405Z Cache mode: write
+2026-11-26T13:29:25.7788815Z Prepare workflow directory
+2026-11-26T13:29:25.8054630Z Prepare all required actions
+2026-11-26T13:29:25.8089554Z Getting action download info
+2026-11-26T13:29:26.1157042Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-11-26T13:29:26.2666585Z Complete job name: snippets (windows-latest)
+2026-11-26T13:29:26.3751578Z ##[group]Run actions/checkout@v5
+2026-11-26T13:29:26.3752249Z with:
+2026-11-26T13:29:26.3752468Z   repository: airsstack/airsl
+2026-11-26T13:29:26.3754451Z   token: ***
+2026-11-26T13:29:26.3754661Z   ssh-strict: true
+2026-11-26T13:29:26.3754879Z   ssh-user: git
+2026-11-26T13:29:26.3755104Z   persist-credentials: true
+2026-11-26T13:29:26.3755347Z   clean: true
+2026-11-26T13:29:26.3755572Z   sparse-checkout-cone-mode: true
+2026-11-26T13:29:26.3755833Z   fetch-depth: 1
+2026-11-26T13:29:26.3756047Z   fetch-tags: false
+2026-11-26T13:29:26.3756266Z   show-progress: true
+2026-11-26T13:29:26.3756488Z   lfs: false
+2026-11-26T13:29:26.3756694Z   submodules: false
+2026-11-26T13:29:26.3756921Z   set-safe-directory: true
+2026-11-26T13:29:26.3757178Z   allow-unsafe-pr-checkout: false
+2026-11-26T13:29:26.3757530Z ##[endgroup]
+2026-11-26T13:29:26.4742575Z Syncing repository: airsstack/airsl
+2026-11-26T13:29:26.4743615Z ##[group]Getting Git version info
+2026-11-26T13:29:26.4744061Z Working directory is 'D:\a\airsl\airsl'
+2026-11-26T13:29:26.5129292Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-11-26T13:29:26.7685140Z git version 2.56.1.windows.1
+2026-11-26T13:29:26.7721916Z ##[endgroup]
+2026-11-26T13:29:26.7737039Z Temporarily overriding HOME='D:\a\_temp\7590e84b-d22c-4924-b791-d4a6a19b779a' before making global git config changes
+2026-11-26T13:29:26.7737812Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T13:29:26.7743725Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\airsl\airsl
+2026-11-26T13:29:26.8265494Z Deleting the contents of 'D:\a\airsl\airsl'
+2026-11-26T13:29:26.8270121Z ##[group]Initializing the repository
+2026-11-26T13:29:26.8276349Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\airsl\airsl
+2026-11-26T13:29:26.8946994Z Initialized empty Git repository in D:/a/airsl/airsl/.git/
+2026-11-26T13:29:26.8985877Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/airsstack/airsl
+2026-11-26T13:29:26.9480171Z ##[endgroup]
+2026-11-26T13:29:26.9482941Z ##[group]Disabling automatic garbage collection
+2026-11-26T13:29:26.9487492Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-11-26T13:29:26.9756141Z ##[endgroup]
+2026-11-26T13:29:26.9756633Z ##[group]Setting up auth
+2026-11-26T13:29:26.9765375Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T13:29:27.0036367Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-11-26T13:29:28.1036038Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T13:29:28.1322318Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-11-26T13:29:28.5909190Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T13:29:28.6195135Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-11-26T13:29:29.0634524Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-11-26T13:29:29.0914617Z ##[endgroup]
+2026-11-26T13:29:29.0914957Z ##[group]Fetching the repository
+2026-11-26T13:29:29.0924693Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c:refs/remotes/origin/probe-ci-rocks-version
+2026-11-26T13:29:29.9968906Z From https://github.com/airsstack/airsl
+2026-11-26T13:29:29.9969617Z  * [new ref]         9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c -> origin/probe-ci-rocks-version
+2026-11-26T13:29:30.0000939Z ##[endgroup]
+2026-11-26T13:29:30.0001195Z ##[group]Determining the checkout info
+2026-11-26T13:29:30.0002900Z ##[endgroup]
+2026-11-26T13:29:30.0011937Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-11-26T13:29:30.0389814Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-11-26T13:29:30.0681773Z ##[group]Checking out the ref
+2026-11-26T13:29:30.0689525Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force -B probe-ci-rocks-version refs/remotes/origin/probe-ci-rocks-version
+2026-11-26T13:29:30.1209221Z Switched to a new branch 'probe-ci-rocks-version'
+2026-11-26T13:29:30.1223535Z branch 'probe-ci-rocks-version' set up to track 'origin/probe-ci-rocks-version'.
+2026-11-26T13:29:30.1261913Z ##[endgroup]
+2026-11-26T13:29:30.1616073Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-11-26T13:29:30.1873467Z 9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c
+2026-11-26T13:29:30.2211839Z ##[group]Run echo "\$ bash --version | head -1; jq --version; command -v bash jq"
+2026-11-26T13:29:30.2212281Z [36;1mecho "\$ bash --version | head -1; jq --version; command -v bash jq"[0m
+2026-11-26T13:29:30.2212549Z [36;1mbash --version | head -1; jq --version; command -v bash jq[0m
+2026-11-26T13:29:30.2225105Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-26T13:29:30.2225351Z ##[endgroup]
+2026-11-26T13:29:30.3623632Z $ bash --version | head -1; jq --version; command -v bash jq
+2026-11-26T13:29:30.3963622Z GNU bash, version 5.3.15(2)-release (x86_64-pc-cygwin)
+2026-11-26T13:29:30.5132260Z jq-1.8.2
+2026-11-26T13:29:30.5247068Z /usr/bin/bash
+2026-11-26T13:29:30.5247878Z /c/ProgramData/Chocolatey/bin/jq
+2026-11-26T13:29:30.5383680Z ##[group]Run bash probe/run-tag.sh probe
+2026-11-26T13:29:30.5383912Z [36;1mbash probe/run-tag.sh probe[0m
+2026-11-26T13:29:30.5391673Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-26T13:29:30.5392384Z ##[endgroup]
+2026-11-26T13:29:30.6041880Z $ PLAN=<plan-tag.json> bash tag.sh
+2026-11-26T13:29:30.6956864Z version=0.2.0
+2026-11-26T13:29:30.6961490Z [exit 0]
+2026-11-26T13:29:30.7101913Z $ PLAN=<plan-pr.json> bash tag.sh
+2026-11-26T13:29:30.7878944Z publish-rocks: the release tag v0.2.0 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T13:29:30.7887082Z [exit 1]
+2026-11-26T13:29:30.7892638Z $ PLAN='{"announcement_tag":"airsl-cli-v0.0.0","announcement_is_prerelease":false,"publish_prereleases":false,"artifacts":{}}' bash tag.sh
+2026-11-26T13:29:30.8692394Z version=0.0.0
+2026-11-26T13:29:30.8700126Z [exit 0]
+2026-11-26T13:29:30.8700504Z $ PLAN='{"announcement_tag":null}' bash tag.sh
+2026-11-26T13:29:30.9485085Z publish-rocks: the release plan names no tag; nothing was uploaded
+2026-11-26T13:29:30.9491119Z [exit 1]
+2026-11-26T13:29:30.9491382Z $ PLAN='{}' bash tag.sh
+2026-11-26T13:29:31.0218417Z publish-rocks: the release plan names no tag; nothing was uploaded
+2026-11-26T13:29:31.0224050Z [exit 1]
+2026-11-26T13:29:31.0224243Z $ PLAN='' bash tag.sh
+2026-11-26T13:29:31.0975427Z publish-rocks: the release plan names no tag; nothing was uploaded
+2026-11-26T13:29:31.0981700Z [exit 1]
+2026-11-26T13:29:31.0981915Z $ PLAN='{"announcement_tag":""}' bash tag.sh
+2026-11-26T13:29:31.1611130Z publish-rocks: the release plan names no tag; nothing was uploaded
+2026-11-26T13:29:31.1616555Z [exit 1]
+2026-11-26T13:29:31.1616859Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2"}' bash tag.sh
+2026-11-26T13:29:31.2245364Z publish-rocks: the release tag airsl-cli-v0.2 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T13:29:31.2251399Z [exit 1]
+2026-11-26T13:29:31.2251732Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2.0-rc.1"}' bash tag.sh
+2026-11-26T13:29:31.2880592Z publish-rocks: the release tag airsl-cli-v0.2.0-rc.1 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T13:29:31.2887029Z [exit 1]
+2026-11-26T13:29:31.2887302Z $ PLAN='{"announcement_tag":"airsl-v0.2.0"}' bash tag.sh
+2026-11-26T13:29:31.3529033Z publish-rocks: the release tag airsl-v0.2.0 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T13:29:31.3534718Z [exit 1]
+2026-11-26T13:29:31.3535127Z $ PLAN='{"announcement_tag":5}' bash tag.sh
+2026-11-26T13:29:31.4175655Z publish-rocks: the release tag 5 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T13:29:31.4180519Z [exit 1]
+2026-11-26T13:29:31.4180807Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2.0\n"}' bash tag.sh
+2026-11-26T13:29:31.4794967Z version=0.2.0
+2026-11-26T13:29:31.4800031Z [exit 0]
+2026-11-26T13:29:31.4800514Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2.0
+2026-11-26T13:29:31.4801375Z "}' bash tag.sh
+2026-11-26T13:29:31.5448971Z jq: parse error: Invalid string: control characters from U+0000 through U+001F must be escaped at line 2, column 1
+2026-11-26T13:29:31.5498957Z publish-rocks: could not read the release plan: jq exit status 5; nothing was uploaded
+2026-11-26T13:29:31.5505925Z [exit 1]
+2026-11-26T13:29:31.5506234Z $ PLAN='not json' bash tag.sh
+2026-11-26T13:29:31.6217852Z jq: parse error: Invalid numeric literal at line 1, column 4
+2026-11-26T13:29:31.6269720Z publish-rocks: could not read the release plan: jq exit status 5; nothing was uploaded
+2026-11-26T13:29:31.6276658Z [exit 1]
+2026-11-26T13:29:31.6433773Z ##[group]Run bash probe/run-app.sh probe
+2026-11-26T13:29:31.6434004Z [36;1mbash probe/run-app.sh probe[0m
+2026-11-26T13:29:31.6490163Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-26T13:29:31.6490462Z ##[endgroup]
+2026-11-26T13:29:31.7109001Z $ PLAN=<plan-tag.json> bash app-version.sh
+2026-11-26T13:29:31.7786046Z version=0.2.0
+2026-11-26T13:29:31.7792302Z [exit 0]
+2026-11-26T13:29:31.7916840Z $ PLAN=<plan-pr.json> bash app-version.sh
+2026-11-26T13:29:31.8545653Z version=0.2.0
+2026-11-26T13:29:31.8552429Z [exit 0]
+2026-11-26T13:29:31.8553174Z $ PLAN='{"releases":[]}' bash app-version.sh
+2026-11-26T13:29:31.9173281Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T13:29:31.9180657Z [exit 1]
+2026-11-26T13:29:31.9181109Z $ PLAN='{}' bash app-version.sh
+2026-11-26T13:29:31.9803097Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T13:29:31.9810481Z [exit 1]
+2026-11-26T13:29:31.9811010Z $ PLAN='' bash app-version.sh
+2026-11-26T13:29:32.0519369Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T13:29:32.0526578Z [exit 1]
+2026-11-26T13:29:32.0527270Z $ PLAN='{"releases":[{"app_name":"airsl","app_version":"0.2.0"},{"app_name":"airsl-cli","app_version":"0.2.0"}]}' bash app-version.sh
+2026-11-26T13:29:32.1286577Z version=0.2.0
+2026-11-26T13:29:32.1292752Z [exit 0]
+2026-11-26T13:29:32.1293145Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":"0.2"}]}' bash app-version.sh
+2026-11-26T13:29:32.1930361Z build-rocks: the release plan's airsl-cli version 0.2 is not <major>.<minor>.<patch>
+2026-11-26T13:29:32.1935798Z [exit 1]
+2026-11-26T13:29:32.1936265Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":"0.2.0"},{"app_name":"airsl-cli","app_version":"0.3.0"}]}' bash app-version.sh
+2026-11-26T13:29:32.2563577Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T13:29:32.2569331Z [exit 1]
+2026-11-26T13:29:32.2569786Z $ PLAN='not json' bash app-version.sh
+2026-11-26T13:29:32.3138385Z jq: parse error: Invalid numeric literal at line 1, column 4
+2026-11-26T13:29:32.3172948Z build-rocks: could not read the release plan: jq exit status 5
+2026-11-26T13:29:32.3179741Z [exit 1]
+2026-11-26T13:29:32.3309819Z ##[group]Run bash probe/run-files.sh probe .
+2026-11-26T13:29:32.3310030Z [36;1mbash probe/run-files.sh probe .[0m
+2026-11-26T13:29:32.3317004Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-26T13:29:32.3317213Z ##[endgroup]
+2026-11-26T13:29:32.3722845Z $ bash files.sh <checkout> 0.2.0
+2026-11-26T13:29:32.3911375Z found crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec
+2026-11-26T13:29:32.3912089Z found crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec
+2026-11-26T13:29:32.3919075Z [exit 0]
+2026-11-26T13:29:32.3919365Z $ bash files.sh <checkout> 0.3.0
+2026-11-26T13:29:32.4112512Z build-rocks: crates/airsl-lua/rockspecs/airsstack-0.3.0-1.rockspec is missing
+2026-11-26T13:29:32.4118777Z [exit 1]
+2026-11-26T13:29:32.4301430Z Post job cleanup.
+2026-11-26T13:29:32.5323281Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-11-26T13:29:32.5589703Z git version 2.56.1.windows.1
+2026-11-26T13:29:32.5650962Z Temporarily overriding HOME='D:\a\_temp\c2e85dd6-ba52-4787-aa48-691be8f85f19' before making global git config changes
+2026-11-26T13:29:32.5651577Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T13:29:32.5659654Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\airsl\airsl
+2026-11-26T13:29:32.6030532Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T13:29:32.6341019Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-11-26T13:29:33.1023050Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T13:29:33.1280715Z http.https://github.com/.extraheader
+2026-11-26T13:29:33.1320504Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-11-26T13:29:33.1615294Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-11-26T13:29:33.5771543Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T13:29:33.6055568Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-11-26T13:29:34.0399743Z Cleaning up orphan processes
+
+# --- raw job log: plan (139942663062) ---
+﻿2026-11-26T13:29:25.2374053Z Current runner version: '2.338.2'
+2026-11-26T13:29:25.2392258Z ##[group]Runner Image Provisioner
+2026-11-26T13:29:25.2392873Z Hosted Compute Agent
+2026-11-26T13:29:25.2393224Z Version: 20261111.635
+2026-11-26T13:29:25.2393622Z Commit: b8a594ea514ff44cadb5342986c68b1eac6e22ed
+2026-11-26T13:29:25.2394060Z Build Date: 2026-11-11T01:49:01Z
+2026-11-26T13:29:25.2394521Z Worker ID: {eb6ac282-dafd-45c1-a43b-8103d5dc131f}
+2026-11-26T13:29:25.2394986Z Region: southcentralus
+2026-11-26T13:29:25.2395333Z Cloud: Azure
+2026-11-26T13:29:25.2395681Z ##[endgroup]
+2026-11-26T13:29:25.2396648Z ##[group]Operating System
+2026-11-26T13:29:25.2397009Z Ubuntu
+2026-11-26T13:29:25.2397368Z 26.04.1
+2026-11-26T13:29:25.2397678Z LTS
+2026-11-26T13:29:25.2398164Z ##[endgroup]
+2026-11-26T13:29:25.2398558Z ##[group]Runner Image
+2026-11-26T13:29:25.2399220Z Image: ubuntu-26.04
+2026-11-26T13:29:25.2399754Z Version: 20261116.202.1
+2026-11-26T13:29:25.2400921Z Included Software: https://github.com/actions/runner-images/blob/ubuntu26/20261116.202/images/ubuntu/Ubuntu2604-Readme.md
+2026-11-26T13:29:25.2402578Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261116.202
+2026-11-26T13:29:25.2403428Z ##[endgroup]
+2026-11-26T13:29:25.2404867Z ##[group]GITHUB_TOKEN Permissions
+2026-11-26T13:29:25.2406517Z Contents: read
+2026-11-26T13:29:25.2406977Z Metadata: read
+2026-11-26T13:29:25.2407314Z ##[endgroup]
+2026-11-26T13:29:25.2408960Z Secret source: Actions
+2026-11-26T13:29:25.2409593Z Cache mode: write
+2026-11-26T13:29:25.2410087Z Prepare workflow directory
+2026-11-26T13:29:25.2627638Z Prepare all required actions
+2026-11-26T13:29:25.2660253Z Getting action download info
+2026-11-26T13:29:25.5131506Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-11-26T13:29:25.6321854Z Complete job name: plan
+2026-11-26T13:29:25.6914827Z ##[group]Run actions/checkout@v5
+2026-11-26T13:29:25.6915237Z with:
+2026-11-26T13:29:25.6915485Z   repository: airsstack/airsl
+2026-11-26T13:29:25.6917515Z   token: ***
+2026-11-26T13:29:25.6917754Z   ssh-strict: true
+2026-11-26T13:29:25.6918127Z   ssh-user: git
+2026-11-26T13:29:25.6918385Z   persist-credentials: true
+2026-11-26T13:29:25.6918654Z   clean: true
+2026-11-26T13:29:25.6918912Z   sparse-checkout-cone-mode: true
+2026-11-26T13:29:25.6919208Z   fetch-depth: 1
+2026-11-26T13:29:25.6919446Z   fetch-tags: false
+2026-11-26T13:29:25.6919694Z   show-progress: true
+2026-11-26T13:29:25.6919943Z   lfs: false
+2026-11-26T13:29:25.6920177Z   submodules: false
+2026-11-26T13:29:25.6920429Z   set-safe-directory: true
+2026-11-26T13:29:25.6920709Z   allow-unsafe-pr-checkout: false
+2026-11-26T13:29:25.6921061Z ##[endgroup]
+2026-11-26T13:29:25.8730870Z Syncing repository: airsstack/airsl
+2026-11-26T13:29:25.8732035Z ##[group]Getting Git version info
+2026-11-26T13:29:25.8732663Z Working directory is '/home/runner/work/airsl/airsl'
+2026-11-26T13:29:25.8733328Z [command]/usr/bin/git version
+2026-11-26T13:29:25.8734311Z git version 2.56.1
+2026-11-26T13:29:25.8745684Z ##[endgroup]
+2026-11-26T13:29:25.8754721Z Temporarily overriding HOME='/home/runner/work/_temp/18dadc6c-7f4d-41a9-a3a6-2eb9f9cd7c07' before making global git config changes
+2026-11-26T13:29:25.8755880Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T13:29:25.8757789Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/airsl/airsl
+2026-11-26T13:29:25.8812723Z Deleting the contents of '/home/runner/work/airsl/airsl'
+2026-11-26T13:29:25.8814573Z ##[group]Initializing the repository
+2026-11-26T13:29:25.8817773Z [command]/usr/bin/git init /home/runner/work/airsl/airsl
+2026-11-26T13:29:25.8897263Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-26T13:29:25.8898702Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-26T13:29:25.8899598Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-26T13:29:25.8900278Z hint: call:
+2026-11-26T13:29:25.8900934Z hint:
+2026-11-26T13:29:25.8901412Z hint: 	git config --global init.defaultBranch <name>
+2026-11-26T13:29:25.8901997Z hint:
+2026-11-26T13:29:25.8902536Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-26T13:29:25.8903391Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-26T13:29:25.8904088Z hint:
+2026-11-26T13:29:25.8904718Z hint: 	git branch -m <name>
+2026-11-26T13:29:25.8905280Z hint:
+2026-11-26T13:29:25.8905968Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-26T13:29:25.8907119Z Initialized empty Git repository in /home/runner/work/airsl/airsl/.git/
+2026-11-26T13:29:25.8913399Z [command]/usr/bin/git remote add origin https://github.com/airsstack/airsl
+2026-11-26T13:29:25.8956132Z ##[endgroup]
+2026-11-26T13:29:25.8956896Z ##[group]Disabling automatic garbage collection
+2026-11-26T13:29:25.8958838Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-26T13:29:25.8987640Z ##[endgroup]
+2026-11-26T13:29:25.8988364Z ##[group]Setting up auth
+2026-11-26T13:29:25.8992216Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T13:29:25.9020212Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T13:29:25.9370715Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T13:29:25.9397720Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T13:29:25.9607019Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T13:29:25.9634097Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T13:29:25.9847336Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-26T13:29:25.9881673Z ##[endgroup]
+2026-11-26T13:29:25.9882207Z ##[group]Fetching the repository
+2026-11-26T13:29:25.9888293Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c:refs/remotes/origin/probe-ci-rocks-version
+2026-11-26T13:29:26.3066691Z From https://github.com/airsstack/airsl
+2026-11-26T13:29:26.3068170Z  * [new ref]         9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c -> origin/probe-ci-rocks-version
+2026-11-26T13:29:26.3071967Z ##[endgroup]
+2026-11-26T13:29:26.3072879Z ##[group]Determining the checkout info
+2026-11-26T13:29:26.3074511Z ##[endgroup]
+2026-11-26T13:29:26.3080154Z [command]/usr/bin/git sparse-checkout disable
+2026-11-26T13:29:26.3132140Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-26T13:29:26.3158332Z ##[group]Checking out the ref
+2026-11-26T13:29:26.3160889Z [command]/usr/bin/git checkout --progress --force -B probe-ci-rocks-version refs/remotes/origin/probe-ci-rocks-version
+2026-11-26T13:29:26.3217762Z Switched to a new branch 'probe-ci-rocks-version'
+2026-11-26T13:29:26.3222120Z branch 'probe-ci-rocks-version' set up to track 'origin/probe-ci-rocks-version'.
+2026-11-26T13:29:26.3226143Z ##[endgroup]
+2026-11-26T13:29:26.3260982Z [command]/usr/bin/git log -1 --format=%H
+2026-11-26T13:29:26.3282054Z 9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c
+2026-11-26T13:29:26.3460781Z ##[group]Run echo "val=$(cat probe/plan-pr.json)" >> "$GITHUB_OUTPUT"
+2026-11-26T13:29:26.3461366Z [36;1mecho "val=$(cat probe/plan-pr.json)" >> "$GITHUB_OUTPUT"[0m
+2026-11-26T13:29:26.3491785Z shell: /usr/bin/bash -e {0}
+2026-11-26T13:29:26.3492096Z ##[endgroup]
+2026-11-26T13:29:26.3684637Z Post job cleanup.
+2026-11-26T13:29:26.4268274Z [command]/usr/bin/git version
+2026-11-26T13:29:26.4318965Z git version 2.56.1
+2026-11-26T13:29:26.4343787Z Temporarily overriding HOME='/home/runner/work/_temp/377beb98-35bf-4eb7-b4ff-eb8fd497199b' before making global git config changes
+2026-11-26T13:29:26.4345520Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T13:29:26.4349054Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/airsl/airsl
+2026-11-26T13:29:26.4390279Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T13:29:26.4471952Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T13:29:26.4753449Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T13:29:26.4772300Z http.https://github.com/.extraheader
+2026-11-26T13:29:26.4782982Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-26T13:29:26.4821213Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T13:29:26.5052397Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T13:29:26.5079540Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T13:29:26.5409363Z Evaluate and set job outputs
+2026-11-26T13:29:26.5415336Z Set output 'val'
+2026-11-26T13:29:26.5416460Z Cleaning up orphan processes
+
+# --- raw job log: version (139942726581) ---
+﻿2026-11-26T13:29:32.0827285Z Current runner version: '2.338.2'
+2026-11-26T13:29:32.0867499Z ##[group]Runner Image Provisioner
+2026-11-26T13:29:32.0868165Z Hosted Compute Agent
+2026-11-26T13:29:32.0868512Z Version: 20261111.635
+2026-11-26T13:29:32.0868876Z Commit: b8a594ea514ff44cadb5342986c68b1eac6e22ed
+2026-11-26T13:29:32.0869315Z Build Date: 2026-11-11T01:49:01Z
+2026-11-26T13:29:32.0869924Z Worker ID: {adee0c8f-aa4a-4e70-af34-75cb391223ae}
+2026-11-26T13:29:32.0870430Z Region: centralus
+2026-11-26T13:29:32.0870816Z Cloud: Azure
+2026-11-26T13:29:32.0871126Z ##[endgroup]
+2026-11-26T13:29:32.0872438Z ##[group]Operating System
+2026-11-26T13:29:32.0872972Z Ubuntu
+2026-11-26T13:29:32.0873359Z 26.04.1
+2026-11-26T13:29:32.0873818Z LTS
+2026-11-26T13:29:32.0874228Z ##[endgroup]
+2026-11-26T13:29:32.0874698Z ##[group]Runner Image
+2026-11-26T13:29:32.0875350Z Image: ubuntu-26.04
+2026-11-26T13:29:32.0875802Z Version: 20261116.202.1
+2026-11-26T13:29:32.0876902Z Included Software: https://github.com/actions/runner-images/blob/ubuntu26/20261116.202/images/ubuntu/Ubuntu2604-Readme.md
+2026-11-26T13:29:32.0878452Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261116.202
+2026-11-26T13:29:32.0879318Z ##[endgroup]
+2026-11-26T13:29:32.0880377Z ##[group]GITHUB_TOKEN Permissions
+2026-11-26T13:29:32.0882183Z Contents: read
+2026-11-26T13:29:32.0882613Z Metadata: read
+2026-11-26T13:29:32.0883148Z ##[endgroup]
+2026-11-26T13:29:32.0884792Z Secret source: Actions
+2026-11-26T13:29:32.0885549Z Cache mode: write
+2026-11-26T13:29:32.0886299Z Prepare workflow directory
+2026-11-26T13:29:32.1096741Z Prepare all required actions
+2026-11-26T13:29:32.1126911Z Getting action download info
+2026-11-26T13:29:32.3112820Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-11-26T13:29:32.4525665Z Complete job name: version
+2026-11-26T13:29:32.5119973Z ##[group]Run actions/checkout@v5
+2026-11-26T13:29:32.5120416Z with:
+2026-11-26T13:29:32.5120716Z   repository: airsstack/airsl
+2026-11-26T13:29:32.5122944Z   token: ***
+2026-11-26T13:29:32.5123282Z   ssh-strict: true
+2026-11-26T13:29:32.5123548Z   ssh-user: git
+2026-11-26T13:29:32.5123850Z   persist-credentials: true
+2026-11-26T13:29:32.5124190Z   clean: true
+2026-11-26T13:29:32.5124447Z   sparse-checkout-cone-mode: true
+2026-11-26T13:29:32.5124794Z   fetch-depth: 1
+2026-11-26T13:29:32.5125092Z   fetch-tags: false
+2026-11-26T13:29:32.5125335Z   show-progress: true
+2026-11-26T13:29:32.5125650Z   lfs: false
+2026-11-26T13:29:32.5125877Z   submodules: false
+2026-11-26T13:29:32.5126121Z   set-safe-directory: true
+2026-11-26T13:29:32.5126465Z   allow-unsafe-pr-checkout: false
+2026-11-26T13:29:32.5126849Z ##[endgroup]
+2026-11-26T13:29:32.7268473Z Syncing repository: airsstack/airsl
+2026-11-26T13:29:32.7269498Z ##[group]Getting Git version info
+2026-11-26T13:29:32.7270121Z Working directory is '/home/runner/work/airsl/airsl'
+2026-11-26T13:29:32.7270633Z [command]/usr/bin/git version
+2026-11-26T13:29:32.7280049Z git version 2.56.1
+2026-11-26T13:29:32.7290777Z ##[endgroup]
+2026-11-26T13:29:32.7299083Z Temporarily overriding HOME='/home/runner/work/_temp/8fc43aaa-2332-46a1-8152-86579f9e069d' before making global git config changes
+2026-11-26T13:29:32.7300600Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T13:29:32.7302119Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/airsl/airsl
+2026-11-26T13:29:32.7372018Z Deleting the contents of '/home/runner/work/airsl/airsl'
+2026-11-26T13:29:32.7421250Z ##[group]Initializing the repository
+2026-11-26T13:29:32.7423718Z [command]/usr/bin/git init /home/runner/work/airsl/airsl
+2026-11-26T13:29:32.7497684Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-26T13:29:32.7498503Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-26T13:29:32.7499242Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-26T13:29:32.7499659Z hint: call:
+2026-11-26T13:29:32.7500213Z hint:
+2026-11-26T13:29:32.7500486Z hint: 	git config --global init.defaultBranch <name>
+2026-11-26T13:29:32.7500806Z hint:
+2026-11-26T13:29:32.7501115Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-26T13:29:32.7501594Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-26T13:29:32.7501979Z hint:
+2026-11-26T13:29:32.7502206Z hint: 	git branch -m <name>
+2026-11-26T13:29:32.7502475Z hint:
+2026-11-26T13:29:32.7502807Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-26T13:29:32.7509137Z Initialized empty Git repository in /home/runner/work/airsl/airsl/.git/
+2026-11-26T13:29:32.7516478Z [command]/usr/bin/git remote add origin https://github.com/airsstack/airsl
+2026-11-26T13:29:32.7558333Z ##[endgroup]
+2026-11-26T13:29:32.7559074Z ##[group]Disabling automatic garbage collection
+2026-11-26T13:29:32.7560664Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-26T13:29:32.7587239Z ##[endgroup]
+2026-11-26T13:29:32.7587933Z ##[group]Setting up auth
+2026-11-26T13:29:32.7592032Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T13:29:32.7616874Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T13:29:32.7980445Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T13:29:32.8027855Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T13:29:32.8240517Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T13:29:32.8266746Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T13:29:32.8467658Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-26T13:29:32.8498306Z ##[endgroup]
+2026-11-26T13:29:32.8498732Z ##[group]Fetching the repository
+2026-11-26T13:29:32.8504765Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c:refs/remotes/origin/probe-ci-rocks-version
+2026-11-26T13:29:33.1617894Z From https://github.com/airsstack/airsl
+2026-11-26T13:29:33.1618613Z  * [new ref]         9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c -> origin/probe-ci-rocks-version
+2026-11-26T13:29:33.1621727Z ##[endgroup]
+2026-11-26T13:29:33.1622189Z ##[group]Determining the checkout info
+2026-11-26T13:29:33.1623816Z ##[endgroup]
+2026-11-26T13:29:33.1628067Z [command]/usr/bin/git sparse-checkout disable
+2026-11-26T13:29:33.1672385Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-26T13:29:33.1696016Z ##[group]Checking out the ref
+2026-11-26T13:29:33.1699037Z [command]/usr/bin/git checkout --progress --force -B probe-ci-rocks-version refs/remotes/origin/probe-ci-rocks-version
+2026-11-26T13:29:33.1756033Z Switched to a new branch 'probe-ci-rocks-version'
+2026-11-26T13:29:33.1761169Z branch 'probe-ci-rocks-version' set up to track 'origin/probe-ci-rocks-version'.
+2026-11-26T13:29:33.1765000Z ##[endgroup]
+2026-11-26T13:29:33.1799731Z [command]/usr/bin/git log -1 --format=%H
+2026-11-26T13:29:33.1819107Z 9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c
+2026-11-26T13:29:33.2003535Z ##[group]Run set -euo pipefail
+2026-11-26T13:29:33.2003967Z [36;1mset -euo pipefail[0m
+2026-11-26T13:29:33.2004299Z [36;1mbash --version | head -1; jq --version[0m
+2026-11-26T13:29:33.2005179Z [36;1mversion=$(jq -r '[.releases[]? | select(.app_name == "airsl-cli") | .app_version] | if length == 1 then .[0] else "" end' <<<"$PLAN") || { code=$?; echo "build-rocks: could not read the release plan: jq exit status $code"; exit 1; }[0m
+2026-11-26T13:29:33.2006174Z [36;1mif [ -z "$version" ]; then[0m
+2026-11-26T13:29:33.2006626Z [36;1m  echo "build-rocks: the release plan names no single airsl-cli release"; exit 1[0m
+2026-11-26T13:29:33.2007080Z [36;1mfi[0m
+2026-11-26T13:29:33.2007382Z [36;1mif [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then[0m
+2026-11-26T13:29:33.2007967Z [36;1m  echo "build-rocks: the release plan's airsl-cli version $version is not <major>.<minor>.<patch>"; exit 1[0m
+2026-11-26T13:29:33.2008496Z [36;1mfi[0m
+2026-11-26T13:29:33.2008821Z [36;1mfor package in airsstack airsstack-luajit; do[0m
+2026-11-26T13:29:33.2009285Z [36;1m  file="crates/airsl-lua/rockspecs/$package-$version-1.rockspec"[0m
+2026-11-26T13:29:33.2009915Z [36;1m  if [ ! -f "$file" ]; then echo "build-rocks: $file is missing"; exit 1; fi[0m
+2026-11-26T13:29:33.2010344Z [36;1m  echo "found $file"[0m
+2026-11-26T13:29:33.2010631Z [36;1mdone[0m
+2026-11-26T13:29:33.2010924Z [36;1mecho "version=$version" >> "$GITHUB_OUTPUT"[0m
+2026-11-26T13:29:33.2011313Z [36;1mecho "wrote version=$version"[0m
+2026-11-26T13:29:33.2041147Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T13:29:33.2041536Z env:
+2026-11-26T13:29:33.2042059Z   PLAN: {"announcement_tag":"v0.2.0","announcement_is_prerelease":false,"releases":[{"app_name":"airsl-cli","app_version":"0.2.0"}]}
+2026-11-26T13:29:33.2042645Z ##[endgroup]
+2026-11-26T13:29:33.2120180Z GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)
+2026-11-26T13:29:33.2132843Z jq-1.8.1
+2026-11-26T13:29:33.2157560Z found crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec
+2026-11-26T13:29:33.2158066Z found crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec
+2026-11-26T13:29:33.2160040Z wrote version=0.2.0
+2026-11-26T13:29:33.2261461Z Post job cleanup.
+2026-11-26T13:29:33.2801751Z [command]/usr/bin/git version
+2026-11-26T13:29:33.2833491Z git version 2.56.1
+2026-11-26T13:29:33.2856758Z Temporarily overriding HOME='/home/runner/work/_temp/29243c07-266f-431e-bc8a-dd108bbe411b' before making global git config changes
+2026-11-26T13:29:33.2858165Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T13:29:33.2860289Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/airsl/airsl
+2026-11-26T13:29:33.2890952Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T13:29:33.2926143Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T13:29:33.3173769Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T13:29:33.3196347Z http.https://github.com/.extraheader
+2026-11-26T13:29:33.3213728Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-26T13:29:33.3236932Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T13:29:33.3471261Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T13:29:33.3496771Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T13:29:33.3807720Z Evaluate and set job outputs
+2026-11-26T13:29:33.3813008Z Set output 'version'
+2026-11-26T13:29:33.3814296Z Cleaning up orphan processes
+
+# --- raw job log: legs (ubuntu-latest) (139942784302) ---
+﻿2026-11-26T13:29:39.1651274Z Current runner version: '2.338.2'
+2026-11-26T13:29:39.1674975Z ##[group]Runner Image Provisioner
+2026-11-26T13:29:39.1675903Z Hosted Compute Agent
+2026-11-26T13:29:39.1676427Z Version: 20261111.635
+2026-11-26T13:29:39.1677009Z Commit: b8a594ea514ff44cadb5342986c68b1eac6e22ed
+2026-11-26T13:29:39.1677667Z Build Date: 2026-11-11T01:49:01Z
+2026-11-26T13:29:39.1678270Z Worker ID: {3b1218b0-2b26-4780-a0db-c89849631e7f}
+2026-11-26T13:29:39.1679170Z Region: westus3
+2026-11-26T13:29:39.1679663Z Cloud: Azure
+2026-11-26T13:29:39.1680124Z ##[endgroup]
+2026-11-26T13:29:39.1681563Z ##[group]Operating System
+2026-11-26T13:29:39.1682126Z Ubuntu
+2026-11-26T13:29:39.1682698Z 26.04.1
+2026-11-26T13:29:39.1683159Z LTS
+2026-11-26T13:29:39.1683601Z ##[endgroup]
+2026-11-26T13:29:39.1684135Z ##[group]Runner Image
+2026-11-26T13:29:39.1684671Z Image: ubuntu-26.04
+2026-11-26T13:29:39.1685216Z Version: 20261116.202.1
+2026-11-26T13:29:39.1686393Z Included Software: https://github.com/actions/runner-images/blob/ubuntu26/20261116.202/images/ubuntu/Ubuntu2604-Readme.md
+2026-11-26T13:29:39.1687796Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261116.202
+2026-11-26T13:29:39.1688865Z ##[endgroup]
+2026-11-26T13:29:39.1690271Z ##[group]GITHUB_TOKEN Permissions
+2026-11-26T13:29:39.1692409Z Contents: read
+2026-11-26T13:29:39.1692975Z Metadata: read
+2026-11-26T13:29:39.1693537Z ##[endgroup]
+2026-11-26T13:29:39.1695962Z Secret source: Actions
+2026-11-26T13:29:39.1696890Z Cache mode: write
+2026-11-26T13:29:39.1697510Z Prepare workflow directory
+2026-11-26T13:29:39.2030798Z Prepare all required actions
+2026-11-26T13:29:39.2081400Z Getting action download info
+2026-11-26T13:29:39.4885057Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-11-26T13:29:39.7344609Z Complete job name: legs (ubuntu-latest)
+2026-11-26T13:29:39.8120060Z ##[group]Run actions/checkout@v5
+2026-11-26T13:29:39.8121092Z with:
+2026-11-26T13:29:39.8121594Z   repository: airsstack/airsl
+2026-11-26T13:29:39.8125293Z   token: ***
+2026-11-26T13:29:39.8125800Z   ssh-strict: true
+2026-11-26T13:29:39.8126292Z   ssh-user: git
+2026-11-26T13:29:39.8126792Z   persist-credentials: true
+2026-11-26T13:29:39.8127361Z   clean: true
+2026-11-26T13:29:39.8127823Z   sparse-checkout-cone-mode: true
+2026-11-26T13:29:39.8128406Z   fetch-depth: 1
+2026-11-26T13:29:39.8129377Z   fetch-tags: false
+2026-11-26T13:29:39.8129889Z   show-progress: true
+2026-11-26T13:29:39.8130387Z   lfs: false
+2026-11-26T13:29:39.8130840Z   submodules: false
+2026-11-26T13:29:39.8131342Z   set-safe-directory: true
+2026-11-26T13:29:39.8131898Z   allow-unsafe-pr-checkout: false
+2026-11-26T13:29:39.8132843Z ##[endgroup]
+2026-11-26T13:29:40.3759822Z Syncing repository: airsstack/airsl
+2026-11-26T13:29:40.3762213Z ##[group]Getting Git version info
+2026-11-26T13:29:40.3763729Z Working directory is '/home/runner/work/airsl/airsl'
+2026-11-26T13:29:40.3765217Z [command]/usr/bin/git version
+2026-11-26T13:29:40.3806776Z git version 2.56.1
+2026-11-26T13:29:40.3831449Z ##[endgroup]
+2026-11-26T13:29:40.3841037Z Temporarily overriding HOME='/home/runner/work/_temp/b4cf62ca-dc37-4702-a907-d323a8eed0ed' before making global git config changes
+2026-11-26T13:29:40.3843992Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T13:29:40.3846376Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/airsl/airsl
+2026-11-26T13:29:40.4270576Z Deleting the contents of '/home/runner/work/airsl/airsl'
+2026-11-26T13:29:40.4274720Z ##[group]Initializing the repository
+2026-11-26T13:29:40.4281121Z [command]/usr/bin/git init /home/runner/work/airsl/airsl
+2026-11-26T13:29:40.4917207Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-26T13:29:40.4919012Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-26T13:29:40.4920080Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-26T13:29:40.4921033Z hint: call:
+2026-11-26T13:29:40.4921794Z hint:
+2026-11-26T13:29:40.4922455Z hint: 	git config --global init.defaultBranch <name>
+2026-11-26T13:29:40.4923172Z hint:
+2026-11-26T13:29:40.4923884Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-26T13:29:40.4924933Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-26T13:29:40.4925758Z hint:
+2026-11-26T13:29:40.4926284Z hint: 	git branch -m <name>
+2026-11-26T13:29:40.4926878Z hint:
+2026-11-26T13:29:40.4927621Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-26T13:29:40.5100357Z Initialized empty Git repository in /home/runner/work/airsl/airsl/.git/
+2026-11-26T13:29:40.5112304Z [command]/usr/bin/git remote add origin https://github.com/airsstack/airsl
+2026-11-26T13:29:40.5350747Z ##[endgroup]
+2026-11-26T13:29:40.5482609Z ##[group]Disabling automatic garbage collection
+2026-11-26T13:29:40.5484257Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-26T13:29:40.5487582Z ##[endgroup]
+2026-11-26T13:29:40.5489570Z ##[group]Setting up auth
+2026-11-26T13:29:40.5490933Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T13:29:40.5494944Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T13:29:40.7734208Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T13:29:40.7768176Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T13:29:40.7988269Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T13:29:40.8022325Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T13:29:40.8241543Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-26T13:29:40.8275444Z ##[endgroup]
+2026-11-26T13:29:40.8276499Z ##[group]Fetching the repository
+2026-11-26T13:29:40.8288260Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c:refs/remotes/origin/probe-ci-rocks-version
+2026-11-26T13:29:41.3602049Z From https://github.com/airsstack/airsl
+2026-11-26T13:29:41.3605028Z  * [new ref]         9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c -> origin/probe-ci-rocks-version
+2026-11-26T13:29:41.3612242Z ##[endgroup]
+2026-11-26T13:29:41.3614601Z ##[group]Determining the checkout info
+2026-11-26T13:29:41.3617168Z ##[endgroup]
+2026-11-26T13:29:41.3618987Z [command]/usr/bin/git sparse-checkout disable
+2026-11-26T13:29:41.3784209Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-26T13:29:41.3813011Z ##[group]Checking out the ref
+2026-11-26T13:29:41.3817432Z [command]/usr/bin/git checkout --progress --force -B probe-ci-rocks-version refs/remotes/origin/probe-ci-rocks-version
+2026-11-26T13:29:41.4181002Z Switched to a new branch 'probe-ci-rocks-version'
+2026-11-26T13:29:41.4221656Z branch 'probe-ci-rocks-version' set up to track 'origin/probe-ci-rocks-version'.
+2026-11-26T13:29:41.4226766Z ##[endgroup]
+2026-11-26T13:29:41.4273095Z [command]/usr/bin/git log -1 --format=%H
+2026-11-26T13:29:41.4294034Z 9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c
+2026-11-26T13:29:41.4604452Z ##[group]Run for package in airsstack airsstack-luajit; do
+2026-11-26T13:29:41.4606318Z [36;1mfor package in airsstack airsstack-luajit; do[0m
+2026-11-26T13:29:41.4608067Z [36;1m  rs=crates/airsl-lua/rockspecs/$package-0.2.0-1.rockspec[0m
+2026-11-26T13:29:41.4610490Z [36;1m  if [ -f "$rs" ]; then echo "found $rs; pack $package 0.2.0-1"; else echo "missing $rs"; exit 1; fi[0m
+2026-11-26T13:29:41.4612438Z [36;1mdone[0m
+2026-11-26T13:29:41.4640251Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T13:29:41.4641788Z ##[endgroup]
+2026-11-26T13:29:41.4722736Z found crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec; pack airsstack 0.2.0-1
+2026-11-26T13:29:41.4726617Z found crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec; pack airsstack-luajit 0.2.0-1
+2026-11-26T13:29:41.4997686Z Post job cleanup.
+2026-11-26T13:29:41.5942309Z [command]/usr/bin/git version
+2026-11-26T13:29:41.5984725Z git version 2.56.1
+2026-11-26T13:29:41.6028029Z Temporarily overriding HOME='/home/runner/work/_temp/c80dc996-c428-4ab4-b2cf-4c43b111fdcf' before making global git config changes
+2026-11-26T13:29:41.6031161Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T13:29:41.6036517Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/airsl/airsl
+2026-11-26T13:29:41.6073747Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T13:29:41.6108351Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T13:29:41.6375037Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T13:29:41.6396401Z http.https://github.com/.extraheader
+2026-11-26T13:29:41.6409215Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-26T13:29:41.6451915Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T13:29:41.6712527Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T13:29:41.6745700Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T13:29:41.7125642Z Cleaning up orphan processes
+
+# --- raw job log: legs (macos-latest) (139942784385) ---
+﻿2026-11-26T13:29:41.2622560Z Current runner version: '2.338.2'
+2026-11-26T13:29:41.2647620Z ##[group]Runner Image Provisioner
+2026-11-26T13:29:41.2648230Z Hosted Compute Agent
+2026-11-26T13:29:41.2648640Z Version: 20261111.635
+2026-11-26T13:29:41.2649100Z Commit: b8a594ea514ff44cadb5342986c68b1eac6e22ed
+2026-11-26T13:29:41.2649650Z Build Date: 2026-11-11T01:49:01Z
+2026-11-26T13:29:41.2650150Z Worker ID: {ff69943e-2402-4974-b2c6-142805fdbdb5}
+2026-11-26T13:29:41.2650680Z Region: westus
+2026-11-26T13:29:41.2651050Z Cloud: MacCloud
+2026-11-26T13:29:41.2651400Z ##[endgroup]
+2026-11-26T13:29:41.2652430Z ##[group]Operating System
+2026-11-26T13:29:41.2652850Z macOS
+2026-11-26T13:29:41.2653240Z 26.7.2
+2026-11-26T13:29:41.2653590Z 25G332
+2026-11-26T13:29:41.2653930Z ##[endgroup]
+2026-11-26T13:29:41.2654320Z ##[group]Runner Image
+2026-11-26T13:29:41.2654750Z Image: macos-26-arm64
+2026-11-26T13:29:41.2655140Z Version: 20261117.0516.1
+2026-11-26T13:29:41.2656080Z Included Software: https://github.com/actions/runner-images/blob/macos-26-arm64/20261117.0516/images/macos/macos-26-arm64-Readme.md
+2026-11-26T13:29:41.2657260Z Image Release: https://github.com/actions/runner-images/releases/tag/macos-26-arm64%2F20261117.0516
+2026-11-26T13:29:41.2657980Z ##[endgroup]
+2026-11-26T13:29:41.2658760Z ##[group]GITHUB_TOKEN Permissions
+2026-11-26T13:29:41.2660060Z Contents: read
+2026-11-26T13:29:41.2660440Z Metadata: read
+2026-11-26T13:29:41.2660820Z ##[endgroup]
+2026-11-26T13:29:41.2662390Z Secret source: Actions
+2026-11-26T13:29:41.2663070Z Cache mode: write
+2026-11-26T13:29:41.2663550Z Prepare workflow directory
+2026-11-26T13:29:41.3185160Z Prepare all required actions
+2026-11-26T13:29:41.3246340Z Getting action download info
+2026-11-26T13:29:41.5252670Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-11-26T13:29:42.7378850Z Complete job name: legs (macos-latest)
+2026-11-26T13:29:42.8481420Z ##[group]Run actions/checkout@v5
+2026-11-26T13:29:42.8482710Z with:
+2026-11-26T13:29:42.8483460Z   repository: airsstack/airsl
+2026-11-26T13:29:42.8524570Z   token: ***
+2026-11-26T13:29:42.8525520Z   ssh-strict: true
+2026-11-26T13:29:42.8526470Z   ssh-user: git
+2026-11-26T13:29:42.8527120Z   persist-credentials: true
+2026-11-26T13:29:42.8527890Z   clean: true
+2026-11-26T13:29:42.8528540Z   sparse-checkout-cone-mode: true
+2026-11-26T13:29:42.8529320Z   fetch-depth: 1
+2026-11-26T13:29:42.8530490Z   fetch-tags: false
+2026-11-26T13:29:42.8531230Z   show-progress: true
+2026-11-26T13:29:42.8531960Z   lfs: false
+2026-11-26T13:29:42.8532690Z   submodules: false
+2026-11-26T13:29:42.8533390Z   set-safe-directory: true
+2026-11-26T13:29:42.8534150Z   allow-unsafe-pr-checkout: false
+2026-11-26T13:29:42.8536110Z ##[endgroup]
+2026-11-26T13:29:43.5253990Z Syncing repository: airsstack/airsl
+2026-11-26T13:29:43.5255390Z ##[group]Getting Git version info
+2026-11-26T13:29:43.5256030Z Working directory is '/Users/runner/work/airsl/airsl'
+2026-11-26T13:29:43.5256730Z [command]/opt/homebrew/bin/git version
+2026-11-26T13:29:43.5831590Z git version 2.56.1
+2026-11-26T13:29:43.5858330Z ##[endgroup]
+2026-11-26T13:29:43.5869190Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/d8fce43a-6010-456b-a8d5-dc5f4ffa34f7/.gitconfig'
+2026-11-26T13:29:43.5874820Z Temporarily overriding HOME='/Users/runner/work/_temp/d8fce43a-6010-456b-a8d5-dc5f4ffa34f7' before making global git config changes
+2026-11-26T13:29:43.5876440Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T13:29:43.5885820Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/airsl/airsl
+2026-11-26T13:29:43.6048430Z Deleting the contents of '/Users/runner/work/airsl/airsl'
+2026-11-26T13:29:43.6054890Z ##[group]Initializing the repository
+2026-11-26T13:29:43.6059650Z [command]/opt/homebrew/bin/git init /Users/runner/work/airsl/airsl
+2026-11-26T13:29:43.7324120Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-26T13:29:43.7327780Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-26T13:29:43.7329640Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-26T13:29:43.7330040Z hint: call:
+2026-11-26T13:29:43.7330250Z hint:
+2026-11-26T13:29:43.7330570Z hint: 	git config --global init.defaultBranch <name>
+2026-11-26T13:29:43.7330970Z hint:
+2026-11-26T13:29:43.7331290Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-26T13:29:43.7331820Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-26T13:29:43.7332200Z hint:
+2026-11-26T13:29:43.7332490Z hint: 	git branch -m <name>
+2026-11-26T13:29:43.7332800Z hint:
+2026-11-26T13:29:43.7333140Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-26T13:29:43.7853720Z Initialized empty Git repository in /Users/runner/work/airsl/airsl/.git/
+2026-11-26T13:29:43.7862220Z [command]/opt/homebrew/bin/git remote add origin https://github.com/airsstack/airsl
+2026-11-26T13:29:43.8331760Z ##[endgroup]
+2026-11-26T13:29:43.8333490Z ##[group]Disabling automatic garbage collection
+2026-11-26T13:29:43.8335150Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+2026-11-26T13:29:43.8443510Z ##[endgroup]
+2026-11-26T13:29:43.8444690Z ##[group]Setting up auth
+2026-11-26T13:29:43.8445920Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T13:29:43.8654660Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T13:29:44.2225000Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T13:29:44.2332220Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T13:29:44.4086660Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T13:29:44.4150120Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T13:29:44.5723350Z [command]/opt/homebrew/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-26T13:29:44.5847550Z ##[endgroup]
+2026-11-26T13:29:44.5848840Z ##[group]Fetching the repository
+2026-11-26T13:29:44.5855150Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c:refs/remotes/origin/probe-ci-rocks-version
+2026-11-26T13:29:45.1814800Z From https://github.com/airsstack/airsl
+2026-11-26T13:29:45.1828630Z  * [new ref]         9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c -> origin/probe-ci-rocks-version
+2026-11-26T13:29:45.1839030Z ##[endgroup]
+2026-11-26T13:29:45.1842150Z ##[group]Determining the checkout info
+2026-11-26T13:29:45.1843940Z ##[endgroup]
+2026-11-26T13:29:45.1844980Z [command]/opt/homebrew/bin/git sparse-checkout disable
+2026-11-26T13:29:45.1984420Z [command]/opt/homebrew/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-26T13:29:45.2124920Z ##[group]Checking out the ref
+2026-11-26T13:29:45.2145030Z [command]/opt/homebrew/bin/git checkout --progress --force -B probe-ci-rocks-version refs/remotes/origin/probe-ci-rocks-version
+2026-11-26T13:29:45.2584150Z Switched to a new branch 'probe-ci-rocks-version'
+2026-11-26T13:29:45.2604920Z branch 'probe-ci-rocks-version' set up to track 'origin/probe-ci-rocks-version'.
+2026-11-26T13:29:45.2694030Z ##[endgroup]
+2026-11-26T13:29:45.2752240Z [command]/opt/homebrew/bin/git log -1 --format=%H
+2026-11-26T13:29:45.2842110Z 9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c
+2026-11-26T13:29:45.3202560Z ##[group]Run for package in airsstack airsstack-luajit; do
+2026-11-26T13:29:45.3203120Z [36;1mfor package in airsstack airsstack-luajit; do[0m
+2026-11-26T13:29:45.3203880Z [36;1m  rs=crates/airsl-lua/rockspecs/$package-0.2.0-1.rockspec[0m
+2026-11-26T13:29:45.3204550Z [36;1m  if [ -f "$rs" ]; then echo "found $rs; pack $package 0.2.0-1"; else echo "missing $rs"; exit 1; fi[0m
+2026-11-26T13:29:45.3205090Z [36;1mdone[0m
+2026-11-26T13:29:45.3264900Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T13:29:45.3265820Z ##[endgroup]
+2026-11-26T13:29:45.3978520Z found crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec; pack airsstack 0.2.0-1
+2026-11-26T13:29:45.3979680Z found crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec; pack airsstack-luajit 0.2.0-1
+2026-11-26T13:29:45.4264000Z Post job cleanup.
+2026-11-26T13:29:45.5873310Z [command]/opt/homebrew/bin/git version
+2026-11-26T13:29:45.6047310Z git version 2.56.1
+2026-11-26T13:29:45.6092230Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/d601b510-f4ab-4f4c-b25a-cfd29a8973a8/.gitconfig'
+2026-11-26T13:29:45.6115890Z Temporarily overriding HOME='/Users/runner/work/_temp/d601b510-f4ab-4f4c-b25a-cfd29a8973a8' before making global git config changes
+2026-11-26T13:29:45.6118510Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T13:29:45.6129270Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/airsl/airsl
+2026-11-26T13:29:45.6272930Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T13:29:45.6423010Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T13:29:45.8319640Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T13:29:45.8400700Z http.https://github.com/.extraheader
+2026-11-26T13:29:45.8416390Z [command]/opt/homebrew/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-26T13:29:45.8517580Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T13:29:46.0181830Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T13:29:46.0265320Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T13:29:46.1894790Z Cleaning up orphan processes
+
+# --- raw job log: legs (windows-latest) (139942784312) ---
+﻿2026-11-26T13:29:38.7955788Z Current runner version: '2.338.2'
+2026-11-26T13:29:38.7993115Z ##[group]Runner Image Provisioner
+2026-11-26T13:29:38.7994422Z Hosted Compute Agent
+2026-11-26T13:29:38.7995374Z Version: 20261111.635
+2026-11-26T13:29:38.7996424Z Commit: b8a594ea514ff44cadb5342986c68b1eac6e22ed
+2026-11-26T13:29:38.7997653Z Build Date: 2026-11-11T01:49:01Z
+2026-11-26T13:29:38.7998879Z Worker ID: {c0710206-e580-467e-9d4f-90ad393e3bc3}
+2026-11-26T13:29:38.8000121Z Region: eastus
+2026-11-26T13:29:38.8001104Z Cloud: Azure
+2026-11-26T13:29:38.8002004Z ##[endgroup]
+2026-11-26T13:29:38.8004315Z ##[group]Operating System
+2026-11-26T13:29:38.8005428Z Microsoft Windows Server 2025
+2026-11-26T13:29:38.8006410Z 10.0.26100
+2026-11-26T13:29:38.8007188Z Datacenter
+2026-11-26T13:29:38.8008092Z ##[endgroup]
+2026-11-26T13:29:38.8008945Z ##[group]Runner Image
+2026-11-26T13:29:38.8009892Z Image: windows-2025-vs2026
+2026-11-26T13:29:38.8011417Z Version: 20261116.315.1
+2026-11-26T13:29:38.8013876Z Included Software: https://github.com/actions/runner-images/blob/win25-vs2026/20261116.315/images/windows/Windows2025-VS2026-Readme.md
+2026-11-26T13:29:38.8016926Z Image Release: https://github.com/actions/runner-images/releases/tag/win25-vs2026%2F20261116.315
+2026-11-26T13:29:38.8018698Z ##[endgroup]
+2026-11-26T13:29:38.8020736Z ##[group]GITHUB_TOKEN Permissions
+2026-11-26T13:29:38.8023383Z Contents: read
+2026-11-26T13:29:38.8024305Z Metadata: read
+2026-11-26T13:29:38.8025136Z ##[endgroup]
+2026-11-26T13:29:38.8027903Z Secret source: Actions
+2026-11-26T13:29:38.8029356Z Cache mode: write
+2026-11-26T13:29:38.8031045Z Prepare workflow directory
+2026-11-26T13:29:38.8412118Z Prepare all required actions
+2026-11-26T13:29:38.8462017Z Getting action download info
+2026-11-26T13:29:39.0484381Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-11-26T13:29:39.3072300Z Complete job name: legs (windows-latest)
+2026-11-26T13:29:39.4815332Z ##[group]Run actions/checkout@v5
+2026-11-26T13:29:39.4816433Z with:
+2026-11-26T13:29:39.4816880Z   repository: airsstack/airsl
+2026-11-26T13:29:39.4821829Z   token: ***
+2026-11-26T13:29:39.4822724Z   ssh-strict: true
+2026-11-26T13:29:39.4823491Z   ssh-user: git
+2026-11-26T13:29:39.4824034Z   persist-credentials: true
+2026-11-26T13:29:39.4824601Z   clean: true
+2026-11-26T13:29:39.4825116Z   sparse-checkout-cone-mode: true
+2026-11-26T13:29:39.4825723Z   fetch-depth: 1
+2026-11-26T13:29:39.4826214Z   fetch-tags: false
+2026-11-26T13:29:39.4826724Z   show-progress: true
+2026-11-26T13:29:39.4827260Z   lfs: false
+2026-11-26T13:29:39.4827751Z   submodules: false
+2026-11-26T13:29:39.4828226Z   set-safe-directory: true
+2026-11-26T13:29:39.4828770Z   allow-unsafe-pr-checkout: false
+2026-11-26T13:29:39.4829629Z ##[endgroup]
+2026-11-26T13:29:39.6375316Z Syncing repository: airsstack/airsl
+2026-11-26T13:29:39.6377432Z ##[group]Getting Git version info
+2026-11-26T13:29:39.6379294Z Working directory is 'D:\a\airsl\airsl'
+2026-11-26T13:29:39.7332814Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-11-26T13:29:40.1477417Z git version 2.56.1.windows.1
+2026-11-26T13:29:40.1539315Z ##[endgroup]
+2026-11-26T13:29:40.1563740Z Temporarily overriding HOME='D:\a\_temp\098c97aa-6493-4271-bce5-d89db7513823' before making global git config changes
+2026-11-26T13:29:40.1565258Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T13:29:40.1578638Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\airsl\airsl
+2026-11-26T13:29:40.3024998Z Deleting the contents of 'D:\a\airsl\airsl'
+2026-11-26T13:29:40.3032780Z ##[group]Initializing the repository
+2026-11-26T13:29:40.3043130Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\airsl\airsl
+2026-11-26T13:29:40.5674452Z Initialized empty Git repository in D:/a/airsl/airsl/.git/
+2026-11-26T13:29:40.5743979Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/airsstack/airsl
+2026-11-26T13:29:40.6973381Z ##[endgroup]
+2026-11-26T13:29:40.6980534Z ##[group]Disabling automatic garbage collection
+2026-11-26T13:29:40.6988958Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-11-26T13:29:40.7511411Z ##[endgroup]
+2026-11-26T13:29:40.7513495Z ##[group]Setting up auth
+2026-11-26T13:29:40.7525986Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T13:29:40.8116649Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-11-26T13:29:44.4400644Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T13:29:44.4833548Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-11-26T13:29:45.1156421Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T13:29:45.1591657Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-11-26T13:29:45.7569568Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-11-26T13:29:45.8007392Z ##[endgroup]
+2026-11-26T13:29:45.8009201Z ##[group]Fetching the repository
+2026-11-26T13:29:45.8023558Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c:refs/remotes/origin/probe-ci-rocks-version
+2026-11-26T13:29:47.4010160Z From https://github.com/airsstack/airsl
+2026-11-26T13:29:47.4012056Z  * [new ref]         9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c -> origin/probe-ci-rocks-version
+2026-11-26T13:29:47.4073506Z ##[endgroup]
+2026-11-26T13:29:47.4074834Z ##[group]Determining the checkout info
+2026-11-26T13:29:47.4076280Z ##[endgroup]
+2026-11-26T13:29:47.4091663Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-11-26T13:29:47.4760284Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-11-26T13:29:47.5248085Z ##[group]Checking out the ref
+2026-11-26T13:29:47.5262007Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force -B probe-ci-rocks-version refs/remotes/origin/probe-ci-rocks-version
+2026-11-26T13:29:47.6179548Z Switched to a new branch 'probe-ci-rocks-version'
+2026-11-26T13:29:47.6209596Z branch 'probe-ci-rocks-version' set up to track 'origin/probe-ci-rocks-version'.
+2026-11-26T13:29:47.6293547Z ##[endgroup]
+2026-11-26T13:29:47.6912652Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-11-26T13:29:47.7320744Z 9afe8bfcd9246aeb3084c71d39ec3ca1a1e6083c
+2026-11-26T13:29:47.7902777Z ##[group]Run if exist crates\airsl-lua\rockspecs\airsstack-0.2.0-1.rockspec (echo found crates\airsl-lua\rockspecs\airsstack-0.2.0-1.rockspec; pack airsstack 0.2.0-1) else (echo missing airsstack & exit /b 1)
+2026-11-26T13:29:47.7904676Z [36;1mif exist crates\airsl-lua\rockspecs\airsstack-0.2.0-1.rockspec (echo found crates\airsl-lua\rockspecs\airsstack-0.2.0-1.rockspec; pack airsstack 0.2.0-1) else (echo missing airsstack & exit /b 1)[0m
+2026-11-26T13:29:47.7906918Z [36;1mif exist crates\airsl-lua\rockspecs\airsstack-luajit-0.2.0-1.rockspec (echo found crates\airsl-lua\rockspecs\airsstack-luajit-0.2.0-1.rockspec; pack airsstack-luajit 0.2.0-1) else (echo missing airsstack-luajit & exit /b 1)[0m
+2026-11-26T13:29:47.7949964Z shell: C:\Windows\system32\cmd.EXE /D /E:ON /V:OFF /S /C "CALL "{0}""
+2026-11-26T13:29:47.7950378Z ##[endgroup]
+2026-11-26T13:29:47.8135532Z found crates\airsl-lua\rockspecs\airsstack-0.2.0-1.rockspec; pack airsstack 0.2.0-1
+2026-11-26T13:29:47.8140825Z found crates\airsl-lua\rockspecs\airsstack-luajit-0.2.0-1.rockspec; pack airsstack-luajit 0.2.0-1
+2026-11-26T13:29:47.8430319Z Post job cleanup.
+2026-11-26T13:29:48.0396923Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-11-26T13:29:48.0763609Z git version 2.56.1.windows.1
+2026-11-26T13:29:48.0846837Z Temporarily overriding HOME='D:\a\_temp\ab838894-f100-4eec-a8f2-83ff4d36e5aa' before making global git config changes
+2026-11-26T13:29:48.0849196Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T13:29:48.0857567Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\airsl\airsl
+2026-11-26T13:29:48.1283182Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T13:29:48.1705300Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-11-26T13:29:48.9024031Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T13:29:48.9467557Z http.https://github.com/.extraheader
+2026-11-26T13:29:48.9534903Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-11-26T13:29:49.0070678Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-11-26T13:29:49.8195347Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T13:29:49.8849504Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-11-26T13:29:50.5799662Z Cleaning up orphan processes
+
+# --- cleanup (after both probe files were saved; serves probes 242 and 243) ---
+$ git push origin --delete probe-ci-rocks-version
+To github.com:airsstack/airsl.git
+ - [deleted]         probe-ci-rocks-version
+$ git ls-remote origin refs/heads/probe-ci-rocks-version | wc -l
+       0
+$ gh api repos/airsstack/airsl/actions/runs/45829615242/artifacts --jq .total_count
+0
+(the scratch repository the branch was pushed from was deleted; its files are 242-ci-probe-src/)

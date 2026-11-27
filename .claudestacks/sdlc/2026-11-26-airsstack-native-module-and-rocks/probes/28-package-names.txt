@@ -1,0 +1,78 @@
+Question B9: luarocks package-name rules (hyphens, dots, underscores, case); does airsstack-luajit work.
+Versions: luarocks 3.12.2 (/opt/homebrew/bin/luarocks, runs on Lua 5.4), Lua 5.4.8 (/opt/homebrew/bin/lua5.4), LuaJIT 2.1.1770848219 (/opt/homebrew/opt/luajit), cargo 1.94.1 / rustc 1.94.1, mlua =0.12.0 (mlua-sys 0.11.0), luarocks-build-rust-mlua 0.2.7-1, macOS Darwin 25.3.0 arm64 (arch macosx-aarch64).
+Date: 2026-11-26. Probe agent B.
+S = /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B (scratch; deleted after recording). Raw output below is unedited; paths appear in full.
+Sources: 28-package-names/*.rockspec. NOTE: the scratch filesystem is case-insensitive APFS, so writing AirsStack-LuaJIT-0.0.1-1.rockspec overwrote airsstack-luajit-0.0.1-1.rockspec (same file). The file listed as airsstack-luajit-0.0.1-1.rockspec therefore holds package = "AirsStack-LuaJIT", and the make below opened it through the mixed-case name. cwd = $S/names.
+$ for n in airsstack-luajit AirsStack-LuaJIT airsstack.luajit airsstack_luajit; do printf <rockspec with package = n> > "$n-0.0.1-1.rockspec"; done; ls
+airsstack_luajit-0.0.1-1.rockspec
+airsstack-luajit-0.0.1-1.rockspec
+airsstack-luajit-0.0.2-1.rockspec
+airsstack.luajit-0.0.1-1.rockspec
+
+$ luarocks lint airsstack_luajit-0.0.1-1.rockspec
+exit=0
+$ luarocks lint airsstack-luajit-0.0.1-1.rockspec
+exit=0
+$ luarocks lint airsstack.luajit-0.0.1-1.rockspec
+exit=0
+$ luarocks --lua-version 5.1 --lua-dir $LJ --tree $S/tree-names make AirsStack-LuaJIT-0.0.1-1.rockspec
+
+Error: Inconsistency between rockspec filename (AirsStack-LuaJIT-0.0.1-1.rockspec) and its contents (airsstack-luajit-0.0.1-1.rockspec).
+exit=1
+$ ls $S/tree-names/lib/luarocks/rocks-5.1
+ls: /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-names/lib/luarocks/rocks-5.1: No such file or directory
+$ luarocks lint airsstack-luajit-0.0.2-1.rockspec (file name/version mismatch: copy of 0.0.1-1)
+
+Error: Failed loading rockspec: Inconsistency between rockspec filename (airsstack-luajit-0.0.2-1.rockspec) and its contents (airsstack-luajit-0.0.1-1.rockspec).
+exit=1
+
+=== luarocks source
+--- 29-luarocks-3.12.2-src/type/rockspec.lua:30-52
+29-luarocks-3.12.2-src/type/rockspec.lua:30:    ["1.0"] = {
+29-luarocks-3.12.2-src/type/rockspec.lua:31:       fields = {
+29-luarocks-3.12.2-src/type/rockspec.lua:32:          rockspec_format = { _type = "string" },
+29-luarocks-3.12.2-src/type/rockspec.lua:33:          package = { _type = "string", _mandatory = true },
+29-luarocks-3.12.2-src/type/rockspec.lua:34:          version = { _type = "string", _pattern = "[%w.]+-[%d]+", _mandatory = true },
+29-luarocks-3.12.2-src/type/rockspec.lua:35:          description = {
+29-luarocks-3.12.2-src/type/rockspec.lua:36:             fields = {
+29-luarocks-3.12.2-src/type/rockspec.lua:37:                summary = { _type = "string" },
+29-luarocks-3.12.2-src/type/rockspec.lua:38:                detailed = { _type = "string" },
+29-luarocks-3.12.2-src/type/rockspec.lua:39:                homepage = { _type = "string" },
+29-luarocks-3.12.2-src/type/rockspec.lua:40:                license = { _type = "string" },
+29-luarocks-3.12.2-src/type/rockspec.lua:41:                maintainer = { _type = "string" },
+29-luarocks-3.12.2-src/type/rockspec.lua:42:             },
+29-luarocks-3.12.2-src/type/rockspec.lua:43:          },
+29-luarocks-3.12.2-src/type/rockspec.lua:44:          dependencies = {
+29-luarocks-3.12.2-src/type/rockspec.lua:45:             fields = {
+29-luarocks-3.12.2-src/type/rockspec.lua:46:                platforms = type_check.MAGIC_PLATFORMS,
+29-luarocks-3.12.2-src/type/rockspec.lua:47:             },
+29-luarocks-3.12.2-src/type/rockspec.lua:48:             _any = {
+29-luarocks-3.12.2-src/type/rockspec.lua:49:                _type = "string",
+29-luarocks-3.12.2-src/type/rockspec.lua:50:                _name = "a valid dependency string",
+29-luarocks-3.12.2-src/type/rockspec.lua:51:                _pattern = "%s*([a-zA-Z0-9][a-zA-Z0-9%.%-%_]*)%s*([^/]*)",
+29-luarocks-3.12.2-src/type/rockspec.lua:52:             },
+--- 29-luarocks-3.12.2-src/rockspecs.lua:140-140
+29-luarocks-3.12.2-src/rockspecs.lua:140:    rockspec.name = rockspec.package:lower()
+--- 29-luarocks-3.12.2-src/util.lua:375-384
+29-luarocks-3.12.2-src/util.lua:375: 
+29-luarocks-3.12.2-src/util.lua:376:    if ns_name:match("%.rockspec$") or ns_name:match("%.rock$") then
+29-luarocks-3.12.2-src/util.lua:377:       args[target] = ns_name
+29-luarocks-3.12.2-src/util.lua:378:    else
+29-luarocks-3.12.2-src/util.lua:379:       local name, namespace = util.split_namespace(ns_name)
+29-luarocks-3.12.2-src/util.lua:380:       args[target] = name:lower()
+29-luarocks-3.12.2-src/util.lua:381:       if namespace then
+29-luarocks-3.12.2-src/util.lua:382:          args.namespace = namespace:lower()
+29-luarocks-3.12.2-src/util.lua:383:       end
+29-luarocks-3.12.2-src/util.lua:384:    end
+--- 29-luarocks-3.12.2-src/queries.lua:151-156
+29-luarocks-3.12.2-src/queries.lua:151:       local ns_name, rest = depstr:match("^%s*([a-zA-Z0-9%.%-%_]*/?[a-zA-Z0-9][a-zA-Z0-9%.%-%_]*)%s*([^/]*)")
+29-luarocks-3.12.2-src/queries.lua:152:       if not ns_name then
+29-luarocks-3.12.2-src/queries.lua:153:          return nil, "failed to extract dependency name from '" .. depstr .. "'"
+29-luarocks-3.12.2-src/queries.lua:154:       end
+29-luarocks-3.12.2-src/queries.lua:155: 
+29-luarocks-3.12.2-src/queries.lua:156:       ns_name = ns_name:lower()
+
+=== findings
+- The rockspec 'package' field has no pattern (type/rockspec.lua:33: _type string only); luarocks lowercases it (rockspecs.lua:140) and lowercases names given on the command line (util.lua:380). Dependency strings must match '[a-zA-Z0-9][a-zA-Z0-9.-_]*' (type/rockspec.lua:51; queries.lua:151), so hyphens, dots and underscores are legal; lint passes for airsstack-luajit, airsstack.luajit, airsstack_luajit, and for package = "AirsStack-LuaJIT" in a lowercase-named file.
+- The rockspec FILE name must equal <lowercased package>-<version>.rockspec: 'Error: Inconsistency between rockspec filename (AirsStack-LuaJIT-0.0.1-1.rockspec) and its contents (airsstack-luajit-0.0.1-1.rockspec).' exit 1; same check for version mismatch (exit 1 from lint).
+- airsstack-luajit built, installed and loaded as module airsstack under LuaJIT (22, 24).

@@ -1,0 +1,29 @@
+[package]
+name        = "airsl-lua"
+description = "The airsstack host modules as a native Lua module, built and shipped as LuaRocks rocks"
+version.workspace      = true
+publish     = false
+
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+homepage.workspace     = true
+authors.workspace      = true
+
+[lib]
+name       = "airsstack"
+crate-type = ["cdylib"]
+
+[lints]
+workspace = true
+
+[features]
+lua54  = ["airsl/lua54"]
+luajit = ["airsl/luajit"]
+
+[dependencies]
+airsl = { path = "../airsl", default-features = false, features = ["module"] }
+
+[package.metadata.dist]
+dist = false

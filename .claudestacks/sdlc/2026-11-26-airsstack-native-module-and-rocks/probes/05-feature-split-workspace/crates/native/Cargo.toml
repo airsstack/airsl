@@ -1,0 +1,21 @@
+[package]
+name    = "native"
+version = "0.0.0"
+edition.workspace      = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+hostlib = { path = "../hostlib", default-features = false }
+mlua    = { workspace = true, features = ["module"] }
+
+[features]
+# No default: the Lua is chosen per build, one per library.
+lua54  = ["hostlib/lua54", "mlua/lua54"]
+luajit = ["hostlib/luajit", "mlua/luajit"]

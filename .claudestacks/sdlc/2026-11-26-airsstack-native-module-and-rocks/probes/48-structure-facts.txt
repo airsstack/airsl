@@ -1,0 +1,425 @@
+# 48 Structure facts: gate, CI, deny, pages (R at 9d054c4, working tree)
+Question: C5. Commands: grep -n on the files named. Date: 2026-11-26. Tools: cargo-make 0.37.24.
+
+## Makefile.toml: every '--workspace' / '--all-features'
+$ grep -n -- '--workspace\|--all-features' Makefile.toml
+19:# Every gate command already carries `--workspace`, so the task must run exactly
+32:# `--all-features` below is carried for forward-safety: neither crate in this
+63:  "--workspace",
+65:  "--all-features",
+77:args = ["doc", "--workspace", "--all-features", "--no-deps"]
+92:args = ["test", "--workspace", "--all-targets", "--all-features"]
+98:args = ["test", "--workspace", "--all-features", "--doc"]
+360:  "--workspace",
+362:  "--all-features",
+370:# While developing a single-crate change, `-p <crate>` replaces `--workspace`.
+377:# rather than reporting zero, unlike `cargo test --workspace --doc`, which
+400:exec --fail-on-error cargo clippy -p ${crate} --all-targets --all-features -- -D warnings
+405:exec --fail-on-error cargo doc -p ${crate} --all-features --no-deps
+407:exec --fail-on-error cargo test -p ${crate} --all-targets --all-features
+411:    exec --fail-on-error cargo test -p ${crate} --all-features --doc
+--- context: the arrays those args belong to
+18:[config]
+19:# Every gate command already carries `--workspace`, so the task must run exactly
+20:# once from the workspace root. Without this, cargo-make re-runs each task once
+21:# per member crate — redundant full-workspace builds.
+22:default_to_workspace = false
+32:# `--all-features` below is carried for forward-safety: neither crate in this
+33:# workspace declares Cargo `[features]`, so today it equals the default build.
+34:# It stays in every command so the gate stays correct the day a feature is added.
+43:[tasks.dod]
+44:category = "Gate"
+45:description = "Definition of Done — every step must exit 0 with zero warnings"
+46:dependencies = ["fmt-check", "clippy", "doc", "test", "test-doc"]
+54:[tasks.clippy]
+55:category = "Gate"
+56:description = "Lint every target, warnings are errors"
+57:# `--all-targets` covers tests, examples and benches — a lint living only in
+58:# test code passes silently without it. `-D warnings` also promotes plain rustc
+59:# warnings, which is why the gate has no separate `cargo build` step.
+60:command = "cargo"
+61:args = [
+62:  "clippy",
+63:  "--workspace",
+64:  "--all-targets",
+65:  "--all-features",
+66:  "--",
+67:  "-D",
+68:  "warnings",
+69:]
+71:[tasks.doc]
+72:category = "Gate"
+73:description = "Build rustdoc with warnings promoted to errors"
+74:# Plain `cargo doc` prints rustdoc warnings and still exits 0; RUSTDOCFLAGS is
+75:# the only thing that makes this step a gate rather than a report.
+76:command = "cargo"
+77:args = ["doc", "--workspace", "--all-features", "--no-deps"]
+78:
+79:[tasks.doc.env]
+80:RUSTDOCFLAGS = "-D warnings"
+82:[tasks.test]
+83:category = "Gate"
+84:description = "Unit, integration, example and bench targets, plus the prose guards in docs-check"
+85:# The shipped prose is checked here rather than in a task of its own: the guards are ordinary
+86:# tests in `crates/docs-check`, so this one command carries them on every OS in the CI matrix,
+87:# with no shell script to port and no sixth gate step to keep in sync with the guideline's five.
+88:# They read the whole repository, not one crate, so `dod-crate airsl` and `dod-crate airsl-cli`
+89:# do not run them; `dod` and `dod-crate docs-check` do. What they assert is listed in that crate's
+90:# module docs and in CLAUDE.md.
+91:command = "cargo"
+92:args = ["test", "--workspace", "--all-targets", "--all-features"]
+93:
+94:[tasks.test-doc]
+95:category = "Gate"
+96:description = "Doctests — excluded by --all-targets, so they need their own run"
+97:command = "cargo"
+98:args = ["test", "--workspace", "--all-features", "--doc"]
+354:[tasks.clippy-fix]
+355:category = "Development"
+356:description = "Apply the clippy suggestions that are machine-applicable"
+357:command = "cargo"
+358:args = [
+359:  "clippy",
+360:  "--workspace",
+361:  "--all-targets",
+362:  "--all-features",
+363:  "--fix",
+364:  "--allow-dirty",
+365:]
+--- dod-crate (-p <crate>, still --all-features)
+367:[tasks.dod-crate]
+368:category = "Development"
+369:description = "The gate scoped to one crate: cargo make dod-crate airsl"
+370:# While developing a single-crate change, `-p <crate>` replaces `--workspace`.
+399:exec --fail-on-error cargo fmt -p ${crate} -- --check
+400:exec --fail-on-error cargo clippy -p ${crate} --all-targets --all-features -- -D warnings
+401:# RUSTDOCFLAGS is set on the environment for this one step and cleared right
+402:# after — it must not leak into the two `cargo test` steps below, which never
+403:# wanted it.
+404:set_env RUSTDOCFLAGS "-D warnings"
+405:exec --fail-on-error cargo doc -p ${crate} --all-features --no-deps
+406:unset_env RUSTDOCFLAGS
+407:exec --fail-on-error cargo test -p ${crate} --all-targets --all-features
+408:lib_path = set crates/${crate}/src/lib.rs
+409:has_lib = is_file ${lib_path}
+410:if ${has_lib}
+411:    exec --fail-on-error cargo test -p ${crate} --all-features --doc
+412:else
+413:    echo "doctest step skipped: ${crate} has no library target (no ${lib_path})"
+414:end
+415:'''
+## Makefile.toml: task names
+$ grep -n '^\[tasks\.' Makefile.toml
+40:[tasks.default]
+43:[tasks.dod]
+48:[tasks.fmt-check]
+54:[tasks.clippy]
+71:[tasks.doc]
+79:[tasks.doc.env]
+82:[tasks.test]
+94:[tasks.test-doc]
+104:[tasks.examples]
+270:[tasks.book]
+277:[tasks.book-build]
+288:[tasks.deny]
+303:[tasks.publish-dry-run]
+330:[tasks.publish-dry-run-unsupported]
+342:[tasks.install]
+348:[tasks.fmt]
+354:[tasks.clippy-fix]
+367:[tasks.dod-crate]
+--- deny and examples are deliberately outside dod
+104:[tasks.examples]
+105:category = "Examples"
+106:description = "Run every example end to end, check the book appendix's output, and compile and test every shipped .lua"
+107:# Deliberately not a dependency of `dod`, for the reason `deny` is not: the
+108:# Definition of Done is five commands, and this is a sixth. It also does things
+288:[tasks.deny]
+289:category = "Supply chain"
+290:description = "cargo-deny: security advisories, licenses, duplicate versions, sources"
+291:# Deliberately not a dependency of `dod`. The Definition of Done is the five
+292:# commands the guideline skill owns; adding a sixth here would make this file
+293:# disagree with its source of truth. This check also answers to a moving
+294:# advisory database rather than to the working tree, so it can fail on a commit
+295:# that changed nothing.
+296:command = "cargo"
+297:args = ["deny", "check"]
+--- examples task cargo invocations (-p, no --workspace)
+187:            ran = exec cargo run -q -p airsl --example ${name}
+206:ran = exec cargo run -q -p airsl-cli -- run --policy trusted ${probe}
+216:ran = exec cargo run -q -p airsl-cli -- run --policy confined ${probe}
+226:ran = exec cargo run -q -p airsl-cli -- run --policy pure --allow-access stdout ${probe}
+245:exec --fail-on-error cargo run -q -p airsl-cli -- check crates/airsl/examples/
+257:exec --fail-on-error cargo run -q -p airsl-cli -- test crates/airsl/examples/
+399:exec --fail-on-error cargo fmt -p ${crate} -- --check
+400:exec --fail-on-error cargo clippy -p ${crate} --all-targets --all-features -- -D warnings
+405:exec --fail-on-error cargo doc -p ${crate} --all-features --no-deps
+407:exec --fail-on-error cargo test -p ${crate} --all-targets --all-features
+411:    exec --fail-on-error cargo test -p ${crate} --all-features --doc
+--- publish-dry-run
+303:[tasks.publish-dry-run]
+304:category = "Release"
+305:description = "Validate both crates against what crates.io enforces, publishing nothing"
+321:windows_alias = "publish-dry-run-unsupported"
+322:script_runner = "@shell"
+323:script = '''
+324:set -x
+325:cargo package --list -p airsl
+326:cargo publish --dry-run -p airsl
+327:cargo package --list -p airsl-cli
+328:'''
+
+## .github/workflows/ci.yml
+$ grep -n '^  [a-z-]*:$\|runs-on\|os: \[\|cargo make\|cargo deny\|mdbook build\|rustup show\|tool: ' .github/workflows/ci.yml
+4:  push:
+26:  dod:
+38:        os: [ubuntu-latest, macos-latest, windows-latest]
+39:    runs-on: ${{ matrix.os }}
+44:      # `rustup show` resolves the override in rust-toolchain.toml and installs it.
+49:          rustup show
+62:          tool: cargo-make
+80:      - name: cargo make dod
+81:        run: cargo make dod
+90:      - name: cargo make examples
+91:        run: cargo make examples
+93:  deny:
+95:    runs-on: ubuntu-latest
+108:        run: rustup show
+113:          tool: cargo-deny
+117:      - name: cargo deny check
+118:        run: cargo deny check
+120:  book:
+122:    runs-on: ubuntu-latest
+134:          tool: mdbook@0.4.52
+136:      - name: mdbook build
+137:        run: mdbook build book
+139:  installer:
+149:        os: [ubuntu-latest, macos-latest, windows-latest]
+150:    runs-on: ${{ matrix.os }}
+--- dod job
+1:name: CI
+2:
+3:on:
+4:  push:
+5:    branches: [main]
+6:  pull_request:
+7:  workflow_dispatch:
+8:
+26:  dod:
+27:    name: Definition of Done
+28:    # The matrix is the point: `mlua` is vendored, so every job here compiles Lua 5.4
+29:    # from C. A platform-specific break in that build — or in the host modules that
+30:    # touch paths, processes and time — is invisible on a single runner.
+31:    #
+32:    # Windows is `x86_64-pc-windows-msvc` only. The GNU target is not gated here: it
+33:    # links a different C runtime under the vendored Lua build, and supporting a second
+34:    # Windows ABI is a promise the crate does not make.
+35:    strategy:
+36:      fail-fast: false
+37:      matrix:
+38:        os: [ubuntu-latest, macos-latest, windows-latest]
+39:    runs-on: ${{ matrix.os }}
+40:    timeout-minutes: 45
+41:    steps:
+42:      - uses: actions/checkout@v5
+43:
+44:      # `rustup show` resolves the override in rust-toolchain.toml and installs it.
+45:      # The versions printed below are the record of which toolchain the gate ran on.
+46:      - name: Install the pinned Rust toolchain
+47:        shell: bash
+48:        run: |
+49:          rustup show
+50:          cargo --version
+51:          cargo clippy --version
+52:          cargo fmt --version
+53:
+54:      - name: Cache cargo registry and target dir
+55:        uses: Swatinem/rust-cache@v2
+56:        with:
+57:          shared-key: gate-${{ matrix.os }}
+58:
+59:      - name: Install cargo-make
+60:        uses: taiki-e/install-action@v2
+61:        with:
+62:          tool: cargo-make
+63:
+64:      # Windows requires elevated rights to create symlinks unless Developer Mode
+65:      # is on; the sandbox tests create them, so this makes the leg match what
+66:      # unix runners get for free.
+67:      #
+68:      # This writes a machine-wide HKLM key that drops the developer-license
+69:      # requirement for symlink creation and app sideloading. That is acceptable
+70:      # only because a GitHub-hosted runner is ephemeral and discarded after the
+71:      # job. Do not copy this step onto a self-hosted runner or a developer
+72:      # machine, where it persists and permanently lowers a system-wide boundary;
+73:      # there, turn on Settings -> For developers -> Developer Mode instead.
+74:      - name: Enable Developer Mode
+75:        if: runner.os == 'Windows'
+76:        run: reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /t REG_DWORD /f /v AllowDevelopmentWithoutDevLicense /d 1
+77:
+78:      # One command, the same one a developer runs locally: fmt-check, clippy,
+79:      # rustdoc, tests, doctests — each with warnings as errors.
+80:      - name: cargo make dod
+81:        run: cargo make dod
+82:
+83:      # A step in this job rather than a job of its own — unlike `deny`, which
+84:      # compiles nothing and is free to isolate. The examples link the whole
+85:      # workspace, so running them where the target dir is already warm costs
+86:      # seconds instead of a second full build.
+87:      #
+88:      # The gate above only compiles the examples. This runs them, which is
+89:      # what makes them a check on the runtime rather than on the type checker.
+90:      - name: cargo make examples
+91:        run: cargo make examples
+--- deny job
+93:  deny:
+94:    name: Supply chain
+95:    runs-on: ubuntu-latest
+96:    timeout-minutes: 15
+97:    # Independent of the gate: this reads Cargo.lock and the advisory database,
+98:    # compiles nothing, and finishes in seconds, so it should not wait behind a
+99:    # build to report a licence or advisory problem.
+100:    steps:
+101:      - uses: actions/checkout@v5
+102:
+103:      # cargo-deny shells out to `cargo metadata`, and `cargo` here is a rustup
+104:      # shim that resolves rust-toolchain.toml, so the pinned toolchain gets
+105:      # fetched either way. Doing it in its own step keeps that cost out of the
+106:      # check's log.
+107:      - name: Install the pinned Rust toolchain
+108:        run: rustup show
+109:
+110:      - name: Install cargo-deny
+111:        uses: taiki-e/install-action@v2
+112:        with:
+113:          tool: cargo-deny
+114:
+115:      # Advisories, licences, duplicate versions and source registries. Policy
+116:      # and every suppression live in deny.toml.
+117:      - name: cargo deny check
+118:        run: cargo deny check
+--- rust-toolchain.toml
+1:[toolchain]
+2:# Pinned to a minor channel rather than an exact patch. An exact patch is worth pinning
+3:# only where something asserts verbatim rustc diagnostics — `trybuild` fixtures, say.
+4:# Nothing in this repository does, so a patch release that merely rewords a diagnostic
+5:# must not turn the gate red.
+6:#
+7:# The channel matches `rust-version` in the workspace manifest, so the MSRV claim is
+8:# exercised by every ordinary build rather than asserted and never checked.
+9:channel    = "1.94"
+10:components = ["rustfmt", "clippy"]
+11:profile    = "minimal"
+
+## deny.toml graph
+13:[graph]
+14:# Deliberately no `targets` list. Restricting it would silence findings on
+15:# platforms this workspace has not ruled out, and the whole-graph view costs
+16:# nothing while every license present resolves to something permissive.
+17:all-features = true
+49:[licenses.private]
+50:# The two published workspace members go to crates.io under Apache-2.0, so their
+51:# license text is a distribution question and is checked like any other crate.
+52:# The unpublished `docs-check` member inherits the same license and is checked too.
+53:ignore = false
+59:[bans]
+60:# Duplicates are denied rather than warned so a second copy of a crate has to
+61:# be acknowledged here. The `skip` list below is the set that exists today —
+62:# it freezes the current state, so a *new* duplicate fails even though the
+63:# known ones pass.
+64:multiple-versions = "deny"
+65:# No `version = "*"` dependencies. The root manifest pins every direct one.
+66:wildcards = "deny"
+67:highlight = "all"
+68:workspace-default-features = "allow"
+69:external-default-features = "allow"
+70:allow = []
+71:deny = []
+72:skip = []
+73:skip-tree = []
+
+## .github/workflows/pages.yml
+1:name: Pages
+2:
+3:# Publishes https://airsstack.github.io/airsl/: the book, with the installer
+4:# wrappers from install/ at the site root so the install commands stay short.
+5:#
+6:# Deployed from an Actions artifact rather than a branch, so the built site is
+7:# never committed and nothing but this workflow can change what is served. The
+8:# repository's Pages source must be set to "GitHub Actions" for the deploy job
+9:# to succeed.
+10:on:
+11:  push:
+12:    branches: [main]
+13:    paths:
+14:      - book/**
+15:      - install/**
+16:      - .github/workflows/pages.yml
+17:  workflow_dispatch:
+18:
+19:permissions:
+20:  contents: read
+21:
+22:# One deploy at a time, and never cancel one halfway: a cancelled deploy can
+23:# leave the previous site half-replaced.
+24:concurrency:
+25:  group: pages
+26:  cancel-in-progress: false
+27:
+28:jobs:
+29:  build:
+30:    name: Build the site
+31:    runs-on: ubuntu-latest
+32:    timeout-minutes: 10
+33:    steps:
+34:      - uses: actions/checkout@v5
+35:        with:
+36:          persist-credentials: false
+37:
+38:      # Pinned to the version the book is written against; keep in step with
+39:      # the `book` job in ci.yml and min_version in Makefile.toml.
+40:      - name: Install mdBook
+41:        uses: taiki-e/install-action@v2
+42:        with:
+43:          tool: mdbook@0.4.52
+44:
+45:      - name: Build the book
+46:        run: mdbook build book
+47:
+48:      - name: Add the installer wrappers
+49:        run: cp install/install.sh install/install.ps1 book/book/
+50:
+51:      - uses: actions/upload-pages-artifact@v5
+52:        with:
+53:          path: book/book
+54:
+55:  deploy:
+56:    name: Deploy
+57:    needs: build
+58:    runs-on: ubuntu-latest
+59:    timeout-minutes: 10
+60:    # Only this job can publish, and only through the OIDC token deploy-pages
+61:    # exchanges; the build job never holds either permission.
+62:    permissions:
+63:      pages: write
+64:      id-token: write
+65:    environment:
+66:      name: github-pages
+67:      url: ${{ steps.deployment.outputs.page_url }}
+68:    steps:
+69:      - id: deployment
+70:        uses: actions/deploy-pages@v5
+
+## workspace members and mlua features
+1:[workspace]
+2:resolver = "3"
+3:# `docs-check` is unpublished and test-only; the other two are the crates.io releases.
+4:members  = ["crates/airsl", "crates/airsl-cli", "crates/docs-check"]
+14:[workspace.dependencies]
+15:# Embedded Lua runtime. `vendored` compiles Lua 5.4 from the C sources shipped by
+16:# `lua-src`, so no system Lua and no pkg-config are involved — but a C compiler is
+17:# required to build this workspace and every crate that depends on `airsl`.
+18:# `serialize` bridges Lua values through serde.
+19:# Lua 5.4 (not 5.1/LuaJIT) because only 5.3+ distinguishes integers from floats,
+20:# which the JSON that host programs exchange with scripts depends on.
+21:mlua       = { version = "0.12", features = ["lua54", "vendored", "serialize", "send"] }

@@ -13,6 +13,8 @@
 //! Non-responsibilities: this module does not decide what happens *after* a failure. Whether an
 //! error is reported or swallowed is [`crate::FailurePolicy`]'s job, applied by the caller.
 
+use crate::types::RootTable;
+
 /// Convenience alias for results carrying an [`Error`].
 pub type Result<T> = core::result::Result<T, Error>;
 
@@ -448,6 +450,20 @@ impl Error {
         }
     }
 
+    /// The root table, or a table inside it, could not be created or set.
+    ///
+    /// Built by `ModuleSet::install`, which the engine and [`ModuleSet::open`] share, and by the
+    /// builder when it sets the global. A module's own install failure is a separate
+    /// [`Error::ModuleInstall`] that the module words itself.
+    ///
+    /// [`ModuleSet::open`]: crate::modules::ModuleSet::open
+    pub(crate) fn root_table_install(root_table: &RootTable, source: &mlua::Error) -> Self {
+        Self::ModuleInstall {
+            module: root_table.to_string(),
+            reason: source.to_string(),
+        }
+    }
+
     /// Which ceiling this failure exhausted, if it exhausted one.
     ///
     /// Lets a caller that discards ordinary script failures still surface a resource breach, which
@@ -471,6 +487,16 @@ impl From<Error> for mlua::Error {
 #[cfg(test)]
 mod tests {
     use super::Error;
+
+    #[test]
+    fn a_root_table_install_failure_names_the_table_and_the_cause() {
+        let root = crate::types::RootTable::default();
+        let err = Error::root_table_install(&root, &mlua::Error::RuntimeError("boom".into()));
+        assert_eq!(
+            err.to_string(),
+            "failed to install host module `airsstack`: runtime error: boom"
+        );
+    }
 
     #[test]
     fn lua_wraps_chunk_name_into_the_message() {

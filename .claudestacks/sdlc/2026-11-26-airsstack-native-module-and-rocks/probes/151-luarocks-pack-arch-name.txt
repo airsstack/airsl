@@ -1,0 +1,171 @@
+question: luarocks 3.12.2 source (the installed Homebrew copy, sha256 below): how 'luarocks pack' names a binary rock from cfg.arch, and how cfg.arch becomes win32-x86_64 on 64-bit Windows (proves the name by source; probe 120 observed it).
+commands: each `$ ...` line below, run in the stated cwd, followed by its raw output and `[exit N]`
+versions: rustc 1.94.1 (e408947bf 2026-03-25), cargo 1.94.1 (29ea6fb6a 2026-03-24) via R/rust-toolchain.toml channel 1.94; mlua 0.12.0, mlua-sys 0.11.0, mlua_derive 0.12.0, syn 2.0.119 (copy's Cargo.lock); cargo-deny 0.20.2; cargo-dist 0.33.1; luarocks 3.12.2 (/opt/homebrew/bin/luarocks, runs on Lua 5.4); Lua 5.4.8 (/opt/homebrew/bin/lua5.4); LuaJIT 2.1.1770848219 (/opt/homebrew/opt/luajit); luarocks-build-rust-mlua 0.2.7-1; macOS 26.3.1 arm64
+setup: S=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad; copy = S/probes-L/repo = rsync of R at 9d054c4 (minus target/, .git, .claudestacks, book/book), with the draft's feature table applied: root mlua features ["serialize"], members += crates/airsl-lua; crates/airsl [features] default=[lua54,vendored,send], lua54/luajit/vendored/send/module -> mlua/*; crates/airsl-lua cdylib (lib name airsstack, airsl path dep default-features=false + module, features lua54/luajit, build.rs dynamic_lookup, lib.rs `mod entry;`, entry.rs #[mlua::lua_module]); probe-only `ModuleSet::open` added to crates/airsl/src/modules/registry.rs so the toy installs airsl's real Json module. Sources and diffs: 140-lua-module-private-mod/. Env: CARGO_BUILD_JOBS=2, CARGO_TARGET_DIR=S/probes-L/target (luarocks' backend passes --target-dir=target, i.e. S/probes-L/repo/target). Every command ran under zsh `setopt pipefail`, so [exit N] is the pipeline's real status.
+date: 2026-11-26 (probe agent L)
+--- raw output ---
+$ shasum -a 256 cmd/pack.lua pack.lua core/cfg.lua core/sysdetect.lua   (cwd=/opt/homebrew/Cellar/luarocks/3.12.2/share/lua/5.4/luarocks)
+5eaea6c387ba440e6082c499a1d6459a125d753ecd298df2e7fa29c46d31227c  cmd/pack.lua
+9db7f0e74f8210c9cdcc577e4a52b55413cd85ff76f02e1404a300faad71dee5  pack.lua
+42386eaee08320a5fd62440e6f8f017b7be859ef081c9709a4ab521bc2519186  core/cfg.lua
+4b11f90f7b1ab6ffa9c05c25f53fc1f449839abf82482c76fd700c11e07f32d3  core/sysdetect.lua
+[exit 0]
+
+$ sed -n 30,38p cmd/pack.lua   (cwd=/opt/homebrew/Cellar/luarocks/3.12.2/share/lua/5.4/luarocks)
+function cmd_pack.command(args)
+   local file, err
+   if args.rock:match(".*%.rockspec") then
+      file, err = pack.pack_source_rock(args.rock)
+   else
+      local query = queries.new(args.rock, args.namespace, args.version)
+      file, err = pack.pack_installed_rock(query, args.tree)
+   end
+   return pack.report_and_sign_local_file(file, err, args.sign)
+[exit 0]
+
+$ sed -n 28,40p pack.lua   (cwd=/opt/homebrew/Cellar/luarocks/3.12.2/share/lua/5.4/luarocks)
+
+
+
+function pack.pack_source_rock(rockspec_file)
+
+   local rockspec, errload = fetch.load_rockspec(rockspec_file)
+   if errload then
+      return nil, "Error loading rockspec: " .. errload
+   end
+   rockspec_file = rockspec.local_abs_filename
+
+   local name_version = rockspec.name .. "-" .. rockspec.version
+   local rock_file = fs.absolute_name(name_version .. ".src.rock")
+[exit 0]
+
+$ sed -n 90,135p pack.lua   (cwd=/opt/homebrew/Cellar/luarocks/3.12.2/share/lua/5.4/luarocks)
+
+
+function pack.pack_installed_rock(query, tree)
+
+   local name, version, repo, repo_url = search.pick_installed_rock(query, tree)
+   if not name then
+      return nil, version
+   end
+
+   local root = path.root_from_rocks_dir(repo_url)
+   local prefix = path.install_dir(name, version, root)
+   if not fs.exists(prefix) then
+      return nil, "'" .. name .. " " .. version .. "' does not seem to be an installed rock."
+   end
+
+   local rock_manifest, err = manif.load_rock_manifest(name, version, root)
+   if not rock_manifest then return nil, err end
+
+   local name_version = name .. "-" .. version
+   local rock_file = fs.absolute_name(name_version .. "." .. cfg.arch .. ".rock")
+
+   local temp_dir = fs.make_temp_dir("pack")
+   fs.copy_contents(prefix, temp_dir)
+
+   local ok
+   local is_binary = false
+   if rock_manifest.lib then
+      ok, err = copy_back_files(name, version, (rock_manifest.lib), path.deploy_lib_dir(repo), dir.path(temp_dir, "lib"), "exec")
+      if not ok then return nil, "Failed copying back files: " .. err end
+      is_binary = true
+   end
+   if rock_manifest.lua then
+      ok, err = copy_back_files(name, version, (rock_manifest.lua), path.deploy_lua_dir(repo), dir.path(temp_dir, "lua"), "read")
+      if not ok then return nil, "Failed copying back files: " .. err end
+   end
+
+   ok, err = fs.change_dir(temp_dir)
+   if not ok then return nil, err end
+   if not is_binary and not repos.has_binaries(name, version) then
+      rock_file = rock_file:gsub("%." .. cfg.arch:gsub("%-", "%%-") .. "%.", ".all.")
+   end
+   fs.delete(rock_file)
+   ok, err = fs.zip(rock_file, _tl_table_unpack(fs.list_dir()))
+   if not ok then
+      return nil, "Failed packing " .. rock_file .. " - " .. err
+   end
+[exit 0]
+
+$ sed -n 674,683p core/cfg.lua; echo ...; sed -n 703,703p core/cfg.lua   (cwd=/opt/homebrew/Cellar/luarocks/3.12.2/share/lua/5.4/luarocks)
+
+   -- A proper build of LuaRocks will hardcode the system
+   -- and proc values with hardcoded.SYSTEM and hardcoded.PROCESSOR.
+   -- If that is not available, we try to identify the system.
+   local system, processor = sysdetect.detect()
+   if hardcoded.SYSTEM then
+      system = hardcoded.SYSTEM
+   end
+   if hardcoded.PROCESSOR then
+      processor = hardcoded.PROCESSOR
+...
+   cfg.target_cpu = processor
+[exit 0]
+
+$ sed -n 284,287p core/cfg.lua; echo ...; sed -n 496,499p core/cfg.lua; echo ...; sed -n 533,536p core/cfg.lua   (cwd=/opt/homebrew/Cellar/luarocks/3.12.2/share/lua/5.4/luarocks)
+   if platforms.windows then
+
+      defaults.arch = "win32-"..target_cpu
+      defaults.lib_extension = "dll"
+...
+      defaults.variables.MAKE = os.getenv("MAKE") or "make"
+      defaults.external_lib_extension = "dylib"
+      defaults.arch = "macosx-"..target_cpu
+      defaults.variables.LIBFLAG = "-bundle -undefined dynamic_lookup -all_load"
+...
+
+   if platforms.linux then
+      defaults.arch = "linux-"..target_cpu
+
+[exit 0]
+
+$ sed -n 398,402p core/sysdetect.lua; echo ...; sed -n 414,418p core/sysdetect.lua; echo ...; sed -n 465,493p core/sysdetect.lua   (cwd=/opt/homebrew/Cellar/luarocks/3.12.2/share/lua/5.4/luarocks)
+
+
+
+local pe_machine = {
+   [0x8664] = "x86_64",
+...
+   end
+   local system = "windows"
+   fd:seek("set", peoffset + 4)
+   local machine = read(fd, 2, "little")
+   local processor = pe_machine[machine]
+...
+
+      local PATHsep
+      local interp = arg and arg[-1]
+      if dirsep == "/" then
+
+         files = {
+            "/bin/sh",
+            "/proc/self/exe",
+         }
+         PATHsep = ":"
+      else
+
+         local systemroot = os.getenv("SystemRoot")
+         files = {
+            systemroot .. "\\system32\\notepad.exe",
+            systemroot .. "\\explorer.exe",
+         }
+         if interp and not interp:lower():match("exe$") then
+            interp = interp .. ".exe"
+         end
+         PATHsep = ";"
+      end
+      if interp then
+         if interp:match(dirsep) then
+
+            table.insert(files, 1, interp)
+         else
+            for d in (os.getenv("PATH") or ""):gmatch("[^" .. PATHsep .. "]+") do
+               table.insert(files, d .. dirsep .. interp)
+[exit 0]
+
+$ luarocks config arch; luarocks config target_cpu 2>&1   (cwd=/tmp)
+macosx-aarch64
+aarch64
+[exit 0]
+

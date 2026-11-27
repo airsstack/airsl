@@ -28,11 +28,24 @@ github-attestations = true
 # dist builds and publishes but never runs what it built. This hook runs after
 # every archive is built and `host` waits for it, so an archive that fails its
 # smoke test is never published. See .github/workflows/airsl-cli-smoke.yml.
-global-artifacts-jobs = ["./airsl-cli-smoke"]
+#
+# The binary rocks of the native module are built the same way: `./build-rocks` is a
+# global job too, so `host` waits for it and a rock leg that fails stops the release, and
+# on a pull request the legs run under `pr-run-mode` below. See
+# .github/workflows/build-rocks.yml.
+global-artifacts-jobs = ["./airsl-cli-smoke", "./build-rocks"]
 # Pull requests build and smoke-test every archive too, publishing nothing. The
 # gate in ci.yml never builds musl or this profile, so without this a change that
 # breaks a release target would first fail on the release tag itself.
 pr-run-mode = "upload"
+# Build only the package each artifact ships. Without this dist builds `--workspace`, and the
+# native module's `module` feature cannot share a build with the rest of the workspace.
+precise-builds = true
+# The rocks upload to luarocks.org once the GitHub Release exists, so a release that fails
+# earlier never reaches the registry. `announce` waits for it, and a prerelease skips it.
+# The job needs the `LUAROCKS_API_KEY` repository secret. See
+# .github/workflows/publish-rocks.yml.
+publish-jobs = ["./publish-rocks"]
 
 # dist's defaults name fixed images (macos-14, ubuntu-22.04, windows-2022). GitHub retires
 # those, and the macos-14 retirement broke every release. The `-latest` labels move with GitHub

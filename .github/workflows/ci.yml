@@ -39,7 +39,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       # `rustup show` resolves the override in rust-toolchain.toml and installs it.
       # The versions printed below are the record of which toolchain the gate ran on.
@@ -75,6 +75,55 @@ jobs:
         if: runner.os == 'Windows'
         run: reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /t REG_DWORD /f /v AllowDevelopmentWithoutDevLicense /d 1
 
+      # The gate loads the native module into real Lua 5.4 and LuaJIT interpreters,
+      # and no runner image ships Lua, so each OS installs both before the gate runs.
+      # Lua is pinned to 5.4 because Homebrew's `lua` and gh-actions-lua default to
+      # 5.5. gh-actions-lua is not used at all: installed twice in one job it keeps the
+      # first Lua and silently skips the second, so it cannot provide both.
+      #
+      # apt and Homebrew follow the runner image and are not pinned; the gate refuses a
+      # wrong interpreter, so drift fails loudly instead of testing the wrong thing.
+      #
+      # The default names, `lua5.4` and `luajit`, are what apt installs, so no variable
+      # is needed here.
+      - name: Install Lua 5.4 and LuaJIT (Ubuntu)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y lua5.4 luajit
+
+      # `lua@5.4` is keg-only: it is not linked into the PATH, so the gate is told
+      # where its interpreter is.
+      - name: Install Lua 5.4 and LuaJIT (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install lua@5.4 luajit
+          echo "AIRSL_LUA54=$(brew --prefix lua@5.4)/bin/lua5.4" >> "$GITHUB_ENV"
+
+      # The module links against an MSVC-built lua54.dll / lua51.dll and their import
+      # libraries, which no Windows package provides, so both interpreters are built
+      # from source with MSVC. msvc-lua.cmd holds the build so that any job needing
+      # these interpreters builds the same ones, and the build needs the MSVC
+      # environment this action sets up for the steps after it. The pin is the commit
+      # the build was proven with.
+      - name: Enter the MSVC developer environment
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: x64
+
+      - name: Build Lua 5.4 and LuaJIT (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call crates\airsl-lua\ci\msvc-lua.cmd
+
+      # Absolute paths: the build installs outside the PATH, and the gate must find
+      # these exact interpreters.
+      - name: Point the gate at the Windows interpreters
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          echo 'AIRSL_LUA54=C:\lua54\bin\lua.exe' >> "$GITHUB_ENV"
+          echo 'AIRSL_LUAJIT=C:\luajit\bin\luajit.exe' >> "$GITHUB_ENV"
+
       # One command, the same one a developer runs locally: fmt-check, clippy,
       # rustdoc, tests, doctests — each with warnings as errors.
       - name: cargo make dod
@@ -90,6 +139,79 @@ jobs:
       - name: cargo make examples
         run: cargo make examples
 
+  rocks:
+    name: Rocks (${{ matrix.os }})
+    # `cargo make rocks` is outside the gate because it needs luarocks and the network, so
+    # nothing else runs it. This is the only place a break in the task itself shows before a
+    # release. build-rocks.yml builds the same rockspecs with direct `luarocks` calls, on every
+    # pull request as well as at release time, so a break in a rockspec shows there too.
+    #
+    # Ubuntu and macOS only: on Windows the interpreters come from msvc-lua.cmd and
+    # build-rocks.yml already builds, packs and loads both rocks there.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install the pinned Rust toolchain
+        run: |
+          rustup show
+          cargo --version
+
+      - name: Cache cargo registry and target dir
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rocks-${{ matrix.os }}
+
+      - name: Install cargo-make
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-make
+
+      # The interpreters the dod job installs, plus luarocks and the Lua development
+      # packages, so luarocks finds a complete installation of each. apt and Homebrew follow
+      # the runner image and are not pinned; `check.lua` refuses an interpreter that is
+      # not the ABI it was told to check, so drift fails loudly.
+      - name: Install LuaRocks, Lua 5.4 and LuaJIT (Ubuntu)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y luarocks lua5.4 liblua5.4-dev luajit libluajit-5.1-dev
+
+      # apt's luarocks runs on PUC Lua 5.1 and only looks for a build backend in its own
+      # Lua 5.1 user tree, so a backend fetched into a 5.4 `--tree` is never found: install
+      # it there first. With `--lua-version 5.1` luarocks also picks `lua5.1`, not LuaJIT, so
+      # the LuaJIT rock gets a `--lua-dir` that holds only `bin/luajit`, the luajit-2.1
+      # headers and the library directory. Pointing it at `/usr` fails the same way.
+      - name: Prepare LuaRocks for the apt layout (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          luarocks --lua-version 5.1 install --local luarocks-build-rust-mlua 0.2.7
+          ljdir="$RUNNER_TEMP/ljdir"
+          mkdir -p "$ljdir/bin"
+          ln -sf /usr/bin/luajit "$ljdir/bin/luajit"
+          ln -sfn /usr/include/luajit-2.1 "$ljdir/include"
+          ln -sfn "/usr/lib/$(gcc -print-multiarch)" "$ljdir/lib"
+          echo "AIRSL_LUAJIT_DIR=$ljdir" >> "$GITHUB_ENV"
+
+      # `lua@5.4` is keg-only and Homebrew's luarocks defaults to Lua 5.5, so the task is
+      # told each interpreter and the prefix luarocks must use for it, as build-rocks.yml
+      # does.
+      - name: Install LuaRocks, Lua 5.4 and LuaJIT (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install lua@5.4 luajit luarocks
+          {
+            echo "AIRSL_LUA54=$(brew --prefix lua@5.4)/bin/lua5.4"
+            echo "AIRSL_LUA54_DIR=$(brew --prefix lua@5.4)"
+            echo "AIRSL_LUAJIT_DIR=$(brew --prefix luajit)"
+          } >> "$GITHUB_ENV"
+
+      - name: cargo make rocks
+        run: cargo make rocks
+
   deny:
     name: Supply chain
     runs-on: ubuntu-latest
@@ -98,7 +220,7 @@ jobs:
     # compiles nothing, and finishes in seconds, so it should not wait behind a
     # build to report a licence or advisory problem.
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       # cargo-deny shells out to `cargo metadata`, and `cargo` here is a rustup
       # shim that resolves rust-toolchain.toml, so the pinned toolchain gets
@@ -124,7 +246,7 @@ jobs:
     # pages.yml only builds the book after a merge, when a broken build would
     # already be on main. This is the same build, on every pull request.
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       # Pinned to the version the book is written against; keep in step with
       # pages.yml and min_version in Makefile.toml.
@@ -154,7 +276,7 @@ jobs:
       # the runner's environment stays as it was.
       AIRSL_CLI_UNMANAGED_INSTALL: ${{ github.workspace }}/.install-test
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: shellcheck
         if: runner.os == 'Linux'

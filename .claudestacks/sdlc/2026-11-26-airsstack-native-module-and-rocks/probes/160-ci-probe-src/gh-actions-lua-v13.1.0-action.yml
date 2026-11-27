@@ -1,0 +1,24 @@
+
+name: "Install Lua/LuaJIT"
+description: "Download, build, and install Lua or LuaJIT for use with scripts, tests and more"
+
+branding:
+  icon: 'moon'
+  color: 'blue'
+
+inputs:
+  luaVersion:
+    description: "The version of Lua to install, must be available on https://lua.org/ftp/ or https://luajit.org/download.html"
+    required: false
+    default: "5.5"
+  luaCompileFlags:
+    description: "Command line flags passed to make when building Lua"
+    required: false
+  buildCache:
+    description: "Set to 'false' to skip restoring .lua from cache and always compile it"
+    required: false
+    default: 'true'
+
+runs:
+  using: 'node24'
+  main: 'main.js'

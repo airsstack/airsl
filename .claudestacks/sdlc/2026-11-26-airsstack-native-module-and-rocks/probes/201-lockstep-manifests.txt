@@ -1,0 +1,96 @@
+# Probe 201 — the final manifests parse, and every crate gets the features the spec says
+# Question: with [workspace.package] version (lockstep, members inherit via version.workspace = true), the root mlua entry reduced to
+#   ["serialize"], airsl's [features] table, and the final crates/airsl-lua/Cargo.toml (201-lockstep-manifests/, byte for byte):
+#   (1) does cargo load the workspace, (2) what version does each package get, (3) which mlua features does each build resolve to?
+#   Resolution only (cargo metadata / cargo tree --offline); nothing is compiled. crates/airsl-lua/src/lib.rs is a one-line stub.
+# Versions: cargo 1.94.1 (29ea6fb6a 2026-03-24), rustc 1.94.1 (e408947bf 2026-03-25); mlua 0.12.0 / mlua-sys 0.11.0 per the copy's Cargo.lock; cargo-tree built in.
+# Setup: copy of R (worktree, HEAD 9d054c4) minus target/.git/.claudestacks/book/book, at <S>/p201/repo; CARGO_BUILD_JOBS=2; CARGO_TARGET_DIR=<S>/p201/target
+# Date: 2026-11-26
+--- raw output ---
+$ cargo metadata --format-version 1 --no-deps --offline -q -o /dev/null
+error: unexpected argument '-o' found
+
+Usage: cargo metadata [OPTIONS]
+
+For more information, try '--help'.
+[exit 1]
+
+$ cargo metadata --format-version 1 --no-deps --offline | jq -r ".packages[] | \"\(.name) \(.version) publish=\(.publish)\""
+airsl 0.2.0 publish=null
+airsl-cli 0.2.0 publish=null
+airsl-lua 0.2.0 publish=[]
+docs-check 0.0.0 publish=[]
+[exit 0]
+
+$ cargo tree --offline -p airsl -e features -i mlua --depth 1
+     Locking 1 package to latest Rust 1.94 compatible version
+      Adding mlua_derive v0.12.0 (available: v0.12.2)
+mlua v0.12.0
+├── mlua feature "default"
+├── mlua feature "error-send"
+├── mlua feature "lua54"
+├── mlua feature "send"
+├── mlua feature "serde"
+├── mlua feature "serialize"
+└── mlua feature "vendored"
+[exit 0]
+
+$ cargo tree --offline -p airsl-cli -e features -i mlua --depth 1
+mlua v0.12.0
+├── mlua feature "default"
+├── mlua feature "error-send"
+├── mlua feature "lua54"
+├── mlua feature "send"
+├── mlua feature "serde"
+├── mlua feature "serialize"
+└── mlua feature "vendored"
+[exit 0]
+
+$ cargo tree --offline -p airsl-lua --features lua54 -e features -i mlua --depth 1
+mlua v0.12.0
+├── mlua feature "default"
+├── mlua feature "lua54"
+├── mlua feature "mlua_derive"
+├── mlua feature "module"
+├── mlua feature "serde"
+└── mlua feature "serialize"
+[exit 0]
+
+$ cargo tree --offline -p airsl-lua --features luajit -e features -i mlua --depth 1
+mlua v0.12.0
+├── mlua feature "default"
+├── mlua feature "luajit"
+├── mlua feature "mlua_derive"
+├── mlua feature "module"
+├── mlua feature "serde"
+└── mlua feature "serialize"
+[exit 0]
+
+$ cargo tree --offline -p airsl-lua -e features -i mlua --depth 1
+mlua v0.12.0
+├── mlua feature "default"
+├── mlua feature "mlua_derive"
+├── mlua feature "module"
+├── mlua feature "serde"
+└── mlua feature "serialize"
+[exit 0]
+
+$ cargo tree --offline --workspace --exclude airsl-lua -e features -i mlua --depth 1
+mlua v0.12.0
+├── mlua feature "default"
+├── mlua feature "error-send"
+├── mlua feature "lua54"
+├── mlua feature "send"
+├── mlua feature "serde"
+├── mlua feature "serialize"
+└── mlua feature "vendored"
+[exit 0]
+
+$ cargo tree --offline -p airsl-lua --features lua54 -d --depth 0
+syn v2.0.119
+
+syn v3.0.3
+[exit 0]
+
+$ cargo metadata --format-version 1 --no-deps --offline > /dev/null   (the first line above mistyped -o; this is the intended form)
+[exit 0]

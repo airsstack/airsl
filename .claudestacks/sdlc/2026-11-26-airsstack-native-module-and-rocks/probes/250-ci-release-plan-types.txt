@@ -1,0 +1,937 @@
+# Probe 250 — the S25 plan reads (probe 246's tag.sh and app-version.sh) on GitHub-hosted ubuntu-latest, macos-latest and windows-latest
+question: R14: do the rewritten `jq -r -s` reads of publish-rocks (spec §5.6.4) and build-rocks' `version` job (§5.6.6) print, under
+  each runner's bash and jq, what they printed locally under bash 3.2.57 / jq 1.7.1 (probe 246), for every case of probe 246's run.sh?
+answer: HOLDS, no difference. The output after "$ bash run.sh 246-release-plan-types" equals probe 246's raw output on all three
+  runners: compared with diff after stripping the log timestamps (and, on Windows, the CR the log adds to every line): no output
+  ("IDENTICAL"), 169 lines each, every message of the wrong-type, two-JSON-text and empty-app_version cases included, and jq's own
+  parse-error lines ("jq: parse error: Invalid numeric literal at line 1, column 4", the U+001F line) unchanged under jq 1.8.
+tool versions (printed in the logs below): ubuntu-26.04 "GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)", "jq-1.8.1",
+  /usr/bin/bash, /usr/bin/jq; macos-26-arm64 "GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)", "jq-1.8.2", /bin/bash,
+  /opt/homebrew/bin/jq; windows-2025-vs2026 (Git Bash, `shell: bash`) "GNU bash, version 5.3.15(2)-release (x86_64-pc-cygwin)",
+  "jq-1.8.2", /usr/bin/bash, /c/ProgramData/Chocolatey/bin/jq. The same versions as probe 242's runners.
+jobs: plan-reads ubuntu https://github.com/airsstack/airsl/actions/runs/45835818805/job/139964267132 ; plan-reads macos https://github.com/airsstack/airsl/actions/runs/45835818805/job/139964267020 ; plan-reads windows https://github.com/airsstack/airsl/actions/runs/45835818805/job/139964267025
+runner images: ubuntu-26.04 20261122.9.1, macos-26-arm64 20261117.0516.1, windows-2025-vs2026 20261116.315.1.
+sources: 250-ci-probe-src/probe/246/ (probe 246's five files, unchanged), job `plan-reads` of the workflow.
+run: https://github.com/airsstack/airsl/actions/runs/45835818805 (attempt 1, trigger push, conclusion success); workflow 250-ci-probe-src/.github/workflows/probe.yml at head
+  c1a6f7a3c7fe9daf4aeca11b8c5147ed1288ea4d, pushed as the one ref probe-ci-rocks-2 from a fresh repository holding only the files of
+  250-ci-probe-src (committed as rstlix0x0), deleted after the run (probe 250's last section). actions/checkout@v5 (SHA
+  fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09). No tokens; no artifacts (total_count 0).
+date: 2026-11-26; logs fetched with: gh api --allow-escape-sequences repos/airsstack/airsl/actions/jobs/<id>/logs (byte for byte
+  below each marker; the Windows logs carry CRLF on every line, the runner's own lines included).
+# --- raw job log: plan-reads (ubuntu-latest) (139964267132) ---
+﻿2026-11-26T14:07:27.7897770Z Current runner version: '2.338.2'
+2026-11-26T14:07:27.7918636Z ##[group]Runner Image Provisioner
+2026-11-26T14:07:27.7919304Z Hosted Compute Agent
+2026-11-26T14:07:27.7919672Z Version: 20261111.635
+2026-11-26T14:07:27.7920156Z Commit: b8a594ea514ff44cadb5342986c68b1eac6e22ed
+2026-11-26T14:07:27.7920658Z Build Date: 2026-11-11T01:49:01Z
+2026-11-26T14:07:27.7921334Z Worker ID: {8524d3ec-501c-4d4d-a232-37833a321f64}
+2026-11-26T14:07:27.7921868Z Region: westus3
+2026-11-26T14:07:27.7922215Z Cloud: Azure
+2026-11-26T14:07:27.7922581Z ##[endgroup]
+2026-11-26T14:07:27.7923508Z ##[group]Operating System
+2026-11-26T14:07:27.7923890Z Ubuntu
+2026-11-26T14:07:27.7924253Z 26.04.1
+2026-11-26T14:07:27.7924579Z LTS
+2026-11-26T14:07:27.7924937Z ##[endgroup]
+2026-11-26T14:07:27.7925308Z ##[group]Runner Image
+2026-11-26T14:07:27.7925704Z Image: ubuntu-26.04
+2026-11-26T14:07:27.7926077Z Version: 20261122.9.1
+2026-11-26T14:07:27.7926934Z Included Software: https://github.com/actions/runner-images/blob/ubuntu26/20261122.9/images/ubuntu/Ubuntu2604-Readme.md
+2026-11-26T14:07:27.7927856Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261122.9
+2026-11-26T14:07:27.7928448Z ##[endgroup]
+2026-11-26T14:07:27.7929172Z ##[group]GITHUB_TOKEN Permissions
+2026-11-26T14:07:27.7930526Z Contents: read
+2026-11-26T14:07:27.7931507Z Metadata: read
+2026-11-26T14:07:27.7931880Z ##[endgroup]
+2026-11-26T14:07:27.7933463Z Secret source: Actions
+2026-11-26T14:07:27.7934122Z Cache mode: write
+2026-11-26T14:07:27.7934569Z Prepare workflow directory
+2026-11-26T14:07:27.8224780Z Prepare all required actions
+2026-11-26T14:07:27.8259952Z Getting action download info
+2026-11-26T14:07:28.1398074Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-11-26T14:07:28.2652596Z Complete job name: plan-reads (ubuntu-latest)
+2026-11-26T14:07:28.3312038Z ##[group]Run actions/checkout@v5
+2026-11-26T14:07:28.3312528Z with:
+2026-11-26T14:07:28.3312800Z   repository: airsstack/airsl
+2026-11-26T14:07:28.3314965Z   token: ***
+2026-11-26T14:07:28.3315220Z   ssh-strict: true
+2026-11-26T14:07:28.3315479Z   ssh-user: git
+2026-11-26T14:07:28.3315743Z   persist-credentials: true
+2026-11-26T14:07:28.3316035Z   clean: true
+2026-11-26T14:07:28.3316305Z   sparse-checkout-cone-mode: true
+2026-11-26T14:07:28.3316615Z   fetch-depth: 1
+2026-11-26T14:07:28.3316872Z   fetch-tags: false
+2026-11-26T14:07:28.3317137Z   show-progress: true
+2026-11-26T14:07:28.3317409Z   lfs: false
+2026-11-26T14:07:28.3317658Z   submodules: false
+2026-11-26T14:07:28.3317930Z   set-safe-directory: true
+2026-11-26T14:07:28.3318232Z   allow-unsafe-pr-checkout: false
+2026-11-26T14:07:28.3318615Z ##[endgroup]
+2026-11-26T14:07:28.5169329Z Syncing repository: airsstack/airsl
+2026-11-26T14:07:28.5171525Z ##[group]Getting Git version info
+2026-11-26T14:07:28.5172295Z Working directory is '/home/runner/work/airsl/airsl'
+2026-11-26T14:07:28.5173212Z [command]/usr/bin/git version
+2026-11-26T14:07:28.5173903Z git version 2.56.1
+2026-11-26T14:07:28.5188977Z ##[endgroup]
+2026-11-26T14:07:28.5201670Z Temporarily overriding HOME='/home/runner/work/_temp/826474e9-37d0-4c0d-870f-da72f2eb08c3' before making global git config changes
+2026-11-26T14:07:28.5203045Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T14:07:28.5205586Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/airsl/airsl
+2026-11-26T14:07:28.5266154Z Deleting the contents of '/home/runner/work/airsl/airsl'
+2026-11-26T14:07:28.5270177Z ##[group]Initializing the repository
+2026-11-26T14:07:28.5273689Z [command]/usr/bin/git init /home/runner/work/airsl/airsl
+2026-11-26T14:07:28.5358061Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-26T14:07:28.5359136Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-26T14:07:28.5359968Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-26T14:07:28.5360649Z hint: call:
+2026-11-26T14:07:28.5361911Z hint:
+2026-11-26T14:07:28.5362413Z hint: 	git config --global init.defaultBranch <name>
+2026-11-26T14:07:28.5362974Z hint:
+2026-11-26T14:07:28.5363493Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-26T14:07:28.5364324Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-26T14:07:28.5364997Z hint:
+2026-11-26T14:07:28.5365390Z hint: 	git branch -m <name>
+2026-11-26T14:07:28.5365835Z hint:
+2026-11-26T14:07:28.5366412Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-26T14:07:28.5367288Z Initialized empty Git repository in /home/runner/work/airsl/airsl/.git/
+2026-11-26T14:07:28.5376632Z [command]/usr/bin/git remote add origin https://github.com/airsstack/airsl
+2026-11-26T14:07:28.5431576Z ##[endgroup]
+2026-11-26T14:07:28.5432112Z ##[group]Disabling automatic garbage collection
+2026-11-26T14:07:28.5439622Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-26T14:07:28.5477257Z ##[endgroup]
+2026-11-26T14:07:28.5478037Z ##[group]Setting up auth
+2026-11-26T14:07:28.5484400Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T14:07:28.5518490Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T14:07:28.5910937Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T14:07:28.5940148Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T14:07:28.6172474Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T14:07:28.6212073Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T14:07:28.6440522Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-26T14:07:28.6476336Z ##[endgroup]
+2026-11-26T14:07:28.6482536Z ##[group]Fetching the repository
+2026-11-26T14:07:28.6483511Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +c1a6f7a3c7fe9daf4aeca11b8c5147ed1288ea4d:refs/remotes/origin/probe-ci-rocks-2
+2026-11-26T14:07:29.0593000Z From https://github.com/airsstack/airsl
+2026-11-26T14:07:29.0594629Z  * [new ref]         c1a6f7a3c7fe9daf4aeca11b8c5147ed1288ea4d -> origin/probe-ci-rocks-2
+2026-11-26T14:07:29.0598471Z ##[endgroup]
+2026-11-26T14:07:29.0599379Z ##[group]Determining the checkout info
+2026-11-26T14:07:29.0600344Z ##[endgroup]
+2026-11-26T14:07:29.0601499Z [command]/usr/bin/git sparse-checkout disable
+2026-11-26T14:07:29.0647184Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-26T14:07:29.0679001Z ##[group]Checking out the ref
+2026-11-26T14:07:29.0680753Z [command]/usr/bin/git checkout --progress --force -B probe-ci-rocks-2 refs/remotes/origin/probe-ci-rocks-2
+2026-11-26T14:07:29.0740668Z Switched to a new branch 'probe-ci-rocks-2'
+2026-11-26T14:07:29.0745174Z branch 'probe-ci-rocks-2' set up to track 'origin/probe-ci-rocks-2'.
+2026-11-26T14:07:29.0749909Z ##[endgroup]
+2026-11-26T14:07:29.0788093Z [command]/usr/bin/git log -1 --format=%H
+2026-11-26T14:07:29.0814492Z c1a6f7a3c7fe9daf4aeca11b8c5147ed1288ea4d
+2026-11-26T14:07:29.1035445Z ##[group]Run echo "\$ bash --version | head -1; jq --version; command -v bash jq"
+2026-11-26T14:07:29.1037011Z [36;1mecho "\$ bash --version | head -1; jq --version; command -v bash jq"[0m
+2026-11-26T14:07:29.1038343Z [36;1mbash --version | head -1; jq --version; command -v bash jq[0m
+2026-11-26T14:07:29.1070924Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T14:07:29.1072031Z ##[endgroup]
+2026-11-26T14:07:29.1139463Z $ bash --version | head -1; jq --version; command -v bash jq
+2026-11-26T14:07:29.1162897Z GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)
+2026-11-26T14:07:29.1176099Z jq-1.8.1
+2026-11-26T14:07:29.1177710Z /usr/bin/bash
+2026-11-26T14:07:29.1178507Z /usr/bin/jq
+2026-11-26T14:07:29.1232398Z ##[group]Run echo "\$ bash run.sh 246-release-plan-types"
+2026-11-26T14:07:29.1233367Z [36;1mecho "\$ bash run.sh 246-release-plan-types"[0m
+2026-11-26T14:07:29.1234198Z [36;1mbash probe/246/run.sh probe/246[0m
+2026-11-26T14:07:29.1261696Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T14:07:29.1262515Z ##[endgroup]
+2026-11-26T14:07:29.1312054Z $ bash run.sh 246-release-plan-types
+2026-11-26T14:07:29.1323848Z ## publish-rocks: tag.sh
+2026-11-26T14:07:29.1350788Z $ PLAN=<plan-tag.json> bash tag.sh
+2026-11-26T14:07:29.1391262Z version=0.2.0
+2026-11-26T14:07:29.1392940Z [exit 0]
+2026-11-26T14:07:29.1418697Z $ PLAN=<plan-pr.json> bash tag.sh
+2026-11-26T14:07:29.1459216Z publish-rocks: the release tag v0.2.0 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T14:07:29.1461444Z [exit 1]
+2026-11-26T14:07:29.1463544Z $ PLAN='{"announcement_tag":"airsl-cli-v0.0.0","announcement_is_prerelease":false,"publish_prereleases":false,"artifacts":{}}' bash tag.sh
+2026-11-26T14:07:29.1501819Z version=0.0.0
+2026-11-26T14:07:29.1502793Z [exit 0]
+2026-11-26T14:07:29.1506133Z $ PLAN='{"announcement_tag":null}' bash tag.sh
+2026-11-26T14:07:29.1542086Z publish-rocks: the release plan names no tag; nothing was uploaded
+2026-11-26T14:07:29.1543417Z [exit 1]
+2026-11-26T14:07:29.1544138Z $ PLAN='{}' bash tag.sh
+2026-11-26T14:07:29.1581780Z publish-rocks: the release plan names no tag; nothing was uploaded
+2026-11-26T14:07:29.1583033Z [exit 1]
+2026-11-26T14:07:29.1583717Z $ PLAN='' bash tag.sh
+2026-11-26T14:07:29.1620863Z publish-rocks: the release plan names no tag; nothing was uploaded
+2026-11-26T14:07:29.1622484Z [exit 1]
+2026-11-26T14:07:29.1623253Z $ PLAN='{"announcement_tag":""}' bash tag.sh
+2026-11-26T14:07:29.1659779Z publish-rocks: the release plan names no tag; nothing was uploaded
+2026-11-26T14:07:29.1660977Z [exit 1]
+2026-11-26T14:07:29.1662226Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2"}' bash tag.sh
+2026-11-26T14:07:29.1699795Z publish-rocks: the release tag airsl-cli-v0.2 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T14:07:29.1701535Z [exit 1]
+2026-11-26T14:07:29.1702469Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2.0-rc.1"}' bash tag.sh
+2026-11-26T14:07:29.1739883Z publish-rocks: the release tag airsl-cli-v0.2.0-rc.1 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T14:07:29.1741684Z [exit 1]
+2026-11-26T14:07:29.1742544Z $ PLAN='{"announcement_tag":"airsl-v0.2.0"}' bash tag.sh
+2026-11-26T14:07:29.1778985Z publish-rocks: the release tag airsl-v0.2.0 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T14:07:29.1780559Z [exit 1]
+2026-11-26T14:07:29.1781676Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2.0\n"}' bash tag.sh
+2026-11-26T14:07:29.1818342Z version=0.2.0
+2026-11-26T14:07:29.1820076Z [exit 0]
+2026-11-26T14:07:29.1820858Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2.0
+2026-11-26T14:07:29.1822213Z "}' bash tag.sh
+2026-11-26T14:07:29.1854066Z jq: parse error: Invalid string: control characters from U+0000 through U+001F must be escaped at line 2, column 1
+2026-11-26T14:07:29.1857727Z publish-rocks: could not read the release plan: jq exit status 5; nothing was uploaded
+2026-11-26T14:07:29.1858917Z [exit 1]
+2026-11-26T14:07:29.1859645Z $ PLAN='not json' bash tag.sh
+2026-11-26T14:07:29.1891444Z jq: parse error: Invalid numeric literal at line 1, column 4
+2026-11-26T14:07:29.1895957Z publish-rocks: could not read the release plan: jq exit status 5; nothing was uploaded
+2026-11-26T14:07:29.1897139Z [exit 1]
+2026-11-26T14:07:29.1897902Z $ PLAN='{"announcement_tag":5}' bash tag.sh
+2026-11-26T14:07:29.1934317Z publish-rocks: in the release plan, announcement_tag is a number, not a string; nothing was uploaded
+2026-11-26T14:07:29.1935814Z [exit 1]
+2026-11-26T14:07:29.1937047Z $ PLAN='{"announcement_tag":false}' bash tag.sh
+2026-11-26T14:07:29.1972129Z publish-rocks: in the release plan, announcement_tag is a boolean, not a string; nothing was uploaded
+2026-11-26T14:07:29.1973525Z [exit 1]
+2026-11-26T14:07:29.1974662Z $ PLAN='{"announcement_tag":true}' bash tag.sh
+2026-11-26T14:07:29.2010467Z publish-rocks: in the release plan, announcement_tag is a boolean, not a string; nothing was uploaded
+2026-11-26T14:07:29.2012087Z [exit 1]
+2026-11-26T14:07:29.2013000Z $ PLAN='{"announcement_tag":["airsl-cli-v0.2.0"]}' bash tag.sh
+2026-11-26T14:07:29.2048817Z publish-rocks: in the release plan, announcement_tag is an array, not a string; nothing was uploaded
+2026-11-26T14:07:29.2050338Z [exit 1]
+2026-11-26T14:07:29.2051196Z $ PLAN='{"announcement_tag":{}}' bash tag.sh
+2026-11-26T14:07:29.2086499Z publish-rocks: in the release plan, announcement_tag is an object, not a string; nothing was uploaded
+2026-11-26T14:07:29.2087966Z [exit 1]
+2026-11-26T14:07:29.2088684Z $ PLAN='[1]' bash tag.sh
+2026-11-26T14:07:29.2123605Z publish-rocks: in the release plan, the top level is an array, not an object; nothing was uploaded
+2026-11-26T14:07:29.2125017Z [exit 1]
+2026-11-26T14:07:29.2125630Z $ PLAN='5' bash tag.sh
+2026-11-26T14:07:29.2161379Z publish-rocks: in the release plan, the top level is a number, not an object; nothing was uploaded
+2026-11-26T14:07:29.2162690Z [exit 1]
+2026-11-26T14:07:29.2163332Z $ PLAN='"x"' bash tag.sh
+2026-11-26T14:07:29.2198658Z publish-rocks: in the release plan, the top level is a string, not an object; nothing was uploaded
+2026-11-26T14:07:29.2200028Z [exit 1]
+2026-11-26T14:07:29.2200617Z $ PLAN='null' bash tag.sh
+2026-11-26T14:07:29.2236163Z publish-rocks: in the release plan, the top level is null, not an object; nothing was uploaded
+2026-11-26T14:07:29.2237502Z [exit 1]
+2026-11-26T14:07:29.2238108Z $ PLAN='true' bash tag.sh
+2026-11-26T14:07:29.2273455Z publish-rocks: in the release plan, the top level is a boolean, not an object; nothing was uploaded
+2026-11-26T14:07:29.2274874Z [exit 1]
+2026-11-26T14:07:29.2275891Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2.0"} {"announcement_tag":"airsl-cli-v0.2.0"}' bash tag.sh
+2026-11-26T14:07:29.2311250Z publish-rocks: the release plan holds 2 JSON values, not one; nothing was uploaded
+2026-11-26T14:07:29.2312463Z [exit 1]
+2026-11-26T14:07:29.2313096Z $ PLAN='{} 5' bash tag.sh
+2026-11-26T14:07:29.2348419Z publish-rocks: the release plan holds 2 JSON values, not one; nothing was uploaded
+2026-11-26T14:07:29.2349593Z [exit 1]
+2026-11-26T14:07:29.2350547Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2.0"} not json' bash tag.sh
+2026-11-26T14:07:29.2381877Z jq: parse error: Invalid numeric literal at line 1, column 44
+2026-11-26T14:07:29.2386361Z publish-rocks: could not read the release plan: jq exit status 5; nothing was uploaded
+2026-11-26T14:07:29.2387584Z [exit 1]
+2026-11-26T14:07:29.2388306Z ## build-rocks: app-version.sh
+2026-11-26T14:07:29.2414041Z $ PLAN=<plan-tag.json> bash app-version.sh
+2026-11-26T14:07:29.2453944Z version=0.2.0
+2026-11-26T14:07:29.2455623Z [exit 0]
+2026-11-26T14:07:29.2480775Z $ PLAN=<plan-pr.json> bash app-version.sh
+2026-11-26T14:07:29.2521202Z version=0.2.0
+2026-11-26T14:07:29.2523142Z [exit 0]
+2026-11-26T14:07:29.2525254Z $ PLAN='{"releases":[{"app_name":"airsl","app_version":"0.2.0"},{"app_name":"airsl-cli","app_version":"0.2.0"}]}' bash app-version.sh
+2026-11-26T14:07:29.2564326Z version=0.2.0
+2026-11-26T14:07:29.2565981Z [exit 0]
+2026-11-26T14:07:29.2567048Z $ PLAN='{"releases":[]}' bash app-version.sh
+2026-11-26T14:07:29.2607332Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T14:07:29.2608635Z [exit 1]
+2026-11-26T14:07:29.2609173Z $ PLAN='{}' bash app-version.sh
+2026-11-26T14:07:29.2648545Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T14:07:29.2650095Z [exit 1]
+2026-11-26T14:07:29.2650634Z $ PLAN='' bash app-version.sh
+2026-11-26T14:07:29.2689166Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T14:07:29.2690718Z [exit 1]
+2026-11-26T14:07:29.2692507Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":"0.2.0"},{"app_name":"airsl-cli","app_version":"0.2.0"}]}' bash app-version.sh
+2026-11-26T14:07:29.2731031Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T14:07:29.2732455Z [exit 1]
+2026-11-26T14:07:29.2733320Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":"0.2"}]}' bash app-version.sh
+2026-11-26T14:07:29.2773951Z build-rocks: the release plan's airsl-cli version 0.2 is not <major>.<minor>.<patch>
+2026-11-26T14:07:29.2775171Z [exit 1]
+2026-11-26T14:07:29.2775689Z $ PLAN='not json' bash app-version.sh
+2026-11-26T14:07:29.2810118Z jq: parse error: Invalid numeric literal at line 1, column 4
+2026-11-26T14:07:29.2814436Z build-rocks: could not read the release plan: jq exit status 5
+2026-11-26T14:07:29.2816265Z [exit 1]
+2026-11-26T14:07:29.2816826Z $ PLAN='{"releases":null}' bash app-version.sh
+2026-11-26T14:07:29.2856069Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T14:07:29.2857945Z [exit 1]
+2026-11-26T14:07:29.2858731Z $ PLAN='{"releases":5}' bash app-version.sh
+2026-11-26T14:07:29.2897914Z build-rocks: in the release plan, releases is a number, not an array
+2026-11-26T14:07:29.2902482Z [exit 1]
+2026-11-26T14:07:29.2903886Z $ PLAN='{"releases":{"app_name":"airsl-cli"}}' bash app-version.sh
+2026-11-26T14:07:29.2944366Z build-rocks: in the release plan, releases is an object, not an array
+2026-11-26T14:07:29.2945799Z [exit 1]
+2026-11-26T14:07:29.2946581Z $ PLAN='{"releases":"x"}' bash app-version.sh
+2026-11-26T14:07:29.2985820Z build-rocks: in the release plan, releases is a string, not an array
+2026-11-26T14:07:29.2987074Z [exit 1]
+2026-11-26T14:07:29.2987627Z $ PLAN='{"releases":[5]}' bash app-version.sh
+2026-11-26T14:07:29.3026379Z build-rocks: in the release plan, releases[0] is a number, not an object
+2026-11-26T14:07:29.3028013Z [exit 1]
+2026-11-26T14:07:29.3029382Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":"0.2.0"},null]}' bash app-version.sh
+2026-11-26T14:07:29.3068013Z build-rocks: in the release plan, releases[1] is null, not an object
+2026-11-26T14:07:29.3069659Z [exit 1]
+2026-11-26T14:07:29.3070752Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":5}]}' bash app-version.sh
+2026-11-26T14:07:29.3109016Z build-rocks: in the release plan, the airsl-cli release's app_version is a number, not a string
+2026-11-26T14:07:29.3110538Z [exit 1]
+2026-11-26T14:07:29.3178089Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":null}]}' bash app-version.sh
+2026-11-26T14:07:29.3180944Z build-rocks: in the release plan, the airsl-cli release's app_version is null, not a string
+2026-11-26T14:07:29.3182938Z [exit 1]
+2026-11-26T14:07:29.3184344Z $ PLAN='{"releases":[{"app_name":"airsl-cli"}]}' bash app-version.sh
+2026-11-26T14:07:29.3192494Z build-rocks: in the release plan, the airsl-cli release's app_version is null, not a string
+2026-11-26T14:07:29.3193863Z [exit 1]
+2026-11-26T14:07:29.3194907Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":["0.2.0"]}]}' bash app-version.sh
+2026-11-26T14:07:29.3233346Z build-rocks: in the release plan, the airsl-cli release's app_version is an array, not a string
+2026-11-26T14:07:29.3234862Z [exit 1]
+2026-11-26T14:07:29.3236253Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":""}]}' bash app-version.sh
+2026-11-26T14:07:29.3273909Z build-rocks: in the release plan, the airsl-cli release's app_version is an empty string
+2026-11-26T14:07:29.3275290Z [exit 1]
+2026-11-26T14:07:29.3276265Z $ PLAN='{"releases":[{"app_name":5,"app_version":"0.2.0"}]}' bash app-version.sh
+2026-11-26T14:07:29.3313409Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T14:07:29.3314757Z [exit 1]
+2026-11-26T14:07:29.3315495Z $ PLAN='[1]' bash app-version.sh
+2026-11-26T14:07:29.3353474Z build-rocks: in the release plan, the top level is an array, not an object
+2026-11-26T14:07:29.3354748Z [exit 1]
+2026-11-26T14:07:29.3355469Z $ PLAN='5' bash app-version.sh
+2026-11-26T14:07:29.3393302Z build-rocks: in the release plan, the top level is a number, not an object
+2026-11-26T14:07:29.3395101Z [exit 1]
+2026-11-26T14:07:29.3396096Z $ PLAN='"x"' bash app-version.sh
+2026-11-26T14:07:29.3433794Z build-rocks: in the release plan, the top level is a string, not an object
+2026-11-26T14:07:29.3435042Z [exit 1]
+2026-11-26T14:07:29.3435737Z $ PLAN='null' bash app-version.sh
+2026-11-26T14:07:29.3473256Z build-rocks: in the release plan, the top level is null, not an object
+2026-11-26T14:07:29.3474557Z [exit 1]
+2026-11-26T14:07:29.3475308Z $ PLAN='false' bash app-version.sh
+2026-11-26T14:07:29.3513107Z build-rocks: in the release plan, the top level is a boolean, not an object
+2026-11-26T14:07:29.3514424Z [exit 1]
+2026-11-26T14:07:29.3515129Z $ PLAN='{} {}' bash app-version.sh
+2026-11-26T14:07:29.3552751Z build-rocks: the release plan holds 2 JSON values, not one
+2026-11-26T14:07:29.3554119Z [exit 1]
+2026-11-26T14:07:29.3555538Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":"0.2.0"}]} {}' bash app-version.sh
+2026-11-26T14:07:29.3592768Z build-rocks: the release plan holds 2 JSON values, not one
+2026-11-26T14:07:29.3594230Z [exit 1]
+2026-11-26T14:07:29.3757026Z Post job cleanup.
+2026-11-26T14:07:29.4369691Z [command]/usr/bin/git version
+2026-11-26T14:07:29.4408059Z git version 2.56.1
+2026-11-26T14:07:29.4439742Z Temporarily overriding HOME='/home/runner/work/_temp/43ad56fa-4939-4aa0-8712-92529801f596' before making global git config changes
+2026-11-26T14:07:29.4442753Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T14:07:29.4446839Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/airsl/airsl
+2026-11-26T14:07:29.4491991Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T14:07:29.4527915Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T14:07:29.4800231Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T14:07:29.4827160Z http.https://github.com/.extraheader
+2026-11-26T14:07:29.4847976Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-26T14:07:29.4882393Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T14:07:29.5161001Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T14:07:29.5193097Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T14:07:29.5569294Z Cleaning up orphan processes
+# --- raw job log: plan-reads (macos-latest) (139964267020) ---
+﻿2026-11-26T14:07:33.9467550Z Current runner version: '2.338.2'
+2026-11-26T14:07:33.9515010Z ##[group]Runner Image Provisioner
+2026-11-26T14:07:33.9515690Z Hosted Compute Agent
+2026-11-26T14:07:33.9516390Z Version: 20261111.635
+2026-11-26T14:07:33.9516940Z Commit: b8a594ea514ff44cadb5342986c68b1eac6e22ed
+2026-11-26T14:07:33.9517430Z Build Date: 2026-11-11T01:49:01Z
+2026-11-26T14:07:33.9517890Z Worker ID: {9d4955ee-946e-46c9-896b-122e0b4d84bc}
+2026-11-26T14:07:33.9518450Z Region: westus
+2026-11-26T14:07:33.9518800Z Cloud: MacCloud
+2026-11-26T14:07:33.9519140Z ##[endgroup]
+2026-11-26T14:07:33.9520280Z ##[group]Operating System
+2026-11-26T14:07:33.9520660Z macOS
+2026-11-26T14:07:33.9521020Z 26.7.2
+2026-11-26T14:07:33.9521390Z 25G332
+2026-11-26T14:07:33.9521770Z ##[endgroup]
+2026-11-26T14:07:33.9522140Z ##[group]Runner Image
+2026-11-26T14:07:33.9522510Z Image: macos-26-arm64
+2026-11-26T14:07:33.9522870Z Version: 20261117.0516.1
+2026-11-26T14:07:33.9523740Z Included Software: https://github.com/actions/runner-images/blob/macos-26-arm64/20261117.0516/images/macos/macos-26-arm64-Readme.md
+2026-11-26T14:07:33.9527310Z Image Release: https://github.com/actions/runner-images/releases/tag/macos-26-arm64%2F20261117.0516
+2026-11-26T14:07:33.9530750Z ##[endgroup]
+2026-11-26T14:07:33.9532020Z ##[group]GITHUB_TOKEN Permissions
+2026-11-26T14:07:33.9537480Z Contents: read
+2026-11-26T14:07:33.9540400Z Metadata: read
+2026-11-26T14:07:33.9540950Z ##[endgroup]
+2026-11-26T14:07:33.9550970Z Secret source: Actions
+2026-11-26T14:07:33.9552950Z Cache mode: write
+2026-11-26T14:07:33.9556300Z Prepare workflow directory
+2026-11-26T14:07:34.0065800Z Prepare all required actions
+2026-11-26T14:07:34.0105700Z Getting action download info
+2026-11-26T14:07:34.2177340Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-11-26T14:07:34.9210030Z Complete job name: plan-reads (macos-latest)
+2026-11-26T14:07:35.0102980Z ##[group]Run actions/checkout@v5
+2026-11-26T14:07:35.0103840Z with:
+2026-11-26T14:07:35.0104190Z   repository: airsstack/airsl
+2026-11-26T14:07:35.0107910Z   token: ***
+2026-11-26T14:07:35.0108320Z   ssh-strict: true
+2026-11-26T14:07:35.0108720Z   ssh-user: git
+2026-11-26T14:07:35.0109130Z   persist-credentials: true
+2026-11-26T14:07:35.0109490Z   clean: true
+2026-11-26T14:07:35.0109830Z   sparse-checkout-cone-mode: true
+2026-11-26T14:07:35.0110210Z   fetch-depth: 1
+2026-11-26T14:07:35.0110570Z   fetch-tags: false
+2026-11-26T14:07:35.0111350Z   show-progress: true
+2026-11-26T14:07:35.0111770Z   lfs: false
+2026-11-26T14:07:35.0112080Z   submodules: false
+2026-11-26T14:07:35.0112460Z   set-safe-directory: true
+2026-11-26T14:07:35.0112890Z   allow-unsafe-pr-checkout: false
+2026-11-26T14:07:35.0113600Z ##[endgroup]
+2026-11-26T14:07:35.5186850Z Syncing repository: airsstack/airsl
+2026-11-26T14:07:35.5188860Z ##[group]Getting Git version info
+2026-11-26T14:07:35.5189750Z Working directory is '/Users/runner/work/airsl/airsl'
+2026-11-26T14:07:35.5190830Z [command]/opt/homebrew/bin/git version
+2026-11-26T14:07:35.5815630Z git version 2.56.1
+2026-11-26T14:07:35.5841020Z ##[endgroup]
+2026-11-26T14:07:35.5855140Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/8239245f-06ae-4ed1-930e-52885a6f5725/.gitconfig'
+2026-11-26T14:07:35.5870410Z Temporarily overriding HOME='/Users/runner/work/_temp/8239245f-06ae-4ed1-930e-52885a6f5725' before making global git config changes
+2026-11-26T14:07:35.5875370Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T14:07:35.5880440Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/airsl/airsl
+2026-11-26T14:07:35.6069860Z Deleting the contents of '/Users/runner/work/airsl/airsl'
+2026-11-26T14:07:35.6074220Z ##[group]Initializing the repository
+2026-11-26T14:07:35.6079130Z [command]/opt/homebrew/bin/git init /Users/runner/work/airsl/airsl
+2026-11-26T14:07:35.6403440Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-26T14:07:35.6405200Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-26T14:07:35.6407710Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-26T14:07:35.6409070Z hint: call:
+2026-11-26T14:07:35.6409790Z hint:
+2026-11-26T14:07:35.6410650Z hint: 	git config --global init.defaultBranch <name>
+2026-11-26T14:07:35.6411750Z hint:
+2026-11-26T14:07:35.6413710Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-26T14:07:35.6415680Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-26T14:07:35.6417180Z hint:
+2026-11-26T14:07:35.6418480Z hint: 	git branch -m <name>
+2026-11-26T14:07:35.6419540Z hint:
+2026-11-26T14:07:35.6421150Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-26T14:07:35.6423670Z Initialized empty Git repository in /Users/runner/work/airsl/airsl/.git/
+2026-11-26T14:07:35.6435780Z [command]/opt/homebrew/bin/git remote add origin https://github.com/airsstack/airsl
+2026-11-26T14:07:35.6537950Z ##[endgroup]
+2026-11-26T14:07:35.6540950Z ##[group]Disabling automatic garbage collection
+2026-11-26T14:07:35.6543680Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+2026-11-26T14:07:35.6640560Z ##[endgroup]
+2026-11-26T14:07:35.6643580Z ##[group]Setting up auth
+2026-11-26T14:07:35.6646480Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T14:07:35.6756810Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T14:07:35.8424690Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T14:07:35.8517270Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T14:07:36.0852800Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T14:07:36.0955870Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T14:07:36.1822180Z [command]/opt/homebrew/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-26T14:07:36.1932900Z ##[endgroup]
+2026-11-26T14:07:36.1935840Z ##[group]Fetching the repository
+2026-11-26T14:07:36.1952560Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +c1a6f7a3c7fe9daf4aeca11b8c5147ed1288ea4d:refs/remotes/origin/probe-ci-rocks-2
+2026-11-26T14:07:36.9449450Z From https://github.com/airsstack/airsl
+2026-11-26T14:07:36.9452050Z  * [new ref]         c1a6f7a3c7fe9daf4aeca11b8c5147ed1288ea4d -> origin/probe-ci-rocks-2
+2026-11-26T14:07:36.9458680Z ##[endgroup]
+2026-11-26T14:07:36.9459960Z ##[group]Determining the checkout info
+2026-11-26T14:07:36.9461770Z ##[endgroup]
+2026-11-26T14:07:36.9473290Z [command]/opt/homebrew/bin/git sparse-checkout disable
+2026-11-26T14:07:36.9577340Z [command]/opt/homebrew/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-26T14:07:36.9658670Z ##[group]Checking out the ref
+2026-11-26T14:07:36.9668010Z [command]/opt/homebrew/bin/git checkout --progress --force -B probe-ci-rocks-2 refs/remotes/origin/probe-ci-rocks-2
+2026-11-26T14:07:36.9883390Z Switched to a new branch 'probe-ci-rocks-2'
+2026-11-26T14:07:36.9894860Z branch 'probe-ci-rocks-2' set up to track 'origin/probe-ci-rocks-2'.
+2026-11-26T14:07:36.9899050Z ##[endgroup]
+2026-11-26T14:07:36.9995670Z [command]/opt/homebrew/bin/git log -1 --format=%H
+2026-11-26T14:07:37.0165230Z c1a6f7a3c7fe9daf4aeca11b8c5147ed1288ea4d
+2026-11-26T14:07:37.0421060Z ##[group]Run echo "\$ bash --version | head -1; jq --version; command -v bash jq"
+2026-11-26T14:07:37.0421790Z [36;1mecho "\$ bash --version | head -1; jq --version; command -v bash jq"[0m
+2026-11-26T14:07:37.0422760Z [36;1mbash --version | head -1; jq --version; command -v bash jq[0m
+2026-11-26T14:07:37.0466510Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T14:07:37.0467220Z ##[endgroup]
+2026-11-26T14:07:37.1079660Z $ bash --version | head -1; jq --version; command -v bash jq
+2026-11-26T14:07:37.1154760Z GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)
+2026-11-26T14:07:37.1265410Z jq-1.8.2
+2026-11-26T14:07:37.1271250Z /bin/bash
+2026-11-26T14:07:37.1271740Z /opt/homebrew/bin/jq
+2026-11-26T14:07:37.1371060Z ##[group]Run echo "\$ bash run.sh 246-release-plan-types"
+2026-11-26T14:07:37.1372800Z [36;1mecho "\$ bash run.sh 246-release-plan-types"[0m
+2026-11-26T14:07:37.1373950Z [36;1mbash probe/246/run.sh probe/246[0m
+2026-11-26T14:07:37.1442190Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T14:07:37.1442660Z ##[endgroup]
+2026-11-26T14:07:37.1902670Z $ bash run.sh 246-release-plan-types
+2026-11-26T14:07:37.1937440Z ## publish-rocks: tag.sh
+2026-11-26T14:07:37.1974030Z $ PLAN=<plan-tag.json> bash tag.sh
+2026-11-26T14:07:37.2070510Z version=0.2.0
+2026-11-26T14:07:37.2071060Z [exit 0]
+2026-11-26T14:07:37.2097840Z $ PLAN=<plan-pr.json> bash tag.sh
+2026-11-26T14:07:37.2224160Z publish-rocks: the release tag v0.2.0 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T14:07:37.2226170Z [exit 1]
+2026-11-26T14:07:37.2227950Z $ PLAN='{"announcement_tag":"airsl-cli-v0.0.0","announcement_is_prerelease":false,"publish_prereleases":false,"artifacts":{}}' bash tag.sh
+2026-11-26T14:07:37.2382870Z version=0.0.0
+2026-11-26T14:07:37.2383450Z [exit 0]
+2026-11-26T14:07:37.2383940Z $ PLAN='{"announcement_tag":null}' bash tag.sh
+2026-11-26T14:07:37.2472900Z publish-rocks: the release plan names no tag; nothing was uploaded
+2026-11-26T14:07:37.2474310Z [exit 1]
+2026-11-26T14:07:37.2475070Z $ PLAN='{}' bash tag.sh
+2026-11-26T14:07:37.2563020Z publish-rocks: the release plan names no tag; nothing was uploaded
+2026-11-26T14:07:37.2564420Z [exit 1]
+2026-11-26T14:07:37.2565200Z $ PLAN='' bash tag.sh
+2026-11-26T14:07:37.2646030Z publish-rocks: the release plan names no tag; nothing was uploaded
+2026-11-26T14:07:37.2647400Z [exit 1]
+2026-11-26T14:07:37.2648440Z $ PLAN='{"announcement_tag":""}' bash tag.sh
+2026-11-26T14:07:37.2732080Z publish-rocks: the release plan names no tag; nothing was uploaded
+2026-11-26T14:07:37.2733450Z [exit 1]
+2026-11-26T14:07:37.2734600Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2"}' bash tag.sh
+2026-11-26T14:07:37.2857290Z publish-rocks: the release tag airsl-cli-v0.2 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T14:07:37.2858130Z [exit 1]
+2026-11-26T14:07:37.2858670Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2.0-rc.1"}' bash tag.sh
+2026-11-26T14:07:37.2952580Z publish-rocks: the release tag airsl-cli-v0.2.0-rc.1 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T14:07:37.2954410Z [exit 1]
+2026-11-26T14:07:37.2955290Z $ PLAN='{"announcement_tag":"airsl-v0.2.0"}' bash tag.sh
+2026-11-26T14:07:37.3093110Z publish-rocks: the release tag airsl-v0.2.0 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T14:07:37.3093910Z [exit 1]
+2026-11-26T14:07:37.3094360Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2.0\n"}' bash tag.sh
+2026-11-26T14:07:37.3176770Z version=0.2.0
+2026-11-26T14:07:37.3177720Z [exit 0]
+2026-11-26T14:07:37.3178610Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2.0
+2026-11-26T14:07:37.3179700Z "}' bash tag.sh
+2026-11-26T14:07:37.3289610Z jq: parse error: Invalid string: control characters from U+0000 through U+001F must be escaped at line 2, column 1
+2026-11-26T14:07:37.3294380Z publish-rocks: could not read the release plan: jq exit status 5; nothing was uploaded
+2026-11-26T14:07:37.3296260Z [exit 1]
+2026-11-26T14:07:37.3297550Z $ PLAN='not json' bash tag.sh
+2026-11-26T14:07:37.3382650Z jq: parse error: Invalid numeric literal at line 1, column 4
+2026-11-26T14:07:37.3384730Z publish-rocks: could not read the release plan: jq exit status 5; nothing was uploaded
+2026-11-26T14:07:37.3387060Z [exit 1]
+2026-11-26T14:07:37.3387970Z $ PLAN='{"announcement_tag":5}' bash tag.sh
+2026-11-26T14:07:37.3484860Z publish-rocks: in the release plan, announcement_tag is a number, not a string; nothing was uploaded
+2026-11-26T14:07:37.3486460Z [exit 1]
+2026-11-26T14:07:37.3487310Z $ PLAN='{"announcement_tag":false}' bash tag.sh
+2026-11-26T14:07:37.3573380Z publish-rocks: in the release plan, announcement_tag is a boolean, not a string; nothing was uploaded
+2026-11-26T14:07:37.3574800Z [exit 1]
+2026-11-26T14:07:37.3578150Z $ PLAN='{"announcement_tag":true}' bash tag.sh
+2026-11-26T14:07:37.3734600Z publish-rocks: in the release plan, announcement_tag is a boolean, not a string; nothing was uploaded
+2026-11-26T14:07:37.3736380Z [exit 1]
+2026-11-26T14:07:37.3737340Z $ PLAN='{"announcement_tag":["airsl-cli-v0.2.0"]}' bash tag.sh
+2026-11-26T14:07:37.3906100Z publish-rocks: in the release plan, announcement_tag is an array, not a string; nothing was uploaded
+2026-11-26T14:07:37.3908530Z [exit 1]
+2026-11-26T14:07:37.3909560Z $ PLAN='{"announcement_tag":{}}' bash tag.sh
+2026-11-26T14:07:37.4008380Z publish-rocks: in the release plan, announcement_tag is an object, not a string; nothing was uploaded
+2026-11-26T14:07:37.4010050Z [exit 1]
+2026-11-26T14:07:37.4010860Z $ PLAN='[1]' bash tag.sh
+2026-11-26T14:07:37.4102270Z publish-rocks: in the release plan, the top level is an array, not an object; nothing was uploaded
+2026-11-26T14:07:37.4103140Z [exit 1]
+2026-11-26T14:07:37.4103450Z $ PLAN='5' bash tag.sh
+2026-11-26T14:07:37.4184430Z publish-rocks: in the release plan, the top level is a number, not an object; nothing was uploaded
+2026-11-26T14:07:37.4186640Z [exit 1]
+2026-11-26T14:07:37.4187480Z $ PLAN='"x"' bash tag.sh
+2026-11-26T14:07:37.4270860Z publish-rocks: in the release plan, the top level is a string, not an object; nothing was uploaded
+2026-11-26T14:07:37.4272010Z [exit 1]
+2026-11-26T14:07:37.4272790Z $ PLAN='null' bash tag.sh
+2026-11-26T14:07:37.4366450Z publish-rocks: in the release plan, the top level is null, not an object; nothing was uploaded
+2026-11-26T14:07:37.4368140Z [exit 1]
+2026-11-26T14:07:37.4368980Z $ PLAN='true' bash tag.sh
+2026-11-26T14:07:37.4468210Z publish-rocks: in the release plan, the top level is a boolean, not an object; nothing was uploaded
+2026-11-26T14:07:37.4469800Z [exit 1]
+2026-11-26T14:07:37.4471520Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2.0"} {"announcement_tag":"airsl-cli-v0.2.0"}' bash tag.sh
+2026-11-26T14:07:37.4609080Z publish-rocks: the release plan holds 2 JSON values, not one; nothing was uploaded
+2026-11-26T14:07:37.4613550Z [exit 1]
+2026-11-26T14:07:37.4617330Z $ PLAN='{} 5' bash tag.sh
+2026-11-26T14:07:37.4731690Z publish-rocks: the release plan holds 2 JSON values, not one; nothing was uploaded
+2026-11-26T14:07:37.4733280Z [exit 1]
+2026-11-26T14:07:37.4734480Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2.0"} not json' bash tag.sh
+2026-11-26T14:07:37.4895150Z jq: parse error: Invalid numeric literal at line 1, column 44
+2026-11-26T14:07:37.4919580Z publish-rocks: could not read the release plan: jq exit status 5; nothing was uploaded
+2026-11-26T14:07:37.4920260Z [exit 1]
+2026-11-26T14:07:37.4920650Z ## build-rocks: app-version.sh
+2026-11-26T14:07:37.4955240Z $ PLAN=<plan-tag.json> bash app-version.sh
+2026-11-26T14:07:37.5124420Z version=0.2.0
+2026-11-26T14:07:37.5126780Z [exit 0]
+2026-11-26T14:07:37.5154740Z $ PLAN=<plan-pr.json> bash app-version.sh
+2026-11-26T14:07:37.5306350Z version=0.2.0
+2026-11-26T14:07:37.5307500Z [exit 0]
+2026-11-26T14:07:37.5312050Z $ PLAN='{"releases":[{"app_name":"airsl","app_version":"0.2.0"},{"app_name":"airsl-cli","app_version":"0.2.0"}]}' bash app-version.sh
+2026-11-26T14:07:37.5433620Z version=0.2.0
+2026-11-26T14:07:37.5435310Z [exit 0]
+2026-11-26T14:07:37.5436240Z $ PLAN='{"releases":[]}' bash app-version.sh
+2026-11-26T14:07:37.5546740Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T14:07:37.5548730Z [exit 1]
+2026-11-26T14:07:37.5550800Z $ PLAN='{}' bash app-version.sh
+2026-11-26T14:07:37.5647160Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T14:07:37.5648670Z [exit 1]
+2026-11-26T14:07:37.5649800Z $ PLAN='' bash app-version.sh
+2026-11-26T14:07:37.5884350Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T14:07:37.5886190Z [exit 1]
+2026-11-26T14:07:37.5887720Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":"0.2.0"},{"app_name":"airsl-cli","app_version":"0.2.0"}]}' bash app-version.sh
+2026-11-26T14:07:37.6013160Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T14:07:37.6015470Z [exit 1]
+2026-11-26T14:07:37.6019590Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":"0.2"}]}' bash app-version.sh
+2026-11-26T14:07:37.6127880Z build-rocks: the release plan's airsl-cli version 0.2 is not <major>.<minor>.<patch>
+2026-11-26T14:07:37.6128780Z [exit 1]
+2026-11-26T14:07:37.6129300Z $ PLAN='not json' bash app-version.sh
+2026-11-26T14:07:37.6215080Z jq: parse error: Invalid numeric literal at line 1, column 4
+2026-11-26T14:07:37.6221740Z build-rocks: could not read the release plan: jq exit status 5
+2026-11-26T14:07:37.6225040Z [exit 1]
+2026-11-26T14:07:37.6226430Z $ PLAN='{"releases":null}' bash app-version.sh
+2026-11-26T14:07:37.6339360Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T14:07:37.6347030Z [exit 1]
+2026-11-26T14:07:37.6351960Z $ PLAN='{"releases":5}' bash app-version.sh
+2026-11-26T14:07:37.6446380Z build-rocks: in the release plan, releases is a number, not an array
+2026-11-26T14:07:37.6447950Z [exit 1]
+2026-11-26T14:07:37.6448660Z $ PLAN='{"releases":{"app_name":"airsl-cli"}}' bash app-version.sh
+2026-11-26T14:07:37.6583520Z build-rocks: in the release plan, releases is an object, not an array
+2026-11-26T14:07:37.6589090Z [exit 1]
+2026-11-26T14:07:37.6590520Z $ PLAN='{"releases":"x"}' bash app-version.sh
+2026-11-26T14:07:37.6713610Z build-rocks: in the release plan, releases is a string, not an array
+2026-11-26T14:07:37.6714250Z [exit 1]
+2026-11-26T14:07:37.6715070Z $ PLAN='{"releases":[5]}' bash app-version.sh
+2026-11-26T14:07:37.6849920Z build-rocks: in the release plan, releases[0] is a number, not an object
+2026-11-26T14:07:37.6851390Z [exit 1]
+2026-11-26T14:07:37.6851800Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":"0.2.0"},null]}' bash app-version.sh
+2026-11-26T14:07:37.6963680Z build-rocks: in the release plan, releases[1] is null, not an object
+2026-11-26T14:07:37.6964230Z [exit 1]
+2026-11-26T14:07:37.6964590Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":5}]}' bash app-version.sh
+2026-11-26T14:07:37.7061830Z build-rocks: in the release plan, the airsl-cli release's app_version is a number, not a string
+2026-11-26T14:07:37.7062860Z [exit 1]
+2026-11-26T14:07:37.7063260Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":null}]}' bash app-version.sh
+2026-11-26T14:07:37.7178370Z build-rocks: in the release plan, the airsl-cli release's app_version is null, not a string
+2026-11-26T14:07:37.7179740Z [exit 1]
+2026-11-26T14:07:37.7180240Z $ PLAN='{"releases":[{"app_name":"airsl-cli"}]}' bash app-version.sh
+2026-11-26T14:07:37.7299210Z build-rocks: in the release plan, the airsl-cli release's app_version is null, not a string
+2026-11-26T14:07:37.7302080Z [exit 1]
+2026-11-26T14:07:37.7306700Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":["0.2.0"]}]}' bash app-version.sh
+2026-11-26T14:07:37.7512510Z build-rocks: in the release plan, the airsl-cli release's app_version is an array, not a string
+2026-11-26T14:07:37.7529100Z [exit 1]
+2026-11-26T14:07:37.7560320Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":""}]}' bash app-version.sh
+2026-11-26T14:07:37.7698500Z build-rocks: in the release plan, the airsl-cli release's app_version is an empty string
+2026-11-26T14:07:37.7699150Z [exit 1]
+2026-11-26T14:07:37.7701460Z $ PLAN='{"releases":[{"app_name":5,"app_version":"0.2.0"}]}' bash app-version.sh
+2026-11-26T14:07:37.7956500Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T14:07:37.7969530Z [exit 1]
+2026-11-26T14:07:37.7988120Z $ PLAN='[1]' bash app-version.sh
+2026-11-26T14:07:37.8237520Z build-rocks: in the release plan, the top level is an array, not an object
+2026-11-26T14:07:37.8239110Z [exit 1]
+2026-11-26T14:07:37.8241190Z $ PLAN='5' bash app-version.sh
+2026-11-26T14:07:37.8487640Z build-rocks: in the release plan, the top level is a number, not an object
+2026-11-26T14:07:37.8492350Z [exit 1]
+2026-11-26T14:07:37.8501190Z $ PLAN='"x"' bash app-version.sh
+2026-11-26T14:07:37.8697360Z build-rocks: in the release plan, the top level is a string, not an object
+2026-11-26T14:07:37.8704610Z [exit 1]
+2026-11-26T14:07:37.8710250Z $ PLAN='null' bash app-version.sh
+2026-11-26T14:07:37.8875490Z build-rocks: in the release plan, the top level is null, not an object
+2026-11-26T14:07:37.8881650Z [exit 1]
+2026-11-26T14:07:37.8889090Z $ PLAN='false' bash app-version.sh
+2026-11-26T14:07:37.9112070Z build-rocks: in the release plan, the top level is a boolean, not an object
+2026-11-26T14:07:37.9122010Z [exit 1]
+2026-11-26T14:07:37.9154130Z $ PLAN='{} {}' bash app-version.sh
+2026-11-26T14:07:37.9354660Z build-rocks: the release plan holds 2 JSON values, not one
+2026-11-26T14:07:37.9361010Z [exit 1]
+2026-11-26T14:07:37.9373330Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":"0.2.0"}]} {}' bash app-version.sh
+2026-11-26T14:07:37.9512060Z build-rocks: the release plan holds 2 JSON values, not one
+2026-11-26T14:07:37.9514670Z [exit 1]
+2026-11-26T14:07:37.9692090Z Post job cleanup.
+2026-11-26T14:07:38.1469230Z [command]/opt/homebrew/bin/git version
+2026-11-26T14:07:38.1580810Z git version 2.56.1
+2026-11-26T14:07:38.1670240Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/a395b8d7-f604-465b-989d-9db0ecda8344/.gitconfig'
+2026-11-26T14:07:38.1678790Z Temporarily overriding HOME='/Users/runner/work/_temp/a395b8d7-f604-465b-989d-9db0ecda8344' before making global git config changes
+2026-11-26T14:07:38.1680930Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T14:07:38.1715070Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/airsl/airsl
+2026-11-26T14:07:38.1980190Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T14:07:38.2060900Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T14:07:38.3860980Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T14:07:38.3889260Z http.https://github.com/.extraheader
+2026-11-26T14:07:38.3899650Z [command]/opt/homebrew/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-26T14:07:38.4157170Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T14:07:38.7599340Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T14:07:38.8146220Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T14:07:38.9707350Z Cleaning up orphan processes
+# --- raw job log: plan-reads (windows-latest) (139964267025) ---
+﻿2026-11-26T14:07:29.3579388Z Current runner version: '2.338.2'
+2026-11-26T14:07:29.3756324Z ##[group]Runner Image Provisioner
+2026-11-26T14:07:29.3757234Z Hosted Compute Agent
+2026-11-26T14:07:29.3757800Z Version: 20261111.635
+2026-11-26T14:07:29.3758400Z Commit: b8a594ea514ff44cadb5342986c68b1eac6e22ed
+2026-11-26T14:07:29.3759107Z Build Date: 2026-11-11T01:49:01Z
+2026-11-26T14:07:29.3759745Z Worker ID: {11262127-ecdb-4956-963c-e1d13b89ff0e}
+2026-11-26T14:07:29.3760451Z Region: eastus
+2026-11-26T14:07:29.3760955Z Cloud: Azure
+2026-11-26T14:07:29.3761498Z ##[endgroup]
+2026-11-26T14:07:29.3762955Z ##[group]Operating System
+2026-11-26T14:07:29.3763633Z Microsoft Windows Server 2025
+2026-11-26T14:07:29.3764263Z 10.0.26100
+2026-11-26T14:07:29.3764759Z Datacenter
+2026-11-26T14:07:29.3765261Z ##[endgroup]
+2026-11-26T14:07:29.3765853Z ##[group]Runner Image
+2026-11-26T14:07:29.3766420Z Image: windows-2025-vs2026
+2026-11-26T14:07:29.3766984Z Version: 20261116.315.1
+2026-11-26T14:07:29.3768447Z Included Software: https://github.com/actions/runner-images/blob/win25-vs2026/20261116.315/images/windows/Windows2025-VS2026-Readme.md
+2026-11-26T14:07:29.3770073Z Image Release: https://github.com/actions/runner-images/releases/tag/win25-vs2026%2F20261116.315
+2026-11-26T14:07:29.3771049Z ##[endgroup]
+2026-11-26T14:07:29.3772159Z ##[group]GITHUB_TOKEN Permissions
+2026-11-26T14:07:29.3774615Z Contents: read
+2026-11-26T14:07:29.3775316Z Metadata: read
+2026-11-26T14:07:29.3775906Z ##[endgroup]
+2026-11-26T14:07:29.3778020Z Secret source: Actions
+2026-11-26T14:07:29.3779002Z Cache mode: write
+2026-11-26T14:07:29.3779689Z Prepare workflow directory
+2026-11-26T14:07:29.4765855Z Prepare all required actions
+2026-11-26T14:07:29.4831841Z Getting action download info
+2026-11-26T14:07:29.6420855Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-11-26T14:07:29.9916249Z Complete job name: plan-reads (windows-latest)
+2026-11-26T14:07:30.5296907Z ##[group]Run actions/checkout@v5
+2026-11-26T14:07:30.5298014Z with:
+2026-11-26T14:07:30.5298456Z   repository: airsstack/airsl
+2026-11-26T14:07:30.5302492Z   token: ***
+2026-11-26T14:07:30.5302913Z   ssh-strict: true
+2026-11-26T14:07:30.5303337Z   ssh-user: git
+2026-11-26T14:07:30.5303771Z   persist-credentials: true
+2026-11-26T14:07:30.5304250Z   clean: true
+2026-11-26T14:07:30.5304689Z   sparse-checkout-cone-mode: true
+2026-11-26T14:07:30.5305202Z   fetch-depth: 1
+2026-11-26T14:07:30.5305615Z   fetch-tags: false
+2026-11-26T14:07:30.5306464Z   show-progress: true
+2026-11-26T14:07:30.5306903Z   lfs: false
+2026-11-26T14:07:30.5307293Z   submodules: false
+2026-11-26T14:07:30.5307731Z   set-safe-directory: true
+2026-11-26T14:07:30.5308229Z   allow-unsafe-pr-checkout: false
+2026-11-26T14:07:30.5309081Z ##[endgroup]
+2026-11-26T14:07:30.7076315Z Syncing repository: airsstack/airsl
+2026-11-26T14:07:30.7077982Z ##[group]Getting Git version info
+2026-11-26T14:07:30.7078625Z Working directory is 'D:\a\airsl\airsl'
+2026-11-26T14:07:30.8006232Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-11-26T14:07:31.1027464Z git version 2.56.1.windows.1
+2026-11-26T14:07:31.1093292Z ##[endgroup]
+2026-11-26T14:07:31.1145961Z Temporarily overriding HOME='D:\a\_temp\95992c42-6fb7-4b9a-b853-6597dbc0b82d' before making global git config changes
+2026-11-26T14:07:31.1149622Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T14:07:31.1152453Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\airsl\airsl
+2026-11-26T14:07:31.1794424Z Deleting the contents of 'D:\a\airsl\airsl'
+2026-11-26T14:07:31.1801083Z ##[group]Initializing the repository
+2026-11-26T14:07:31.1809787Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\airsl\airsl
+2026-11-26T14:07:31.2675083Z Initialized empty Git repository in D:/a/airsl/airsl/.git/
+2026-11-26T14:07:31.2733475Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/airsstack/airsl
+2026-11-26T14:07:31.3522505Z ##[endgroup]
+2026-11-26T14:07:31.3568059Z ##[group]Disabling automatic garbage collection
+2026-11-26T14:07:31.3569833Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-11-26T14:07:31.3931835Z ##[endgroup]
+2026-11-26T14:07:31.3933381Z ##[group]Setting up auth
+2026-11-26T14:07:31.3943684Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T14:07:31.4339677Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-11-26T14:07:32.8324615Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T14:07:32.8754569Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-11-26T14:07:33.4793439Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T14:07:33.5237539Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-11-26T14:07:34.1315462Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-11-26T14:07:34.1736066Z ##[endgroup]
+2026-11-26T14:07:34.1749749Z ##[group]Fetching the repository
+2026-11-26T14:07:34.1751651Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +c1a6f7a3c7fe9daf4aeca11b8c5147ed1288ea4d:refs/remotes/origin/probe-ci-rocks-2
+2026-11-26T14:07:35.1250417Z From https://github.com/airsstack/airsl
+2026-11-26T14:07:35.1251975Z  * [new ref]         c1a6f7a3c7fe9daf4aeca11b8c5147ed1288ea4d -> origin/probe-ci-rocks-2
+2026-11-26T14:07:35.1253797Z ##[endgroup]
+2026-11-26T14:07:35.1254381Z ##[group]Determining the checkout info
+2026-11-26T14:07:35.1255102Z ##[endgroup]
+2026-11-26T14:07:35.1255674Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-11-26T14:07:35.1802919Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-11-26T14:07:35.2193887Z ##[group]Checking out the ref
+2026-11-26T14:07:35.2203134Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force -B probe-ci-rocks-2 refs/remotes/origin/probe-ci-rocks-2
+2026-11-26T14:07:35.2989535Z Switched to a new branch 'probe-ci-rocks-2'
+2026-11-26T14:07:35.3012525Z branch 'probe-ci-rocks-2' set up to track 'origin/probe-ci-rocks-2'.
+2026-11-26T14:07:35.3512998Z ##[endgroup]
+2026-11-26T14:07:35.3518940Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-11-26T14:07:35.3941007Z c1a6f7a3c7fe9daf4aeca11b8c5147ed1288ea4d
+2026-11-26T14:07:35.5820162Z ##[group]Run echo "\$ bash --version | head -1; jq --version; command -v bash jq"
+2026-11-26T14:07:35.5820907Z [36;1mecho "\$ bash --version | head -1; jq --version; command -v bash jq"[0m
+2026-11-26T14:07:35.5821445Z [36;1mbash --version | head -1; jq --version; command -v bash jq[0m
+2026-11-26T14:07:35.5903248Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-26T14:07:35.5903693Z ##[endgroup]
+2026-11-26T14:07:35.7906431Z $ bash --version | head -1; jq --version; command -v bash jq
+2026-11-26T14:07:35.8415462Z GNU bash, version 5.3.15(2)-release (x86_64-pc-cygwin)
+2026-11-26T14:07:35.9994656Z jq-1.8.2
+2026-11-26T14:07:36.0168852Z /usr/bin/bash
+2026-11-26T14:07:36.0170847Z /c/ProgramData/Chocolatey/bin/jq
+2026-11-26T14:07:36.1873984Z ##[group]Run echo "\$ bash run.sh 246-release-plan-types"
+2026-11-26T14:07:36.1874547Z [36;1mecho "\$ bash run.sh 246-release-plan-types"[0m
+2026-11-26T14:07:36.1874908Z [36;1mbash probe/246/run.sh probe/246[0m
+2026-11-26T14:07:36.1963065Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-26T14:07:36.1963513Z ##[endgroup]
+2026-11-26T14:07:36.2682363Z $ bash run.sh 246-release-plan-types
+2026-11-26T14:07:36.2982038Z ## publish-rocks: tag.sh
+2026-11-26T14:07:36.3333279Z $ PLAN=<plan-tag.json> bash tag.sh
+2026-11-26T14:07:36.4683107Z version=0.2.0
+2026-11-26T14:07:36.4695591Z [exit 0]
+2026-11-26T14:07:36.4896072Z $ PLAN=<plan-pr.json> bash tag.sh
+2026-11-26T14:07:36.6014383Z publish-rocks: the release tag v0.2.0 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T14:07:36.6033954Z [exit 1]
+2026-11-26T14:07:36.6035333Z $ PLAN='{"announcement_tag":"airsl-cli-v0.0.0","announcement_is_prerelease":false,"publish_prereleases":false,"artifacts":{}}' bash tag.sh
+2026-11-26T14:07:36.7131388Z version=0.0.0
+2026-11-26T14:07:36.7143240Z [exit 0]
+2026-11-26T14:07:36.7143602Z $ PLAN='{"announcement_tag":null}' bash tag.sh
+2026-11-26T14:07:36.8169503Z publish-rocks: the release plan names no tag; nothing was uploaded
+2026-11-26T14:07:36.8180333Z [exit 1]
+2026-11-26T14:07:36.8181176Z $ PLAN='{}' bash tag.sh
+2026-11-26T14:07:36.9294968Z publish-rocks: the release plan names no tag; nothing was uploaded
+2026-11-26T14:07:36.9309566Z [exit 1]
+2026-11-26T14:07:36.9310061Z $ PLAN='' bash tag.sh
+2026-11-26T14:07:37.0343092Z publish-rocks: the release plan names no tag; nothing was uploaded
+2026-11-26T14:07:37.0356145Z [exit 1]
+2026-11-26T14:07:37.0356712Z $ PLAN='{"announcement_tag":""}' bash tag.sh
+2026-11-26T14:07:37.1379771Z publish-rocks: the release plan names no tag; nothing was uploaded
+2026-11-26T14:07:37.1393008Z [exit 1]
+2026-11-26T14:07:37.1393436Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2"}' bash tag.sh
+2026-11-26T14:07:37.2452533Z publish-rocks: the release tag airsl-cli-v0.2 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T14:07:37.2463616Z [exit 1]
+2026-11-26T14:07:37.2464105Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2.0-rc.1"}' bash tag.sh
+2026-11-26T14:07:37.3472280Z publish-rocks: the release tag airsl-cli-v0.2.0-rc.1 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T14:07:37.3482248Z [exit 1]
+2026-11-26T14:07:37.3482690Z $ PLAN='{"announcement_tag":"airsl-v0.2.0"}' bash tag.sh
+2026-11-26T14:07:37.4616177Z publish-rocks: the release tag airsl-v0.2.0 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+2026-11-26T14:07:37.4630070Z [exit 1]
+2026-11-26T14:07:37.4630515Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2.0\n"}' bash tag.sh
+2026-11-26T14:07:37.5730493Z version=0.2.0
+2026-11-26T14:07:37.5741424Z [exit 0]
+2026-11-26T14:07:37.5742008Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2.0
+2026-11-26T14:07:37.5742468Z "}' bash tag.sh
+2026-11-26T14:07:37.6709020Z jq: parse error: Invalid string: control characters from U+0000 through U+001F must be escaped at line 2, column 1
+2026-11-26T14:07:37.6777921Z publish-rocks: could not read the release plan: jq exit status 5; nothing was uploaded
+2026-11-26T14:07:37.6791163Z [exit 1]
+2026-11-26T14:07:37.6791474Z $ PLAN='not json' bash tag.sh
+2026-11-26T14:07:37.7815207Z jq: parse error: Invalid numeric literal at line 1, column 4
+2026-11-26T14:07:37.7885784Z publish-rocks: could not read the release plan: jq exit status 5; nothing was uploaded
+2026-11-26T14:07:37.7897243Z [exit 1]
+2026-11-26T14:07:37.7898113Z $ PLAN='{"announcement_tag":5}' bash tag.sh
+2026-11-26T14:07:37.8936352Z publish-rocks: in the release plan, announcement_tag is a number, not a string; nothing was uploaded
+2026-11-26T14:07:37.8947398Z [exit 1]
+2026-11-26T14:07:37.8947975Z $ PLAN='{"announcement_tag":false}' bash tag.sh
+2026-11-26T14:07:38.0037700Z publish-rocks: in the release plan, announcement_tag is a boolean, not a string; nothing was uploaded
+2026-11-26T14:07:38.0038504Z [exit 1]
+2026-11-26T14:07:38.0038723Z $ PLAN='{"announcement_tag":true}' bash tag.sh
+2026-11-26T14:07:38.1072744Z publish-rocks: in the release plan, announcement_tag is a boolean, not a string; nothing was uploaded
+2026-11-26T14:07:38.1084814Z [exit 1]
+2026-11-26T14:07:38.1085264Z $ PLAN='{"announcement_tag":["airsl-cli-v0.2.0"]}' bash tag.sh
+2026-11-26T14:07:38.2162519Z publish-rocks: in the release plan, announcement_tag is an array, not a string; nothing was uploaded
+2026-11-26T14:07:38.2177479Z [exit 1]
+2026-11-26T14:07:38.2178046Z $ PLAN='{"announcement_tag":{}}' bash tag.sh
+2026-11-26T14:07:38.3252647Z publish-rocks: in the release plan, announcement_tag is an object, not a string; nothing was uploaded
+2026-11-26T14:07:38.3264960Z [exit 1]
+2026-11-26T14:07:38.3265265Z $ PLAN='[1]' bash tag.sh
+2026-11-26T14:07:38.4278431Z publish-rocks: in the release plan, the top level is an array, not an object; nothing was uploaded
+2026-11-26T14:07:38.4366320Z [exit 1]
+2026-11-26T14:07:38.4366692Z $ PLAN='5' bash tag.sh
+2026-11-26T14:07:38.5405588Z publish-rocks: in the release plan, the top level is a number, not an object; nothing was uploaded
+2026-11-26T14:07:38.5418535Z [exit 1]
+2026-11-26T14:07:38.5418865Z $ PLAN='"x"' bash tag.sh
+2026-11-26T14:07:38.6467112Z publish-rocks: in the release plan, the top level is a string, not an object; nothing was uploaded
+2026-11-26T14:07:38.6479698Z [exit 1]
+2026-11-26T14:07:38.6480210Z $ PLAN='null' bash tag.sh
+2026-11-26T14:07:38.7537712Z publish-rocks: in the release plan, the top level is null, not an object; nothing was uploaded
+2026-11-26T14:07:38.7549208Z [exit 1]
+2026-11-26T14:07:38.7549747Z $ PLAN='true' bash tag.sh
+2026-11-26T14:07:38.8705442Z publish-rocks: in the release plan, the top level is a boolean, not an object; nothing was uploaded
+2026-11-26T14:07:38.8717705Z [exit 1]
+2026-11-26T14:07:38.8718818Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2.0"} {"announcement_tag":"airsl-cli-v0.2.0"}' bash tag.sh
+2026-11-26T14:07:38.9837811Z publish-rocks: the release plan holds 2 JSON values, not one; nothing was uploaded
+2026-11-26T14:07:38.9852257Z [exit 1]
+2026-11-26T14:07:38.9852577Z $ PLAN='{} 5' bash tag.sh
+2026-11-26T14:07:39.0968513Z publish-rocks: the release plan holds 2 JSON values, not one; nothing was uploaded
+2026-11-26T14:07:39.0980734Z [exit 1]
+2026-11-26T14:07:39.0981228Z $ PLAN='{"announcement_tag":"airsl-cli-v0.2.0"} not json' bash tag.sh
+2026-11-26T14:07:39.2046159Z jq: parse error: Invalid numeric literal at line 1, column 44
+2026-11-26T14:07:39.2117034Z publish-rocks: could not read the release plan: jq exit status 5; nothing was uploaded
+2026-11-26T14:07:39.2129830Z [exit 1]
+2026-11-26T14:07:39.2130436Z ## build-rocks: app-version.sh
+2026-11-26T14:07:39.2473095Z $ PLAN=<plan-tag.json> bash app-version.sh
+2026-11-26T14:07:39.3624975Z version=0.2.0
+2026-11-26T14:07:39.3637819Z [exit 0]
+2026-11-26T14:07:39.3874604Z $ PLAN=<plan-pr.json> bash app-version.sh
+2026-11-26T14:07:39.5052814Z version=0.2.0
+2026-11-26T14:07:39.5066512Z [exit 0]
+2026-11-26T14:07:39.5068611Z $ PLAN='{"releases":[{"app_name":"airsl","app_version":"0.2.0"},{"app_name":"airsl-cli","app_version":"0.2.0"}]}' bash app-version.sh
+2026-11-26T14:07:39.6157410Z version=0.2.0
+2026-11-26T14:07:39.6169421Z [exit 0]
+2026-11-26T14:07:39.6169814Z $ PLAN='{"releases":[]}' bash app-version.sh
+2026-11-26T14:07:39.7254532Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T14:07:39.7266268Z [exit 1]
+2026-11-26T14:07:39.7342237Z $ PLAN='{}' bash app-version.sh
+2026-11-26T14:07:39.8310934Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T14:07:39.8321453Z [exit 1]
+2026-11-26T14:07:39.8321837Z $ PLAN='' bash app-version.sh
+2026-11-26T14:07:39.9457951Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T14:07:39.9472937Z [exit 1]
+2026-11-26T14:07:39.9475007Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":"0.2.0"},{"app_name":"airsl-cli","app_version":"0.2.0"}]}' bash app-version.sh
+2026-11-26T14:07:40.0549470Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T14:07:40.0562369Z [exit 1]
+2026-11-26T14:07:40.0563755Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":"0.2"}]}' bash app-version.sh
+2026-11-26T14:07:40.1625592Z build-rocks: the release plan's airsl-cli version 0.2 is not <major>.<minor>.<patch>
+2026-11-26T14:07:40.1637717Z [exit 1]
+2026-11-26T14:07:40.1638095Z $ PLAN='not json' bash app-version.sh
+2026-11-26T14:07:40.2605575Z jq: parse error: Invalid numeric literal at line 1, column 4
+2026-11-26T14:07:40.2677258Z build-rocks: could not read the release plan: jq exit status 5
+2026-11-26T14:07:40.2690803Z [exit 1]
+2026-11-26T14:07:40.2691687Z $ PLAN='{"releases":null}' bash app-version.sh
+2026-11-26T14:07:40.3831028Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T14:07:40.3844856Z [exit 1]
+2026-11-26T14:07:40.3845362Z $ PLAN='{"releases":5}' bash app-version.sh
+2026-11-26T14:07:40.5011846Z build-rocks: in the release plan, releases is a number, not an array
+2026-11-26T14:07:40.5026285Z [exit 1]
+2026-11-26T14:07:40.5026779Z $ PLAN='{"releases":{"app_name":"airsl-cli"}}' bash app-version.sh
+2026-11-26T14:07:40.6082505Z build-rocks: in the release plan, releases is an object, not an array
+2026-11-26T14:07:40.6094395Z [exit 1]
+2026-11-26T14:07:40.6095131Z $ PLAN='{"releases":"x"}' bash app-version.sh
+2026-11-26T14:07:40.7134385Z build-rocks: in the release plan, releases is a string, not an array
+2026-11-26T14:07:40.7146723Z [exit 1]
+2026-11-26T14:07:40.7147627Z $ PLAN='{"releases":[5]}' bash app-version.sh
+2026-11-26T14:07:40.8181603Z build-rocks: in the release plan, releases[0] is a number, not an object
+2026-11-26T14:07:40.8215387Z [exit 1]
+2026-11-26T14:07:40.8216098Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":"0.2.0"},null]}' bash app-version.sh
+2026-11-26T14:07:40.9237267Z build-rocks: in the release plan, releases[1] is null, not an object
+2026-11-26T14:07:40.9248569Z [exit 1]
+2026-11-26T14:07:40.9249287Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":5}]}' bash app-version.sh
+2026-11-26T14:07:41.0301208Z build-rocks: in the release plan, the airsl-cli release's app_version is a number, not a string
+2026-11-26T14:07:41.0314478Z [exit 1]
+2026-11-26T14:07:41.0315230Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":null}]}' bash app-version.sh
+2026-11-26T14:07:41.1392244Z build-rocks: in the release plan, the airsl-cli release's app_version is null, not a string
+2026-11-26T14:07:41.1405417Z [exit 1]
+2026-11-26T14:07:41.1406581Z $ PLAN='{"releases":[{"app_name":"airsl-cli"}]}' bash app-version.sh
+2026-11-26T14:07:41.2497689Z build-rocks: in the release plan, the airsl-cli release's app_version is null, not a string
+2026-11-26T14:07:41.2509640Z [exit 1]
+2026-11-26T14:07:41.2510270Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":["0.2.0"]}]}' bash app-version.sh
+2026-11-26T14:07:41.3554021Z build-rocks: in the release plan, the airsl-cli release's app_version is an array, not a string
+2026-11-26T14:07:41.3564932Z [exit 1]
+2026-11-26T14:07:41.3565544Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":""}]}' bash app-version.sh
+2026-11-26T14:07:41.4600856Z build-rocks: in the release plan, the airsl-cli release's app_version is an empty string
+2026-11-26T14:07:41.4613779Z [exit 1]
+2026-11-26T14:07:41.4614412Z $ PLAN='{"releases":[{"app_name":5,"app_version":"0.2.0"}]}' bash app-version.sh
+2026-11-26T14:07:41.5790634Z build-rocks: the release plan names no single airsl-cli release
+2026-11-26T14:07:41.5802647Z [exit 1]
+2026-11-26T14:07:41.5803150Z $ PLAN='[1]' bash app-version.sh
+2026-11-26T14:07:41.6838469Z build-rocks: in the release plan, the top level is an array, not an object
+2026-11-26T14:07:41.6850595Z [exit 1]
+2026-11-26T14:07:41.6850959Z $ PLAN='5' bash app-version.sh
+2026-11-26T14:07:41.7921043Z build-rocks: in the release plan, the top level is a number, not an object
+2026-11-26T14:07:41.7933055Z [exit 1]
+2026-11-26T14:07:41.7933456Z $ PLAN='"x"' bash app-version.sh
+2026-11-26T14:07:41.8968188Z build-rocks: in the release plan, the top level is a string, not an object
+2026-11-26T14:07:41.8980836Z [exit 1]
+2026-11-26T14:07:41.8981744Z $ PLAN='null' bash app-version.sh
+2026-11-26T14:07:42.0029354Z build-rocks: in the release plan, the top level is null, not an object
+2026-11-26T14:07:42.0041366Z [exit 1]
+2026-11-26T14:07:42.0041775Z $ PLAN='false' bash app-version.sh
+2026-11-26T14:07:42.1109544Z build-rocks: in the release plan, the top level is a boolean, not an object
+2026-11-26T14:07:42.1122828Z [exit 1]
+2026-11-26T14:07:42.1123325Z $ PLAN='{} {}' bash app-version.sh
+2026-11-26T14:07:42.2203181Z build-rocks: the release plan holds 2 JSON values, not one
+2026-11-26T14:07:42.2214758Z [exit 1]
+2026-11-26T14:07:42.2215543Z $ PLAN='{"releases":[{"app_name":"airsl-cli","app_version":"0.2.0"}]} {}' bash app-version.sh
+2026-11-26T14:07:42.3259139Z build-rocks: the release plan holds 2 JSON values, not one
+2026-11-26T14:07:42.3273430Z [exit 1]
+2026-11-26T14:07:42.3571450Z Post job cleanup.
+2026-11-26T14:07:42.5507412Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-11-26T14:07:42.5933487Z git version 2.56.1.windows.1
+2026-11-26T14:07:42.6015134Z Temporarily overriding HOME='D:\a\_temp\6bb24996-8946-4a8d-a1ca-fe55ba672b28' before making global git config changes
+2026-11-26T14:07:42.6016223Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T14:07:42.6027108Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\airsl\airsl
+2026-11-26T14:07:42.6433808Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T14:07:42.6856274Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-11-26T14:07:43.2884425Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T14:07:43.3255655Z http.https://github.com/.extraheader
+2026-11-26T14:07:43.3310850Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-11-26T14:07:43.3729336Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-11-26T14:07:43.9589755Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T14:07:43.9978443Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-11-26T14:07:44.5899888Z Cleaning up orphan processes
+
+# --- cleanup (after the four probe files' logs were fetched; serves probes 250, 251, 252 and 253) ---
+$ git push origin --delete probe-ci-rocks-2
+To github.com:airsstack/airsl.git
+ - [deleted]         probe-ci-rocks-2
+$ git ls-remote origin refs/heads/probe-ci-rocks-2 | wc -l
+       0
+$ gh api repos/airsstack/airsl/actions/runs/45835818805/artifacts --jq .total_count
+0
+(the scratch repository the branch was pushed from was deleted; its files are 250-ci-probe-src/)

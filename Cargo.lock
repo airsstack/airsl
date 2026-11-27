@@ -13,7 +13,7 @@ dependencies = [
 
 [[package]]
 name = "airsl"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "globset",
  "jiff",
@@ -31,14 +31,22 @@ dependencies = [
 
 [[package]]
 name = "airsl-cli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "airsl",
  "clap",
  "mlua",
  "serde_json",
  "tempfile",
+ "thiserror",
  "walkdir",
+]
+
+[[package]]
+name = "airsl-lua"
+version = "0.3.0"
+dependencies = [
+ "airsl",
 ]
 
 [[package]]
@@ -261,6 +269,7 @@ name = "docs-check"
 version = "0.0.0"
 dependencies = [
  "tempfile",
+ "toml",
  "walkdir",
 ]
 
@@ -492,6 +501,7 @@ dependencies = [
  "erased-serde",
  "libc",
  "mlua-sys",
+ "mlua_derive",
  "num-traits",
  "parking_lot",
  "rustc-hash",
@@ -511,6 +521,17 @@ dependencies = [
  "lua-src",
  "luajit-src",
  "pkg-config",
+]
+
+[[package]]
+name = "mlua_derive"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0232231813b214d44b57c7678e7dbbcfaac35bd1a01acef0dad7c5dfdc1b1973"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]

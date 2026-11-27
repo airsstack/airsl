@@ -1,0 +1,311 @@
+Question B2: luarocks make of a rust-mlua rockspec at the root of a virtual cargo workspace (resolver 3): where cargo runs, whether --features is rejected at a virtual root, which rockspec mechanism builds the native member, require() under lua5.4, installed layout.
+Versions: luarocks 3.12.2 (/opt/homebrew/bin/luarocks, runs on Lua 5.4), Lua 5.4.8 (/opt/homebrew/bin/lua5.4), LuaJIT 2.1.1770848219 (/opt/homebrew/opt/luajit), cargo 1.94.1 / rustc 1.94.1, mlua =0.12.0 (mlua-sys 0.11.0), luarocks-build-rust-mlua 0.2.7-1, macOS Darwin 25.3.0 arm64 (arch macosx-aarch64).
+Date: 2026-11-26. Probe agent B.
+S = /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B (scratch; deleted after recording). Raw output below is unedited; paths appear in full.
+Sources: 21-toy-workspace/ (crates/core lib; crates/native cdylib [lib] name = "airsstack", path-dep on core, mlua =0.12.0 features ["module"], features lua54/luajit, no default Lua feature, #[mlua::lua_module] fn airsstack, build.rs emits -undefined dynamic_lookup on macOS; crates/host = stand-in for airsl: mlua lua54,vendored,send). 21-toy-workspace/bin/cargo is a wrapper put first on PATH that prints 'CARGO-WRAPPER cwd=<pwd> args=<args>' to stderr then execs the real cargo.
+Attempt 1 ran BEFORE crates/host existed (members = core, native) with variants/plain. Attempt 2 and all variants ran with members = core, native, host.
+Variant runs piped through: grep -v '^   Compiling\|Downloaded\|Downloading\|Blocking' (cargo progress lines only removed).
+
+=== ATTEMPT 1: $ cd $S/ws && PATH=$S/bin:$PATH luarocks make --tree $S/tree-54 airsstack-0.0.1-1.rockspec   (variants/plain; members core+native)
+Missing dependencies for airsstack 0.0.1-1:
+   luarocks-build-rust-mlua (not installed)
+
+airsstack 0.0.1-1 depends on luarocks-build-rust-mlua (not installed)
+Installing https://luarocks.org/luarocks-build-rust-mlua-0.2.7-1.src.rock
+
+
+No existing manifest. Attempting to rebuild...
+CARGO-WRAPPER cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/ws args=build --release --target-dir=target --features lua54
+    Updating crates.io index
+     Locking 30 packages to highest Rust 1.99.0 compatible versions
+      Adding mlua v0.12.0 (available: v0.12.3)
+      Adding mlua_derive v0.12.0 (available: v0.12.2)
+   Compiling libc v0.2.191
+   Compiling proc-macro2 v1.0.107
+   Compiling shlex v2.0.1
+   Compiling find-msvc-tools v0.1.15
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling autocfg v1.5.1
+   Compiling pkg-config v0.3.34
+   Compiling cc v1.11.3
+   Compiling cfg-if v1.0.5
+   Compiling parking_lot_core v0.9.12
+   Compiling scopeguard v1.2.0
+   Compiling smallvec v1.16.6
+   Compiling num-traits v0.2.19
+   Compiling lock_api v0.4.14
+   Compiling memchr v2.8.3
+   Compiling either v1.19.0
+   Compiling airsstack-native v0.0.1 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/ws/crates/native)
+   Compiling bstr v1.14.0
+   Compiling rustc-hash v2.1.3
+   Compiling airsstack-core v0.0.1 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/ws/crates/core)
+   Compiling mlua-sys v0.11.0
+   Compiling syn v2.0.119
+   Compiling parking_lot v0.12.5
+   Compiling mlua_derive v0.12.0
+   Compiling mlua v0.12.0
+    Finished `release` profile [optimized] target(s) in 6.79s
+luarocks-build-rust-mlua 0.2.7-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-54 (license: MIT)
+
+
+airsstack 0.0.1-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+airsstack 0.0.1-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-54 (license: MIT)
+
+exit=0
+
+=== ATTEMPT 1 result
+$ luarocks --tree $S/tree-54 path
+export LUA_PATH='/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-54/share/lua/5.4/?.lua;/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-54/share/lua/5.4/?/init.lua;/opt/homebrew/Cellar/luarocks/3.12.2/share/lua/5.4/?.lua;/opt/homebrew/share/lua/5.4/?.lua;/opt/homebrew/share/lua/5.4/?/init.lua;/opt/homebrew/lib/lua/5.4/?.lua;/opt/homebrew/lib/lua/5.4/?/init.lua;./?.lua;./?/init.lua;/Users/hiraq/.luarocks/share/lua/5.4/?.lua;/Users/hiraq/.luarocks/share/lua/5.4/?/init.lua'
+export LUA_CPATH='/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-54/lib/lua/5.4/?.so;/opt/homebrew/lib/lua/5.4/?.so;/opt/homebrew/lib/lua/5.4/loadall.so;./?.so;/Users/hiraq/.luarocks/lib/lua/5.4/?.so'
+export PATH='/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-54/bin:/Users/hiraq/.luarocks/bin:/Users/hiraq/.opencode/bin:/opt/homebrew/bin:/Users/hiraq/.antigravity/antigravity/bin:/Users/hiraq/.bun/bin:/Users/hiraq/.wasmer/bin:/Users/hiraq/.nvm/versions/node/v25.1.0/bin:/opt/homebrew/opt/libpq/bin:/opt/homebrew/opt/postgresql@15/bin:/Users/hiraq/.sdkman/candidates/kotlin/current/bin:/Users/hiraq/.sdkman/candidates/java/current/bin:/Users/hiraq/.sdkman/candidates/gradle/current/bin:/Users/hiraq/bin:/usr/local/bin:/Users/hiraq/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/opt/pmk/env/global/bin:/usr/local/go/bin:/Users/hiraq/.cargo/bin:/Users/hiraq/.orbstack/bin:/Users/hiraq/.local/bin:/Users/hiraq/go/bin'
+exit=0
+$ lua5.4 -e ...
+table	42	false	nil
+exit=0
+$ find tree-54 -name "airsstack*"
+tree-54/lib/luarocks/rocks-5.4/airsstack
+tree-54/lib/lua/5.4/airsstack.so
+tree-54/lib/luarocks/rocks-5.4/airsstack/0.0.1-1/airsstack-0.0.1-1.rockspec
+$ find tree-54 (all files under lib/ and airsstack rock dir)
+tree-54/lib/lua/5.4/airsstack.so
+tree-54/lib/luarocks/rocks-5.4/airsstack/0.0.1-1/airsstack-0.0.1-1.rockspec
+tree-54/lib/luarocks/rocks-5.4/airsstack/0.0.1-1/airsstack-0.0.1-1.rockspec
+tree-54/lib/luarocks/rocks-5.4/airsstack/0.0.1-1/rock_manifest
+tree-54/lib/luarocks/rocks-5.4/airsstack/0.0.1-1/rock_manifest
+tree-54/lib/luarocks/rocks-5.4/luarocks-build-rust-mlua/0.2.7-1/doc/CHANGELOG.md
+tree-54/lib/luarocks/rocks-5.4/luarocks-build-rust-mlua/0.2.7-1/doc/LICENSE
+tree-54/lib/luarocks/rocks-5.4/luarocks-build-rust-mlua/0.2.7-1/doc/README.md
+tree-54/lib/luarocks/rocks-5.4/luarocks-build-rust-mlua/0.2.7-1/luarocks-build-rust-mlua-0.2.7-1.rockspec
+tree-54/lib/luarocks/rocks-5.4/luarocks-build-rust-mlua/0.2.7-1/rock_manifest
+tree-54/lib/luarocks/rocks-5.4/manifest
+tree-54/lib/lua/5.4/airsstack.so: Mach-O 64-bit dynamically linked shared library arm64
+tree-54/lib/lua/5.4/airsstack.so:
+	/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/ws/target/release/deps/libairsstack.dylib (compatibility version 0.0.0, current version 0.0.0)
+	/usr/lib/libiconv.2.dylib (compatibility version 7.0.0, current version 7.0.0)
+	/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1345.100.2)
+0000000000001f1c T _luaopen_airsstack
+
+=== ATTEMPT 2 (crates/host added: mlua lua54,vendored,send): $ cd $S/ws && PATH=$S/bin:$PATH luarocks make --tree $S/tree-54b airsstack-0.0.1-1.rockspec   (variants/plain)
+Missing dependencies for airsstack 0.0.1-1:
+   luarocks-build-rust-mlua (not installed)
+
+airsstack 0.0.1-1 depends on luarocks-build-rust-mlua (not installed)
+Installing https://luarocks.org/luarocks-build-rust-mlua-0.2.7-1.src.rock
+
+
+No existing manifest. Attempting to rebuild...
+CARGO-WRAPPER cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/ws args=build --release --target-dir=target --features lua54
+     Locking 3 packages to highest Rust 1.99.0 compatible versions
+      Adding lua-src v550.1.1
+      Adding luajit-src v210.7.5+63c8f1a
+      Adding which v8.0.6
+    Blocking waiting for file lock on package cache
+   Compiling libc v0.2.191
+   Compiling lua-src v550.1.1
+   Compiling which v8.0.6
+   Compiling luajit-src v210.7.5+63c8f1a
+   Compiling mlua-sys v0.11.0
+error: `vendored`, `external` and `module` features are mutually exclusive
+  --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-sys-0.11.0/build/main_inner.rs:22:5
+   |
+22 |     compile_error!("`vendored`, `external` and `module` features are mutually exclusive");
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: could not compile `mlua-sys` (build script) due to 1 previous error
+
+Error: Build error: Failed building.
+luarocks-build-rust-mlua 0.2.7-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-54b (license: MIT)
+
+
+airsstack 0.0.1-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+exit=1
+
+=== VARIANT pkg (21-toy-workspace/variants/pkg/airsstack-0.0.1-1.rockspec)
+## variant=pkg cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/ws
+$ luarocks make --tree $S/tree-v-pkg /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/variants/pkg/airsstack-0.0.1-1.rockspec
+Missing dependencies for airsstack 0.0.1-1:
+   luarocks-build-rust-mlua (not installed)
+
+airsstack 0.0.1-1 depends on luarocks-build-rust-mlua (not installed)
+Installing https://luarocks.org/luarocks-build-rust-mlua-0.2.7-1.src.rock
+
+
+No existing manifest. Attempting to rebuild...
+CARGO-WRAPPER cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/ws args=build --release --package airsstack-native --target-dir=target --features lua54
+    Finished `release` profile [optimized] target(s) in 9.56s
+luarocks-build-rust-mlua 0.2.7-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-v-pkg (license: MIT)
+
+
+airsstack 0.0.1-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+airsstack 0.0.1-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-v-pkg (license: MIT)
+
+exit=0
+table
+require exit=0
+
+=== VARIANT pkgstr (21-toy-workspace/variants/pkgstr/airsstack-0.0.1-1.rockspec)
+## variant=pkgstr cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/ws
+$ luarocks make --tree $S/tree-v-pkgstr /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/variants/pkgstr/airsstack-0.0.1-1.rockspec
+Missing dependencies for airsstack 0.0.1-1:
+   luarocks-build-rust-mlua (not installed)
+
+airsstack 0.0.1-1 depends on luarocks-build-rust-mlua (not installed)
+Installing https://luarocks.org/luarocks-build-rust-mlua-0.2.7-1.src.rock
+
+
+No existing manifest. Attempting to rebuild...
+CARGO-WRAPPER cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/ws args=build --release --package airsstack-native --locked --target-dir=target --features lua54
+    Finished `release` profile [optimized] target(s) in 9.29s
+luarocks-build-rust-mlua 0.2.7-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-v-pkgstr (license: MIT)
+
+
+airsstack 0.0.1-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+airsstack 0.0.1-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-v-pkgstr (license: MIT)
+
+exit=0
+table
+require exit=0
+
+=== VARIANT srcdir (21-toy-workspace/variants/srcdir/airsstack-0.0.1-1.rockspec)
+## variant=srcdir cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/ws
+$ luarocks make --tree $S/tree-v-srcdir /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/variants/srcdir/airsstack-0.0.1-1.rockspec
+Missing dependencies for airsstack 0.0.1-1:
+   luarocks-build-rust-mlua (not installed)
+
+airsstack 0.0.1-1 depends on luarocks-build-rust-mlua (not installed)
+Installing https://luarocks.org/luarocks-build-rust-mlua-0.2.7-1.src.rock
+
+
+No existing manifest. Attempting to rebuild...
+CARGO-WRAPPER cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/ws args=build --release --target-dir=target --features lua54
+error: `vendored`, `external` and `module` features are mutually exclusive
+  --> /Users/hiraq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mlua-sys-0.11.0/build/main_inner.rs:22:5
+   |
+22 |     compile_error!("`vendored`, `external` and `module` features are mutually exclusive");
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: could not compile `mlua-sys` (build script) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+
+Error: Build error: Failed building.
+luarocks-build-rust-mlua 0.2.7-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-v-srcdir (license: MIT)
+
+
+airsstack 0.0.1-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+exit=1
+lua5.4: (command line):1: module 'airsstack' not found:
+	no field package.preload['airsstack']
+	no file '/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-v-srcdir/share/lua/5.4/airsstack.lua'
+	no file '/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-v-srcdir/share/lua/5.4/airsstack/init.lua'
+	no file '/opt/homebrew/Cellar/luarocks/3.12.2/share/lua/5.4/airsstack.lua'
+	no file '/opt/homebrew/share/lua/5.4/airsstack.lua'
+	no file '/opt/homebrew/share/lua/5.4/airsstack/init.lua'
+	no file '/opt/homebrew/lib/lua/5.4/airsstack.lua'
+	no file '/opt/homebrew/lib/lua/5.4/airsstack/init.lua'
+	no file './airsstack.lua'
+	no file './airsstack/init.lua'
+	no file '/Users/hiraq/.luarocks/share/lua/5.4/airsstack.lua'
+	no file '/Users/hiraq/.luarocks/share/lua/5.4/airsstack/init.lua'
+	no file '/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-v-srcdir/lib/lua/5.4/airsstack.so'
+	no file '/opt/homebrew/lib/lua/5.4/airsstack.so'
+	no file '/opt/homebrew/lib/lua/5.4/loadall.so'
+	no file './airsstack.so'
+	no file '/Users/hiraq/.luarocks/lib/lua/5.4/airsstack.so'
+stack traceback:
+	[C]: in function 'require'
+	(command line):1: in main chunk
+	[C]: in ?
+require exit=1
+
+=== VARIANT cratedir (21-toy-workspace/variants/cratedir/airsstack-0.0.1-1.rockspec)
+## variant=cratedir cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/ws/crates/native
+$ luarocks make --tree $S/tree-v-cratedir /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/variants/cratedir/airsstack-0.0.1-1.rockspec
+Missing dependencies for airsstack 0.0.1-1:
+   luarocks-build-rust-mlua (not installed)
+
+airsstack 0.0.1-1 depends on luarocks-build-rust-mlua (not installed)
+Installing https://luarocks.org/luarocks-build-rust-mlua-0.2.7-1.src.rock
+
+
+No existing manifest. Attempting to rebuild...
+CARGO-WRAPPER cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/ws/crates/native args=build --release --target-dir=../../target --features lua54
+    Finished `release` profile [optimized] target(s) in 10.61s
+luarocks-build-rust-mlua 0.2.7-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-v-cratedir (license: MIT)
+
+
+airsstack 0.0.1-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+airsstack 0.0.1-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-v-cratedir (license: MIT)
+
+exit=0
+table
+require exit=0
+
+=== cargo directly at the virtual root (members core, native, host)
+$ cargo build --release --target-dir=target --features nosuch   (cwd = virtual workspace root)
+error: none of the selected packages contains this feature: nosuch
+selected packages: airsstack-core, airsstack-native, airsstack-host
+exit=101
+$ cargo build --release --package airsstack-core --target-dir=target --features lua54
+error: the package 'airsstack-core' does not contain this feature: lua54
+help: package with the missing feature: airsstack-native
+exit=101
+
+=== luarocks source: make never changes directory (minimal_mode), so source.dir is ignored by make
+--- 29-luarocks-3.12.2-src/cmd/make.lua:99-111
+29-luarocks-3.12.2-src/cmd/make.lua:99:    end
+29-luarocks-3.12.2-src/cmd/make.lua:100: 
+29-luarocks-3.12.2-src/cmd/make.lua:101:    local cwd = fs.absolute_name(dir.path("."))
+29-luarocks-3.12.2-src/cmd/make.lua:102:    local rockspec, err = fetch.load_rockspec(rockspec_filename)
+29-luarocks-3.12.2-src/cmd/make.lua:103:    if not rockspec then
+29-luarocks-3.12.2-src/cmd/make.lua:104:       return nil, err
+29-luarocks-3.12.2-src/cmd/make.lua:105:    end
+29-luarocks-3.12.2-src/cmd/make.lua:106: 
+29-luarocks-3.12.2-src/cmd/make.lua:107:    name, namespace = util.split_namespace(rockspec.name)
+29-luarocks-3.12.2-src/cmd/make.lua:108:    namespace = namespace or args.namespace
+29-luarocks-3.12.2-src/cmd/make.lua:109: 
+29-luarocks-3.12.2-src/cmd/make.lua:110:    local opts = {
+29-luarocks-3.12.2-src/cmd/make.lua:111:       need_to_fetch = false,
+--- 29-luarocks-3.12.2-src/build.lua:166-197
+29-luarocks-3.12.2-src/build.lua:166: local function fetch_and_change_to_source_dir(rockspec, opts)
+29-luarocks-3.12.2-src/build.lua:167:    if opts.minimal_mode or opts.build_only_deps then
+29-luarocks-3.12.2-src/build.lua:168:       return true
+29-luarocks-3.12.2-src/build.lua:169:    end
+29-luarocks-3.12.2-src/build.lua:170:    if opts.need_to_fetch then
+29-luarocks-3.12.2-src/build.lua:171:       if opts.branch then
+29-luarocks-3.12.2-src/build.lua:172:          rockspec.source.branch = opts.branch
+29-luarocks-3.12.2-src/build.lua:173:       end
+29-luarocks-3.12.2-src/build.lua:174:       local oks, source_dir, errcode = fetch.fetch_sources(rockspec, true)
+29-luarocks-3.12.2-src/build.lua:175:       if not oks then
+29-luarocks-3.12.2-src/build.lua:176:          return nil, source_dir, errcode
+29-luarocks-3.12.2-src/build.lua:177:       end
+29-luarocks-3.12.2-src/build.lua:178:       local ok, err
+29-luarocks-3.12.2-src/build.lua:179:       ok, err = fs.change_dir(source_dir)
+29-luarocks-3.12.2-src/build.lua:180:       if not ok then
+29-luarocks-3.12.2-src/build.lua:181:          return nil, err
+29-luarocks-3.12.2-src/build.lua:182:       end
+29-luarocks-3.12.2-src/build.lua:183:    else
+29-luarocks-3.12.2-src/build.lua:184:       if rockspec.source.file then
+29-luarocks-3.12.2-src/build.lua:185:          local ok, err = fs.unpack_archive(rockspec.source.file)
+29-luarocks-3.12.2-src/build.lua:186:          if not ok then
+29-luarocks-3.12.2-src/build.lua:187:             return nil, err
+29-luarocks-3.12.2-src/build.lua:188:          end
+29-luarocks-3.12.2-src/build.lua:189:       end
+29-luarocks-3.12.2-src/build.lua:190:       local ok, err = fetch.find_rockspec_source_dir(rockspec, ".")
+29-luarocks-3.12.2-src/build.lua:191:       if not ok then
+29-luarocks-3.12.2-src/build.lua:192:          return nil, err
+29-luarocks-3.12.2-src/build.lua:193:       end
+29-luarocks-3.12.2-src/build.lua:194:    end
+29-luarocks-3.12.2-src/build.lua:195:    fs.change_dir(rockspec.source.dir)
+29-luarocks-3.12.2-src/build.lua:196:    return true
+29-luarocks-3.12.2-src/build.lua:197: end
+
+=== findings
+- cargo cwd under 'luarocks make' = the directory luarocks was invoked from (CARGO-WRAPPER cwd=$S/ws, and cwd=$S/ws/crates/native in the cratedir variant). make sets minimal_mode = true (cmd/make.lua:111-112) and fetch_and_change_to_source_dir returns before any chdir when minimal_mode (build.lua:167-169), so source.dir has no effect on make (variant srcdir: cargo still ran at $S/ws).
+- '--features lua54' at a virtual workspace root is NOT rejected by cargo 1.94.1: it applies to every selected member that has the feature (attempt 1 built). cargo errors only if no selected package has it: 'error: none of the selected packages contains this feature: nosuch' (exit 101).
+- What breaks at the root is feature unification: with a member that enables mlua vendored+send, the root build unifies vendored with module and mlua-sys fails: 'error: `vendored`, `external` and `module` features are mutually exclusive' -> luarocks 'Error: Build error: Failed building.' exit 1.
+- Working mechanisms: (a) cargo_extra_args = { "--package", "airsstack-native" } -> 'cargo build --release --package airsstack-native --target-dir=target --features lua54' (built, require ok); (b) one string "--package airsstack-native" plus "--locked" also works because the backend joins with spaces; (c) running luarocks make from crates/native with target_path = "../../target" (cargo selects the member from cwd). (d) source.dir = "crates/native" does NOT work under make (ignored).
+- require: lua5.4 -e 'require("airsstack")' -> table 42 false nil (type, answer from core crate, jit flag, no global set).
+- Installed layout: lib/lua/5.4/airsstack.so (Mach-O arm64 bundle with _luaopen_airsstack exported) + lib/luarocks/rocks-5.4/airsstack/0.0.1-1/{airsstack-0.0.1-1.rockspec,rock_manifest}; build dependency installed as rocks-5.4/luarocks-build-rust-mlua + share/lua/5.4/luarocks/build/rust-mlua.lua.
+- Note: otool -L shows the .so's own install name is the build path ($S/ws/target/release/deps/libairsstack.dylib); harmless for dlopen by path but it is embedded in the binary.

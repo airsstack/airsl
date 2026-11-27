@@ -1,0 +1,161 @@
+# Probe 185 — luarocks whose default Lua is not installed (5.5) or whose configured interpreter path does not exist
+Question (P5): `config lua_version` output + exit when luarocks targets a Lua that is not installed, and whether
+`--lua-version 5.4` overrides it (config + install). Three set-ups: (1) LUAROCKS_CONFIG = a temp file with lua_version = "5.5";
+(2) LUAROCKS_CONFIG = a temp file whose variables.LUA_DIR/LUA_BINDIR/LUA point at a directory that does not exist;
+(3) the documented way, `luarocks config --local lua_version 5.5` in a fake HOME (writes HOME/.luarocks/default-lua-version.lua).
+Config files: 185-luarocks-target-lua-missing/ (paths inside are under S/probes-M/p5/).
+Versions: luarocks 3.12.2 (Homebrew; system config /opt/homebrew/etc/luarocks/config-5.4.lua), Lua 5.4.8, no Lua 5.5 installed, macOS 26.3.1 arm64.
+Server: S/probes-M/server (probe 181). S=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad
+Source (/opt/homebrew/Cellar/luarocks/3.12.2/share/lua/5.4/luarocks/): cmd.lua:271-290 default-lua-version.lua is read from
+<project>/.luarocks, then homeconfdir, then sysconfdir; cmd/config.lua:337 "Lua version will default to"; util.lua:508
+"<interp> not found at <prefix>"; cmd.lua:238-241 "Could not find Lua <v> in PATH."; cmd.lua:756-766 `config` is exempt from the
+interpreter check (so `config lua_version` exits 0 with 5.5 while no 5.5 exists).
+Observed, not explained by source read here: in set-up (2) the plain `config variables.LUA` printed the Homebrew interpreter while
+`--lua-version 5.4 config variables.LUA` printed the non-existent path; binary-rock install succeeded in both (a binary install runs no interpreter).
+Each `$ ...` line is followed by its combined stdout+stderr and `[exit N]`; cwd S/probes-M.
+Date: 2026-11-26T07:18Z
+
+== LUAROCKS_CONFIG=S/probes-M/p5/config-lua55.lua, HOME=S/probes-M/home-p5:
+lua_version = "5.5"
+
+$ luarocks config lua_version
+5.5
+[exit 0]
+
+$ luarocks config variables.LUA
+
+Error: Unknown entry LUA
+[exit 1]
+
+$ luarocks --lua-version 5.4 config lua_version
+5.4
+[exit 0]
+
+$ luarocks --lua-version 5.4 config variables.LUA
+/opt/homebrew/opt/lua/bin/lua5.4
+[exit 0]
+
+$ luarocks install --local --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server airsstack 0.0.2
+
+Error: Lua 5.5 interpreter not found at /opt/homebrew/opt/lua
+
+Please set your Lua interpreter with:
+
+   luarocks --local config variables.LUA </path/lua>
+
+[exit 1]
+
+$ luarocks --lua-version 5.4 install --local --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server airsstack 0.0.2
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server/airsstack-0.0.2-1.macosx-aarch64.rock
+
+airsstack 0.0.2-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack 0.0.2-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p5/.luarocks (license: Apache-2.0)
+
+[exit 0]
+
+$ luarocks --lua-version 5.4 list --local --porcelain
+airsstack	0.0.2-1	installed	/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p5/.luarocks/lib/luarocks/rocks-5.4
+[exit 0]
+
+$ luarocks --lua-version 5.4 remove --local airsstack
+Checking stability of dependencies in the absence of
+airsstack 0.0.2-1...
+
+Removing airsstack 0.0.2-1...
+Removal successful.
+[exit 0]
+
+== LUAROCKS_CONFIG=S/probes-M/p5/config-nolua.lua, HOME=S/probes-M/home-p5:
+variables = {
+   LUA_DIR = "/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/p5/no-lua",
+   LUA_BINDIR = "/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/p5/no-lua/bin",
+   LUA = "/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/p5/no-lua/bin/lua5.4",
+}
+
+$ luarocks config lua_version
+5.4
+[exit 0]
+
+$ luarocks config variables.LUA
+/opt/homebrew/opt/lua/bin/lua5.4
+[exit 0]
+
+$ luarocks --lua-version 5.4 config lua_version
+5.4
+[exit 0]
+
+$ luarocks --lua-version 5.4 config variables.LUA
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/p5/no-lua/bin/lua5.4
+[exit 0]
+
+$ luarocks install --local --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server airsstack 0.0.2
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server/airsstack-0.0.2-1.macosx-aarch64.rock
+
+airsstack 0.0.2-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+airsstack 0.0.2-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p5/.luarocks (license: Apache-2.0)
+
+[exit 0]
+
+$ luarocks --lua-version 5.4 install --local --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server airsstack 0.0.2
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server/airsstack-0.0.2-1.macosx-aarch64.rock
+airsstack 0.0.2-1 is already installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p5/.luarocks
+Use --force to reinstall.
+[exit 0]
+
+$ luarocks --lua-version 5.4 list --local --porcelain
+airsstack	0.0.2-1	installed	/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p5/.luarocks/lib/luarocks/rocks-5.4
+[exit 0]
+
+$ luarocks --lua-version 5.4 remove --local airsstack
+Checking stability of dependencies in the absence of
+airsstack 0.0.2-1...
+
+Removing airsstack 0.0.2-1...
+Removal successful.
+[exit 0]
+
+== default version 5.5 set the documented way: HOME=S/probes-M/home-p5b, no LUAROCKS_CONFIG
+$ luarocks config --local lua_version 5.5
+Lua version will default to 5.5 in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p5b/.luarocks
+Wrote
+	lua_version = "5.5"
+to
+	/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p5b/.luarocks/config-5.5.lua
+[exit 0]
+
+$ find /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p5b/.luarocks -type f
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p5b/.luarocks/default-lua-version.lua
+/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p5b/.luarocks/config-5.5.lua
+[exit 0]
+
+$ cat /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p5b/.luarocks/default-lua-version.lua
+return "5.5"
+[exit 0]
+
+$ luarocks config lua_version
+5.5
+[exit 0]
+
+$ luarocks install --local --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server airsstack 0.0.2
+
+Error: Could not find Lua 5.5 in PATH.
+Please set your Lua interpreter with:
+
+   luarocks --local config variables.LUA </path/lua>
+
+[exit 1]
+
+$ luarocks --lua-version 5.4 config lua_version
+5.4
+[exit 0]
+
+$ luarocks --lua-version 5.4 install --local --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server airsstack 0.0.2
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server/airsstack-0.0.2-1.macosx-aarch64.rock
+
+airsstack 0.0.2-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack 0.0.2-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/home-p5b/.luarocks (license: Apache-2.0)
+
+[exit 0]
+

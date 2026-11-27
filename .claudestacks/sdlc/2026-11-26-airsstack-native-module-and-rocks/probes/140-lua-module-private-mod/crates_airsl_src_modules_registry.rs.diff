@@ -1,0 +1,32 @@
+--- a/crates/airsl/src/modules/registry.rs
++++ b/crates/airsl/src/modules/registry.rs
+@@ -203,6 +203,29 @@
+         self.modules.iter().any(|m| m.name() == name)
+     }
+ 
++    /// Installs every module of the set into a state this crate did not create, with trusted
++    /// authority, and returns the root table (probe stand-in for the draft's `ModuleSet::open`).
++    ///
++    /// # Errors
++    ///
++    /// Returns [`Error::ModuleInstall`] when a table cannot be created or set, or what a module's
++    /// `install` returns.
++    pub fn open(&self, lua: &mlua::Lua, root_table: &RootTable) -> Result<mlua::Table> {
++        let policy = Policy::trusted();
++        let fail = |e: mlua::Error| Error::ModuleInstall {
++            module: root_table.to_string(),
++            reason: e.to_string(),
++        };
++        let context = InstallContext::new(&policy, root_table);
++        let root = lua.create_table().map_err(fail)?;
++        for module in &self.modules {
++            let table = lua.create_table().map_err(fail)?;
++            module.install(lua, &table, &context)?;
++            root.set(module.name().as_str(), table).map_err(fail)?;
++        }
++        Ok(root)
++    }
++
+     /// The registered names, in installation order.
+     #[must_use]
+     pub fn names(&self) -> Vec<&ModuleName> {

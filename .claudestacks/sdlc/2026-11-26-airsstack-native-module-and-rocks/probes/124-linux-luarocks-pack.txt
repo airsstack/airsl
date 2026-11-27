@@ -1,0 +1,400 @@
+# Probe 124 — luarocks make (rust-mlua) and luarocks pack on Linux x86_64
+# Question: on ubuntu-latest with leafo/gh-actions-lua@v13 (luaVersion "5.4") + leafo/gh-actions-luarocks@v6,
+#   does luarocks make of the toy rockspec (build.type "rust-mlua", build_dependencies luarocks-build-rust-mlua)
+#   install airsstack.so, does require work via luarocks path, and what exact file does luarocks pack produce?
+# Answer: HOLDS. Lua 5.4.9, luarocks 3.13.0, arch linux-x86_64; luarocks-build-rust-mlua 0.2.7-1 installed;
+#   <tree>/lib/lua/5.4/airsstack.so; require("airsstack").ok = true json [2,2.0] after eval $(luarocks path --tree T);
+#   "Packed: /home/runner/work/_temp/pack/airsstack-0.0.0-1.linux-x86_64.rock" containing
+#   airsstack-0.0.0-1.rockspec, lib/airsstack.so, rock_manifest.
+# Job: linux-luarocks, id 139738938916, runner ubuntu-latest (Ubuntu 26.04.1 LTS, ImageOS=ubuntu26)
+Run: https://github.com/airsstack/airsl/actions/runs/45769647202 (run 2 of 2 on throwaway branch probe/x86-rocks-2026-11-26, since deleted; run 1 = 45769208286 gave the same results but its mac-inspect step grepped only LC_BUILD_VERSION, which printed nothing)
+Fetched with: gh run view -R airsstack/airsl --job <id> --log   Date: 2026-11-26
+Sources: 120-x86-probe-src/ (workflow .github/workflows/probe-x86.yml, toy crate mlua =0.12.0, ci/*.sh, ci/probe.lua)
+# ---- raw log follows, byte for byte ----
+linux-luarocks	Set up job	﻿2026-11-26T06:39:02.8758410Z Current runner version: '2.338.2'
+linux-luarocks	Set up job	2026-11-26T06:39:02.8789892Z ##[group]Runner Image Provisioner
+linux-luarocks	Set up job	2026-11-26T06:39:02.8791175Z Hosted Compute Agent
+linux-luarocks	Set up job	2026-11-26T06:39:02.8791895Z Version: 20261111.635
+linux-luarocks	Set up job	2026-11-26T06:39:02.8792557Z Commit: b8a594ea514ff44cadb5342986c68b1eac6e22ed
+linux-luarocks	Set up job	2026-11-26T06:39:02.8793295Z Build Date: 2026-11-11T01:49:01Z
+linux-luarocks	Set up job	2026-11-26T06:39:02.8794054Z Worker ID: {706839a3-5825-409c-a44d-538eaf5ad809}
+linux-luarocks	Set up job	2026-11-26T06:39:02.8794775Z Region: northcentralus
+linux-luarocks	Set up job	2026-11-26T06:39:02.8795373Z Cloud: Azure
+linux-luarocks	Set up job	2026-11-26T06:39:02.8795975Z ##[endgroup]
+linux-luarocks	Set up job	2026-11-26T06:39:02.8797568Z ##[group]Operating System
+linux-luarocks	Set up job	2026-11-26T06:39:02.8798297Z Ubuntu
+linux-luarocks	Set up job	2026-11-26T06:39:02.8798831Z 26.04.1
+linux-luarocks	Set up job	2026-11-26T06:39:02.8799366Z LTS
+linux-luarocks	Set up job	2026-11-26T06:39:02.8799943Z ##[endgroup]
+linux-luarocks	Set up job	2026-11-26T06:39:02.8800815Z ##[group]Runner Image
+linux-luarocks	Set up job	2026-11-26T06:39:02.8801478Z Image: ubuntu-26.04
+linux-luarocks	Set up job	2026-11-26T06:39:02.8802065Z Version: 20261116.202.1
+linux-luarocks	Set up job	2026-11-26T06:39:02.8803184Z Included Software: https://github.com/actions/runner-images/blob/ubuntu26/20261116.202/images/ubuntu/Ubuntu2604-Readme.md
+linux-luarocks	Set up job	2026-11-26T06:39:02.8805417Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261116.202
+linux-luarocks	Set up job	2026-11-26T06:39:02.8806452Z ##[endgroup]
+linux-luarocks	Set up job	2026-11-26T06:39:02.8807580Z ##[group]GITHUB_TOKEN Permissions
+linux-luarocks	Set up job	2026-11-26T06:39:02.8809776Z Contents: read
+linux-luarocks	Set up job	2026-11-26T06:39:02.8810591Z Metadata: read
+linux-luarocks	Set up job	2026-11-26T06:39:02.8811144Z ##[endgroup]
+linux-luarocks	Set up job	2026-11-26T06:39:02.8813301Z Secret source: Actions
+linux-luarocks	Set up job	2026-11-26T06:39:02.8814310Z Cache mode: write
+linux-luarocks	Set up job	2026-11-26T06:39:02.8815393Z Prepare workflow directory
+linux-luarocks	Set up job	2026-11-26T06:39:02.9340758Z Prepare all required actions
+linux-luarocks	Set up job	2026-11-26T06:39:02.9414399Z Getting action download info
+linux-luarocks	Set up job	2026-11-26T06:39:03.1985427Z Download action repository 'actions/checkout@v6' (SHA:d23441a48e516b6c34aea4fa41551a30e30af803)
+linux-luarocks	Set up job	2026-11-26T06:39:03.2926386Z Download action repository 'leafo/gh-actions-lua@v13' (SHA:32909a2dea0a48c433aec79e7fcd31b4cd55800f)
+linux-luarocks	Set up job	2026-11-26T06:39:04.4044879Z Download action repository 'leafo/gh-actions-luarocks@v6' (SHA:1c4a92caecc8f6850f673cbadfd57b3e555417ce)
+linux-luarocks	Set up job	2026-11-26T06:39:04.7954062Z Complete job name: linux-luarocks
+linux-luarocks	Run actions/checkout@v6	﻿2026-11-26T06:39:04.9151466Z ##[group]Run actions/checkout@v6
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:04.9152921Z with:
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:04.9153728Z   repository: airsstack/airsl
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:04.9163747Z   token: ***
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:04.9164581Z   ssh-strict: true
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:04.9165388Z   ssh-user: git
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:04.9166203Z   persist-credentials: true
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:04.9167302Z   clean: true
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:04.9168151Z   sparse-checkout-cone-mode: true
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:04.9169161Z   fetch-depth: 1
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:04.9169956Z   fetch-tags: false
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:04.9171206Z   show-progress: true
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:04.9172547Z   lfs: false
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:04.9173803Z   submodules: false
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:04.9175158Z   set-safe-directory: true
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:04.9176271Z   allow-unsafe-pr-checkout: false
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:04.9177636Z ##[endgroup]
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2157105Z Syncing repository: airsstack/airsl
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2160727Z ##[group]Getting Git version info
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2161777Z Working directory is '/home/runner/work/airsl/airsl'
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2163774Z [command]/usr/bin/git version
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2196289Z git version 2.56.1
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2224876Z ##[endgroup]
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2242302Z Temporarily overriding HOME='/home/runner/work/_temp/3d62bab0-20a2-4d54-808e-b9b7685cd9a8' before making global git config changes
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2271723Z Adding repository directory to the temporary git global config as a safe directory
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2274160Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/airsl/airsl
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2375548Z Deleting the contents of '/home/runner/work/airsl/airsl'
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2378292Z ##[group]Determining repository object format
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2380893Z ##[endgroup]
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2383174Z ##[group]Initializing the repository
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2385500Z [command]/usr/bin/git init /home/runner/work/airsl/airsl
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2516124Z hint: Using 'master' as the name for the initial branch. This default branch name
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2518806Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2521287Z hint: to use in all of your new repositories, which will suppress this warning,
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2523351Z hint: call:
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2524802Z hint:
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2526665Z hint: 	git config --global init.defaultBranch <name>
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2528640Z hint:
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2530744Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2533012Z hint: 'development'. The just-created branch can be renamed via this command:
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2535059Z hint:
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2536592Z hint: 	git branch -m <name>
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2538191Z hint:
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2540402Z hint: Disable this message with "git config set advice.defaultBranchName false"
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2542916Z Initialized empty Git repository in /home/runner/work/airsl/airsl/.git/
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2548893Z [command]/usr/bin/git remote add origin https://github.com/airsstack/airsl
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2633622Z ##[endgroup]
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2635870Z ##[group]Disabling automatic garbage collection
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2637578Z [command]/usr/bin/git config --local gc.auto 0
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2741066Z ##[endgroup]
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2748390Z ##[group]Setting up auth
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2751061Z Removing SSH command configuration
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2753000Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.2756266Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.3369648Z Removing HTTP extra header
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.3377319Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.3416697Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.3716266Z Removing includeIf entries pointing to credentials config files
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.3722281Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.3762083Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.4062351Z [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-d759c806-d713-438b-9bf4-9986262aca2a.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.4108238Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/airsl/airsl/.git.path /home/runner/work/_temp/git-credentials-d759c806-d713-438b-9bf4-9986262aca2a.config
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.4143201Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/airsl/airsl/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-d759c806-d713-438b-9bf4-9986262aca2a.config
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.4187569Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-d759c806-d713-438b-9bf4-9986262aca2a.config
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.4227258Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-d759c806-d713-438b-9bf4-9986262aca2a.config
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.4270426Z ##[endgroup]
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.4272605Z ##[group]Fetching the repository
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.4279272Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +4ab5690fdf269392b0e548f2e5e4c8f2f22b487b:refs/remotes/origin/probe/x86-rocks-2026-11-26
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.6619446Z From https://github.com/airsstack/airsl
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.6622253Z  * [new ref]         4ab5690fdf269392b0e548f2e5e4c8f2f22b487b -> origin/probe/x86-rocks-2026-11-26
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.6632496Z [command]/usr/bin/git branch --list --remote origin/probe/x86-rocks-2026-11-26
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.6664810Z   origin/probe/x86-rocks-2026-11-26
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.6675035Z [command]/usr/bin/git rev-parse refs/remotes/origin/probe/x86-rocks-2026-11-26
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.6700530Z 4ab5690fdf269392b0e548f2e5e4c8f2f22b487b
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.6707015Z ##[endgroup]
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.6707909Z ##[group]Determining the checkout info
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.6709069Z ##[endgroup]
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.6714058Z [command]/usr/bin/git sparse-checkout disable
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.6773946Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.6807071Z ##[group]Checking out the ref
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.6811295Z [command]/usr/bin/git checkout --progress --force -B probe/x86-rocks-2026-11-26 refs/remotes/origin/probe/x86-rocks-2026-11-26
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.6888290Z Switched to a new branch 'probe/x86-rocks-2026-11-26'
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.6895348Z branch 'probe/x86-rocks-2026-11-26' set up to track 'origin/probe/x86-rocks-2026-11-26'.
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.6900614Z ##[endgroup]
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.6952355Z [command]/usr/bin/git log -1 --format=%H
+linux-luarocks	Run actions/checkout@v6	2026-11-26T06:39:05.6980247Z 4ab5690fdf269392b0e548f2e5e4c8f2f22b487b
+linux-luarocks	Run leafo/gh-actions-lua@v13	﻿2026-11-26T06:39:05.7271909Z ##[group]Run leafo/gh-actions-lua@v13
+linux-luarocks	Run leafo/gh-actions-lua@v13	2026-11-26T06:39:05.7272722Z with:
+linux-luarocks	Run leafo/gh-actions-lua@v13	2026-11-26T06:39:05.7273314Z   luaVersion: 5.4
+linux-luarocks	Run leafo/gh-actions-lua@v13	2026-11-26T06:39:05.7273928Z   buildCache: true
+linux-luarocks	Run leafo/gh-actions-lua@v13	2026-11-26T06:39:05.7274531Z ##[endgroup]
+linux-luarocks	Run leafo/gh-actions-lua@v13	2026-11-26T06:39:06.2010742Z Cache hit for: lua:5.4.9:linux:x64:
+linux-luarocks	Run leafo/gh-actions-lua@v13	2026-11-26T06:39:06.5677403Z Received 270620 of 270620 (100.0%), 1.1 MBs/sec
+linux-luarocks	Run leafo/gh-actions-lua@v13	2026-11-26T06:39:06.5679401Z Cache Size: ~0 MB (270620 B)
+linux-luarocks	Run leafo/gh-actions-lua@v13	2026-11-26T06:39:06.5707610Z [command]/usr/bin/tar -xf /home/runner/work/_temp/891b05ea-1593-4467-b844-5cc9153f3ba1/cache.tzst -P -C /home/runner/work/airsl/airsl --use-compress-program unzstd
+linux-luarocks	Run leafo/gh-actions-lua@v13	2026-11-26T06:39:06.5792839Z Cache restored successfully
+linux-luarocks	Run leafo/gh-actions-lua@v13	2026-11-26T06:39:06.5819692Z ##[notice]gh-actions-lua: Cache restored: lua:5.4.9:linux:x64:
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	﻿2026-11-26T06:39:06.6094283Z ##[group]Run leafo/gh-actions-luarocks@v6
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:06.6094797Z with:
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:06.6095140Z   luaRocksVersion: 3.13.0
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:06.6095534Z ##[endgroup]
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:06.9329139Z [command]/usr/bin/tar xz --warning=no-unknown-keyword --overwrite -C /home/runner/work/_temp/.build-luarocks -f /home/runner/work/_temp/ece75a07-4bb0-46c7-8732-3c9c794ce475
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:06.9592047Z [command]/home/runner/work/_temp/.build-luarocks/luarocks-3.13.0/configure --with-lua=/home/runner/work/airsl/airsl/.lua --prefix=/home/runner/work/airsl/airsl/.luarocks
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:06.9847965Z 
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:06.9849531Z ^[[1;36mConfiguring LuaRocks version 3.13.0...^[[0m
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:06.9850647Z 
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:06.9867057Z Lua version detected: ^[[1;32m5.4^[[0m
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:06.9870825Z Lua interpreter found: ^[[1;32m/home/runner/work/airsl/airsl/.lua/bin/lua^[[0m
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:06.9932218Z lua.h found: ^[[1;32m/home/runner/work/airsl/airsl/.lua/include/lua.h^[[0m
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:06.9967318Z unzip found in PATH: ^[[1;32m/usr/bin^[[0m
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0188686Z 
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0190001Z ^[[1;36mDone configuring.^[[0m
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0190967Z 
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0195086Z LuaRocks will be installed at......: ^[[1;32m/home/runner/work/airsl/airsl/.luarocks^[[0m
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0196728Z LuaRocks will install rocks at.....: ^[[1;32m/home/runner/work/airsl/airsl/.luarocks^[[0m
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0202334Z LuaRocks configuration directory...: ^[[1;32m/home/runner/work/airsl/airsl/.luarocks/etc/luarocks^[[0m
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0206401Z Using Lua from.....................: ^[[1;32m/home/runner/work/airsl/airsl/.lua^[[0m
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0207601Z 
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0215489Z * Type ^[[1mmake^[[0m and ^[[1mmake install^[[0m:
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0216630Z   to install to /home/runner/work/airsl/airsl/.luarocks as usual.
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0219166Z * Type ^[[1mmake bootstrap^[[0m:
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0220701Z   to install LuaRocks into /home/runner/work/airsl/airsl/.luarocks as a rock.
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0228307Z 
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0246888Z [command]/usr/bin/make
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0315435Z mkdir -p "build"
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0376977Z mkdir -p "build"
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0410953Z (printf '#!/home/runner/work/airsl/airsl/.lua/bin/lua\n'\
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0412261Z 'package.loaded["luarocks.core.hardcoded"] = { '\
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0413635Z "$([ -n "" ] && printf 'FORCE_CONFIG = true, ')"\
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0414877Z 'SYSCONFDIR = [[/home/runner/work/airsl/airsl/.luarocks/etc/luarocks]] }\n'\
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0416397Z 'package.path=[[/home/runner/work/airsl/airsl/.luarocks/share/lua/5.4/?.lua;]] .. package.path\n'\
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0447129Z 'local list = package.searchers or package.loaders; table.insert(list, 1, function(name) if name:match("^luarocks%%.") then return loadfile([[/home/runner/work/airsl/airsl/.luarocks/share/lua/5.4/]] .. name:gsub([[%%.]], [[/]]) .. [[.lua]]) end end)\n'; \
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0448279Z tail -n +2 src/bin/luarocks \
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0448597Z )> "build/luarocks"
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0460534Z mkdir -p "build"
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0494175Z (printf '#!/home/runner/work/airsl/airsl/.lua/bin/lua\n'\
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0495018Z 'package.loaded["luarocks.core.hardcoded"] = { '\
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0495870Z "$([ -n "" ] && printf 'FORCE_CONFIG = true, ')"\
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0496726Z 'SYSCONFDIR = [[/home/runner/work/airsl/airsl/.luarocks/etc/luarocks]] }\n'\
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0498013Z 'package.path=[[/home/runner/work/airsl/airsl/.luarocks/share/lua/5.4/?.lua;]] .. package.path\n'\
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0500464Z 'local list = package.searchers or package.loaders; table.insert(list, 1, function(name) if name:match("^luarocks%%.") then return loadfile([[/home/runner/work/airsl/airsl/.luarocks/share/lua/5.4/]] .. name:gsub([[%%.]], [[/]]) .. [[.lua]]) end end)\n'; \
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0501894Z tail -n +2 src/bin/luarocks-admin \
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0502340Z )> "build/luarocks-admin"
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0555286Z [command]/usr/bin/make install
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0623053Z mkdir -p '/home/runner/work/airsl/airsl/.luarocks/etc/luarocks/'
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0649859Z install -m 644  './build/config-5.4.lua' '/home/runner/work/airsl/airsl/.luarocks/etc/luarocks/config-5.4.lua'
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0682053Z mkdir -p '/home/runner/work/airsl/airsl/.luarocks/bin/'
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0709508Z install './build/luarocks' '/home/runner/work/airsl/airsl/.luarocks/bin/luarocks'
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0736187Z install './build/luarocks-admin' '/home/runner/work/airsl/airsl/.luarocks/bin/luarocks-admin'
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0763391Z find src/luarocks/ -type d | while read f; \
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0764031Z do \
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0764823Z    mkdir -p '/home/runner/work/airsl/airsl/.luarocks/share/lua/5.4'/`echo $f | sed 's,^src/,,'`; \
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.0765864Z done
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.1491068Z find src/luarocks/ -type f -name '*.lua' | while read f; \
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.1492426Z do \
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.1495889Z    install -m 644 "$f" '/home/runner/work/airsl/airsl/.luarocks/share/lua/5.4'/`echo $f | sed 's,^src/,,'`; \
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.1497438Z done
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.5875213Z [command]/home/runner/work/airsl/airsl/.luarocks/bin/luarocks path --lr-bin
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.7374194Z /home/runner/.luarocks/bin:/home/runner/work/airsl/airsl/.luarocks/bin
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.7400819Z [command]/home/runner/work/airsl/airsl/.luarocks/bin/luarocks path --lr-path
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.7918650Z /home/runner/.luarocks/share/lua/5.4/?.lua;/home/runner/.luarocks/share/lua/5.4/?/init.lua;/home/runner/work/airsl/airsl/.luarocks/share/lua/5.4/?.lua;/home/runner/work/airsl/airsl/.luarocks/share/lua/5.4/?/init.lua
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.7941391Z [command]/home/runner/work/airsl/airsl/.luarocks/bin/luarocks path --lr-cpath
+linux-luarocks	Run leafo/gh-actions-luarocks@v6	2026-11-26T06:39:07.8431860Z /home/runner/.luarocks/lib/lua/5.4/?.so;/home/runner/work/airsl/airsl/.luarocks/lib/lua/5.4/?.so
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	﻿2026-11-26T06:39:07.8582396Z ##[group]Run echo "ImageOS=$ImageOS ImageVersion=$ImageVersion"; . /etc/os-release; echo "$PRETTY_NAME"
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:07.8583213Z ^[[36;1mecho "ImageOS=$ImageOS ImageVersion=$ImageVersion"; . /etc/os-release; echo "$PRETTY_NAME"^[[0m
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:07.8583874Z ^[[36;1mrustup toolchain install 1.94 --profile minimal; export RUSTUP_TOOLCHAIN=1.94^[[0m
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:07.8584401Z ^[[36;1mrustc -V; cargo -V; lua -v; luarocks --version | head -1^[[0m
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:07.8584827Z ^[[36;1mluarocks config arch; luarocks config lua_version^[[0m
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:07.8585173Z ^[[36;1mT=$RUNNER_TEMP/rtree^[[0m
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:07.8585597Z ^[[36;1mluarocks make --tree $T airsstack-0.0.0-1.rockspec 2>&1; echo "make exit=$?"^[[0m
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:07.8586052Z ^[[36;1mfind $T -type f | sort^[[0m
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:07.8586320Z ^[[36;1mluarocks list --tree $T^[[0m
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:07.8586607Z ^[[36;1meval "$(luarocks path --tree $T)"^[[0m
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:07.8587276Z ^[[36;1mlua -e 'local m = require("airsstack"); print("require(\"airsstack\").ok = " .. tostring(m.ok) .. "  json = " .. tostring(m.json))'; echo "require exit=$?"^[[0m
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:07.8588026Z ^[[36;1mmkdir -p $RUNNER_TEMP/pack; cd $RUNNER_TEMP/pack^[[0m
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:07.8588475Z ^[[36;1mluarocks pack --tree $T airsstack 2>&1; echo "pack exit=$?"^[[0m
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:07.8588827Z ^[[36;1mls -la^[[0m
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:07.8589107Z ^[[36;1mfor r in *.rock; do echo "== $r"; unzip -l "$r"; done^[[0m
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:07.8624189Z shell: /usr/bin/bash --noprofile --norc {0}
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:07.8624506Z env:
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:07.8625306Z   LUA_PATH: ;;/home/runner/.luarocks/share/lua/5.4/?.lua;/home/runner/.luarocks/share/lua/5.4/?/init.lua;/home/runner/work/airsl/airsl/.luarocks/share/lua/5.4/?.lua;/home/runner/work/airsl/airsl/.luarocks/share/lua/5.4/?/init.lua
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:07.8626358Z   LUA_CPATH: ;;/home/runner/.luarocks/lib/lua/5.4/?.so;/home/runner/work/airsl/airsl/.luarocks/lib/lua/5.4/?.so
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:07.8626827Z ##[endgroup]
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:07.8707500Z ImageOS=ubuntu26 ImageVersion=20261116.202.1
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:07.8708228Z Ubuntu 26.04.1 LTS
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:07.9247604Z info: syncing channel updates for 1.94-x86_64-unknown-linux-gnu
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:08.0389798Z info: latest update on 2026-03-26 for version 1.94.1 (e408947bf 2026-03-25)
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:08.0390926Z info: downloading 3 components
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:15.7125061Z 
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:15.7200865Z   1.94-x86_64-unknown-linux-gnu installed - rustc 1.94.1 (e408947bf 2026-03-25)
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:15.7201454Z 
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:15.7564530Z rustc 1.94.1 (e408947bf 2026-03-25)
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:15.7660864Z cargo 1.94.1 (29ea6fb6a 2026-03-24)
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:15.7675373Z Lua 5.4.9  Copyright (C) 1994-2026 Lua.org, PUC-Rio
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:15.8040914Z /home/runner/work/airsl/airsl/.luarocks/bin/luarocks 3.13.0
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:15.8533490Z linux-x86_64
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:15.9015276Z 5.4
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.3201552Z Missing dependencies for airsstack 0.0.0-1:
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.3202183Z    luarocks-build-rust-mlua (not installed)
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.3202608Z 
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.3202879Z airsstack 0.0.0-1 depends on luarocks-build-rust-mlua (not installed)
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.3203560Z Installing https://luarocks.org/luarocks-build-rust-mlua-0.2.7-1.src.rock
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.3367196Z 
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.3367331Z 
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.4236710Z No existing manifest. Attempting to rebuild...
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.4866332Z     Updating crates.io index
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.5836012Z  Downloading crates ...
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.6306552Z   Downloaded erased-serde v0.4.11
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.6342019Z   Downloaded serde-value v0.7.0
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.6356504Z   Downloaded typeid v1.0.3
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.6375707Z   Downloaded quote v1.0.47
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.6407303Z   Downloaded zmij v1.0.23
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.6427546Z   Downloaded proc-macro2 v1.0.107
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.6458711Z   Downloaded serde_core v1.0.229
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.6488059Z   Downloaded num-traits v0.2.19
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.6514515Z   Downloaded memchr v2.8.3
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.6569061Z   Downloaded serde v1.0.229
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.6604682Z   Downloaded mlua-sys v0.11.0
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.6641595Z   Downloaded serde_json v1.0.154
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.6713515Z   Downloaded cc v1.11.3
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.6754907Z   Downloaded bstr v1.14.0
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.6833699Z   Downloaded unicode-ident v1.0.27
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.6861346Z   Downloaded smallvec v1.16.6
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.6875694Z   Downloaded shlex v2.0.1
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.6890442Z   Downloaded parking_lot_core v0.9.12
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.6911475Z   Downloaded syn v2.0.119
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.7014295Z   Downloaded mlua v0.12.0
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.7179682Z   Downloaded parking_lot v0.12.5
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.7204098Z   Downloaded lock_api v0.4.14
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.7216608Z   Downloaded find-msvc-tools v0.1.15
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.7233252Z   Downloaded pkg-config v0.3.34
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.7247679Z   Downloaded mlua_derive v0.12.0
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.7259425Z   Downloaded autocfg v1.5.1
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.7277271Z   Downloaded scopeguard v1.2.0
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.7289071Z   Downloaded rustc-hash v2.1.3
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.7302055Z   Downloaded ordered-float v2.10.1
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.7314974Z   Downloaded itoa v1.0.19
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.7329090Z   Downloaded either v1.19.0
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.7344011Z   Downloaded cfg-if v1.0.5
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.7364554Z   Downloaded libc v0.2.191
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.8044113Z    Compiling serde_core v1.0.229
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.8044865Z    Compiling proc-macro2 v1.0.107
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.8045497Z    Compiling libc v0.2.191
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:16.8046379Z    Compiling autocfg v1.5.1
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:17.0859041Z    Compiling unicode-ident v1.0.27
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:17.1281790Z    Compiling num-traits v0.2.19
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:17.1331186Z    Compiling find-msvc-tools v0.1.15
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:17.1661256Z    Compiling shlex v2.0.1
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:17.2067597Z    Compiling quote v1.0.47
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:17.2885769Z    Compiling cc v1.11.3
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:18.0531602Z    Compiling pkg-config v0.3.34
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:18.5451103Z    Compiling cfg-if v1.0.5
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:18.5721170Z    Compiling typeid v1.0.3
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:18.6381228Z    Compiling parking_lot_core v0.9.12
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:18.7201227Z    Compiling serde v1.0.229
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:18.9910698Z    Compiling erased-serde v0.4.11
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:19.1607206Z    Compiling memchr v2.8.3
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:19.1706018Z    Compiling mlua-sys v0.11.0
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:19.3081245Z    Compiling scopeguard v1.2.0
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:19.3501237Z    Compiling smallvec v1.16.6
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:19.5619877Z    Compiling zmij v1.0.23
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:19.8331241Z    Compiling ordered-float v2.10.1
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:20.0791849Z    Compiling lock_api v0.4.14
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:20.1971226Z    Compiling syn v2.0.119
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:20.4241322Z    Compiling serde_json v1.0.154
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:20.5191576Z    Compiling serde-value v0.7.0
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:20.5251374Z    Compiling parking_lot v0.12.5
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:21.2941591Z    Compiling bstr v1.14.0
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:21.5543019Z    Compiling either v1.19.0
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:21.6367882Z    Compiling itoa v1.0.19
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:21.7660997Z    Compiling airsstack v0.0.0 (/home/runner/work/airsl/airsl)
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:21.8147984Z    Compiling rustc-hash v2.1.3
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:23.2181256Z    Compiling mlua_derive v0.12.0
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:23.4311382Z    Compiling mlua v0.12.0
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.3543066Z     Finished `release` profile [optimized] target(s) in 10.89s
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.3764057Z luarocks-build-rust-mlua 0.2.7-1 is now installed in /home/runner/work/_temp/rtree (license: MIT)
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.3764842Z 
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.3764852Z 
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.3765180Z airsstack 0.0.0-1 depends on lua >= 5.1 (5.4-1 provided by VM: success)
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.4404885Z airsstack 0.0.0-1 is now installed in /home/runner/work/_temp/rtree (license: MIT)
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.4405540Z 
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.4417974Z make exit=0
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.4451928Z /home/runner/work/_temp/rtree/lib/lua/5.4/airsstack.so
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.4453039Z /home/runner/work/_temp/rtree/lib/luarocks/rocks-5.4/airsstack/0.0.0-1/airsstack-0.0.0-1.rockspec
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.4453670Z /home/runner/work/_temp/rtree/lib/luarocks/rocks-5.4/airsstack/0.0.0-1/rock_manifest
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.4454294Z /home/runner/work/_temp/rtree/lib/luarocks/rocks-5.4/luarocks-build-rust-mlua/0.2.7-1/doc/CHANGELOG.md
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.4454976Z /home/runner/work/_temp/rtree/lib/luarocks/rocks-5.4/luarocks-build-rust-mlua/0.2.7-1/doc/LICENSE
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.4455634Z /home/runner/work/_temp/rtree/lib/luarocks/rocks-5.4/luarocks-build-rust-mlua/0.2.7-1/doc/README.md
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.4456390Z /home/runner/work/_temp/rtree/lib/luarocks/rocks-5.4/luarocks-build-rust-mlua/0.2.7-1/luarocks-build-rust-mlua-0.2.7-1.rockspec
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.4457153Z /home/runner/work/_temp/rtree/lib/luarocks/rocks-5.4/luarocks-build-rust-mlua/0.2.7-1/rock_manifest
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.4457684Z /home/runner/work/_temp/rtree/lib/luarocks/rocks-5.4/manifest
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.4458117Z /home/runner/work/_temp/rtree/share/lua/5.4/luarocks/build/rust-mlua.lua
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.4916177Z 
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.4916743Z Rocks installed for Lua 5.4 in /home/runner/work/_temp/rtree
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.4917297Z ------------------------------------------------------------
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.4917648Z 
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.4917783Z airsstack
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.4918205Z    0.0.0-1 (installed) - /home/runner/work/_temp/rtree/lib/luarocks/rocks-5.4
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.4918606Z 
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.4918739Z luarocks-build-rust-mlua
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.4919333Z    0.2.7-1 (installed) - /home/runner/work/_temp/rtree/lib/luarocks/rocks-5.4
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.4919912Z 
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.5385012Z require("airsstack").ok = true  json = [2,2.0]
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.5387088Z require exit=0
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.6954385Z Packed: /home/runner/work/_temp/pack/airsstack-0.0.0-1.linux-x86_64.rock
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.6957724Z pack exit=0
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.6996450Z total 316
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.6996919Z drwxr-xr-x 2 runner runner   4096 Nov 26 06:39 .
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.6997586Z drwxr-xr-x 8 runner runner   4096 Nov 26 06:39 ..
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.6998159Z -rw-r--r-- 1 runner runner 313694 Nov 26 06:39 airsstack-0.0.0-1.linux-x86_64.rock
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.7001583Z == airsstack-0.0.0-1.linux-x86_64.rock
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.7015316Z Archive:  airsstack-0.0.0-1.linux-x86_64.rock
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.7015874Z   Length      Date    Time    Name
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.7016318Z ---------  ---------- -----   ----
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.7016642Z       332  2026-11-26 06:39   airsstack-0.0.0-1.rockspec
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.7016976Z         0  2026-11-26 06:39   lib/
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.7017269Z    754256  2026-11-26 06:39   lib/airsstack.so
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.7017772Z       168  2026-11-26 06:39   rock_manifest
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.7018230Z ---------                     -------
+linux-luarocks	(d) luarocks make (rust-mlua) then luarocks pack	2026-11-26T06:39:27.7018655Z    754756                     4 files
+linux-luarocks	Post Run actions/checkout@v6	﻿2026-11-26T06:39:27.7144731Z Post job cleanup.
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.8065462Z [command]/usr/bin/git version
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.8113084Z git version 2.56.1
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.8155539Z Temporarily overriding HOME='/home/runner/work/_temp/4611922e-804f-480c-93c0-d941b305206a' before making global git config changes
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.8157325Z Adding repository directory to the temporary git global config as a safe directory
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.8161546Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/airsl/airsl
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.8199888Z Removing SSH command configuration
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.8207712Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.8252753Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.8595560Z Removing HTTP extra header
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.8596525Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.8639625Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.8970387Z Removing includeIf entries pointing to credentials config files
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.8971464Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.9001097Z includeif.gitdir:/home/runner/work/airsl/airsl/.git.path
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.9001880Z includeif.gitdir:/home/runner/work/airsl/airsl/.git/worktrees/*.path
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.9003042Z includeif.gitdir:/github/workspace/.git.path
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.9003985Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.9015510Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/airsl/airsl/.git.path
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.9046628Z /home/runner/work/_temp/git-credentials-d759c806-d713-438b-9bf4-9986262aca2a.config
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.9064224Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/airsl/airsl/.git.path /home/runner/work/_temp/git-credentials-d759c806-d713-438b-9bf4-9986262aca2a.config
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.9110049Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/airsl/airsl/.git/worktrees/*.path
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.9137455Z /home/runner/work/_temp/git-credentials-d759c806-d713-438b-9bf4-9986262aca2a.config
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.9149677Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/airsl/airsl/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-d759c806-d713-438b-9bf4-9986262aca2a.config
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.9190564Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.9218686Z /github/runner_temp/git-credentials-d759c806-d713-438b-9bf4-9986262aca2a.config
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.9230390Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-d759c806-d713-438b-9bf4-9986262aca2a.config
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.9271573Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.9298139Z /github/runner_temp/git-credentials-d759c806-d713-438b-9bf4-9986262aca2a.config
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.9310797Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-d759c806-d713-438b-9bf4-9986262aca2a.config
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.9356705Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+linux-luarocks	Post Run actions/checkout@v6	2026-11-26T06:39:27.9650895Z Removing credentials config '/home/runner/work/_temp/git-credentials-d759c806-d713-438b-9bf4-9986262aca2a.config'
+linux-luarocks	Complete job	﻿2026-11-26T06:39:27.9823947Z Cleaning up orphan processes

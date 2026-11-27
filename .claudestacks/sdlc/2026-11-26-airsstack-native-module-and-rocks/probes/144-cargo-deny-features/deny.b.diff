@@ -1,0 +1,10 @@
+--- a/deny.toml
++++ b/deny.toml
+@@ -15,6 +15,7 @@
+ # platforms this workspace has not ruled out, and the whole-graph view costs
+ # nothing while every license present resolves to something permissive.
+ all-features = true
++exclude = ["airsl-lua"]
+ 
+ [output]
+ feature-depth = 1

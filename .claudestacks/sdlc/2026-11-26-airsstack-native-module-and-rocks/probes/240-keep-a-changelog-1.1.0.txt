@@ -1,0 +1,47 @@
+# Probe 240 — where an unreleased CHANGELOG item goes under Keep a Changelog 1.1.0, and the repository's heading style
+question: plan-set review finding 6 (spec §2.5, §11): CHANGELOG.md:3-4 declares Keep a Changelog 1.1.0. What does that format say
+  about changes not yet released, and what do the file's existing release headings look like (so the new heading matches them)?
+source: curl -sS -L 'https://keepachangelog.com/en/1.1.0/' -o 240-keep-a-changelog-1.1.0/index.html (kept); grep over it and over
+  the repository's CHANGELOG.md at HEAD 9a1fbd8.
+date: 2026-11-26
+--- raw output ---
+$ curl -sS -L 'https://keepachangelog.com/en/1.1.0/' -o 240-keep-a-changelog-1.1.0/index.html; wc -c
+   26341
+$ grep -n "^## \[Unreleased\]" 240-keep-a-changelog-1.1.0/index.html
+8:## [Unreleased]
+$ grep -n -o "Keep an <code>Unreleased</code> section at the top to track upcoming changes." …
+289:Keep an <code>Unreleased</code> section at the top to track upcoming changes.
+$ grep -n -o "At release time, you can move the <code>Unreleased</code> section changes into a new release version section." …
+289:At release time, you can move the <code>Unreleased</code> section changes into a new release version section.
+$ grep -n "^## \|^### " CHANGELOG.md   (repository, HEAD)
+12:## airsl 0.2.0 — airsl-cli 0.2.0 — 2026-11-25
+24:### Breaking
+55:### Added
+72:### Changed
+97:## airsl 0.1.6 — airsl-cli 0.1.6 — 2026-11-24
+101:### Added
+107:### Changed
+114:## airsl 0.1.5 — airsl-cli 0.1.5 — 2026-11-23
+118:### Fixed
+124:### Changed
+132:## airsl-cli 0.1.4 — 2026-10-22
+137:### Added
+147:## airsl 0.1.4 — airsl-cli 0.1.3 — 2026-08-30
+154:### Added
+169:### Changed — behaviour worth checking before upgrading
+179:### Fixed
+188:## airsl 0.1.3 — airsl-cli 0.1.2 — 2026-08-23
+194:### Added
+218:## airsl 0.1.2 — airsl-cli 0.1.1 — 2026-08-23
+223:### Fixed
+249:### Added
+264:### Changed — behaviour worth checking before upgrading
+278:## airsl 0.1.1 — airsl-cli 0.1.0 — 2026-08-22
+280:### Changed
+286:### Added
+291:## airsl 0.1.0 — 2026-08-22
+$ grep -n -i unreleased CHANGELOG.md
+[exit 1]
+$ sed -n 3,4p CHANGELOG.md
+Notable changes to both crates in this workspace, newest first. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and both crates follow

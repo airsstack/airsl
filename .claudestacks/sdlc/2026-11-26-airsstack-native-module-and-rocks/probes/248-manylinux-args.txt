@@ -1,0 +1,27 @@
+# Probe 248 — the arguments of crates/airsl-lua/ci/manylinux.sh: checkout, output directory, <version>
+question: spec review round 2, finding R5 (spec §9.4): probe 160's y1-manylinux.sh took `$1` = the checkout and `$2` = the output
+  directory (its header, :2, and probe-ci.yml:64 `docker run … $I bash /src/ci/y1-manylinux.sh /src /out`) and hard-coded each
+  rockspec (`RS=`, :44-45). With a third argument, <version>, and a count check: what does the script build each rockspec path and
+  `pack` argument from, and what does it print for a wrong number of arguments?
+versions: GNU bash 3.2.57 (macOS 26.3.1 arm64). Not run in the manylinux2014 container (its bash is the CentOS 7 one); no Docker
+  was run for this probe.
+sources: 248-manylinux-args/args.sh (the script's argument handling; the build steps replaced by echo), run.sh (driver).
+date: 2026-11-26
+--- raw output ---
+$ bash --version | head -1
+GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)
+$ bash run.sh 248-manylinux-args
+$ bash args.sh
+manylinux.sh: expected 3 arguments (checkout directory, output directory, version), got 0
+[exit 1]
+$ bash args.sh /src /out
+manylinux.sh: expected 3 arguments (checkout directory, output directory, version), got 2
+[exit 1]
+$ bash args.sh /src /out 0.2.0
+source /src, output /out
+airsstack: luarocks make crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec; luarocks pack airsstack 0.2.0-1
+airsstack-luajit: luarocks make crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec; luarocks pack airsstack-luajit 0.2.0-1
+[exit 0]
+$ bash args.sh /src /out 0.2.0 extra
+manylinux.sh: expected 3 arguments (checkout directory, output directory, version), got 4
+[exit 1]

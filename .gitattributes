@@ -1,0 +1,5 @@
+# cmd.exe labels and `goto` only work on CRLF line ends, so these files stay CRLF in every checkout.
+*.cmd text eol=crlf
+# Git Bash on Windows cannot read a shell script with CRLF line ends (`set -euo pipefail\r` fails), so
+# these stay LF in every checkout.
+*.sh text eol=lf

@@ -1,0 +1,261 @@
+# Probe 160 -- y1-container-x86_64
+# question: Y1: can a job run directly in container: quay.io/pypa/manylinux2014_<arch> with actions/checkout (node in glibc 2.17), or must it docker run? Inside manylinux2014: Lua 5.4.8 + LuaJIT v2.1 from source, luarocks 3.12.2 from source per interpreter, luarocks make + pack both real-shaped rockspecs (crates/airsl-lua/rockspecs/), binary rock names, max GLIBC of each packed .so, unzip -l of each rock.
+# run: https://github.com/airsstack/airsl/actions/runs/45773840390 (run id 45773840390, attempt 1), job id 139752616811: https://github.com/airsstack/airsl/actions/runs/45773840390/job/139752616811
+# job: y1-container (x86_64, ubuntu-latest) | runner label: ubuntu-latest | started 2026-11-26T07:14:30Z | head 64c02e9c3a4d5993e45ffe694f57b0c72eb7b458
+# runner image: ubuntu-26.04 20261111.635 (from the log's Runner Image group)
+# branch: probe/ci-toolchain-2026-11-26 (throwaway orphan, deleted after the probe); sources: 160-ci-probe-src/
+# date: 2026-11-26 (probe agent Y); log fetched with: gh api repos/airsstack/airsl/actions/jobs/139752616811/logs (byte for byte below this header)
+# --- raw job log ---
+﻿2026-11-26T07:14:30.8238928Z Current runner version: '2.338.2'
+2026-11-26T07:14:30.8265724Z ##[group]Runner Image Provisioner
+2026-11-26T07:14:30.8267227Z Hosted Compute Agent
+2026-11-26T07:14:30.8268402Z Version: 20261111.635
+2026-11-26T07:14:30.8269855Z Commit: b8a594ea514ff44cadb5342986c68b1eac6e22ed
+2026-11-26T07:14:30.8271212Z Build Date: 2026-11-11T01:49:01Z
+2026-11-26T07:14:30.8272800Z Worker ID: {f1ef6e58-ed8f-47ba-b854-dfe86a2f1f67}
+2026-11-26T07:14:30.8274238Z Region: southcentralus
+2026-11-26T07:14:30.8275461Z Cloud: Azure
+2026-11-26T07:14:30.8276483Z ##[endgroup]
+2026-11-26T07:14:30.8279712Z ##[group]Operating System
+2026-11-26T07:14:30.8280903Z Ubuntu
+2026-11-26T07:14:30.8281962Z 26.04.1
+2026-11-26T07:14:30.8282858Z LTS
+2026-11-26T07:14:30.8283896Z ##[endgroup]
+2026-11-26T07:14:30.8284901Z ##[group]Runner Image
+2026-11-26T07:14:30.8286467Z Image: ubuntu-26.04
+2026-11-26T07:14:30.8287642Z Version: 20261116.202.1
+2026-11-26T07:14:30.8290160Z Included Software: https://github.com/actions/runner-images/blob/ubuntu26/20261116.202/images/ubuntu/Ubuntu2604-Readme.md
+2026-11-26T07:14:30.8293003Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261116.202
+2026-11-26T07:14:30.8294813Z ##[endgroup]
+2026-11-26T07:14:30.8296858Z ##[group]GITHUB_TOKEN Permissions
+2026-11-26T07:14:30.8299973Z Contents: read
+2026-11-26T07:14:30.8301104Z Metadata: read
+2026-11-26T07:14:30.8302144Z ##[endgroup]
+2026-11-26T07:14:30.8304929Z Secret source: Actions
+2026-11-26T07:14:30.8306481Z Cache mode: write
+2026-11-26T07:14:30.8308147Z Prepare workflow directory
+2026-11-26T07:14:30.9013906Z Prepare all required actions
+2026-11-26T07:14:30.9089688Z Getting action download info
+2026-11-26T07:14:31.1426016Z Download action repository 'actions/checkout@v6' (SHA:d23441a48e516b6c34aea4fa41551a30e30af803)
+2026-11-26T07:14:31.3672121Z Complete job name: y1-container (x86_64, ubuntu-latest)
+2026-11-26T07:14:31.4225020Z ##[group]Checking docker version
+2026-11-26T07:14:31.4238145Z ##[command]/usr/bin/docker version --format '{{.Server.APIVersion}}'
+2026-11-26T07:14:31.5508074Z '1.54'
+2026-11-26T07:14:31.5525170Z Docker daemon API version: '1.54'
+2026-11-26T07:14:31.5526187Z ##[command]/usr/bin/docker version --format '{{.Client.APIVersion}}'
+2026-11-26T07:14:31.5722630Z '1.54'
+2026-11-26T07:14:31.5739678Z Docker client API version: '1.54'
+2026-11-26T07:14:31.5744441Z ##[endgroup]
+2026-11-26T07:14:31.5747536Z ##[group]Clean up resources from previous jobs
+2026-11-26T07:14:31.5753428Z ##[command]/usr/bin/docker ps --all --quiet --no-trunc --filter "label=b58c32"
+2026-11-26T07:14:31.5925694Z ##[command]/usr/bin/docker network prune --force --filter "label=b58c32"
+2026-11-26T07:14:31.6082029Z ##[endgroup]
+2026-11-26T07:14:31.6082698Z ##[group]Create local container network
+2026-11-26T07:14:31.6092658Z ##[command]/usr/bin/docker network create --label b58c32 github_network_8330d460089843d59135e9140081f516
+2026-11-26T07:14:31.6547814Z a32790dcf1f14ece4bd223e7dbac90d736bd56ced6545977d71c3d1cf73e0332
+2026-11-26T07:14:31.6572301Z ##[endgroup]
+2026-11-26T07:14:31.6595934Z ##[group]Starting job container
+2026-11-26T07:14:31.6617793Z ##[command]/usr/bin/docker pull quay.io/pypa/manylinux2014_x86_64
+2026-11-26T07:14:31.6753436Z Using default tag: latest
+2026-11-26T07:14:31.9180924Z latest: Pulling from pypa/manylinux2014_x86_64
+2026-11-26T07:14:32.3875059Z 4edb201d17ee: Pulling fs layer
+2026-11-26T07:14:32.3876518Z e7ec9dfdb6fc: Pulling fs layer
+2026-11-26T07:14:32.3879589Z 631fa712f99c: Pulling fs layer
+2026-11-26T07:14:32.3881117Z 54554c7e77c4: Pulling fs layer
+2026-11-26T07:14:32.3881995Z 7726904e82e2: Pulling fs layer
+2026-11-26T07:14:32.3882942Z 5ea49d58f915: Pulling fs layer
+2026-11-26T07:14:32.3883757Z 1e9aee9a38a7: Pulling fs layer
+2026-11-26T07:14:32.3884522Z f625d084418f: Pulling fs layer
+2026-11-26T07:14:32.3885603Z 220d4af3274b: Pulling fs layer
+2026-11-26T07:14:32.3887110Z c9c763983040: Pulling fs layer
+2026-11-26T07:14:32.3888177Z 08c1e9597cf2: Pulling fs layer
+2026-11-26T07:14:32.3889713Z a6371af18e0f: Pulling fs layer
+2026-11-26T07:14:32.3891828Z ec7e347fb214: Pulling fs layer
+2026-11-26T07:14:32.3893663Z 4eab65590c2f: Pulling fs layer
+2026-11-26T07:14:32.3895087Z b898f4e97930: Pulling fs layer
+2026-11-26T07:14:32.3896440Z 3780addb199f: Pulling fs layer
+2026-11-26T07:14:32.3897541Z c68e5b0c4146: Pulling fs layer
+2026-11-26T07:14:32.3898208Z b8d1ad701542: Pulling fs layer
+2026-11-26T07:14:32.3899136Z 748ea9071aa0: Pulling fs layer
+2026-11-26T07:14:32.3899723Z 1f5557c9c8d9: Pulling fs layer
+2026-11-26T07:14:32.3900306Z 536e6ac9ded3: Pulling fs layer
+2026-11-26T07:14:32.3900875Z 2d7900d53ecc: Pulling fs layer
+2026-11-26T07:14:32.3901429Z 8e51ccb76202: Pulling fs layer
+2026-11-26T07:14:32.3902050Z ba74311c46aa: Pulling fs layer
+2026-11-26T07:14:32.3903066Z 1ef7f6cf3083: Pulling fs layer
+2026-11-26T07:14:32.5843314Z 54554c7e77c4: Download complete
+2026-11-26T07:14:32.5859930Z c68e5b0c4146: Download complete
+2026-11-26T07:14:32.6829596Z 1e9aee9a38a7: Download complete
+2026-11-26T07:14:32.6850127Z 4eab65590c2f: Download complete
+2026-11-26T07:14:32.6886122Z f625d084418f: Download complete
+2026-11-26T07:14:32.6888145Z ec7e347fb214: Download complete
+2026-11-26T07:14:32.6892322Z b898f4e97930: Download complete
+2026-11-26T07:14:32.6901438Z 3780addb199f: Download complete
+2026-11-26T07:14:32.6908626Z 748ea9071aa0: Download complete
+2026-11-26T07:14:32.6921076Z 1ef7f6cf3083: Download complete
+2026-11-26T07:14:32.6943172Z 1f5557c9c8d9: Download complete
+2026-11-26T07:14:32.6945328Z ba74311c46aa: Download complete
+2026-11-26T07:14:32.6959220Z 631fa712f99c: Download complete
+2026-11-26T07:14:32.6979083Z 7726904e82e2: Download complete
+2026-11-26T07:14:32.6998077Z 5ea49d58f915: Download complete
+2026-11-26T07:14:32.7030242Z b8d1ad701542: Download complete
+2026-11-26T07:14:32.7044408Z 08c1e9597cf2: Download complete
+2026-11-26T07:14:32.7056347Z e7ec9dfdb6fc: Download complete
+2026-11-26T07:14:32.7066000Z 536e6ac9ded3: Download complete
+2026-11-26T07:14:32.7078009Z a6371af18e0f: Download complete
+2026-11-26T07:14:32.7795271Z 8e51ccb76202: Download complete
+2026-11-26T07:14:32.7796777Z 4edb201d17ee: Download complete
+2026-11-26T07:14:32.7798236Z 220d4af3274b: Download complete
+2026-11-26T07:14:33.7793497Z c9c763983040: Download complete
+2026-11-26T07:14:34.2787312Z 2d7900d53ecc: Download complete
+2026-11-26T07:14:38.2891674Z ec7e347fb214: Pull complete
+2026-11-26T07:14:38.2897900Z b898f4e97930: Pull complete
+2026-11-26T07:14:38.3054855Z 536e6ac9ded3: Pull complete
+2026-11-26T07:14:38.3066025Z a6371af18e0f: Pull complete
+2026-11-26T07:14:38.3145559Z c9c763983040: Pull complete
+2026-11-26T07:14:38.3792599Z 54554c7e77c4: Pull complete
+2026-11-26T07:14:38.3858421Z f625d084418f: Pull complete
+2026-11-26T07:14:38.3879988Z 748ea9071aa0: Pull complete
+2026-11-26T07:14:38.3937229Z ba74311c46aa: Pull complete
+2026-11-26T07:14:38.3975280Z b8d1ad701542: Pull complete
+2026-11-26T07:14:38.4811284Z 1e9aee9a38a7: Pull complete
+2026-11-26T07:14:38.4846000Z 4eab65590c2f: Pull complete
+2026-11-26T07:14:38.4862125Z 3780addb199f: Pull complete
+2026-11-26T07:14:38.4876193Z 1ef7f6cf3083: Pull complete
+2026-11-26T07:14:38.4915444Z 7726904e82e2: Pull complete
+2026-11-26T07:14:38.4931750Z 5ea49d58f915: Pull complete
+2026-11-26T07:14:38.4992329Z e7ec9dfdb6fc: Pull complete
+2026-11-26T07:14:38.7837409Z 1f5557c9c8d9: Pull complete
+2026-11-26T07:14:38.7862333Z 08c1e9597cf2: Pull complete
+2026-11-26T07:14:38.7876555Z 8e51ccb76202: Pull complete
+2026-11-26T07:14:38.7911304Z 220d4af3274b: Pull complete
+2026-11-26T07:14:38.9828953Z 631fa712f99c: Pull complete
+2026-11-26T07:14:38.9844018Z 4edb201d17ee: Pull complete
+2026-11-26T07:14:47.0682665Z c68e5b0c4146: Pull complete
+2026-11-26T07:14:47.0701795Z 2d7900d53ecc: Pull complete
+2026-11-26T07:14:47.0702780Z Digest: sha256:8a79ff36ce155d8f242dc8013d73c5e8bbe937defb15de7d7afb342c1ab537f4
+2026-11-26T07:14:47.0704153Z Status: Downloaded newer image for quay.io/pypa/manylinux2014_x86_64:latest
+2026-11-26T07:14:47.0729707Z quay.io/pypa/manylinux2014_x86_64:latest
+2026-11-26T07:14:47.0838038Z ##[command]/usr/bin/docker create --name 68b1e78446f24fb5ab7c75b648871ed6_quayiopypamanylinux2014_x86_64_6c8806 --label b58c32 --workdir /__w/airsl/airsl --network github_network_8330d460089843d59135e9140081f516  -e "HOME=/github/home" -e GITHUB_ACTIONS=true -e CI=true -v "/var/run/docker.sock":"/var/run/docker.sock" -v "/home/runner/work":"/__w" -v "/home/runner/actions-runner/cached/2.338.2/externals":"/__e":ro -v "/home/runner/work/_temp":"/__w/_temp" -v "/home/runner/work/_actions":"/__w/_actions" -v "/opt/hostedtoolcache":"/__t" -v "/home/runner/work/_temp/_github_home":"/github/home" -v "/home/runner/work/_temp/_github_workflow":"/github/workflow" --entrypoint "tail" quay.io/pypa/manylinux2014_x86_64 "-f" "/dev/null"
+2026-11-26T07:14:49.8127074Z ff49956448a9dfdbbf5564aa1b84df3da9ddaac1d4d6013c2b77e078c7379a7b
+2026-11-26T07:14:49.8157486Z ##[command]/usr/bin/docker start ff49956448a9dfdbbf5564aa1b84df3da9ddaac1d4d6013c2b77e078c7379a7b
+2026-11-26T07:14:50.0261624Z ff49956448a9dfdbbf5564aa1b84df3da9ddaac1d4d6013c2b77e078c7379a7b
+2026-11-26T07:14:50.0288076Z ##[command]/usr/bin/docker ps --all --filter id=ff49956448a9dfdbbf5564aa1b84df3da9ddaac1d4d6013c2b77e078c7379a7b --filter status=running --no-trunc --format "{{.ID}} {{.Status}}"
+2026-11-26T07:14:50.0471758Z ff49956448a9dfdbbf5564aa1b84df3da9ddaac1d4d6013c2b77e078c7379a7b Up Less than a second
+2026-11-26T07:14:50.0492700Z ##[command]/usr/bin/docker inspect --format "{{range .Config.Env}}{{println .}}{{end}}" ff49956448a9dfdbbf5564aa1b84df3da9ddaac1d4d6013c2b77e078c7379a7b
+2026-11-26T07:14:50.0636402Z HOME=/github/home
+2026-11-26T07:14:50.0637042Z GITHUB_ACTIONS=true
+2026-11-26T07:14:50.0637640Z CI=true
+2026-11-26T07:14:50.0638447Z PATH=/opt/clang/bin:/opt/rh/devtoolset-10/root/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+2026-11-26T07:14:50.0639568Z AUDITWHEEL_POLICY=manylinux2014
+2026-11-26T07:14:50.0640063Z AUDITWHEEL_ARCH=x86_64
+2026-11-26T07:14:50.0640797Z AUDITWHEEL_PLAT=manylinux2014_x86_64
+2026-11-26T07:14:50.0641336Z LC_ALL=en_US.UTF-8
+2026-11-26T07:14:50.0641733Z LANG=en_US.UTF-8
+2026-11-26T07:14:50.0642145Z LANGUAGE=en_US.UTF-8
+2026-11-26T07:14:50.0642604Z DEVTOOLSET_ROOTPATH=/opt/rh/devtoolset-10/root
+2026-11-26T07:14:50.0643895Z LD_LIBRARY_PATH=/opt/rh/devtoolset-10/root/usr/lib64:/opt/rh/devtoolset-10/root/usr/lib:/opt/rh/devtoolset-10/root/usr/lib64/dyninst:/opt/rh/devtoolset-10/root/usr/lib/dyninst:/usr/local/lib64
+2026-11-26T07:14:50.0645295Z PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+2026-11-26T07:14:50.0645826Z SSL_CERT_FILE=/opt/_internal/certs.pem
+2026-11-26T07:14:50.0646376Z PIPX_DISABLE_SHARED_LIBS_AUTO_UPGRADE=1
+2026-11-26T07:14:50.0660223Z ##[endgroup]
+2026-11-26T07:14:50.0671976Z ##[group]Waiting for all services to be ready
+2026-11-26T07:14:50.0673857Z ##[endgroup]
+2026-11-26T07:14:50.0893954Z ##[group]Run echo "runner=ubuntu-latest ImageOS=${ImageOS:-} ImageVersion=${ImageVersion:-}"
+2026-11-26T07:14:50.0894763Z [36;1mecho "runner=ubuntu-latest ImageOS=${ImageOS:-} ImageVersion=${ImageVersion:-}"[0m
+2026-11-26T07:14:50.0895425Z [36;1muname -m; ldd --version 2>&1 | head -1; cat /etc/redhat-release[0m
+2026-11-26T07:14:50.0895912Z [36;1mls -la /__e 2>&1; ls /__e/node*/bin 2>&1[0m
+2026-11-26T07:14:50.0896517Z [36;1mfor n in /__e/node*/bin/node; do echo "$n -> $($n --version 2>&1 | head -3)"; done[0m
+2026-11-26T07:14:50.0899936Z shell: bash --noprofile --norc {0}
+2026-11-26T07:14:50.0900521Z ##[endgroup]
+2026-11-26T07:14:50.1567601Z runner=ubuntu-latest ImageOS= ImageVersion=
+2026-11-26T07:14:50.1568996Z x86_64
+2026-11-26T07:14:50.1588664Z ldd (GNU libc) 2.17
+2026-11-26T07:14:50.1598758Z CentOS Linux release 7.9.2009 (Core)
+2026-11-26T07:14:50.1625176Z total 24
+2026-11-26T07:14:50.1625982Z drwxrwxrwx 6 1001 1001 4096 Oct 26 14:26 .
+2026-11-26T07:14:50.1626680Z drwxr-xr-x 1 root root 4096 Nov 26 07:14 ..
+2026-11-26T07:14:50.1627332Z drwxrwxrwx 6 1001 1001 4096 Oct 26 14:26 node20
+2026-11-26T07:14:50.1628164Z drwxrwxrwx 3 1001 1001 4096 Oct 26 14:26 node20_alpine
+2026-11-26T07:14:50.1629296Z drwxrwxrwx 6 1001 1001 4096 Oct 26 14:26 node24
+2026-11-26T07:14:50.1629759Z drwxrwxrwx 3 1001 1001 4096 Oct 26 14:26 node24_alpine
+2026-11-26T07:14:50.1642481Z /__e/node20_alpine/bin:
+2026-11-26T07:14:50.1643021Z node
+2026-11-26T07:14:50.1643256Z 
+2026-11-26T07:14:50.1643469Z /__e/node20/bin:
+2026-11-26T07:14:50.1643942Z corepack
+2026-11-26T07:14:50.1644354Z node
+2026-11-26T07:14:50.1644762Z npm
+2026-11-26T07:14:50.1645131Z npx
+2026-11-26T07:14:50.1645370Z 
+2026-11-26T07:14:50.1645567Z /__e/node24_alpine/bin:
+2026-11-26T07:14:50.1646300Z node
+2026-11-26T07:14:50.1646603Z 
+2026-11-26T07:14:50.1646781Z /__e/node24/bin:
+2026-11-26T07:14:50.1647109Z corepack
+2026-11-26T07:14:50.1647353Z node
+2026-11-26T07:14:50.1647588Z npm
+2026-11-26T07:14:50.1647883Z npx
+2026-11-26T07:14:50.2264321Z /__e/node20_alpine/bin/node -> /__w/_temp/ee09bc81-8bfe-4792-9187-2c10fcb79aa9.sh: /__e/node20_alpine/bin/node: /lib/ld-musl-x86_64.so.1: bad ELF interpreter: No such file or directory
+2026-11-26T07:14:50.3302800Z /__e/node20/bin/node -> /__e/node20/bin/node: /lib64/libm.so.6: version `GLIBC_2.27' not found (required by /__e/node20/bin/node)
+2026-11-26T07:14:50.3304516Z /__e/node20/bin/node: /lib64/libstdc++.so.6: version `GLIBCXX_3.4.20' not found (required by /__e/node20/bin/node)
+2026-11-26T07:14:50.3306471Z /__e/node20/bin/node: /lib64/libstdc++.so.6: version `CXXABI_1.3.9' not found (required by /__e/node20/bin/node)
+2026-11-26T07:14:50.3479793Z /__e/node24_alpine/bin/node -> /__w/_temp/ee09bc81-8bfe-4792-9187-2c10fcb79aa9.sh: /__e/node24_alpine/bin/node: /lib/ld-musl-x86_64.so.1: bad ELF interpreter: No such file or directory
+2026-11-26T07:14:50.3522502Z /__e/node24/bin/node -> /__e/node24/bin/node: /lib64/libstdc++.so.6: version `CXXABI_1.3.11' not found (required by /__e/node24/bin/node)
+2026-11-26T07:14:50.3524740Z /__e/node24/bin/node: /lib64/libstdc++.so.6: version `CXXABI_1.3.8' not found (required by /__e/node24/bin/node)
+2026-11-26T07:14:50.3526140Z /__e/node24/bin/node: /lib64/libstdc++.so.6: version `GLIBCXX_3.4.20' not found (required by /__e/node24/bin/node)
+2026-11-26T07:14:50.3819760Z ##[group]Run actions/checkout@v6
+2026-11-26T07:14:50.3820117Z with:
+2026-11-26T07:14:50.3820410Z   repository: airsstack/airsl
+2026-11-26T07:14:50.3824266Z   token: ***
+2026-11-26T07:14:50.3824489Z   ssh-strict: true
+2026-11-26T07:14:50.3824712Z   ssh-user: git
+2026-11-26T07:14:50.3824934Z   persist-credentials: true
+2026-11-26T07:14:50.3825186Z   clean: true
+2026-11-26T07:14:50.3825412Z   sparse-checkout-cone-mode: true
+2026-11-26T07:14:50.3825689Z   fetch-depth: 1
+2026-11-26T07:14:50.3825911Z   fetch-tags: false
+2026-11-26T07:14:50.3826143Z   show-progress: true
+2026-11-26T07:14:50.3826371Z   lfs: false
+2026-11-26T07:14:50.3826576Z   submodules: false
+2026-11-26T07:14:50.3826801Z   set-safe-directory: true
+2026-11-26T07:14:50.3827069Z   allow-unsafe-pr-checkout: false
+2026-11-26T07:14:50.3827347Z ##[endgroup]
+2026-11-26T07:14:50.3875602Z ##[command]/usr/bin/docker exec  ff49956448a9dfdbbf5564aa1b84df3da9ddaac1d4d6013c2b77e078c7379a7b sh -c "cat /etc/*release | grep ^ID"
+2026-11-26T07:14:50.4961223Z /__e/node24/bin/node: /lib64/libstdc++.so.6: version `CXXABI_1.3.11' not found (required by /__e/node24/bin/node)
+2026-11-26T07:14:50.4962788Z /__e/node24/bin/node: /lib64/libstdc++.so.6: version `CXXABI_1.3.8' not found (required by /__e/node24/bin/node)
+2026-11-26T07:14:50.4964367Z /__e/node24/bin/node: /lib64/libstdc++.so.6: version `GLIBCXX_3.4.20' not found (required by /__e/node24/bin/node)
+2026-11-26T07:14:50.4965531Z /__e/node24/bin/node: /lib64/libstdc++.so.6: version `GLIBCXX_3.4.21' not found (required by /__e/node24/bin/node)
+2026-11-26T07:14:50.4967123Z /__e/node24/bin/node: /lib64/libstdc++.so.6: version `CXXABI_1.3.9' not found (required by /__e/node24/bin/node)
+2026-11-26T07:14:50.4968843Z /__e/node24/bin/node: /lib64/libm.so.6: version `GLIBC_2.27' not found (required by /__e/node24/bin/node)
+2026-11-26T07:14:50.4970100Z /__e/node24/bin/node: /lib64/libm.so.6: version `GLIBC_2.23' not found (required by /__e/node24/bin/node)
+2026-11-26T07:14:50.4971288Z /__e/node24/bin/node: /lib64/libc.so.6: version `GLIBC_2.27' not found (required by /__e/node24/bin/node)
+2026-11-26T07:14:50.4973193Z /__e/node24/bin/node: /lib64/libc.so.6: version `GLIBC_2.28' not found (required by /__e/node24/bin/node)
+2026-11-26T07:14:50.4974331Z /__e/node24/bin/node: /lib64/libc.so.6: version `GLIBC_2.25' not found (required by /__e/node24/bin/node)
+2026-11-26T07:14:50.5034685Z ##[group]Run echo "checkout outcome=failure conclusion=success"; ls -la
+2026-11-26T07:14:50.5035291Z [36;1mecho "checkout outcome=failure conclusion=success"; ls -la[0m
+2026-11-26T07:14:50.5035834Z shell: bash --noprofile --norc {0}
+2026-11-26T07:14:50.5036138Z ##[endgroup]
+2026-11-26T07:14:50.5590364Z checkout outcome=failure conclusion=success
+2026-11-26T07:14:50.5612949Z total 8
+2026-11-26T07:14:50.5613393Z drwxr-xr-x 2 1001 1001 4096 Nov 26 07:14 .
+2026-11-26T07:14:50.5613862Z drwxr-xr-x 3 1001 1001 4096 Nov 26 07:14 ..
+2026-11-26T07:14:50.5800473Z Post job cleanup.
+2026-11-26T07:14:50.5809456Z ##[command]/usr/bin/docker exec  ff49956448a9dfdbbf5564aa1b84df3da9ddaac1d4d6013c2b77e078c7379a7b sh -c "cat /etc/*release | grep ^ID"
+2026-11-26T07:14:50.6868843Z /__e/node24/bin/node: /lib64/libstdc++.so.6: version `CXXABI_1.3.11' not found (required by /__e/node24/bin/node)
+2026-11-26T07:14:50.6870943Z /__e/node24/bin/node: /lib64/libstdc++.so.6: version `CXXABI_1.3.8' not found (required by /__e/node24/bin/node)
+2026-11-26T07:14:50.6873040Z /__e/node24/bin/node: /lib64/libstdc++.so.6: version `GLIBCXX_3.4.20' not found (required by /__e/node24/bin/node)
+2026-11-26T07:14:50.6874616Z /__e/node24/bin/node: /lib64/libstdc++.so.6: version `GLIBCXX_3.4.21' not found (required by /__e/node24/bin/node)
+2026-11-26T07:14:50.6875966Z /__e/node24/bin/node: /lib64/libstdc++.so.6: version `CXXABI_1.3.9' not found (required by /__e/node24/bin/node)
+2026-11-26T07:14:50.6877287Z /__e/node24/bin/node: /lib64/libm.so.6: version `GLIBC_2.27' not found (required by /__e/node24/bin/node)
+2026-11-26T07:14:50.6878229Z /__e/node24/bin/node: /lib64/libm.so.6: version `GLIBC_2.23' not found (required by /__e/node24/bin/node)
+2026-11-26T07:14:50.6880281Z /__e/node24/bin/node: /lib64/libc.so.6: version `GLIBC_2.27' not found (required by /__e/node24/bin/node)
+2026-11-26T07:14:50.6881383Z /__e/node24/bin/node: /lib64/libc.so.6: version `GLIBC_2.28' not found (required by /__e/node24/bin/node)
+2026-11-26T07:14:50.6882479Z /__e/node24/bin/node: /lib64/libc.so.6: version `GLIBC_2.25' not found (required by /__e/node24/bin/node)
+2026-11-26T07:14:50.6927950Z Stop and remove container: 68b1e78446f24fb5ab7c75b648871ed6_quayiopypamanylinux2014_x86_64_6c8806
+2026-11-26T07:14:50.6932938Z ##[command]/usr/bin/docker rm --force ff49956448a9dfdbbf5564aa1b84df3da9ddaac1d4d6013c2b77e078c7379a7b
+2026-11-26T07:14:50.8005092Z ff49956448a9dfdbbf5564aa1b84df3da9ddaac1d4d6013c2b77e078c7379a7b
+2026-11-26T07:14:50.8038010Z Remove container network: github_network_8330d460089843d59135e9140081f516
+2026-11-26T07:14:50.8042843Z ##[command]/usr/bin/docker network rm github_network_8330d460089843d59135e9140081f516
+2026-11-26T07:14:50.8712067Z github_network_8330d460089843d59135e9140081f516
+2026-11-26T07:14:50.8794379Z Cleaning up orphan processes

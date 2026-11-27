@@ -1,0 +1,132 @@
+# 41 luarocks 3.12.2 client: what 'luarocks upload' sends, flags, API key
+Question: C1 (upload client). Source: github.com/luarocks/luarocks tag v3.12.2
+Commands: curl -sS -L https://raw.githubusercontent.com/luarocks/luarocks/v3.12.2/src/luarocks/{cmd/upload.lua,upload/api.lua,upload/multipart.lua,core/cfg.lua} -o 41-luarocks-upload/<basename>
+Date: 2026-11-26. Quotes are grep -n of the kept copies.
+
+--- upload.lua (cmd/upload.lua): args, flags
+28:function upload.add_to_parser(parser)
+29:   local cmd = parser:command("upload", "Pack a source rock file (.src.rock extension) " ..
+30:   "and upload it and the rockspec to the public rocks repository.", util.see_also()):
+31:   summary("Upload a rockspec to the public rocks repository.")
+32:
+33:   cmd:argument("rockspec", "Rockspec for the rock to upload.")
+34:   cmd:argument("src_rock", "A corresponding .src.rock file; if not given it will be generated."):
+35:   args("?")
+36:
+37:   cmd:flag("--skip-pack", "Do not pack and send source rock.")
+38:   cmd:option("--api-key", "Pass an API key. It will be stored for subsequent uses."):
+39:   argname("<key>")
+40:   cmd:option("--temp-key", "Use the given a temporary API key in this " ..
+41:   "invocation only. It will not be stored."):
+42:   argname("<key>")
+43:   cmd:flag("--force", "Replace existing rockspec if the same revision of a " ..
+44:   "module already exists. This should be used only in case of upload " ..
+45:   "mistakes: when updating a rockspec, increment the revision number " ..
+46:   "instead.")
+47:   cmd:flag("--sign", "Upload a signature file alongside each file as well.")
+48:   cmd:flag("--debug"):hidden(true)
+49:end
+--- upload.lua: check_rockspec, duplicate refusal (client-side), what is sent
+73:   res, err = api:method("check_rockspec", {
+74:      package = rockspec.package,
+75:      version = rockspec.version,
+76:   })
+77:   if not res then return nil, err end
+78:
+79:   if not res.module then
+80:      util.printout("Will create new module (" .. tostring(rockspec.package) .. ")")
+81:   end
+82:   if res.version and not args.force then
+83:      return nil, "Revision " .. rockspec.version .. " already exists on the server. " .. util.see_help("upload")
+84:   end
+97:   local rock_fname
+98:   if args.src_rock then
+99:      rock_fname = args.src_rock
+100:   elseif not args.skip_pack and not is_dev_version(rockspec.version) then
+101:      util.printout("Packing " .. tostring(rockspec.package))
+102:      rock_fname, err = pack.pack_source_rock(args.rockspec)
+103:      if not rock_fname then
+104:         return nil, err
+105:      end
+106:   end
+118:   res, err = api:method("upload", nil, {
+119:      rockspec_file = multipart.new_file(args.rockspec),
+120:      rockspec_sig = sigfname and multipart.new_file(sigfname),
+121:   })
+122:   if not res then return nil, err end
+123:
+124:   if res.is_new and #res.manifests == 0 then
+125:      util.printerr("Warning: module not added to root manifest due to name taken.")
+126:   end
+127:
+128:   local module_url = res.module_url
+129:
+130:   if rock_fname then
+131:      if (not res.version) or (not res.version.id) then
+132:         return nil, "Invalid response from server."
+133:      end
+134:      util.printout(("Sending " .. tostring(rock_fname) .. " ..."))
+135:      local id = math.tointeger(res.version.id)
+136:      res, err = api:method("upload_rock/" .. ("%d"):format(id), nil, {
+137:         rock_file = multipart.new_file(rock_fname),
+138:         rock_sig = rock_sigfname and multipart.new_file(rock_sigfname),
+139:      })
+140:      if not res then return nil, err end
+141:   end
+NOTE: one invocation sends the rockspec plus AT MOST ONE rock (the positional src_rock or a packed .src.rock); no binary-rock loop. A second invocation for the same version is refused by the client unless --force (which re-posts the rockspec: server bumps revision, see 40 uploaders.moon:140-146).
+--- api.lua (upload/api.lua): where the key comes from
+38:local function upload_config_file()
+39:   if not cfg.config_files.user.file then
+40:      return nil
+41:   end
+42:   return (cfg.config_files.user.file:gsub("[\\/][^\\/]+$", dir_sep .. "upload_config.lua"))
+43:end
+44:
+45:function api.Api:load_config()
+46:   local upload_conf = upload_config_file()
+47:   if not upload_conf then return nil end
+48:   local config = persist.load_into_table(upload_conf)
+49:   return config
+50:end
+62:   local upload_conf = upload_config_file()
+63:   if not upload_conf then return nil end
+64:   local ok, errmake = fs.make_dir(dir.dir_name(upload_conf))
+65:   if not ok then
+66:      return nil, errmake
+67:   end
+68:   persist.save_from_table(upload_conf, self.config)
+69:   fs.set_permissions(upload_conf, "read", "user")
+112:function api.Api:raw_method(path, ...)
+113:   self:check_version()
+114:   local url = tostring(self.config.server) .. "/api/" .. tostring(cfg.upload.api_version) .. "/" .. tostring(self.config.key) .. "/" .. path
+115:   return self:request(url, ...)
+278:function api.new(args)
+279:   local self = {}
+280:   setmetatable(self, { __index = Api })
+281:   self.config = self:load_config() or {}
+282:   self.config.server = args.server or self.config.server or cfg.upload.server
+283:   self.config.version = self.config.version or cfg.upload.version
+284:   self.config.key = args.temp_key or args.api_key or self.config.key
+285:   self.debug = args.debug
+286:   if not self.config.key then
+287:      return nil, "You need an API key to upload rocks.\n" ..
+288:      "Navigate to " .. self.config.server .. "/settings to get a key\n" ..
+289:      "and then pass it through the --api-key=<key> flag."
+290:   end
+291:   if args.api_key then
+292:      local ok, err = self:save_config()
+293:      if not ok then
+294:         return nil, err
+295:      end
+296:   end
+297:   return self
+298:end
+--- cfg.lua (core/cfg.lua): upload defaults
+212:      upload = {
+213:         server = "https://luarocks.org",
+214:         tool_version = "1.0.0",
+215:         api_version = "1",
+216:      },
+--- TFA support in the 3.12.2 client
+$ grep -n -i 'tfa\|two.factor' upload.lua api.lua multipart.lua; echo exit=$?
+exit=1

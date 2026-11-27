@@ -1,0 +1,5 @@
+# Probe Y toy: a virtual workspace so the rockspecs' `--package airsl-lua` resolves as in the real repo.
+[workspace]
+resolver = "3"
+members = ["crates/airsl-lua"]
+exclude = ["ci/cmdprobe"]

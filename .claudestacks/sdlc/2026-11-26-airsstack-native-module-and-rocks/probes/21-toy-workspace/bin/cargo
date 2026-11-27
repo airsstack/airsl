@@ -1,0 +1,3 @@
+#!/bin/sh
+echo "CARGO-WRAPPER cwd=$(pwd) args=$*" >&2
+exec /Users/hiraq/.cargo/bin/cargo "$@"

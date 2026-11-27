@@ -1,0 +1,20 @@
+
+name: "Install LuaRocks"
+description: "Download, build, and install LuaRocks for use with scripts, tests, and more"
+
+branding:
+  icon: 'moon'
+  color: 'blue'
+
+inputs:
+  luaRocksVersion:
+    description: "The version of LuaRocks to install, must be available on https://luarocks.github.io/luarocks/releases/"
+    required: false
+    default: "3.13.0"
+  withLuaPath:
+    description: "Directly specify existing version of Lua to use (as ./configure --with-lua)"
+    required: false
+
+runs:
+  using: 'node24'
+  main: 'main.js'

@@ -1,0 +1,54 @@
+# Probe 234 — the publish job's two jq tests over /upload answers shaped as api.moon:290 builds them
+question: review findings 1 and 12 (spec §5.6.4): does `jq -e '.manifests | any(.name == "root")'` pass only when the module is in the
+  root manifest (fail for an empty list on a first upload and on a re-run, and for a non-root manifest), and does
+  `jq -e '.version.id | numbers'` pass only for an integer id; what do both do with a non-JSON body?
+inputs: hand-written answers with the fields of api.moon:290 `{ :module, :version, :module_url, :manifests, :is_new }` (shape from
+  probes/189 and 231; no request was sent to luarocks.org). The files are in 234-publish-jq-checks/.
+versions: jq-1.7.1-apple (macOS 26.3.1). The ubuntu-26.04 runner has jq 1.8.1 (probes/47-ci-lua-tooling/runner-images/Ubuntu2604-Readme.md:78);
+  that version was not run.
+date: 2026-11-26
+--- raw output ---
+$ jq --version
+jq-1.7.1-apple
+$ cat in-root.json
+{"module":{"id":7,"name":"airsstack"},"version":{"id":42,"version_name":"0.3.0-1"},"module_url":"u","manifests":[{"id":1,"name":"root"}],"is_new":true}
+$ cat taken-first.json
+{"module":{"id":7},"version":{"id":42},"module_url":"u","manifests":[],"is_new":true}
+$ cat taken-rerun.json
+{"module":{"id":7},"version":{"id":43},"module_url":"u","manifests":[],"is_new":false}
+$ cat other-manifest.json
+{"module":{"id":7},"version":{"id":43},"module_url":"u","manifests":[{"id":9,"name":"some-sub"}],"is_new":false}
+$ cat id-string.json
+{"module":{"id":7},"version":{"id":"43"},"manifests":[{"name":"root"}],"is_new":false}
+$ cat no-version.json
+{"module":{"id":7},"manifests":[{"name":"root"}],"is_new":false}
+$ cat html.txt
+<!DOCTYPE HTML><html>
+$ jq -e '.manifests | any(.name == "root")' in-root.json
+true
+[exit 0]
+$ jq -e '.manifests | any(.name == "root")' taken-first.json
+false
+[exit 1]
+$ jq -e '.manifests | any(.name == "root")' taken-rerun.json
+false
+[exit 1]
+$ jq -e '.manifests | any(.name == "root")' other-manifest.json
+false
+[exit 1]
+$ jq -e '.manifests | any(.name == "root")' no-version.json
+true
+[exit 0]
+$ jq -e '.manifests | any(.name == "root")' html.txt
+jq: parse error: Invalid numeric literal at line 1, column 10
+[exit 5]
+$ jq -e '.version.id | numbers' in-root.json
+42
+[exit 0]
+$ jq -e '.version.id | numbers' id-string.json
+[exit 4]
+$ jq -e '.version.id | numbers' no-version.json
+[exit 4]
+$ jq -e '.version.id | numbers' html.txt
+jq: parse error: Invalid numeric literal at line 1, column 10
+[exit 5]

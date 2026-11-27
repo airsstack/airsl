@@ -5,7 +5,7 @@ airsl run    [OPTIONS] <script.lua> [args…]
 airsl test   [OPTIONS] [<path>]
 airsl check  [<path>]
 airsl doctor [--policy <preset>] [GRANTS]
-airsl lua setup  [<DIR>]
+airsl lua setup  [--native [--lua 5.4|luajit]] [<DIR>]
 airsl ext doctor <DIR>         [GRANTS] [LIMITS] [--event NAME] [--var NAME=VALUE]
 airsl ext fire   <DIR> <EVENT> [GRANTS] [LIMITS] [--event NAME] [--var NAME=VALUE]
 ```
@@ -17,7 +17,7 @@ airsl ext fire   <DIR> <EVENT> [GRANTS] [LIMITS] [--event NAME] [--var NAME=VALU
 | `run` | runs one script; everything after the script's path goes to `arg` |
 | `test` | runs every `*_test.lua` and `test_*.lua` under a folder; finding none is a failure |
 | `check` | compiles every `.lua` under a folder without running any; finding none is a failure |
-| `lua setup` | writes a description of the built-in modules into a project and adds it to the language server's settings file, so your editor completes `airsstack` calls; see [Editor Support](ch01-04-editor-support.md) |
+| `lua setup` | writes a description of the built-in modules into a project and adds it to the language server's settings file, so your editor completes `airsstack` calls; see [Editor Support](ch01-04-editor-support.md). `--native` also installs the native module with LuaRocks, for running scripts in stock Lua; see [Running Scripts in Stock Lua](ch01-05-stock-lua.md) |
 | `doctor` | prints the policy a script would get from the preset and grant flags you give it |
 | `ext doctor` | prints what a host would grant, reduce and deny for an extension, without running it |
 | `ext fire` | loads an extension and fires one event; payload on stdin, result on stdout as JSON |
@@ -68,7 +68,7 @@ every kind of host access.
 | `run` | the script finished | the script failed or hit a limit; with `--fail-open`, always `0` |
 | `test` | every test passed | a test failed, or no test files were found |
 | `check` | every file compiled | a file failed to compile, or no `.lua` files were found |
-| `lua setup` | both files are set up or already were | any error; nothing is written when a check fails |
+| `lua setup` | both files are set up or already were | any error, including a LuaRocks failure with `--native`; nothing is written when a check fails, and an install that fails leaves the type file and the settings entry written |
 | `ext doctor` | any decision, including deny | the manifest or the ceiling is invalid |
 | `ext fire` | the event was fired and a result (or `null`) printed | any error |
 

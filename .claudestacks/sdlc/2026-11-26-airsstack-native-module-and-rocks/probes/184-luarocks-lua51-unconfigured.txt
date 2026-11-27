@@ -1,0 +1,73 @@
+# Probe 184 — `luarocks --lua-version 5.1` with no Lua 5.1 configured (Homebrew default config)
+Question (P4): `--lua-version 5.1 config lua_version` and `install --local airsstack-luajit <v>` when only the Homebrew
+config-5.4.lua exists — (a) with LuaJIT on PATH (Homebrew luajit in /opt/homebrew/bin), (b) with no 5.1-capable Lua on PATH.
+PUC Lua 5.1 only: not probed (no PUC 5.1 is installed here, and installing global software is out of bounds).
+Versions: luarocks 3.12.2 (/opt/homebrew/bin/luarocks, absolute shebang /opt/homebrew/opt/lua/bin/lua5.4, so PATH does not
+affect which Lua runs luarocks itself); system config /opt/homebrew/etc/luarocks/config-5.4.lua only (no config-5.1.lua);
+LuaJIT 2.1.1770848219 (/opt/homebrew/bin/luajit); Lua 5.4.8; macOS 26.3.1 arm64.
+Setup: HOME=S/probes-M/home-p4 (fresh, no user config). server3 = airsstack-luajit-0.0.1-1.rockspec (saved in
+184-luarocks-lua51-unconfigured/; probe 146's luajit rockspec with version 0.0.1-1, source git+file://S/probes-M/toy which is not a
+git repo) + airsstack-0.0.2-1 rock+rockspec (dependencies lua == 5.4), `luarocks-admin make_manifest`.
+S=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad
+Source (luarocks 3.12.2, /opt/homebrew/Cellar/luarocks/3.12.2/share/lua/5.4/luarocks/):
+ cmd.lua:222-242 search_lua walks PATH and returns "Could not find Lua <v> in PATH.";
+ cmd.lua:756-766 `if not cfg.variables["LUA"] and args.command ~= "config" and args.command ~= "help" then die(...)` —
+   `config` is exempt, so `config lua_version` succeeds (prints the requested version) even when no interpreter exists;
+ util.lua:481-483 for luaver "5.1" the candidate names include "luajit" (why (a) finds /opt/homebrew/bin/luajit);
+ search.lua:242 + :287 the "No results matching query were found for Lua 5.1." / --check-lua-versions text.
+Each `$ ...` line is followed by its combined stdout+stderr and `[exit N]`; cwd S/probes-M.
+Date: 2026-11-26T07:17Z
+
+== (a) default Homebrew config, PATH unchanged (luajit and lua5.4 in /opt/homebrew/bin on PATH)
+$ luarocks --lua-version 5.1 config lua_version
+5.1
+[exit 0]
+
+$ luarocks --lua-version 5.1 config variables.LUA
+/opt/homebrew/bin/luajit
+[exit 0]
+
+$ luarocks --lua-version 5.1 config variables.LUA_INCDIR
+/opt/homebrew/include/luajit-2.1
+[exit 0]
+
+$ luarocks --lua-version 5.1 install --local --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server3 airsstack-luajit 0.0.1
+Installing /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server3/airsstack-luajit-0.0.1-1.rockspec
+fatal: repository '/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/toy' does not exist
+
+Error: Failed cloning git repository.
+[exit 1]
+
+$ luarocks --lua-version 5.1 install --local --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server3 airsstack 0.0.2
+
+Error: No results matching query were found for Lua 5.1.
+To check if it is available for other Lua versions, use --check-lua-versions.
+[exit 1]
+
+== (b) PATH=S/probes-M/bin-nolj:/usr/bin:/bin (bin-nolj holds only a luarocks symlink; no lua5.1/luajit/lua on PATH)
+$ luarocks --lua-version 5.1 config lua_version
+5.1
+[exit 0]
+
+$ luarocks --lua-version 5.1 config variables.LUA
+
+Error: Unknown entry LUA
+[exit 1]
+
+$ luarocks --lua-version 5.1 install --local --only-server=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-M/server3 airsstack-luajit 0.0.1
+
+Error: Could not find Lua 5.1 in PATH.
+Please set your Lua interpreter with:
+
+   luarocks --lua-version=5.1 --local config variables.LUA </path/lua>
+
+[exit 1]
+
+$ luarocks config lua_version
+5.4
+[exit 0]
+
+$ luarocks --lua-version 5.4 config lua_version
+5.4
+[exit 0]
+

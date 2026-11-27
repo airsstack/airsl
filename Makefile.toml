@@ -8,17 +8,21 @@
 #   cargo make book       # serve the book locally with live reload
 #   cargo make --list-all-steps
 #
-# The five gate steps are the canonical command set for this repository: fmt, clippy,
-# rustdoc, tests, doctests, every one of them warnings-as-errors. CI runs
-# `cargo make dod`, so the pipeline and a local run are the same command.
+# The five gate steps keep the names and the order of the guideline's canonical set: fmt,
+# clippy, rustdoc, tests, doctests, every one of them warnings-as-errors. A step can run more
+# than one cargo command, because the native module is built once per Lua ABI, and `test` also
+# loads that module into a real Lua 5.4 and a real LuaJIT, so `dod` needs `lua5.4` and `luajit`
+# on PATH (or `AIRSL_LUA54` and `AIRSL_LUAJIT` pointing at them). CI runs `cargo make dod`, so
+# the pipeline and a local run are the same command.
 #
 # Install: cargo install --locked cargo-make
 #
 
 [config]
-# Every gate command already carries `--workspace`, so the task must run exactly
-# once from the workspace root. Without this, cargo-make re-runs each task once
-# per member crate — redundant full-workspace builds.
+# Every gate command selects its packages itself (`--workspace`, or `-p`, or a bare command
+# that resolves `default-members`), so the task must run exactly once from the workspace
+# root. Without this, cargo-make re-runs each task once per member crate — redundant
+# full-workspace builds.
 default_to_workspace = false
 # No implicit task graph. The gate is only what is written below, and a
 # built-in `build`/`test`/`ci-flow` inherited from cargo-make's core set would
@@ -29,9 +33,10 @@ min_version = "0.37.0"
 [env]
 CARGO_TERM_COLOR = "always"
 
-# `--all-features` below is carried for forward-safety: neither crate in this
-# workspace declares Cargo `[features]`, so today it equals the default build.
-# It stays in every command so the gate stays correct the day a feature is added.
+# No command below passes `--all-features`: `airsl` forwards mlua's mutually
+# exclusive Lua features (`lua54`, `luajit`), so an all-features build is a
+# compile error by construction. Coverage is the default build plus the per-ABI
+# runs of the native module.
 
 # ---------------------------------------------------------------------------
 # The gate
@@ -57,45 +62,223 @@ description = "Lint every target, warnings are errors"
 # `--all-targets` covers tests, examples and benches — a lint living only in
 # test code passes silently without it. `-D warnings` also promotes plain rustc
 # warnings, which is why the gate has no separate `cargo build` step.
-command = "cargo"
-args = [
-  "clippy",
-  "--workspace",
-  "--all-targets",
-  "--all-features",
-  "--",
-  "-D",
-  "warnings",
-]
+#
+# Three commands, because the native module cannot share a build with the rest:
+# its `module` feature excludes `vendored` and `send`, and a `--workspace` build
+# unifies features across members. The workspace run leaves `airsl-lua` out, and
+# it is then linted once per Lua ABI. Those two runs also lint `airsl` in module
+# mode, which no other command builds.
+script_runner = "@duckscript"
+script = '''
+exec --fail-on-error cargo clippy --workspace --exclude airsl-lua --all-targets -- -D warnings
+exec --fail-on-error cargo clippy -p airsl-lua --features lua54 --all-targets -- -D warnings
+exec --fail-on-error cargo clippy -p airsl-lua --features luajit --all-targets -- -D warnings
+'''
 
 [tasks.doc]
 category = "Gate"
 description = "Build rustdoc with warnings promoted to errors"
 # Plain `cargo doc` prints rustdoc warnings and still exits 0; RUSTDOCFLAGS is
-# the only thing that makes this step a gate rather than a report.
-command = "cargo"
-args = ["doc", "--workspace", "--all-features", "--no-deps"]
-
-[tasks.doc.env]
-RUSTDOCFLAGS = "-D warnings"
+# the only thing that makes this step a gate rather than a report. The native
+# module is documented once per Lua ABI for the reason `clippy` lints it that way.
+script_runner = "@duckscript"
+script = '''
+set_env RUSTDOCFLAGS "-D warnings"
+exec --fail-on-error cargo doc --workspace --exclude airsl-lua --no-deps
+exec --fail-on-error cargo doc -p airsl-lua --no-deps --features lua54
+exec --fail-on-error cargo doc -p airsl-lua --no-deps --features luajit
+unset_env RUSTDOCFLAGS
+'''
 
 [tasks.test]
 category = "Gate"
-description = "Unit, integration, example and bench targets, plus the prose guards in docs-check"
+description = "Unit, integration, example and bench targets, the prose guards in docs-check, and the native module loaded into real interpreters, with its refusals checked"
+dependencies = ["test-cargo", "native-load", "native-refusals"]
+
+[tasks.test-cargo]
+category = "Gate"
+description = "The cargo test run behind the test step"
 # The shipped prose is checked here rather than in a task of its own: the guards are ordinary
 # tests in `crates/docs-check`, so this one command carries them on every OS in the CI matrix,
-# with no shell script to port and no sixth gate step to keep in sync with the guideline's five.
-# They read the whole repository, not one crate, so `dod-crate airsl` and `dod-crate airsl-cli`
-# do not run them; `dod` and `dod-crate docs-check` do. What they assert is listed in that crate's
+# with no shell script to port and no sixth gate step to keep in sync with the five. The guards
+# read the whole repository, not one crate, so `dod-crate airsl` and `dod-crate airsl-cli` do not
+# run them; `dod` and `dod-crate docs-check` do. What they assert is listed in that crate's
 # module docs and in CLAUDE.md.
-command = "cargo"
-args = ["test", "--workspace", "--all-targets", "--all-features"]
+#
+# The `test` step is this command plus `native-load` and `native-refusals`, which are what test
+# the native module: a module-mode build cannot link a Rust test, so the module is loaded into
+# real interpreters instead. The five step names and their order stay, a step can run more than
+# one command, and `dod` needs `lua5.4` and `luajit` (or `AIRSL_LUA54` and `AIRSL_LUAJIT`)
+# because of it.
+#
+# `airsl-lua` is left out of the workspace run for the reason `clippy` gives. The second command is
+# a bare `cargo test --all-targets --no-run`, which selects the workspace's `default-members`
+# instead and compiles nothing the first did not already build. It is here because the bare form
+# is what a contributor runs, and a `default-members` that went back to including `airsl-lua`
+# would break that command while this step stayed green; with it, that line fails the step.
+script_runner = "@duckscript"
+script = '''
+exec --fail-on-error cargo test --workspace --exclude airsl-lua --all-targets
+exec --fail-on-error cargo test --all-targets --no-run
+'''
 
 [tasks.test-doc]
 category = "Gate"
 description = "Doctests — excluded by --all-targets, so they need their own run"
 command = "cargo"
-args = ["test", "--workspace", "--all-features", "--doc"]
+args = ["test", "--workspace", "--exclude", "airsl-lua", "--doc"]
+
+# ---------------------------------------------------------------------------
+# Native module
+# ---------------------------------------------------------------------------
+
+[tasks.native-load]
+category = "Gate"
+description = "Build the native module per Lua ABI and load it into a real Lua 5.4 and LuaJIT"
+# The native module has no Rust tests, because a module-mode build cannot link a test that
+# touches Lua. `crates/airsl-lua/lua/check.lua` is its test: it loads the library into the
+# interpreter and asserts what the module promises. A missing interpreter fails the task and
+# never skips it, so a green `dod` always means both ABIs loaded.
+#
+# `--target-dir target/native-build` is explicit so the library's path does not depend on
+# `CARGO_TARGET_DIR` or `build.target-dir`, at the cost of a second target tree for the module
+# builds. A set `build.target` (or `CARGO_BUILD_TARGET`) still moves it to
+# `native-build/<triple>/debug`, and the copy below then fails with "Path does not exist". Each
+# ABI's library is copied to `target/native/<abi>/airsstack.so` (`.dll` on Windows), the file
+# name a Lua `package.cpath` entry looks for.
+script_runner = "@duckscript"
+script = '''
+# `${1}` is the variable naming the interpreter, `${2}` its default program and `${3}` what to
+# call it in the message. `which` answers empty for a bare name and for a path alike when nothing
+# runs, which is what "missing" means here. Returns the program as typed.
+function find_interpreter
+    program = get_env ${1}
+    if is_empty ${program}
+        program = set ${2}
+    end
+    found = which ${program}
+    if is_empty ${found}
+        echo "native-load: `${program}` was not found; install ${3} or set ${1} to its interpreter"
+        exit 1
+    end
+    return ${program}
+end
+
+# `${1}` is the ABI and `${2}` the interpreter that loads what was built.
+function native_load
+    abi = set ${1}
+    program = set ${2}
+    exec --fail-on-error cargo build -p airsl-lua --features ${abi} --target-dir target/native-build
+    target_os = get_env CARGO_MAKE_RUST_TARGET_OS
+    if eq ${target_os} windows
+        built = set target/native-build/debug/airsstack.dll
+        installed = set target/native/${abi}/airsstack.dll
+    else
+        if eq ${target_os} macos
+            built = set target/native-build/debug/libairsstack.dylib
+        else
+            built = set target/native-build/debug/libairsstack.so
+        end
+        installed = set target/native/${abi}/airsstack.so
+    end
+    mkdir target/native/${abi}
+    cp ${built} ${installed}
+    exec --fail-on-error ${program} crates/airsl-lua/lua/check.lua target/native/${abi} ${abi}
+end
+
+# Both interpreters are looked up before either build, so a missing one is reported at once and
+# not after the first ABI's compile.
+lua54 = find_interpreter AIRSL_LUA54 lua5.4 "Lua 5.4"
+luajit = find_interpreter AIRSL_LUAJIT luajit LuaJIT
+native_load lua54 ${lua54}
+native_load luajit ${luajit}
+'''
+
+[tasks.native-refusals]
+category = "Gate"
+description = "Assert that native-load and check.lua refuse a missing or mismatched interpreter instead of passing"
+# `native-load` and `check.lua` each promise to fail, never to skip, when the interpreter is
+# missing or is not the one the ABI argument names, and a green `dod` only means something if
+# that promise holds. A refusal that went back to a pass would leave every other step green, so
+# this task provokes each one and requires both a non-zero exit and the message. Both
+# interpreters must already exist, which is true after `native-load`: inside `test` and
+# `dod-crate airsl-lua` this task runs after it, and run alone it assumes the same. It builds
+# nothing: every refusal here comes before any cargo command, and a refusal that built first
+# fails the check that no cargo output appears.
+#
+# The nested `cargo make` takes the missing interpreter through `--env`, which holds for that run
+# alone: a `set_env` here would stay set for the `native-load` that runs in this same process.
+script_runner = "@duckscript"
+script = '''
+# `${1}` is what was run, `${2}` its exit code and `${3}` everything it printed. A zero exit and
+# any cargo output both fail, the first because the run did not refuse, the second because it
+# refused only after building.
+function expect_refused_before_building
+    if eq ${2} 0
+        trigger_error "native-refusals: ${1} exited 0, but it must refuse"
+    end
+    built = contains ${3} Finished
+    compiled = contains ${3} Compiling
+    if ${built} or ${compiled}
+        echo ${3}
+        trigger_error "native-refusals: ${1} ran cargo before refusing"
+    end
+end
+
+# `${1}` is what was run, `${2}` its exit code, `${3}` everything it printed and `${4}` the text
+# it must contain.
+function expect_message
+    expect_refused_before_building ${1} ${2} ${3}
+    found = contains ${3} ${4}
+    if not ${found}
+        echo ${3}
+        trigger_error "native-refusals: ${1} did not print: ${4}"
+    end
+end
+
+# `${1}` is the variable naming the interpreter and `${2}` what to call it in the message. The
+# nested run is pointed at a program that does not exist.
+function expect_missing_interpreter
+    program = concat airsl-no-such- ${1}
+    out = exec cargo make --env ${1}=${program} native-load
+    message = concat "native-load: `" ${program} "` was not found; install " ${2}
+    message = concat ${message} " or set " ${1} " to its interpreter"
+    expect_message "native-load without ${2}" ${out.code} "${out.stdout}${out.stderr}" ${message}
+end
+
+lua54 = get_env AIRSL_LUA54
+if is_empty ${lua54}
+    lua54 = set lua5.4
+end
+luajit = get_env AIRSL_LUAJIT
+if is_empty ${luajit}
+    luajit = set luajit
+end
+check = set crates/airsl-lua/lua/check.lua
+usage = set "check.lua: usage: <interpreter> check.lua "
+usage = concat ${usage} "<directory holding the built airsstack library> <lua54|luajit>"
+
+expect_missing_interpreter AIRSL_LUA54 "Lua 5.4"
+expect_missing_interpreter AIRSL_LUAJIT LuaJIT
+
+out = exec ${lua54} ${check}
+output = set "${out.stdout}${out.stderr}"
+expect_message "check.lua with no arguments" ${out.code} ${output} ${usage}
+
+out = exec ${lua54} ${check} target/native nonsense
+output = set "${out.stdout}${out.stderr}"
+expect_message "check.lua with an unknown ABI" ${out.code} ${output} ${usage}
+
+out = exec ${lua54} ${check} target/native luajit
+output = set "${out.stdout}${out.stderr}"
+message = set "check.lua: this check is for luajit, but the interpreter is Lua 5.4 without jit"
+expect_message "check.lua for luajit under Lua 5.4" ${out.code} ${output} ${message}
+
+out = exec ${luajit} ${check} target/native lua54
+output = set "${out.stdout}${out.stderr}"
+message = set "check.lua: this check is for lua54, but the interpreter is Lua 5.1"
+expect_message "check.lua for lua54 under LuaJIT" ${out.code} ${output} ${message}
+'''
 
 # ---------------------------------------------------------------------------
 # Examples
@@ -105,11 +288,12 @@ args = ["test", "--workspace", "--all-features", "--doc"]
 category = "Examples"
 description = "Run every example end to end, check the book appendix's output, and compile and test every shipped .lua"
 # Deliberately not a dependency of `dod`, for the reason `deny` is not: the
-# Definition of Done is five commands, and this is a sixth. It also does things
-# the five do not — runs each example with the invoking shell's stdin, runs the
-# book appendix's script under each preset, and runs `airsl check` and
-# `airsl test` over every shipped `.lua` — so it answers to the invoking shell
-# as well as to the working tree.
+# Definition of Done is five steps, and this would be a sixth. Those five keep their names
+# and their order, a step can run more than one command, and `dod` needs `lua5.4` and `luajit`
+# (or `AIRSL_LUA54` and `AIRSL_LUAJIT`). This task also does things the five do not
+# — runs each example with the invoking shell's stdin, runs the book appendix's script
+# under each preset, and runs `airsl check` and `airsl test` over every shipped `.lua` —
+# so it answers to the invoking shell as well as to the working tree.
 #
 # What each example prints is not compared here. The gate's `docs-check` tests
 # run every example and require its README's `## Output` block to equal the
@@ -289,8 +473,10 @@ args = ["build", "book"]
 category = "Supply chain"
 description = "cargo-deny: security advisories, licenses, duplicate versions, sources"
 # Deliberately not a dependency of `dod`. The Definition of Done is the five
-# commands the guideline skill owns; adding a sixth here would make this file
-# disagree with its source of truth. This check also answers to a moving
+# steps the guideline skill names; adding a sixth here would make this file
+# disagree with its source of truth. Those five keep their names and their order,
+# a step can run more than one command, and `dod` needs `lua5.4` and `luajit`
+# (or `AIRSL_LUA54` and `AIRSL_LUAJIT`). This check also answers to a moving
 # advisory database rather than to the working tree, so it can fail on a commit
 # that changed nothing.
 command = "cargo"
@@ -299,6 +485,132 @@ args = ["deny", "check"]
 # ---------------------------------------------------------------------------
 # Release
 # ---------------------------------------------------------------------------
+
+[tasks.rocks]
+category = "Release"
+description = "Build, pack and load both LuaRocks packages of the native module into target/rocks"
+# Deliberately not a dependency of `dod`, as `deny` and `examples` are not: it needs luarocks and
+# the network (luarocks fetches the build backend), which the gate must not. It reads
+# `AIRSL_LUAROCKS`, `AIRSL_LUA54` and `AIRSL_LUAJIT` for the three programs it runs, and
+# `AIRSL_LUA54_DIR` and `AIRSL_LUAJIT_DIR` when luarocks cannot find an interpreter by itself, as
+# Homebrew's luarocks cannot: it defaults to Lua 5.5.
+#
+# Every tool and rockspec is looked up before anything builds, so a missing one is reported at
+# once and not after the first package's compile. The rockspec is the one file the anchored
+# pattern finds: `<package>-*-1.rockspec` would take `airsstack-luajit-0.3.0-1.rockspec` for
+# `airsstack`. The task does not compare the version it reads with the workspace version, which
+# `docs-check` owns.
+#
+# `pack` writes into the working directory, so the task moves into `target/rocks/dist` for it and
+# back to the root after, which is also what makes the relative rockspec and `check.lua` paths
+# resolve for the next step. duckscript's `cd` answers empty and stays where it was when it cannot
+# change directory, so each answer is tested rather than let `pack` or `check.lua` run elsewhere.
+script_runner = "@duckscript"
+script = '''
+root = pwd
+
+# `${1}` is the variable naming the program, `${2}` its default, `${3}` what to install and `${4}`
+# what to set it to. `which` answers empty for a bare name and for a path alike when nothing runs,
+# which is what "missing" means here. Returns the program as typed.
+function find_tool
+    program = get_env ${1}
+    if is_empty ${program}
+        program = set ${2}
+    end
+    found = which ${program}
+    if is_empty ${found}
+        echo "rocks: `${program}` was not found; install ${3} or set ${1} to its ${4}"
+        exit 1
+    end
+    return ${program}
+end
+
+# `${1}` is the package. Returns its one rockspec, as the relative path the glob gave.
+function find_rockspec
+    package = set ${1}
+    dir = set crates/airsl-lua/rockspecs
+    files = glob_array ${dir}/${package}-[0-9]*-1.rockspec
+    n = array_length ${files}
+    if eq ${n} 0
+        echo "rocks: no `${package}-<version>-1.rockspec` in `${dir}`"
+        exit 1
+    end
+    if greater_than ${n} 1
+        names = array_join ${files} ", "
+        echo "rocks: ${n} files match `${package}-<version>-1.rockspec` in `${dir}` (${names}); docs-check allows one per package"
+        exit 1
+    end
+    rockspec = array_get ${files} 0
+    return ${rockspec}
+end
+
+# `${1}` is the package and `${2}` its rockspec. Returns the base name without `<package>-` and
+# `-1.rockspec`, the latter being 11 characters.
+function rockspec_version
+    name = basename ${2}
+    prefix = concat ${1} -
+    start = length ${prefix}
+    stop = length ${name}
+    stop = calc ${stop} - 11
+    version = substring ${name} ${start} ${stop}
+    return ${version}
+end
+
+function enter
+    entered = cd ${1}
+    if is_empty ${entered}
+        echo "rocks: could not change into `${1}`"
+        exit 1
+    end
+end
+
+# `${1}` is the package, `${2}` its rockspec, `${3}` its version, `${4}` the ABI, `${5}` the Lua
+# version luarocks is given, `${6}` the variable naming a `--lua-dir`, `${7}` luarocks, `${8}` the
+# interpreter that loads what was built and `${9}` the workspace root. A call to `enter` below
+# overwrites `${1}`, so each argument that is used after one is copied to a name first; `${6}`
+# is the exception, read with `get_env` before the first `enter`. Duckscript has one global
+# namespace, so `root = set ${9}` rebinds the caller's `root` (to the same value today).
+function build_package
+    package = set ${1}
+    rockspec = set ${2}
+    version = set ${3}
+    abi = set ${4}
+    lua_version = set ${5}
+    luarocks = set ${7}
+    interpreter = set ${8}
+    root = set ${9}
+    tree = set ${root}/target/rocks/${abi}
+    lua_dir = get_env ${6}
+    if is_empty ${lua_dir}
+        exec --fail-on-error ${luarocks} --lua-version ${lua_version} make --tree ${tree} ${rockspec}
+    else
+        exec --fail-on-error ${luarocks} --lua-version ${lua_version} --lua-dir ${lua_dir} make --tree ${tree} ${rockspec}
+    end
+
+    enter ${root}/target/rocks/dist
+    if is_empty ${lua_dir}
+        exec --fail-on-error ${luarocks} --lua-version ${lua_version} --tree ${tree} pack ${package} ${version}-1
+    else
+        exec --fail-on-error ${luarocks} --lua-version ${lua_version} --lua-dir ${lua_dir} --tree ${tree} pack ${package} ${version}-1
+    end
+
+    enter ${root}
+    exec --fail-on-error ${interpreter} crates/airsl-lua/lua/check.lua ${tree}/lib/lua/${lua_version} ${abi}
+end
+
+luarocks = find_tool AIRSL_LUAROCKS luarocks LuaRocks path
+lua54 = find_tool AIRSL_LUA54 lua5.4 "Lua 5.4" interpreter
+luajit = find_tool AIRSL_LUAJIT luajit LuaJIT interpreter
+rockspec_lua54 = find_rockspec airsstack
+rockspec_luajit = find_rockspec airsstack-luajit
+version_lua54 = rockspec_version airsstack ${rockspec_lua54}
+version_luajit = rockspec_version airsstack-luajit ${rockspec_luajit}
+
+mkdir ${root}/target/rocks/dist
+
+build_package airsstack ${rockspec_lua54} ${version_lua54} lua54 5.4 AIRSL_LUA54_DIR ${luarocks} ${lua54} ${root}
+build_package airsstack-luajit ${rockspec_luajit} ${version_luajit} luajit 5.1 AIRSL_LUAJIT_DIR ${luarocks} ${luajit} ${root}
+'''
 
 [tasks.publish-dry-run]
 category = "Release"
@@ -354,15 +666,13 @@ args = ["fmt", "--all"]
 [tasks.clippy-fix]
 category = "Development"
 description = "Apply the clippy suggestions that are machine-applicable"
-command = "cargo"
-args = [
-  "clippy",
-  "--workspace",
-  "--all-targets",
-  "--all-features",
-  "--fix",
-  "--allow-dirty",
-]
+# The same three runs as `clippy`, so the native module is fixed under both ABIs.
+script_runner = "@duckscript"
+script = '''
+exec --fail-on-error cargo clippy --workspace --exclude airsl-lua --all-targets --fix --allow-dirty
+exec --fail-on-error cargo clippy -p airsl-lua --features lua54 --all-targets --fix --allow-dirty
+exec --fail-on-error cargo clippy -p airsl-lua --features luajit --all-targets --fix --allow-dirty
+'''
 
 [tasks.dod-crate]
 category = "Development"
@@ -371,6 +681,13 @@ description = "The gate scoped to one crate: cargo make dod-crate airsl"
 # Cross-crate changes and pre-release runs use the unscoped `dod`. The prose
 # guards live in the `docs-check` crate, so only `dod` and
 # `dod-crate docs-check` run them.
+#
+# `airsl-lua` takes a branch of its own. It is a module-mode `cdylib`: `cargo test` cannot link
+# a Rust test for it and rustdoc cannot test a `cdylib`, so it runs clippy and rustdoc once per
+# Lua ABI, which is how `clippy` and `doc` run it in `dod`, and then `native-load` and
+# `native-refusals`, whose interpreter checks are its test. It runs no `cargo test` and no
+# doctests. Formatting is checked first, for every crate: it is the gate's first step, and a
+# crate with no tests still has source to format.
 #
 # `airsl-cli` ships no `[lib]` target — every public item lives in `airsl` —
 # so `cargo test -p airsl-cli --doc` has nothing to doctest and fails outright
@@ -397,18 +714,29 @@ if is_empty ${crate}
     trigger_error "usage: cargo make dod-crate <crate-name>"
 end
 exec --fail-on-error cargo fmt -p ${crate} -- --check
-exec --fail-on-error cargo clippy -p ${crate} --all-targets --all-features -- -D warnings
+if eq ${crate} airsl-lua
+    exec --fail-on-error cargo clippy -p airsl-lua --features lua54 --all-targets -- -D warnings
+    exec --fail-on-error cargo clippy -p airsl-lua --features luajit --all-targets -- -D warnings
+    set_env RUSTDOCFLAGS "-D warnings"
+    exec --fail-on-error cargo doc -p airsl-lua --no-deps --features lua54
+    exec --fail-on-error cargo doc -p airsl-lua --no-deps --features luajit
+    unset_env RUSTDOCFLAGS
+    exec --fail-on-error cargo make native-load
+    exec --fail-on-error cargo make native-refusals
+    exit 0
+end
+exec --fail-on-error cargo clippy -p ${crate} --all-targets -- -D warnings
 # RUSTDOCFLAGS is set on the environment for this one step and cleared right
 # after — it must not leak into the two `cargo test` steps below, which never
 # wanted it.
 set_env RUSTDOCFLAGS "-D warnings"
-exec --fail-on-error cargo doc -p ${crate} --all-features --no-deps
+exec --fail-on-error cargo doc -p ${crate} --no-deps
 unset_env RUSTDOCFLAGS
-exec --fail-on-error cargo test -p ${crate} --all-targets --all-features
+exec --fail-on-error cargo test -p ${crate} --all-targets
 lib_path = set crates/${crate}/src/lib.rs
 has_lib = is_file ${lib_path}
 if ${has_lib}
-    exec --fail-on-error cargo test -p ${crate} --all-features --doc
+    exec --fail-on-error cargo test -p ${crate} --doc
 else
     echo "doctest step skipped: ${crate} has no library target (no ${lib_path})"
 end

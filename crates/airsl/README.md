@@ -99,4 +99,4 @@ compiled from its C source and linked in statically, so there is no system Lua t
 ## Releases
 
 See [CHANGELOG.md](https://github.com/airsstack/airsl/blob/main/CHANGELOG.md). This crate and
-`airsl-cli` are versioned independently and share one changelog.
+`airsl-cli` share one version, are released together and share one changelog.

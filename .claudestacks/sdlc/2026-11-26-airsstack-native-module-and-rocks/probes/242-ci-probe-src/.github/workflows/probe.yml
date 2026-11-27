@@ -1,0 +1,302 @@
+# Throwaway CI probe (spec 2026-11-26-airsstack-native-module-and-rocks, R14): the release-job shell/jq snippets of
+# probes 236/241 and the rocks task's duckscript lookups of probe 237 on the three GitHub-hosted runners.
+name: probe-ci-rocks-version
+on:
+  push:
+    branches: [probe-ci-rocks-version]
+permissions:
+  contents: read
+
+jobs:
+  # The shell snippets as scripts (probe 236 app-version.sh, files.sh; probe 241 tag.sh), run by each runner's bash and jq.
+  # The spec runs them only on ubuntu-latest; macOS and Windows (Git Bash) are for comparison.
+  snippets:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - name: tool versions
+        run: |
+          echo "\$ bash --version | head -1; jq --version; command -v bash jq"
+          bash --version | head -1; jq --version; command -v bash jq
+      - name: publish-rocks tag read (tag.sh)
+        run: bash probe/run-tag.sh probe
+      - name: build-rocks app_version read (app-version.sh)
+        run: bash probe/run-app.sh probe
+      - name: build-rocks file test (files.sh)
+        run: bash probe/run-files.sh probe .
+
+  # The release workflow's plan job hands the plan JSON on as a job output (airsl-cli-release.yml `val`).
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      val: ${{ steps.plan.outputs.val }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: plan
+        run: echo "val=$(cat probe/plan-pr.json)" >> "$GITHUB_OUTPUT"
+
+  # build-rocks' first job as the spec writes it (§5.6.6): bash with set -euo pipefail, env PLAN, output version.
+  version:
+    needs: plan
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: version
+        shell: bash
+        env:
+          PLAN: ${{ needs.plan.outputs.val }}
+        run: |
+          set -euo pipefail
+          bash --version | head -1; jq --version
+          version=$(jq -r '[.releases[]? | select(.app_name == "airsl-cli") | .app_version] | if length == 1 then .[0] else "" end' <<<"$PLAN") || { code=$?; echo "build-rocks: could not read the release plan: jq exit status $code"; exit 1; }
+          if [ -z "$version" ]; then
+            echo "build-rocks: the release plan names no single airsl-cli release"; exit 1
+          fi
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "build-rocks: the release plan's airsl-cli version $version is not <major>.<minor>.<patch>"; exit 1
+          fi
+          for package in airsstack airsstack-luajit; do
+            file="crates/airsl-lua/rockspecs/$package-$version-1.rockspec"
+            if [ ! -f "$file" ]; then echo "build-rocks: $file is missing"; exit 1; fi
+            echo "found $file"
+          done
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "wrote version=$version"
+
+  # The legs name both rockspecs from needs.version.outputs.version, in each leg's shell (cmd on Windows).
+  legs:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: name the rockspecs (bash)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          for package in airsstack airsstack-luajit; do
+            rs=crates/airsl-lua/rockspecs/$package-${{ needs.version.outputs.version }}-1.rockspec
+            if [ -f "$rs" ]; then echo "found $rs; pack $package ${{ needs.version.outputs.version }}-1"; else echo "missing $rs"; exit 1; fi
+          done
+      - name: name the rockspecs (cmd)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          if exist crates\airsl-lua\rockspecs\airsstack-${{ needs.version.outputs.version }}-1.rockspec (echo found crates\airsl-lua\rockspecs\airsstack-${{ needs.version.outputs.version }}-1.rockspec; pack airsstack ${{ needs.version.outputs.version }}-1) else (echo missing airsstack & exit /b 1)
+          if exist crates\airsl-lua\rockspecs\airsstack-luajit-${{ needs.version.outputs.version }}-1.rockspec (echo found crates\airsl-lua\rockspecs\airsstack-luajit-${{ needs.version.outputs.version }}-1.rockspec; pack airsstack-luajit ${{ needs.version.outputs.version }}-1) else (echo missing airsstack-luajit & exit /b 1)
+
+  # The rocks task's lookups (§5.6.5) under cargo-make 0.37.24, one step per case, cwd = a tree with
+  # crates/airsl-lua/rockspecs, PROBE_DIR = that relative path (the task's own). env is set by the runner, not a shell.
+  rocks:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install cargo-make
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-make@0.37.24
+      - name: tool versions and an existing absolute path (unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cargo make --version
+          echo "TOOL=$(command -v cargo-make)" >> "$GITHUB_ENV"
+          echo "TOOL=$(command -v cargo-make)"
+      - name: tool versions and an existing absolute path (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cargo make --version
+          $t = (Get-Command cargo-make).Source
+          "TOOL=$t" >> $env:GITHUB_ENV
+          "TOOL_NOEXT=$($t -replace '\.exe$','')" >> $env:GITHUB_ENV
+          "TOOL_FWD=$($t -replace '\\','/')" >> $env:GITHUB_ENV
+          "TOOL=$t"; "TOOL_NOEXT=$($t -replace '\.exe$','')"; "TOOL_FWD=$($t -replace '\\','/')"
+      - name: build the case trees
+        shell: bash
+        run: bash probe/setup-cases.sh
+      - name: "case old_glob: cargo make old-glob in work/real"
+        id: old_glob
+        continue-on-error: true
+        working-directory: work/real
+        env:
+          PROBE_DIR: crates/airsl-lua/rockspecs
+        run: cargo make old-glob
+      - name: "case found_all: cargo make rocks-lookup in work/real"
+        id: found_all
+        continue-on-error: true
+        working-directory: work/real
+        env:
+          PROBE_DIR: crates/airsl-lua/rockspecs
+          AIRSL_LUAROCKS: '${{ env.TOOL }}'
+          AIRSL_LUA54: '${{ env.TOOL }}'
+          AIRSL_LUAJIT: '${{ env.TOOL }}'
+        run: cargo make rocks-lookup
+      - name: "case leftover: cargo make rocks-lookup in work/leftover"
+        id: leftover
+        continue-on-error: true
+        working-directory: work/leftover
+        env:
+          PROBE_DIR: crates/airsl-lua/rockspecs
+          AIRSL_LUAROCKS: '${{ env.TOOL }}'
+          AIRSL_LUA54: '${{ env.TOOL }}'
+          AIRSL_LUAJIT: '${{ env.TOOL }}'
+        run: cargo make rocks-lookup
+      - name: "case empty: cargo make rocks-lookup in work/empty"
+        id: empty
+        continue-on-error: true
+        working-directory: work/empty
+        env:
+          PROBE_DIR: crates/airsl-lua/rockspecs
+          AIRSL_LUAROCKS: '${{ env.TOOL }}'
+          AIRSL_LUA54: '${{ env.TOOL }}'
+          AIRSL_LUAJIT: '${{ env.TOOL }}'
+        run: cargo make rocks-lookup
+      - name: "case malformed: cargo make rocks-lookup in work/malformed"
+        id: malformed
+        continue-on-error: true
+        working-directory: work/malformed
+        env:
+          PROBE_DIR: crates/airsl-lua/rockspecs
+          AIRSL_LUAROCKS: '${{ env.TOOL }}'
+          AIRSL_LUA54: '${{ env.TOOL }}'
+          AIRSL_LUAJIT: '${{ env.TOOL }}'
+        run: cargo make rocks-lookup
+      - name: "case luarocks_default: cargo make rocks-lookup in work/real"
+        id: luarocks_default
+        continue-on-error: true
+        working-directory: work/real
+        env:
+          PROBE_DIR: crates/airsl-lua/rockspecs
+          AIRSL_LUA54: '${{ env.TOOL }}'
+          AIRSL_LUAJIT: '${{ env.TOOL }}'
+        run: cargo make rocks-lookup
+      - name: "case luarocks_bare_missing: cargo make rocks-lookup in work/real"
+        id: luarocks_bare_missing
+        continue-on-error: true
+        working-directory: work/real
+        env:
+          PROBE_DIR: crates/airsl-lua/rockspecs
+          AIRSL_LUAROCKS: 'nope-luarocks'
+        run: cargo make rocks-lookup
+      - name: "case luarocks_path_missing: cargo make rocks-lookup in work/real"
+        id: luarocks_path_missing
+        continue-on-error: true
+        working-directory: work/real
+        env:
+          PROBE_DIR: crates/airsl-lua/rockspecs
+          AIRSL_LUAROCKS: '/no/such/luarocks'
+        run: cargo make rocks-lookup
+      - name: "case luarocks_bare_found: cargo make rocks-lookup in work/real"
+        id: luarocks_bare_found
+        continue-on-error: true
+        working-directory: work/real
+        env:
+          PROBE_DIR: crates/airsl-lua/rockspecs
+          AIRSL_LUAROCKS: 'cargo-make'
+          AIRSL_LUA54: '${{ env.TOOL }}'
+          AIRSL_LUAJIT: '${{ env.TOOL }}'
+        run: cargo make rocks-lookup
+      - name: "case lua54_default: cargo make rocks-lookup in work/real"
+        id: lua54_default
+        continue-on-error: true
+        working-directory: work/real
+        env:
+          PROBE_DIR: crates/airsl-lua/rockspecs
+          AIRSL_LUAROCKS: '${{ env.TOOL }}'
+          AIRSL_LUAJIT: '${{ env.TOOL }}'
+        run: cargo make rocks-lookup
+      - name: "case lua54_missing: cargo make rocks-lookup in work/real"
+        id: lua54_missing
+        continue-on-error: true
+        working-directory: work/real
+        env:
+          PROBE_DIR: crates/airsl-lua/rockspecs
+          AIRSL_LUAROCKS: '${{ env.TOOL }}'
+          AIRSL_LUA54: 'nope-lua5.4'
+        run: cargo make rocks-lookup
+      - name: "case luajit_default: cargo make rocks-lookup in work/real"
+        id: luajit_default
+        continue-on-error: true
+        working-directory: work/real
+        env:
+          PROBE_DIR: crates/airsl-lua/rockspecs
+          AIRSL_LUAROCKS: '${{ env.TOOL }}'
+          AIRSL_LUA54: '${{ env.TOOL }}'
+        run: cargo make rocks-lookup
+      - name: "case luajit_missing: cargo make rocks-lookup in work/real"
+        id: luajit_missing
+        continue-on-error: true
+        working-directory: work/real
+        env:
+          PROBE_DIR: crates/airsl-lua/rockspecs
+          AIRSL_LUAROCKS: '${{ env.TOOL }}'
+          AIRSL_LUA54: '${{ env.TOOL }}'
+          AIRSL_LUAJIT: 'nope-luajit'
+        run: cargo make rocks-lookup
+      - name: "case win_path_noext: cargo make rocks-lookup in work/real"
+        id: win_path_noext
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        working-directory: work/real
+        env:
+          PROBE_DIR: crates/airsl-lua/rockspecs
+          AIRSL_LUAROCKS: '${{ env.TOOL_NOEXT }}'
+          AIRSL_LUA54: '${{ env.TOOL }}'
+          AIRSL_LUAJIT: '${{ env.TOOL }}'
+        run: cargo make rocks-lookup
+      - name: "case win_drive_missing: cargo make rocks-lookup in work/real"
+        id: win_drive_missing
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        working-directory: work/real
+        env:
+          PROBE_DIR: crates/airsl-lua/rockspecs
+          AIRSL_LUAROCKS: 'C:\no\such\luarocks.exe'
+        run: cargo make rocks-lookup
+      - name: "case win_fwd_slash: cargo make rocks-lookup in work/real"
+        id: win_fwd_slash
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        working-directory: work/real
+        env:
+          PROBE_DIR: crates/airsl-lua/rockspecs
+          AIRSL_LUAROCKS: '${{ env.TOOL_FWD }}'
+          AIRSL_LUA54: '${{ env.TOOL }}'
+          AIRSL_LUAJIT: '${{ env.TOOL }}'
+        run: cargo make rocks-lookup
+      - name: outcomes
+        shell: bash
+        run: |
+          echo "old_glob: ${{ steps.old_glob.outcome }}"
+          echo "found_all: ${{ steps.found_all.outcome }}"
+          echo "leftover: ${{ steps.leftover.outcome }}"
+          echo "empty: ${{ steps.empty.outcome }}"
+          echo "malformed: ${{ steps.malformed.outcome }}"
+          echo "luarocks_default: ${{ steps.luarocks_default.outcome }}"
+          echo "luarocks_bare_missing: ${{ steps.luarocks_bare_missing.outcome }}"
+          echo "luarocks_path_missing: ${{ steps.luarocks_path_missing.outcome }}"
+          echo "luarocks_bare_found: ${{ steps.luarocks_bare_found.outcome }}"
+          echo "lua54_default: ${{ steps.lua54_default.outcome }}"
+          echo "lua54_missing: ${{ steps.lua54_missing.outcome }}"
+          echo "luajit_default: ${{ steps.luajit_default.outcome }}"
+          echo "luajit_missing: ${{ steps.luajit_missing.outcome }}"
+          echo "win_path_noext: ${{ steps.win_path_noext.outcome }}"
+          echo "win_drive_missing: ${{ steps.win_drive_missing.outcome }}"
+          echo "win_fwd_slash: ${{ steps.win_fwd_slash.outcome }}"

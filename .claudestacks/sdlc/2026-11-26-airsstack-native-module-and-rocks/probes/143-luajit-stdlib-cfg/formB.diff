@@ -1,0 +1,37 @@
+--- a/crates/airsl/src/sandbox/language_surface.rs
++++ b/crates/airsl/src/sandbox/language_surface.rs
+@@ -15,6 +15,19 @@
+ 
+ use mlua::StdLib;
+ 
++/// `utf8`, which `LuaJIT` does not have.
++#[cfg(not(feature = "luajit"))]
++const UTF8: StdLib = StdLib::UTF8;
++/// `utf8`, which `LuaJIT` does not have.
++#[cfg(feature = "luajit")]
++const UTF8: StdLib = StdLib::NONE;
++/// `coroutine`, which `LuaJIT` loads as part of its base library.
++#[cfg(not(feature = "luajit"))]
++const COROUTINE: StdLib = StdLib::COROUTINE;
++/// `coroutine`, which `LuaJIT` loads as part of its base library.
++#[cfg(feature = "luajit")]
++const COROUTINE: StdLib = StdLib::NONE;
++
+ /// Base-library globals that hand a script a second way to load code, bypassing the surface and
+ /// the confined `require`. Withheld everywhere except [`LanguageSurface::Full`].
+ pub(crate) const CHUNK_LOADERS: [&str; 4] = ["load", "loadstring", "dofile", "loadfile"];
+@@ -96,11 +109,11 @@
+                 StdLib::STRING
+                     | StdLib::TABLE
+                     | StdLib::MATH
+-                    | StdLib::UTF8
+-                    | StdLib::COROUTINE
++                    | UTF8
++                    | COROUTINE
+                     | StdLib::OS
+             }
+-            Self::Minimal => StdLib::STRING | StdLib::TABLE | StdLib::MATH | StdLib::UTF8,
++            Self::Minimal => StdLib::STRING | StdLib::TABLE | StdLib::MATH | UTF8,
+         }
+     }
+ 

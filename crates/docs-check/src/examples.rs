@@ -26,13 +26,13 @@
 //! The inner `cargo run` takes its build from the test binary's own path: its profile, its target
 //! triple when the outer run was cross-directed, and the target directory, which is the nearest
 //! ancestor of the binary that holds a `CACHEDIR.TAG`. Under `build.build-dir` that ancestor is the
-//! build directory rather than the target directory, and the inner run is given that one. It also
-//! passes `--all-features`. Without that, a `cargo test --release` or `--target-dir` run would
-//! quietly build a second tree, and a feature that changed an example's output would be compared
-//! against the wrong build. Flags that cargo does not expose to a test, namely the outer run's
-//! `--locked`, `--offline` and `--frozen`, are not forwarded; their environment forms, such as
-//! `CARGO_NET_OFFLINE`, are inherited by the child process like any other variable, and the outer
-//! run has already resolved the lockfile the inner run reads.
+//! build directory rather than the target directory, and the inner run is given that one. The inner
+//! build is therefore the outer build: the same profile, triple and target directory. Without that,
+//! a `cargo test --release` or `--target-dir` run would quietly build a second tree, and an example
+//! would be compared against the wrong build. Flags that cargo does not expose to a test, namely
+//! the outer run's `--locked`, `--offline` and `--frozen`, are not forwarded; their environment
+//! forms, such as `CARGO_NET_OFFLINE`, are inherited by the child process like any other variable,
+//! and the outer run has already resolved the lockfile the inner run reads.
 //!
 //! Responsibilities:
 //!
@@ -192,15 +192,7 @@ fn current_outer_build() -> Result<OuterBuild, String> {
 fn example_command(cargo: &Path, build: &OuterBuild, root: &Path, name: &str) -> Command {
     let mut command = Command::new(cargo);
     command
-        .args([
-            "run",
-            "-q",
-            "-p",
-            "airsl",
-            "--example",
-            name,
-            "--all-features",
-        ])
+        .args(["run", "-q", "-p", "airsl", "--example", name])
         .arg("--profile")
         .arg(&build.profile)
         .arg("--target-dir")
@@ -450,7 +442,7 @@ mod tests {
     }
 
     #[test]
-    fn the_inner_run_carries_the_outer_target_dir_profile_triple_and_all_features() {
+    fn the_inner_run_carries_the_outer_target_dir_profile_and_triple() {
         let build = OuterBuild {
             target_dir: PathBuf::from("/w/target"),
             triple: Some("aarch64-apple-darwin".to_owned()),
@@ -470,7 +462,6 @@ mod tests {
                 "airsl",
                 "--example",
                 "hello",
-                "--all-features",
                 "--profile",
                 "release",
                 "--target-dir",

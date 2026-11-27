@@ -1,0 +1,65 @@
+# Probe 239 — how docs-check splits a file name in crates/airsl-lua/rockspecs/, and how luarocks reads the same names
+question: plan-set review finding 4 (spec §5.6.3): the rule "strip `.rockspec`; split the stem from the right at its last two `-`
+  into package, version, revision; the name is malformed unless package and version are non-empty and the revision is one or more
+  ASCII digits" -- (a) what does it give, in std Rust, for each name below with workspace version 0.2.0 (names that could break it
+  included: airsstack-luajit-…, a prerelease-shaped version, empty parts, case, suffixes)? (b) how does luarocks' own
+  path.parse_name read the same names? (c) what does luarocks say about a rockspec file whose name does not split?
+versions: rustc 1.94.1 (rust-toolchain.toml channel 1.94; std only, rsplitn/strip_suffix); lua5.4 5.4.8 + luarocks 3.12.2
+  (/opt/homebrew/share/lua/5.4/luarocks/path.lua:174-180 parse_name; fetch.lua:405-431 load_local_rockspec); macOS 26.3.1 arm64.
+sources: 239-rockspec-name-split/split.rs, 239-rockspec-name-split/parse_name.lua. The binary was built in the scratchpad and deleted.
+  (c) linted copies of probe 235's airsstack-0.2.0-1.rockspec under the names shown, in a scratch directory (deleted).
+date: 2026-11-26
+--- raw output ---
+$ rustc --version
+rustc 1.94.1 (e408947bf 2026-03-25)
+$ rustc --edition 2024 split.rs -o <scratch>/split && <scratch>/split
+airsstack-0.2.0-1.rockspec           -> current: package airsstack, line checks
+airsstack-luajit-0.2.0-1.rockspec    -> current: package airsstack-luajit, line checks
+airsstack.rockspec                   -> malformed (fewer than two `-`)
+airsstack-0.2.0.rockspec             -> malformed (fewer than two `-`)
+airsstack-luajit-0.2.0.rockspec      -> malformed (package="airsstack" version="luajit" revision="0.2.0")
+airsstack-0.2.0-x.rockspec           -> malformed (package="airsstack" version="0.2.0" revision="x")
+airsstack--1.rockspec                -> malformed (package="airsstack" version="" revision="1")
+-0.2.0-1.rockspec                    -> malformed (package="" version="0.2.0" revision="1")
+.rockspec                            -> malformed (fewer than two `-`)
+airsstack-0.2.0-.rockspec            -> malformed (package="airsstack" version="0.2.0" revision="")
+airsstack-0.2.0-rc.1-1.rockspec      -> names package airsstack-0.2.0
+airsstack-0.1.0-1.rockspec           -> names version 0.1.0
+airsstack-luajit-0.1.0-1.rockspec    -> names version 0.1.0
+airsstack-0.2.0-2.rockspec           -> has revision 2
+airsstack-0.2.0-01.rockspec          -> has revision 01
+other-0.2.0-1.rockspec               -> names package other
+AIRSSTACK-0.2.0-1.rockspec           -> names package AIRSSTACK
+airsstack-0.2.0-1.ROCKSPEC           -> not a rockspec
+airsstack-0.2.0-1.rockspec.bak       -> not a rockspec
+notes.txt                            -> not a rockspec
+[exit 0]
+$ lua5.4 parse_name.lua <names>   (LUA_PATH=/opt/homebrew/share/lua/5.4/?.lua;; -- luarocks 3.12.2 path.lua)
+airsstack-0.2.0-1.rockspec           -> airsstack 0.2.0-1
+airsstack-luajit-0.2.0-1.rockspec    -> airsstack-luajit 0.2.0-1
+airsstack.rockspec                   -> nil nil
+airsstack-0.2.0.rockspec             -> nil nil
+airsstack-luajit-0.2.0.rockspec      -> nil nil
+airsstack-0.2.0-x.rockspec           -> nil nil
+airsstack--1.rockspec                -> nil nil
+-0.2.0-1.rockspec                    ->  0.2.0-1
+.rockspec                            -> nil nil
+airsstack-0.2.0-.rockspec            -> nil nil
+airsstack-0.2.0-rc.1-1.rockspec      -> airsstack-0.2.0 rc.1-1
+airsstack-0.2.0-01.rockspec          -> airsstack 0.2.0-01
+airsstack-0.2.0-1.rockspec.bak       -> airsstack 0.2.0-1
+[exit 0]
+$ luarocks --version
+/opt/homebrew/bin/luarocks 3.12.2
+$ luarocks lint airsstack.rockspec   (a copy of probe 235's airsstack-0.2.0-1.rockspec)
+
+Error: Failed loading rockspec: Expected filename in format 'name-version-revision.rockspec'.
+[exit 1]
+$ luarocks lint airsstack-0.2.0.rockspec   (a copy of probe 235's airsstack-0.2.0-1.rockspec)
+
+Error: Failed loading rockspec: Expected filename in format 'name-version-revision.rockspec'.
+[exit 1]
+$ luarocks lint airsstack-0.2.0-x.rockspec   (a copy of probe 235's airsstack-0.2.0-1.rockspec)
+
+Error: Failed loading rockspec: Inconsistency between rockspec filename (airsstack-0.2.0-x.rockspec) and its contents (airsstack-0.2.0-1.rockspec).
+[exit 1]

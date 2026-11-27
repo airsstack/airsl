@@ -1,0 +1,229 @@
+name: Publish rocks
+
+# Uploads both rockspecs and all ten binary rocks to luarocks.org once the GitHub Release
+# exists.
+#
+# Not triggered on its own: airsl-cli-release.yml calls it through dist's `publish-jobs`
+# hook. dist runs it after `host` has created the release, skips it for a prerelease, and
+# makes `announce` wait for it. build-rocks.yml built and loaded every rock earlier in the
+# same run, so what is uploaded here is what was tested.
+#
+# This file is written by hand, unlike the release workflow, so `dist generate` never
+# touches it.
+#
+# The version comes from the release tag, which is the `source.tag` of both rockspecs, so
+# the version uploaded is the version the rockspecs build. Every file the upload needs
+# therefore has a name before anything is downloaded, and a missing rockspec is reported
+# the same way as a missing rock. The checks that can fail without a request run first, so
+# a bad plan, tag or file set stops the job before luarocks.org hears anything.
+#
+# It talks to the luarocks.org HTTP API directly: `luarocks upload` sends at most one rock
+# per call, and a version needs five per package. No source rock is ever packed or
+# uploaded; the rockspec is what luarocks.org stores for a source build.
+#
+# The upload has two phases. Phase 1 sends both rockspecs, which creates each version and
+# answers with its id. Only then does phase 2 attach the binary rocks to those ids. After
+# each rockspec the job checks that luarocks.org put the module in its root manifest.
+# That check follows the upload because no answer names a module's owner beforehand: a
+# name held by another account is only visible once the upload has been answered. Failing
+# there, before any binary rock is sent, means a taken name fails the same way on the first
+# run and on every re-run. An answer that carries no manifest list at all is told apart from
+# a name that is missing from one: the first is an answer this job does not understand, the
+# second is a taken name.
+#
+# Re-running a failed job is safe for every failure except a taken name: uploads replace
+# in place, so what was sent before the failure is sent again. Each failure that follows
+# an upload says which files were already sent.
+#
+# Prerequisite, not code: a luarocks.org account without two-factor on uploads, whose API
+# key is the repository secret `LUAROCKS_API_KEY`. An account that requires a code for
+# uploads cannot be used unattended.
+#
+# No `permissions:` block: dist gives this job its own, and a called workflow can only
+# narrow them. That token has no `contents` permission, and the checkout works under it only
+# because the repository is public, which the first step checks rather than assumes.
+on:
+  workflow_call:
+    inputs:
+      plan:
+        description: The dist manifest the release's plan step produced
+        required: true
+        type: string
+
+jobs:
+  publish:
+    name: Upload to luarocks.org
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # dist gives this job no `contents` permission, so the checkout below authenticates
+      # with a token that cannot read a private repository: it works on a public one,
+      # which is served without a token, and fails on a private one with a message about
+      # the repository, not about this workflow. Stopping here names the cause before any
+      # file is downloaded.
+      - name: Check that the repository is public
+        shell: bash
+        env:
+          PRIVATE: ${{ github.event.repository.private }}
+        run: |
+          if [ "$PRIVATE" = true ]; then
+            echo "publish-rocks: this repository is private, and the checkout below runs without a contents permission, so it cannot read the rockspecs; nothing was uploaded"
+            exit 1
+          fi
+
+      # The plan is untrusted input to `jq`, so each shape it could have is named in a
+      # message rather than left to a jq error that names none of them. `jq -s` collects
+      # every JSON text of the input into one array, so an empty plan and two texts are
+      # told apart from one.
+      - name: Check the API key and read the version from the release tag
+        id: check
+        shell: bash
+        env:
+          PLAN: ${{ inputs.plan }}
+          # An undefined secret arrives as the empty string, not as an error, so this step
+          # tests for it. The key is set on the two steps that read it and on no other, so
+          # the actions that download and check out files never see it.
+          LUAROCKS_API_KEY: ${{ secrets.LUAROCKS_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$LUAROCKS_API_KEY" ]; then
+            echo "publish-rocks: LUAROCKS_API_KEY is empty; add the luarocks.org API key as a repository secret"
+            exit 1
+          fi
+          read=$(jq -r -s '
+            def word: {"null": "null", "boolean": "a boolean", "number": "a number", "string": "a string",
+                       "array": "an array", "object": "an object"}[type];
+            if length == 0 then "none"
+            elif length > 1 then "many \(length)"
+            else .[0]
+              | if type != "object" then "type the top level is \(word), not an object"
+                elif .announcement_tag == null or .announcement_tag == "" then "none"
+                elif (.announcement_tag | type) != "string" then "type announcement_tag is \(.announcement_tag | word), not a string"
+                else "tag \(.announcement_tag)" end
+            end' <<<"$PLAN") || { code=$?; echo "publish-rocks: could not read the release plan: jq exit status $code; nothing was uploaded"; exit 1; }
+          case $read in
+            none) echo "publish-rocks: the release plan names no tag; nothing was uploaded"; exit 1 ;;
+            "many "*) echo "publish-rocks: the release plan holds ${read#many } JSON values, not one; nothing was uploaded"; exit 1 ;;
+            "type "*) echo "publish-rocks: in the release plan, ${read#type }; nothing was uploaded"; exit 1 ;;
+          esac
+          tag=${read#tag }
+          if [[ ! "$tag" =~ ^airsl-cli-v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "publish-rocks: the release tag $tag is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded"
+            exit 1
+          fi
+          version=${BASH_REMATCH[1]}
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "version=$version"
+
+      # `rocks-*`, not `artifacts-*`: dist's `host` attaches every `artifacts-*` artifact to
+      # the GitHub Release, and the rocks belong on luarocks.org only. merge-multiple puts
+      # all ten files in one directory.
+      - name: Download the rocks build-rocks made in this run
+        uses: actions/download-artifact@v8
+        with:
+          pattern: rocks-*
+          merge-multiple: true
+          path: rocks/
+
+      # The checkout is only for the two rockspecs: the run's ref is the release tag, so
+      # `src/` holds exactly what the rocks were built from.
+      - name: Check out the release tag for its rockspecs
+        uses: actions/checkout@v6
+        with:
+          path: src
+          persist-credentials: false
+
+      - name: Upload both rockspecs, then the binary rocks
+        shell: bash
+        env:
+          VERSION: ${{ steps.check.outputs.version }}
+          LUAROCKS_API_KEY: ${{ secrets.LUAROCKS_API_KEY }}
+        run: |
+          set -euo pipefail
+          packages=(airsstack airsstack-luajit)
+          arches=(linux-x86_64 linux-aarch64 macosx-aarch64 macosx-x86_64 win32-x86_64)
+          api="https://luarocks.org/api/1/$LUAROCKS_API_KEY"
+          body=$RUNNER_TEMP/luarocks-answer
+          uploaded=
+
+          # Prints the message, then what already reached luarocks.org so the person
+          # reading the log knows the state it was left in. The key is only ever in the
+          # request URL, never in a printed line.
+          fail() {
+            echo "publish-rocks: $1"
+            if [ -n "$uploaded" ]; then
+              echo "publish-rocks: uploaded before this failure: $uploaded; re-running the job replaces them"
+            fi
+            exit 1
+          }
+
+          # $1 file, $2 form field, $3 URL. Leaves luarocks.org's answer in $body. curl's
+          # exit status is the transport and the printed code is the HTTP status, so the two
+          # failures are told apart. A rock is a few megabytes, so 300 seconds is far more
+          # than an upload needs; the limits turn a stalled connection into a curl failure
+          # (exit status 28) that names the file, instead of a silent wait for the job's
+          # own timeout.
+          send() {
+            local status=0 code
+            code=$(curl -sS --connect-timeout 30 --max-time 300 -w '%{http_code}' -o "$body" -F "$2=@$1" "$3") || status=$?
+            if [ "$status" -ne 0 ]; then
+              fail "could not reach luarocks.org to upload $1: curl exit status $status"
+            fi
+            if [[ ! "$code" =~ ^2[0-9][0-9]$ ]]; then
+              fail "luarocks.org refused $1 (HTTP $code): $(cat "$body")"
+            fi
+          }
+
+          # Every file is named from the version before the first request, in the order the
+          # upload sends them: each package's rockspec, then its five rocks.
+          rockspec() { echo "src/crates/airsl-lua/rockspecs/$1-$VERSION-1.rockspec"; }
+          rock() { echo "rocks/$1-$VERSION-1.$2.rock"; }
+          for package in "${packages[@]}"; do
+            required=("$(rockspec "$package")")
+            for arch in "${arches[@]}"; do
+              required+=("$(rock "$package" "$arch")")
+            done
+            for file in "${required[@]}"; do
+              if [ ! -f "$file" ]; then
+                echo "publish-rocks: $file is missing; nothing was uploaded"
+                exit 1
+              fi
+            done
+          done
+
+          # Phase 1: both rockspecs, which create the versions and give their ids.
+          ids=()
+          for package in "${packages[@]}"; do
+            file=$(rockspec "$package")
+            send "$file" rockspec_file "$api/upload"
+            # An answer with a success status means luarocks.org stored the rockspec, even
+            # when it names no version id, so the file counts as uploaded from here on.
+            uploaded=${uploaded:+$uploaded, }$file
+            if ! id=$(jq -e '.version.id | numbers' "$body" 2>/dev/null); then
+              fail "luarocks.org answered $file without a version id: $(cat "$body")"
+            fi
+            echo "publish-rocks: uploaded $file"
+            # Without a manifest list there is nothing to test the name against, and
+            # reading "no list" as "not in the list" would blame the account for an answer
+            # this job does not understand.
+            if ! jq -e '.manifests | arrays' "$body" >/dev/null 2>&1; then
+              fail "luarocks.org answered the upload of $file without a manifests list: $(cat "$body")"
+            fi
+            # A module the account does not own is refused by nothing before this point:
+            # luarocks.org takes the upload but leaves it out of the root manifest.
+            if ! jq -e '.manifests | any(type == "object" and .name == "root")' "$body" >/dev/null; then
+              fail "luarocks.org did not put $package in its root manifest, so the name $package belongs to another account; no binary rock was uploaded for either package"
+            fi
+            ids+=("$id")
+          done
+
+          # Phase 2: only after both names are confirmed, the binary rocks.
+          for index in "${!packages[@]}"; do
+            package=${packages[$index]}
+            for arch in "${arches[@]}"; do
+              file=$(rock "$package" "$arch")
+              send "$file" rock_file "$api/upload_rock/${ids[$index]}"
+              uploaded=${uploaded:+$uploaded, }$file
+              echo "publish-rocks: uploaded $file"
+            done
+          done

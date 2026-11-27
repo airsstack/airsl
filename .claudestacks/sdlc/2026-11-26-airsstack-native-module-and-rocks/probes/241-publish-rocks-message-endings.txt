@@ -1,0 +1,61 @@
+# Probe 241 — publish-rocks' three tag-read refusals (unreadable plan, no tag, tag shape) all end "; nothing was uploaded": probe 236 (b) re-run with the unreadable-plan message changed
+question: accepted amendment (e): the publish job's jq-failure message becomes `publish-rocks: could not read the release plan: jq exit
+  status {code}; nothing was uploaded`, like the no-tag and tag-shape messages. Does probe 236 (b)'s tag read, with only that message
+  changed, still give the version for the tag plans and print each message for every other plan?
+versions: jq-1.7.1-apple; GNU bash 3.2.57 (macOS 26.3.1 arm64), as printed. Same machine as probe 236.
+setup: 241-publish-rocks-message-endings/tag.sh is 236-release-version-source/tag.sh with the one message changed (diff: line 2, the
+  comment; line 5, "jq exit status $code" -> "jq exit status $code; nothing was uploaded"). plan-tag.json and plan-pr.json hold the two
+  dist plans as probe 236 (a) printed them. run.sh prints each command, the output (stderr merged) and the exit status. The case
+  "airsl-cli-v0.2.0\n" is the JSON escape, which is what probe 236 ran (its transcript shows the newline expanded); a raw newline
+  inside the JSON string is a jq parse error and is shown as an extra case.
+command: bash 241-publish-rocks-message-endings/run.sh 241-publish-rocks-message-endings
+date: 2026-11-26
+--- raw output ---
+$ jq --version; bash --version | head -1
+jq-1.7.1-apple
+GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)
+$ PLAN=<plan-tag.json> bash tag.sh
+version=0.2.0
+[exit 0]
+$ PLAN=<plan-pr.json> bash tag.sh
+publish-rocks: the release tag v0.2.0 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":"airsl-cli-v0.0.0","announcement_is_prerelease":false,"publish_prereleases":false,"artifacts":{}}' bash tag.sh
+version=0.0.0
+[exit 0]
+$ PLAN='{"announcement_tag":null}' bash tag.sh
+publish-rocks: the release plan names no tag; nothing was uploaded
+[exit 1]
+$ PLAN='{}' bash tag.sh
+publish-rocks: the release plan names no tag; nothing was uploaded
+[exit 1]
+$ PLAN='' bash tag.sh
+publish-rocks: the release plan names no tag; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":""}' bash tag.sh
+publish-rocks: the release plan names no tag; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":"airsl-cli-v0.2"}' bash tag.sh
+publish-rocks: the release tag airsl-cli-v0.2 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":"airsl-cli-v0.2.0-rc.1"}' bash tag.sh
+publish-rocks: the release tag airsl-cli-v0.2.0-rc.1 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":"airsl-v0.2.0"}' bash tag.sh
+publish-rocks: the release tag airsl-v0.2.0 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":5}' bash tag.sh
+publish-rocks: the release tag 5 is not airsl-cli-v<major>.<minor>.<patch>; nothing was uploaded
+[exit 1]
+$ PLAN='{"announcement_tag":"airsl-cli-v0.2.0\n"}' bash tag.sh
+version=0.2.0
+[exit 0]
+$ PLAN='{"announcement_tag":"airsl-cli-v0.2.0
+"}' bash tag.sh
+jq: parse error: Invalid string: control characters from U+0000 through U+001F must be escaped at line 2, column 1
+publish-rocks: could not read the release plan: jq exit status 5; nothing was uploaded
+[exit 1]
+$ PLAN='not json' bash tag.sh
+jq: parse error: Invalid numeric literal at line 1, column 4
+publish-rocks: could not read the release plan: jq exit status 5; nothing was uploaded
+[exit 1]

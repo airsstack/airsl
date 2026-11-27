@@ -1,0 +1,900 @@
+# Probe 251 — docs-check's file-type rule (probe 245) and the toml reason line (probe 249) built and run on GitHub-hosted ubuntu-latest, macos-latest and windows-latest
+question: R14 and S24: (a) does probe 245's entries.rs (`fs::metadata` before any open; hidden entries skipped) print on Linux
+  and Windows what it printed on macOS, over the same fixture kinds (a directory and a FIFO under the current names, symlinks to a
+  file and to a directory, a dangling symlink, a non-UTF-8 regular file, hidden entries; FIFO on unix only), and what does
+  control.rs (`read_to_string` alone on a directory) give there? (b) does probe 249's crate print the same on each runner?
+answer: (a) HOLDS. ubuntu-latest and macos-latest: the output from "$ entries <F>/A" to the end equals probe 245's raw output
+  (diff after stripping timestamps: no output), the control included on macOS; on Linux the control too ("Err(Os { code: 21,
+  kind: IsADirectory, message: \"Is a directory\" })"). windows-latest: the fixtures are built by fixtures_windows.rs (std's
+  symlink_file / symlink_dir as runneradmin; no FIFO, so A has nothing under the LuaJIT name) and the symlinks are real ("lrwxrwxrwx
+  … airsstack-0.2.0-1.rockspec -> ../real.rockspec"). Every rule outcome is the same: hidden entries skipped; a directory and a
+  symlink to a directory "is not a regular file, so it cannot be a rockspec"; a symlink to a file read ("read, 22 bytes");
+  non-UTF-8 content "could not be read: stream did not contain valid UTF-8". Three lines differ from macOS, none from the rule:
+  A prints "has no `airsstack-luajit-0.2.0-1.rockspec` …" in place of the FIFO's line (the fixture has no such entry); the
+  dangling symlink's io error is Windows' text, "could not be read: The system cannot find the file specified. (os error 2)";
+  and the control gives "Err(Os { code: 5, kind: PermissionDenied, message: \"Access is denied.\" })", so without the metadata
+  check a directory so named would read as a permission error on Windows. (b) HOLDS: the 30 output lines and "[exit 0]" of probe 249 are
+  identical on all three runners (diff: no output), "dotted key of 100 parts: … full = \"recursion limit\n\"" included.
+tool versions: rustc 1.94.1 (e408947bf 2026-03-25) and cargo 1.94.1 (29ea6fb6a 2026-03-24) on all three, the 1.94 channel of
+  rust-toolchain.toml beside each source, installed by rustup on first use ("1.94-x86_64-unknown-linux-gnu (overridden by …)",
+  "1.94-aarch64-apple-darwin", "1.94-x86_64-pc-windows-msvc"); probe 249's `cargo tree --locked` prints toml 1.2.2+spec-1.1.0,
+  toml_parser 1.1.6+spec-1.1.0, toml_datetime 1.1.3+spec-1.1.0 on each. CARGO_BUILD_JOBS=2.
+jobs: rust ubuntu https://github.com/airsstack/airsl/actions/runs/45835818805/job/139964267123 ; rust macos https://github.com/airsstack/airsl/actions/runs/45835818805/job/139964266935 ; rust windows https://github.com/airsstack/airsl/actions/runs/45835818805/job/139964266843
+runner images: ubuntu-26.04 20261122.9.1, macos-26-arm64 20261117.0516.1, windows-2025-vs2026 20261116.315.1.
+sources: 250-ci-probe-src/probe/245/ (probe 245's entries.rs, control.rs, fixtures.sh unchanged; fixtures_windows.rs new;
+  rust-toolchain.toml as the repository's), 250-ci-probe-src/probe/249/ (probe 249's crate), job `rust` of the workflow.
+run: https://github.com/airsstack/airsl/actions/runs/45835818805 (attempt 1, trigger push, conclusion success); workflow 250-ci-probe-src/.github/workflows/probe.yml at head
+  c1a6f7a3c7fe9daf4aeca11b8c5147ed1288ea4d, pushed as the one ref probe-ci-rocks-2 from a fresh repository holding only the files of
+  250-ci-probe-src (committed as rstlix0x0), deleted after the run (probe 250's last section). actions/checkout@v5 (SHA
+  fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09). No tokens; no artifacts (total_count 0).
+date: 2026-11-26; logs fetched with: gh api --allow-escape-sequences repos/airsstack/airsl/actions/jobs/<id>/logs (byte for byte
+  below each marker; the Windows logs carry CRLF on every line, the runner's own lines included).
+# --- raw job log: rust (ubuntu-latest) (139964267123) ---
+﻿2026-11-26T14:07:27.8764368Z Current runner version: '2.338.2'
+2026-11-26T14:07:27.8787771Z ##[group]Runner Image Provisioner
+2026-11-26T14:07:27.8788554Z Hosted Compute Agent
+2026-11-26T14:07:27.8789036Z Version: 20261111.635
+2026-11-26T14:07:27.8789590Z Commit: b8a594ea514ff44cadb5342986c68b1eac6e22ed
+2026-11-26T14:07:27.8790247Z Build Date: 2026-11-11T01:49:01Z
+2026-11-26T14:07:27.8791012Z Worker ID: {74a2a7a7-218f-4247-a1dc-fc3c1cbc32b6}
+2026-11-26T14:07:27.8791644Z Region: westus3
+2026-11-26T14:07:27.8792103Z Cloud: Azure
+2026-11-26T14:07:27.8792534Z ##[endgroup]
+2026-11-26T14:07:27.8793657Z ##[group]Operating System
+2026-11-26T14:07:27.8794200Z Ubuntu
+2026-11-26T14:07:27.8794675Z 26.04.1
+2026-11-26T14:07:27.8795141Z LTS
+2026-11-26T14:07:27.8795566Z ##[endgroup]
+2026-11-26T14:07:27.8796608Z ##[group]Runner Image
+2026-11-26T14:07:27.8797198Z Image: ubuntu-26.04
+2026-11-26T14:07:27.8797695Z Version: 20261122.9.1
+2026-11-26T14:07:27.8798769Z Included Software: https://github.com/actions/runner-images/blob/ubuntu26/20261122.9/images/ubuntu/Ubuntu2604-Readme.md
+2026-11-26T14:07:27.8800079Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261122.9
+2026-11-26T14:07:27.8800852Z ##[endgroup]
+2026-11-26T14:07:27.8801781Z ##[group]GITHUB_TOKEN Permissions
+2026-11-26T14:07:27.8803611Z Contents: read
+2026-11-26T14:07:27.8804165Z Metadata: read
+2026-11-26T14:07:27.8804679Z ##[endgroup]
+2026-11-26T14:07:27.8806651Z Secret source: Actions
+2026-11-26T14:07:27.8807559Z Cache mode: write
+2026-11-26T14:07:27.8808321Z Prepare workflow directory
+2026-11-26T14:07:27.9144466Z Prepare all required actions
+2026-11-26T14:07:27.9186341Z Getting action download info
+2026-11-26T14:07:28.2095103Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-11-26T14:07:28.3847030Z Complete job name: rust (ubuntu-latest)
+2026-11-26T14:07:28.4570519Z ##[group]Run actions/checkout@v5
+2026-11-26T14:07:28.4571195Z with:
+2026-11-26T14:07:28.4571571Z   repository: airsstack/airsl
+2026-11-26T14:07:28.4574574Z   token: ***
+2026-11-26T14:07:28.4574944Z   ssh-strict: true
+2026-11-26T14:07:28.4575316Z   ssh-user: git
+2026-11-26T14:07:28.4575688Z   persist-credentials: true
+2026-11-26T14:07:28.4576096Z   clean: true
+2026-11-26T14:07:28.4576608Z   sparse-checkout-cone-mode: true
+2026-11-26T14:07:28.4577041Z   fetch-depth: 1
+2026-11-26T14:07:28.4577405Z   fetch-tags: false
+2026-11-26T14:07:28.4577778Z   show-progress: true
+2026-11-26T14:07:28.4578155Z   lfs: false
+2026-11-26T14:07:28.4578492Z   submodules: false
+2026-11-26T14:07:28.4578860Z   set-safe-directory: true
+2026-11-26T14:07:28.4579280Z   allow-unsafe-pr-checkout: false
+2026-11-26T14:07:28.4579845Z env:
+2026-11-26T14:07:28.4580182Z   CARGO_BUILD_JOBS: 2
+2026-11-26T14:07:28.4580558Z ##[endgroup]
+2026-11-26T14:07:28.7482846Z Syncing repository: airsstack/airsl
+2026-11-26T14:07:28.7491098Z ##[group]Getting Git version info
+2026-11-26T14:07:28.7491866Z Working directory is '/home/runner/work/airsl/airsl'
+2026-11-26T14:07:28.7493606Z [command]/usr/bin/git version
+2026-11-26T14:07:28.7514284Z git version 2.56.1
+2026-11-26T14:07:28.7535942Z ##[endgroup]
+2026-11-26T14:07:28.7551617Z Temporarily overriding HOME='/home/runner/work/_temp/dc9d5473-5ceb-4f2a-af39-5ba4df318628' before making global git config changes
+2026-11-26T14:07:28.7554001Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T14:07:28.7557839Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/airsl/airsl
+2026-11-26T14:07:28.7651638Z Deleting the contents of '/home/runner/work/airsl/airsl'
+2026-11-26T14:07:28.7657149Z ##[group]Initializing the repository
+2026-11-26T14:07:28.7662603Z [command]/usr/bin/git init /home/runner/work/airsl/airsl
+2026-11-26T14:07:28.7753657Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-26T14:07:28.7755259Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-26T14:07:28.7757240Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-26T14:07:28.7758965Z hint: call:
+2026-11-26T14:07:28.7759913Z hint:
+2026-11-26T14:07:28.7760930Z hint: 	git config --global init.defaultBranch <name>
+2026-11-26T14:07:28.7762064Z hint:
+2026-11-26T14:07:28.7763105Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-26T14:07:28.7764783Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-26T14:07:28.7766115Z hint:
+2026-11-26T14:07:28.7767001Z hint: 	git branch -m <name>
+2026-11-26T14:07:28.7767704Z hint:
+2026-11-26T14:07:28.7768592Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-26T14:07:28.7777962Z Initialized empty Git repository in /home/runner/work/airsl/airsl/.git/
+2026-11-26T14:07:28.7782054Z [command]/usr/bin/git remote add origin https://github.com/airsstack/airsl
+2026-11-26T14:07:28.7838709Z ##[endgroup]
+2026-11-26T14:07:28.7839928Z ##[group]Disabling automatic garbage collection
+2026-11-26T14:07:28.7842150Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-26T14:07:28.7888547Z ##[endgroup]
+2026-11-26T14:07:28.7889650Z ##[group]Setting up auth
+2026-11-26T14:07:28.7891948Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T14:07:28.7946329Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T14:07:28.8365554Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T14:07:28.8398387Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T14:07:28.8665664Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T14:07:28.8699366Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T14:07:28.8955233Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-26T14:07:28.8995566Z ##[endgroup]
+2026-11-26T14:07:28.8997016Z ##[group]Fetching the repository
+2026-11-26T14:07:28.9005424Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +c1a6f7a3c7fe9daf4aeca11b8c5147ed1288ea4d:refs/remotes/origin/probe-ci-rocks-2
+2026-11-26T14:07:29.3204714Z From https://github.com/airsstack/airsl
+2026-11-26T14:07:29.3206220Z  * [new ref]         c1a6f7a3c7fe9daf4aeca11b8c5147ed1288ea4d -> origin/probe-ci-rocks-2
+2026-11-26T14:07:29.3209273Z ##[endgroup]
+2026-11-26T14:07:29.3210519Z ##[group]Determining the checkout info
+2026-11-26T14:07:29.3211938Z ##[endgroup]
+2026-11-26T14:07:29.3216887Z [command]/usr/bin/git sparse-checkout disable
+2026-11-26T14:07:29.3265935Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-26T14:07:29.3297100Z ##[group]Checking out the ref
+2026-11-26T14:07:29.3301767Z [command]/usr/bin/git checkout --progress --force -B probe-ci-rocks-2 refs/remotes/origin/probe-ci-rocks-2
+2026-11-26T14:07:29.3379016Z Switched to a new branch 'probe-ci-rocks-2'
+2026-11-26T14:07:29.3382556Z branch 'probe-ci-rocks-2' set up to track 'origin/probe-ci-rocks-2'.
+2026-11-26T14:07:29.3389124Z ##[endgroup]
+2026-11-26T14:07:29.3436976Z [command]/usr/bin/git log -1 --format=%H
+2026-11-26T14:07:29.3463707Z c1a6f7a3c7fe9daf4aeca11b8c5147ed1288ea4d
+2026-11-26T14:07:29.3707676Z ##[group]Run echo "\$ rustup show active-toolchain; rustc --version; cargo --version   (in probe/245 and probe/249)"
+2026-11-26T14:07:29.3710141Z [36;1mecho "\$ rustup show active-toolchain; rustc --version; cargo --version   (in probe/245 and probe/249)"[0m
+2026-11-26T14:07:29.3712006Z [36;1mrustup show active-toolchain; rustc --version; cargo --version[0m
+2026-11-26T14:07:29.3713524Z [36;1mcd ../249 && rustup show active-toolchain && rustc --version && cargo --version[0m
+2026-11-26T14:07:29.3750306Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T14:07:29.3751238Z env:
+2026-11-26T14:07:29.3751696Z   CARGO_BUILD_JOBS: 2
+2026-11-26T14:07:29.3752224Z ##[endgroup]
+2026-11-26T14:07:29.3838280Z $ rustup show active-toolchain; rustc --version; cargo --version   (in probe/245 and probe/249)
+2026-11-26T14:07:29.4306196Z info: syncing channel updates for 1.94-x86_64-unknown-linux-gnu
+2026-11-26T14:07:29.5820638Z info: latest update on 2026-03-26 for version 1.94.1 (e408947bf 2026-03-25)
+2026-11-26T14:07:29.5822400Z info: downloading 5 components
+2026-11-26T14:07:36.8108357Z warn: the missing active toolchain `1.94-x86_64-unknown-linux-gnu` has been auto-installed
+2026-11-26T14:07:36.8109343Z 1.94-x86_64-unknown-linux-gnu (overridden by '/home/runner/work/airsl/airsl/probe/245/rust-toolchain.toml')
+2026-11-26T14:07:36.8110250Z warn: auto-installation is deprecated for most `rustup` commands
+2026-11-26T14:07:36.8111084Z warn: scripts relying on this behavior in `rustup` may stop working in the future
+2026-11-26T14:07:36.8111756Z warn: to install the active toolchain, use `rustup install` instead
+2026-11-26T14:07:36.8112366Z warn: see <https://github.com/rust-lang/rustup/issues/4836> for more info
+2026-11-26T14:07:36.8563735Z rustc 1.94.1 (e408947bf 2026-03-25)
+2026-11-26T14:07:36.8824943Z cargo 1.94.1 (29ea6fb6a 2026-03-24)
+2026-11-26T14:07:36.9028572Z 1.94-x86_64-unknown-linux-gnu (overridden by '/home/runner/work/airsl/airsl/probe/249/rust-toolchain.toml')
+2026-11-26T14:07:36.9314187Z rustc 1.94.1 (e408947bf 2026-03-25)
+2026-11-26T14:07:36.9563900Z cargo 1.94.1 (29ea6fb6a 2026-03-24)
+2026-11-26T14:07:36.9611500Z ##[group]Run set +e   # each command's exit is printed, as in the local probes
+2026-11-26T14:07:36.9611993Z [36;1mset +e   # each command's exit is printed, as in the local probes[0m
+2026-11-26T14:07:36.9612388Z [36;1mEXE=; [ "$RUNNER_OS" = Windows ] && EXE=.exe[0m
+2026-11-26T14:07:36.9612886Z [36;1mecho "\$ rustc --edition 2024 entries.rs -o entries$EXE && rustc --edition 2024 control.rs -o control$EXE"[0m
+2026-11-26T14:07:36.9613535Z [36;1mrustc --edition 2024 entries.rs -o "entries$EXE" && rustc --edition 2024 control.rs -o "control$EXE"; echo "[exit $?]"[0m
+2026-11-26T14:07:36.9644998Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T14:07:36.9645320Z env:
+2026-11-26T14:07:36.9645524Z   CARGO_BUILD_JOBS: 2
+2026-11-26T14:07:36.9645744Z ##[endgroup]
+2026-11-26T14:07:36.9696254Z $ rustc --edition 2024 entries.rs -o entries && rustc --edition 2024 control.rs -o control
+2026-11-26T14:07:37.2062736Z [exit 0]
+2026-11-26T14:07:37.2114427Z ##[group]Run set +e   # each command's exit is printed, as in the local probes
+2026-11-26T14:07:37.2183433Z [36;1mset +e   # each command's exit is printed, as in the local probes[0m
+2026-11-26T14:07:37.2183873Z [36;1mecho "\$ bash fixtures.sh <F>"[0m
+2026-11-26T14:07:37.2184182Z [36;1mbash probe/245/fixtures.sh "$RUNNER_TEMP/F"; echo "[exit $?]"[0m
+2026-11-26T14:07:37.2215809Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T14:07:37.2216099Z env:
+2026-11-26T14:07:37.2216277Z   CARGO_BUILD_JOBS: 2
+2026-11-26T14:07:37.2216728Z ##[endgroup]
+2026-11-26T14:07:37.2266751Z $ bash fixtures.sh <F>
+2026-11-26T14:07:37.2485734Z [exit 0]
+2026-11-26T14:07:37.2526748Z ##[group]Run for d in A B C D; do echo "\$ ls -la <F>/$d"; ls -la "$RUNNER_TEMP/F/$d"; done
+2026-11-26T14:07:37.2527228Z [36;1mfor d in A B C D; do echo "\$ ls -la <F>/$d"; ls -la "$RUNNER_TEMP/F/$d"; done[0m
+2026-11-26T14:07:37.2557651Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T14:07:37.2557930Z env:
+2026-11-26T14:07:37.2558097Z   CARGO_BUILD_JOBS: 2
+2026-11-26T14:07:37.2558296Z ##[endgroup]
+2026-11-26T14:07:37.2607242Z $ ls -la <F>/A
+2026-11-26T14:07:37.2645586Z total 20
+2026-11-26T14:07:37.2645872Z drwxr-xr-x 5 runner runner 4096 Nov 26 14:07 .
+2026-11-26T14:07:37.2646277Z drwxr-xr-x 7 runner runner 4096 Nov 26 14:07 ..
+2026-11-26T14:07:37.2647184Z -rw-r--r-- 1 runner runner    0 Nov 26 14:07 .DS_Store
+2026-11-26T14:07:37.2647708Z -rw-r--r-- 1 runner runner    0 Nov 26 14:07 .airsstack-0.2.0-1.rockspec
+2026-11-26T14:07:37.2648235Z drwxr-xr-x 2 runner runner 4096 Nov 26 14:07 .hidden-dir
+2026-11-26T14:07:37.2648729Z -rw-r--r-- 1 runner runner    0 Nov 26 14:07 .rockspec
+2026-11-26T14:07:37.2649215Z drwxr-xr-x 2 runner runner 4096 Nov 26 14:07 airsstack-0.2.0-1.rockspec
+2026-11-26T14:07:37.2649729Z prw-r--r-- 1 runner runner    0 Nov 26 14:07 airsstack-luajit-0.2.0-1.rockspec
+2026-11-26T14:07:37.2650213Z drwxr-xr-x 2 runner runner 4096 Nov 26 14:07 notes
+2026-11-26T14:07:37.2650618Z -rw-r--r-- 1 runner runner    0 Nov 26 14:07 notes.txt
+2026-11-26T14:07:37.2651030Z $ ls -la <F>/B
+2026-11-26T14:07:37.2684001Z total 8
+2026-11-26T14:07:37.2684359Z drwxr-xr-x 2 runner runner 4096 Nov 26 14:07 .
+2026-11-26T14:07:37.2684767Z drwxr-xr-x 7 runner runner 4096 Nov 26 14:07 ..
+2026-11-26T14:07:37.2685158Z lrwxrwxrwx 1 runner runner   16 Nov 26 14:07 airsstack-0.2.0-1.rockspec -> ../real.rockspec
+2026-11-26T14:07:37.2685673Z lrwxrwxrwx 1 runner runner   12 Nov 26 14:07 airsstack-luajit-0.2.0-1.rockspec -> ../targetdir
+2026-11-26T14:07:37.2687776Z $ ls -la <F>/C
+2026-11-26T14:07:37.2719742Z total 12
+2026-11-26T14:07:37.2720078Z drwxr-xr-x 2 runner runner 4096 Nov 26 14:07 .
+2026-11-26T14:07:37.2720493Z drwxr-xr-x 7 runner runner 4096 Nov 26 14:07 ..
+2026-11-26T14:07:37.2721075Z lrwxrwxrwx 1 runner runner   19 Nov 26 14:07 airsstack-0.2.0-1.rockspec -> ../no-such.rockspec
+2026-11-26T14:07:37.2721753Z -rw-r--r-- 1 runner runner   14 Nov 26 14:07 airsstack-luajit-0.2.0-1.rockspec
+2026-11-26T14:07:37.2723892Z $ ls -la <F>/D
+2026-11-26T14:07:37.2756270Z total 8
+2026-11-26T14:07:37.2756693Z drwxr-xr-x 2 runner runner 4096 Nov 26 14:07 .
+2026-11-26T14:07:37.2757155Z drwxr-xr-x 7 runner runner 4096 Nov 26 14:07 ..
+2026-11-26T14:07:37.2757489Z -rw-r--r-- 1 runner runner    0 Nov 26 14:07 .DS_Store
+2026-11-26T14:07:37.2757795Z -rw-r--r-- 1 runner runner    0 Nov 26 14:07 .gitkeep
+2026-11-26T14:07:37.2792665Z ##[group]Run set +e   # each command's exit is printed, as in the local probes
+2026-11-26T14:07:37.2793092Z [36;1mset +e   # each command's exit is printed, as in the local probes[0m
+2026-11-26T14:07:37.2793403Z [36;1mEXE=; [ "$RUNNER_OS" = Windows ] && EXE=.exe[0m
+2026-11-26T14:07:37.2793796Z [36;1mfor d in A B C D; do echo "\$ entries <F>/$d"; "./entries$EXE" "$RUNNER_TEMP/F/$d" 2>&1; echo "[exit $?]"; done[0m
+2026-11-26T14:07:37.2794232Z [36;1mecho "\$ control <F>/A/airsstack-0.2.0-1.rockspec   (a directory)"[0m
+2026-11-26T14:07:37.2794641Z [36;1m"./control$EXE" "$RUNNER_TEMP/F/A/airsstack-0.2.0-1.rockspec" 2>&1; echo "[exit $?]"[0m
+2026-11-26T14:07:37.2826693Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T14:07:37.2826975Z env:
+2026-11-26T14:07:37.2827145Z   CARGO_BUILD_JOBS: 2
+2026-11-26T14:07:37.2827329Z ##[endgroup]
+2026-11-26T14:07:37.2876292Z $ entries <F>/A
+2026-11-26T14:07:37.2885146Z trace: skipped ".DS_Store" (hidden)
+2026-11-26T14:07:37.2885698Z trace: skipped ".airsstack-0.2.0-1.rockspec" (hidden)
+2026-11-26T14:07:37.2886106Z trace: skipped ".hidden-dir" (hidden)
+2026-11-26T14:07:37.2886357Z trace: skipped ".rockspec" (hidden)
+2026-11-26T14:07:37.2887183Z crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec: is not a regular file, so it cannot be a rockspec
+2026-11-26T14:07:37.2887862Z crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec: is not a regular file, so it cannot be a rockspec
+2026-11-26T14:07:37.2888929Z crates/airsl-lua/rockspecs/notes: is not a rockspec; only the two rockspecs live here
+2026-11-26T14:07:37.2889682Z crates/airsl-lua/rockspecs/notes.txt: is not a rockspec; only the two rockspecs live here
+2026-11-26T14:07:37.2890362Z [exit 0]
+2026-11-26T14:07:37.2890630Z $ entries <F>/B
+2026-11-26T14:07:37.2896548Z trace: crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec read, 22 bytes; the per-line checks run
+2026-11-26T14:07:37.2897497Z crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec: is not a regular file, so it cannot be a rockspec
+2026-11-26T14:07:37.2898420Z [exit 0]
+2026-11-26T14:07:37.2898893Z $ entries <F>/C
+2026-11-26T14:07:37.2906595Z crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec: could not be read: No such file or directory (os error 2)
+2026-11-26T14:07:37.2907387Z crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec: could not be read: stream did not contain valid UTF-8
+2026-11-26T14:07:37.2909929Z [exit 0]
+2026-11-26T14:07:37.2910196Z $ entries <F>/D
+2026-11-26T14:07:37.2916146Z trace: skipped ".DS_Store" (hidden)
+2026-11-26T14:07:37.2916616Z trace: skipped ".gitkeep" (hidden)
+2026-11-26T14:07:37.2917407Z crates/airsl-lua/rockspecs: has no `airsstack-0.2.0-1.rockspec`, which the workspace version 0.2.0 needs; a version bump renames both rockspecs
+2026-11-26T14:07:37.2918610Z crates/airsl-lua/rockspecs: has no `airsstack-luajit-0.2.0-1.rockspec`, which the workspace version 0.2.0 needs; a version bump renames both rockspecs
+2026-11-26T14:07:37.2919648Z [exit 0]
+2026-11-26T14:07:37.2920022Z $ control <F>/A/airsstack-0.2.0-1.rockspec   (a directory)
+2026-11-26T14:07:37.2926378Z Err(Os { code: 21, kind: IsADirectory, message: "Is a directory" })
+2026-11-26T14:07:37.2927626Z [exit 0]
+2026-11-26T14:07:37.2957510Z ##[group]Run set +e   # each command's exit is printed, as in the local probes
+2026-11-26T14:07:37.2957944Z [36;1mset +e   # each command's exit is printed, as in the local probes[0m
+2026-11-26T14:07:37.2958278Z [36;1mecho "\$ cargo run --locked --quiet"[0m
+2026-11-26T14:07:37.2958559Z [36;1mcargo run --locked --quiet 2>&1; echo "[exit $?]"[0m
+2026-11-26T14:07:37.2958828Z [36;1mecho "\$ cargo tree --locked"[0m
+2026-11-26T14:07:37.2959058Z [36;1mcargo tree --locked 2>&1[0m
+2026-11-26T14:07:37.2990744Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T14:07:37.2991039Z env:
+2026-11-26T14:07:37.2991208Z   CARGO_BUILD_JOBS: 2
+2026-11-26T14:07:37.2991395Z ##[endgroup]
+2026-11-26T14:07:37.3040293Z $ cargo run --locked --quiet
+2026-11-26T14:07:39.7695512Z unclosed header: Display has 5 lines; full = "TOML parse error at line 1, column 9\n  |\n1 | [package\n  |         ^\nunclosed table, expected `]`\n"
+2026-11-26T14:07:39.7696939Z unclosed header: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 1, column 9: unclosed table, expected `]`"
+2026-11-26T14:07:39.7698062Z missing value: Display has 5 lines; full = "TOML parse error at line 2, column 7\n  |\n2 | name =\n  |       ^\nstring values must be quoted, expected literal string\n"
+2026-11-26T14:07:39.7699251Z missing value: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 7: string values must be quoted, expected literal string"
+2026-11-26T14:07:39.7700357Z duplicate key: Display has 5 lines; full = "TOML parse error at line 3, column 1\n  |\n3 | name = \"b\"\n  | ^^^^\nduplicate key\n"
+2026-11-26T14:07:39.7701311Z duplicate key: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 3, column 1: duplicate key"
+2026-11-26T14:07:39.7702416Z unterminated string: Display has 5 lines; full = "TOML parse error at line 2, column 14\n  |\n2 | name = \"airsl\n  |              ^\ninvalid basic string, expected `\"`\n"
+2026-11-26T14:07:39.7703367Z unterminated string: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 14: invalid basic string, expected `\"`"
+2026-11-26T14:07:39.7704294Z error on line 3: Display has 5 lines; full = "TOML parse error at line 3, column 21\n  |\n3 | version.workspace = = true\n  |                     ^\nextra `=`, expected nothing\n"
+2026-11-26T14:07:39.7705006Z error on line 3: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 3, column 21: extra `=`, expected nothing"
+2026-11-26T14:07:39.7705625Z duplicate table: Display has 5 lines; full = "TOML parse error at line 2, column 2\n  |\n2 | [package]\n  |  ^^^^^^^\nduplicate key\n"
+2026-11-26T14:07:39.7706690Z duplicate table: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 2: duplicate key"
+2026-11-26T14:07:39.7707915Z crlf unclosed header: Display has 5 lines; full = "TOML parse error at line 1, column 9\n  |\n1 | [package\r\n  |         ^\nunclosed table, expected `]`\n"
+2026-11-26T14:07:39.7708903Z crlf unclosed header: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 1, column 9: unclosed table, expected `]`"
+2026-11-26T14:07:39.7709711Z dotted key of 100 parts: Display has 1 lines; full = "recursion limit\n"
+2026-11-26T14:07:39.7710452Z dotted key of 100 parts: message = "crates/airsl/Cargo.toml: is not valid TOML: recursion limit"
+2026-11-26T14:07:39.7711809Z arrays nested 100 deep: Display has 5 lines; full = "TOML parse error at line 1, column 85\n  |\n1 | x = [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\n  |                                                                                     ^\ncannot recurse further; max recursion depth met\n"
+2026-11-26T14:07:39.7713655Z arrays nested 100 deep: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 1, column 85: cannot recurse further; max recursion depth met"
+2026-11-26T14:07:39.7714893Z invalid date-time: Display has 5 lines; full = "TOML parse error at line 2, column 8\n  |\n2 | date = 2026-13-45\n  |        ^^^^^^^^^^\ninvalid date, expected month between 01 and 12\n"
+2026-11-26T14:07:39.7716096Z invalid date-time: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 8: invalid date, expected month between 01 and 12"
+2026-11-26T14:07:39.7717502Z two values on one line: Display has 5 lines; full = "TOML parse error at line 2, column 12\n  |\n2 | name = \"a\" version = \"b\"\n  |            ^\nunexpected key or value, expected newline, `#`\n"
+2026-11-26T14:07:39.7718736Z two values on one line: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 12: unexpected key or value, expected newline, `#`"
+2026-11-26T14:07:39.7720011Z bare carriage return: Display has 5 lines; full = "TOML parse error at line 2, column 12\n  |\n2 | name = \"a\"\r\r\n  |            ^\ncarriage return must be followed by newline, expected newline\n"
+2026-11-26T14:07:39.7721322Z bare carriage return: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 12: carriage return must be followed by newline, expected newline"
+2026-11-26T14:07:39.7722768Z invalid escape: Display has 5 lines; full = "TOML parse error at line 2, column 10\n  |\n2 | name = \"\\q\"\n  |          ^\nmissing escaped value, expected `b`, `e`, `f`, `n`, `r`, `\\`, `\"`, `x`, `u`, `U`\n"
+2026-11-26T14:07:39.7724063Z invalid escape: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 10: missing escaped value, expected `b`, `e`, `f`, `n`, `r`, `\\`, `\"`, `x`, `u`, `U`"
+2026-11-26T14:07:39.7725371Z end of file, no newline: Display has 5 lines; full = "TOML parse error at line 2, column 7\n  |\n2 | name =\n  |       ^\nstring values must be quoted, expected literal string\n"
+2026-11-26T14:07:39.7726663Z end of file, no newline: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 7: string values must be quoted, expected literal string"
+2026-11-26T14:07:39.7727978Z dotted key extends a value: Display has 5 lines; full = "TOML parse error at line 3, column 1\n  |\n3 | version.workspace = true\n  | ^^^^^^^\ncannot extend value of type integer with a dotted key\n"
+2026-11-26T14:07:39.7729370Z dotted key extends a value: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 3, column 1: cannot extend value of type integer with a dotted key"
+2026-11-26T14:07:39.7730202Z [exit 0]
+2026-11-26T14:07:39.7730439Z $ cargo tree --locked
+2026-11-26T14:07:39.8067462Z p249 v0.0.0 (/home/runner/work/airsl/airsl/probe/249)
+2026-11-26T14:07:39.8068591Z └── toml v1.2.2+spec-1.1.0
+2026-11-26T14:07:39.8068951Z     ├── serde_core v1.0.229
+2026-11-26T14:07:39.8069291Z     ├── serde_spanned v1.1.3
+2026-11-26T14:07:39.8069627Z     │   └── serde_core v1.0.229
+2026-11-26T14:07:39.8070015Z     ├── toml_datetime v1.1.3+spec-1.1.0
+2026-11-26T14:07:39.8070383Z     │   └── serde_core v1.0.229
+2026-11-26T14:07:39.8070722Z     ├── toml_parser v1.1.6+spec-1.1.0
+2026-11-26T14:07:39.8071073Z     │   └── winnow v1.0.5
+2026-11-26T14:07:39.8071367Z     └── winnow v1.0.5
+2026-11-26T14:07:39.8178936Z Post job cleanup.
+2026-11-26T14:07:39.8889797Z [command]/usr/bin/git version
+2026-11-26T14:07:39.8925356Z git version 2.56.1
+2026-11-26T14:07:39.8959328Z Temporarily overriding HOME='/home/runner/work/_temp/b0a3eb6c-6d35-4602-9624-98570ef437ba' before making global git config changes
+2026-11-26T14:07:39.8960268Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T14:07:39.8964101Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/airsl/airsl
+2026-11-26T14:07:39.9006856Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T14:07:39.9043107Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T14:07:39.9329365Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T14:07:39.9354263Z http.https://github.com/.extraheader
+2026-11-26T14:07:39.9365284Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-26T14:07:39.9398197Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T14:07:39.9681812Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T14:07:39.9724647Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T14:07:40.0118091Z Cleaning up orphan processes
+# --- raw job log: rust (macos-latest) (139964266935) ---
+﻿2026-11-26T14:07:31.2760520Z Current runner version: '2.338.2'
+2026-11-26T14:07:31.2801230Z ##[group]Runner Image Provisioner
+2026-11-26T14:07:31.2802000Z Hosted Compute Agent
+2026-11-26T14:07:31.2802400Z Version: 20261111.635
+2026-11-26T14:07:31.2802830Z Commit: b8a594ea514ff44cadb5342986c68b1eac6e22ed
+2026-11-26T14:07:31.2803310Z Build Date: 2026-11-11T01:49:01Z
+2026-11-26T14:07:31.2803760Z Worker ID: {b6c1ff66-8a01-426d-97ea-0325dd55420d}
+2026-11-26T14:07:31.2804230Z Region: westus
+2026-11-26T14:07:31.2805360Z Cloud: MacCloud
+2026-11-26T14:07:31.2806120Z ##[endgroup]
+2026-11-26T14:07:31.2807910Z ##[group]Operating System
+2026-11-26T14:07:31.2808810Z macOS
+2026-11-26T14:07:31.2809250Z 26.7.2
+2026-11-26T14:07:31.2809580Z 25G332
+2026-11-26T14:07:31.2809950Z ##[endgroup]
+2026-11-26T14:07:31.2810320Z ##[group]Runner Image
+2026-11-26T14:07:31.2810790Z Image: macos-26-arm64
+2026-11-26T14:07:31.2811200Z Version: 20261117.0516.1
+2026-11-26T14:07:31.2812130Z Included Software: https://github.com/actions/runner-images/blob/macos-26-arm64/20261117.0516/images/macos/macos-26-arm64-Readme.md
+2026-11-26T14:07:31.2813370Z Image Release: https://github.com/actions/runner-images/releases/tag/macos-26-arm64%2F20261117.0516
+2026-11-26T14:07:31.2814950Z ##[endgroup]
+2026-11-26T14:07:31.2815810Z ##[group]GITHUB_TOKEN Permissions
+2026-11-26T14:07:31.2818090Z Contents: read
+2026-11-26T14:07:31.2818490Z Metadata: read
+2026-11-26T14:07:31.2818880Z ##[endgroup]
+2026-11-26T14:07:31.2852690Z Secret source: Actions
+2026-11-26T14:07:31.2853670Z Cache mode: write
+2026-11-26T14:07:31.2854230Z Prepare workflow directory
+2026-11-26T14:07:31.3647770Z Prepare all required actions
+2026-11-26T14:07:31.4854530Z Getting action download info
+2026-11-26T14:07:31.8021750Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-11-26T14:07:32.3704880Z Complete job name: rust (macos-latest)
+2026-11-26T14:07:32.4439790Z ##[group]Run actions/checkout@v5
+2026-11-26T14:07:32.4440430Z with:
+2026-11-26T14:07:32.4440770Z   repository: airsstack/airsl
+2026-11-26T14:07:32.4443760Z   token: ***
+2026-11-26T14:07:32.4444080Z   ssh-strict: true
+2026-11-26T14:07:32.4444420Z   ssh-user: git
+2026-11-26T14:07:32.4444750Z   persist-credentials: true
+2026-11-26T14:07:32.4445120Z   clean: true
+2026-11-26T14:07:32.4445460Z   sparse-checkout-cone-mode: true
+2026-11-26T14:07:32.4445960Z   fetch-depth: 1
+2026-11-26T14:07:32.4446360Z   fetch-tags: false
+2026-11-26T14:07:32.4446780Z   show-progress: true
+2026-11-26T14:07:32.4447130Z   lfs: false
+2026-11-26T14:07:32.4447440Z   submodules: false
+2026-11-26T14:07:32.4447780Z   set-safe-directory: true
+2026-11-26T14:07:32.4448150Z   allow-unsafe-pr-checkout: false
+2026-11-26T14:07:32.4448890Z env:
+2026-11-26T14:07:32.4449210Z   CARGO_BUILD_JOBS: 2
+2026-11-26T14:07:32.4449540Z ##[endgroup]
+2026-11-26T14:07:32.8215550Z Syncing repository: airsstack/airsl
+2026-11-26T14:07:32.8217210Z ##[group]Getting Git version info
+2026-11-26T14:07:32.8217810Z Working directory is '/Users/runner/work/airsl/airsl'
+2026-11-26T14:07:32.8218780Z [command]/opt/homebrew/bin/git version
+2026-11-26T14:07:32.8813810Z git version 2.56.1
+2026-11-26T14:07:32.8842700Z ##[endgroup]
+2026-11-26T14:07:32.8853090Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/5279fb2c-7130-455d-8b01-b3bbdb925f5b/.gitconfig'
+2026-11-26T14:07:32.8863240Z Temporarily overriding HOME='/Users/runner/work/_temp/5279fb2c-7130-455d-8b01-b3bbdb925f5b' before making global git config changes
+2026-11-26T14:07:32.8869520Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T14:07:32.8872520Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/airsl/airsl
+2026-11-26T14:07:32.9004090Z Deleting the contents of '/Users/runner/work/airsl/airsl'
+2026-11-26T14:07:32.9006740Z ##[group]Initializing the repository
+2026-11-26T14:07:32.9010330Z [command]/opt/homebrew/bin/git init /Users/runner/work/airsl/airsl
+2026-11-26T14:07:32.9278370Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-26T14:07:32.9281730Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-26T14:07:32.9282700Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-26T14:07:32.9283670Z hint: call:
+2026-11-26T14:07:32.9284090Z hint:
+2026-11-26T14:07:32.9285400Z hint: 	git config --global init.defaultBranch <name>
+2026-11-26T14:07:32.9286120Z hint:
+2026-11-26T14:07:32.9286730Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-26T14:07:32.9287560Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-26T14:07:32.9288920Z hint:
+2026-11-26T14:07:32.9289420Z hint: 	git branch -m <name>
+2026-11-26T14:07:32.9289960Z hint:
+2026-11-26T14:07:32.9290530Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-26T14:07:32.9297410Z Initialized empty Git repository in /Users/runner/work/airsl/airsl/.git/
+2026-11-26T14:07:32.9316160Z [command]/opt/homebrew/bin/git remote add origin https://github.com/airsstack/airsl
+2026-11-26T14:07:32.9404010Z ##[endgroup]
+2026-11-26T14:07:32.9405110Z ##[group]Disabling automatic garbage collection
+2026-11-26T14:07:32.9408150Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+2026-11-26T14:07:32.9494430Z ##[endgroup]
+2026-11-26T14:07:32.9495270Z ##[group]Setting up auth
+2026-11-26T14:07:32.9496000Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T14:07:32.9584120Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T14:07:33.1027190Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T14:07:33.1114740Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T14:07:33.2095220Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T14:07:33.2163570Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T14:07:33.3456430Z [command]/opt/homebrew/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-26T14:07:33.3546820Z ##[endgroup]
+2026-11-26T14:07:33.3551600Z ##[group]Fetching the repository
+2026-11-26T14:07:33.3554130Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +c1a6f7a3c7fe9daf4aeca11b8c5147ed1288ea4d:refs/remotes/origin/probe-ci-rocks-2
+2026-11-26T14:07:34.0130440Z From https://github.com/airsstack/airsl
+2026-11-26T14:07:34.0148910Z  * [new ref]         c1a6f7a3c7fe9daf4aeca11b8c5147ed1288ea4d -> origin/probe-ci-rocks-2
+2026-11-26T14:07:34.0206780Z ##[endgroup]
+2026-11-26T14:07:34.0208080Z ##[group]Determining the checkout info
+2026-11-26T14:07:34.0209510Z ##[endgroup]
+2026-11-26T14:07:34.0210470Z [command]/opt/homebrew/bin/git sparse-checkout disable
+2026-11-26T14:07:34.0272050Z [command]/opt/homebrew/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-26T14:07:34.0367870Z ##[group]Checking out the ref
+2026-11-26T14:07:34.0379420Z [command]/opt/homebrew/bin/git checkout --progress --force -B probe-ci-rocks-2 refs/remotes/origin/probe-ci-rocks-2
+2026-11-26T14:07:34.0594780Z Switched to a new branch 'probe-ci-rocks-2'
+2026-11-26T14:07:34.0602270Z branch 'probe-ci-rocks-2' set up to track 'origin/probe-ci-rocks-2'.
+2026-11-26T14:07:34.0608310Z ##[endgroup]
+2026-11-26T14:07:34.0730730Z [command]/opt/homebrew/bin/git log -1 --format=%H
+2026-11-26T14:07:34.0815330Z c1a6f7a3c7fe9daf4aeca11b8c5147ed1288ea4d
+2026-11-26T14:07:34.1162540Z ##[group]Run echo "\$ rustup show active-toolchain; rustc --version; cargo --version   (in probe/245 and probe/249)"
+2026-11-26T14:07:34.1165170Z [36;1mecho "\$ rustup show active-toolchain; rustc --version; cargo --version   (in probe/245 and probe/249)"[0m
+2026-11-26T14:07:34.1167340Z [36;1mrustup show active-toolchain; rustc --version; cargo --version[0m
+2026-11-26T14:07:34.1168860Z [36;1mcd ../249 && rustup show active-toolchain && rustc --version && cargo --version[0m
+2026-11-26T14:07:34.1215280Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T14:07:34.1216370Z env:
+2026-11-26T14:07:34.1217050Z   CARGO_BUILD_JOBS: 2
+2026-11-26T14:07:34.1217880Z ##[endgroup]
+2026-11-26T14:07:34.1669480Z $ rustup show active-toolchain; rustc --version; cargo --version   (in probe/245 and probe/249)
+2026-11-26T14:07:34.2633620Z info: syncing channel updates for 1.94-aarch64-apple-darwin
+2026-11-26T14:07:34.3846080Z info: latest update on 2026-03-26 for version 1.94.1 (e408947bf 2026-03-25)
+2026-11-26T14:07:34.3855570Z info: downloading 5 components
+2026-11-26T14:07:45.0974350Z warn: the missing active toolchain `1.94-aarch64-apple-darwin` has been auto-installed
+2026-11-26T14:07:45.0985140Z 1.94-aarch64-apple-darwin (overridden by '/Users/runner/work/airsl/airsl/probe/245/rust-toolchain.toml')
+2026-11-26T14:07:45.1013870Z warn: auto-installation is deprecated for most `rustup` commands
+2026-11-26T14:07:45.1016840Z warn: scripts relying on this behavior in `rustup` may stop working in the future
+2026-11-26T14:07:45.1026870Z warn: to install the active toolchain, use `rustup install` instead
+2026-11-26T14:07:45.1036590Z warn: see <https://github.com/rust-lang/rustup/issues/4836> for more info
+2026-11-26T14:07:45.5786810Z rustc 1.94.1 (e408947bf 2026-03-25)
+2026-11-26T14:07:45.7786420Z cargo 1.94.1 (29ea6fb6a 2026-03-24)
+2026-11-26T14:07:45.8559770Z 1.94-aarch64-apple-darwin (overridden by '/Users/runner/work/airsl/airsl/probe/249/rust-toolchain.toml')
+2026-11-26T14:07:45.9468380Z rustc 1.94.1 (e408947bf 2026-03-25)
+2026-11-26T14:07:46.0479540Z cargo 1.94.1 (29ea6fb6a 2026-03-24)
+2026-11-26T14:07:46.0738810Z ##[group]Run set +e   # each command's exit is printed, as in the local probes
+2026-11-26T14:07:46.0740710Z [36;1mset +e   # each command's exit is printed, as in the local probes[0m
+2026-11-26T14:07:46.0742300Z [36;1mEXE=; [ "$RUNNER_OS" = Windows ] && EXE=.exe[0m
+2026-11-26T14:07:46.0743850Z [36;1mecho "\$ rustc --edition 2024 entries.rs -o entries$EXE && rustc --edition 2024 control.rs -o control$EXE"[0m
+2026-11-26T14:07:46.0746080Z [36;1mrustc --edition 2024 entries.rs -o "entries$EXE" && rustc --edition 2024 control.rs -o "control$EXE"; echo "[exit $?]"[0m
+2026-11-26T14:07:46.0870230Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T14:07:46.0870810Z env:
+2026-11-26T14:07:46.0871080Z   CARGO_BUILD_JOBS: 2
+2026-11-26T14:07:46.0871600Z ##[endgroup]
+2026-11-26T14:07:46.2155720Z $ rustc --edition 2024 entries.rs -o entries && rustc --edition 2024 control.rs -o control
+2026-11-26T14:07:52.9267190Z [exit 0]
+2026-11-26T14:07:52.9690940Z ##[group]Run set +e   # each command's exit is printed, as in the local probes
+2026-11-26T14:07:52.9692540Z [36;1mset +e   # each command's exit is printed, as in the local probes[0m
+2026-11-26T14:07:52.9696540Z [36;1mecho "\$ bash fixtures.sh <F>"[0m
+2026-11-26T14:07:52.9697090Z [36;1mbash probe/245/fixtures.sh "$RUNNER_TEMP/F"; echo "[exit $?]"[0m
+2026-11-26T14:07:52.9763220Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T14:07:52.9763760Z env:
+2026-11-26T14:07:52.9764000Z   CARGO_BUILD_JOBS: 2
+2026-11-26T14:07:52.9764400Z ##[endgroup]
+2026-11-26T14:07:53.1163680Z $ bash fixtures.sh <F>
+2026-11-26T14:07:53.2372140Z [exit 0]
+2026-11-26T14:07:53.2458480Z ##[group]Run for d in A B C D; do echo "\$ ls -la <F>/$d"; ls -la "$RUNNER_TEMP/F/$d"; done
+2026-11-26T14:07:53.2459140Z [36;1mfor d in A B C D; do echo "\$ ls -la <F>/$d"; ls -la "$RUNNER_TEMP/F/$d"; done[0m
+2026-11-26T14:07:53.2523020Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T14:07:53.2529080Z env:
+2026-11-26T14:07:53.2530950Z   CARGO_BUILD_JOBS: 2
+2026-11-26T14:07:53.2561100Z ##[endgroup]
+2026-11-26T14:07:53.3497800Z $ ls -la <F>/A
+2026-11-26T14:07:53.3596040Z total 0
+2026-11-26T14:07:53.3596680Z drwxr-xr-x  10 runner  staff  320 Nov 26 14:07 .
+2026-11-26T14:07:53.3597160Z drwxr-xr-x   8 runner  staff  256 Nov 26 14:07 ..
+2026-11-26T14:07:53.3597800Z -rw-r--r--   1 runner  staff    0 Nov 26 14:07 .airsstack-0.2.0-1.rockspec
+2026-11-26T14:07:53.3598390Z -rw-r--r--   1 runner  staff    0 Nov 26 14:07 .DS_Store
+2026-11-26T14:07:53.3598780Z drwxr-xr-x   2 runner  staff   64 Nov 26 14:07 .hidden-dir
+2026-11-26T14:07:53.3599460Z -rw-r--r--   1 runner  staff    0 Nov 26 14:07 .rockspec
+2026-11-26T14:07:53.3600000Z drwxr-xr-x   2 runner  staff   64 Nov 26 14:07 airsstack-0.2.0-1.rockspec
+2026-11-26T14:07:53.3600510Z prw-r--r--   1 runner  staff    0 Nov 26 14:07 airsstack-luajit-0.2.0-1.rockspec
+2026-11-26T14:07:53.3600980Z drwxr-xr-x   2 runner  staff   64 Nov 26 14:07 notes
+2026-11-26T14:07:53.3601270Z -rw-r--r--   1 runner  staff    0 Nov 26 14:07 notes.txt
+2026-11-26T14:07:53.3601670Z $ ls -la <F>/B
+2026-11-26T14:07:53.3661550Z total 0
+2026-11-26T14:07:53.3662370Z drwxr-xr-x  4 runner  staff  128 Nov 26 14:07 .
+2026-11-26T14:07:53.3662830Z drwxr-xr-x  8 runner  staff  256 Nov 26 14:07 ..
+2026-11-26T14:07:53.3663420Z lrwxr-xr-x  1 runner  staff   16 Nov 26 14:07 airsstack-0.2.0-1.rockspec -> ../real.rockspec
+2026-11-26T14:07:53.3664330Z lrwxr-xr-x  1 runner  staff   12 Nov 26 14:07 airsstack-luajit-0.2.0-1.rockspec -> ../targetdir
+2026-11-26T14:07:53.3664990Z $ ls -la <F>/C
+2026-11-26T14:07:53.3766620Z total 8
+2026-11-26T14:07:53.3768290Z drwxr-xr-x  4 runner  staff  128 Nov 26 14:07 .
+2026-11-26T14:07:53.3772130Z drwxr-xr-x  8 runner  staff  256 Nov 26 14:07 ..
+2026-11-26T14:07:53.3776240Z lrwxr-xr-x  1 runner  staff   19 Nov 26 14:07 airsstack-0.2.0-1.rockspec -> ../no-such.rockspec
+2026-11-26T14:07:53.3776980Z -rw-r--r--  1 runner  staff   14 Nov 26 14:07 airsstack-luajit-0.2.0-1.rockspec
+2026-11-26T14:07:53.3777690Z $ ls -la <F>/D
+2026-11-26T14:07:53.3847790Z total 0
+2026-11-26T14:07:53.3848440Z drwxr-xr-x  4 runner  staff  128 Nov 26 14:07 .
+2026-11-26T14:07:53.3848960Z drwxr-xr-x  8 runner  staff  256 Nov 26 14:07 ..
+2026-11-26T14:07:53.3849330Z -rw-r--r--  1 runner  staff    0 Nov 26 14:07 .DS_Store
+2026-11-26T14:07:53.3850200Z -rw-r--r--  1 runner  staff    0 Nov 26 14:07 .gitkeep
+2026-11-26T14:07:53.3920320Z ##[group]Run set +e   # each command's exit is printed, as in the local probes
+2026-11-26T14:07:53.3921100Z [36;1mset +e   # each command's exit is printed, as in the local probes[0m
+2026-11-26T14:07:53.3921510Z [36;1mEXE=; [ "$RUNNER_OS" = Windows ] && EXE=.exe[0m
+2026-11-26T14:07:53.3922110Z [36;1mfor d in A B C D; do echo "\$ entries <F>/$d"; "./entries$EXE" "$RUNNER_TEMP/F/$d" 2>&1; echo "[exit $?]"; done[0m
+2026-11-26T14:07:53.3922630Z [36;1mecho "\$ control <F>/A/airsstack-0.2.0-1.rockspec   (a directory)"[0m
+2026-11-26T14:07:53.3923090Z [36;1m"./control$EXE" "$RUNNER_TEMP/F/A/airsstack-0.2.0-1.rockspec" 2>&1; echo "[exit $?]"[0m
+2026-11-26T14:07:53.4003950Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T14:07:53.4004800Z env:
+2026-11-26T14:07:53.4005240Z   CARGO_BUILD_JOBS: 2
+2026-11-26T14:07:53.4005910Z ##[endgroup]
+2026-11-26T14:07:53.4901820Z $ entries <F>/A
+2026-11-26T14:07:53.4941070Z trace: skipped ".DS_Store" (hidden)
+2026-11-26T14:07:53.4941590Z trace: skipped ".airsstack-0.2.0-1.rockspec" (hidden)
+2026-11-26T14:07:53.4941910Z trace: skipped ".hidden-dir" (hidden)
+2026-11-26T14:07:53.4942150Z trace: skipped ".rockspec" (hidden)
+2026-11-26T14:07:53.4942630Z crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec: is not a regular file, so it cannot be a rockspec
+2026-11-26T14:07:53.4943300Z crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec: is not a regular file, so it cannot be a rockspec
+2026-11-26T14:07:53.4943940Z crates/airsl-lua/rockspecs/notes: is not a rockspec; only the two rockspecs live here
+2026-11-26T14:07:53.4944590Z crates/airsl-lua/rockspecs/notes.txt: is not a rockspec; only the two rockspecs live here
+2026-11-26T14:07:53.4945650Z [exit 0]
+2026-11-26T14:07:53.4945840Z $ entries <F>/B
+2026-11-26T14:07:53.4994270Z trace: crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec read, 22 bytes; the per-line checks run
+2026-11-26T14:07:53.4995010Z crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec: is not a regular file, so it cannot be a rockspec
+2026-11-26T14:07:53.4997910Z [exit 0]
+2026-11-26T14:07:53.4998400Z $ entries <F>/C
+2026-11-26T14:07:53.5079040Z crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec: could not be read: No such file or directory (os error 2)
+2026-11-26T14:07:53.5084770Z crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec: could not be read: stream did not contain valid UTF-8
+2026-11-26T14:07:53.5088040Z [exit 0]
+2026-11-26T14:07:53.5088410Z $ entries <F>/D
+2026-11-26T14:07:53.5194090Z trace: skipped ".DS_Store" (hidden)
+2026-11-26T14:07:53.5197790Z trace: skipped ".gitkeep" (hidden)
+2026-11-26T14:07:53.5200170Z crates/airsl-lua/rockspecs: has no `airsstack-0.2.0-1.rockspec`, which the workspace version 0.2.0 needs; a version bump renames both rockspecs
+2026-11-26T14:07:53.5201250Z crates/airsl-lua/rockspecs: has no `airsstack-luajit-0.2.0-1.rockspec`, which the workspace version 0.2.0 needs; a version bump renames both rockspecs
+2026-11-26T14:07:53.5205960Z [exit 0]
+2026-11-26T14:07:53.5207060Z $ control <F>/A/airsstack-0.2.0-1.rockspec   (a directory)
+2026-11-26T14:07:53.5298850Z Err(Os { code: 21, kind: IsADirectory, message: "Is a directory" })
+2026-11-26T14:07:53.5309470Z [exit 0]
+2026-11-26T14:07:53.5405030Z ##[group]Run set +e   # each command's exit is printed, as in the local probes
+2026-11-26T14:07:53.5405640Z [36;1mset +e   # each command's exit is printed, as in the local probes[0m
+2026-11-26T14:07:53.5406000Z [36;1mecho "\$ cargo run --locked --quiet"[0m
+2026-11-26T14:07:53.5406290Z [36;1mcargo run --locked --quiet 2>&1; echo "[exit $?]"[0m
+2026-11-26T14:07:53.5406600Z [36;1mecho "\$ cargo tree --locked"[0m
+2026-11-26T14:07:53.5406850Z [36;1mcargo tree --locked 2>&1[0m
+2026-11-26T14:07:53.5485780Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-26T14:07:53.5486080Z env:
+2026-11-26T14:07:53.5486300Z   CARGO_BUILD_JOBS: 2
+2026-11-26T14:07:53.5486480Z ##[endgroup]
+2026-11-26T14:07:53.6223410Z $ cargo run --locked --quiet
+2026-11-26T14:08:00.9623920Z unclosed header: Display has 5 lines; full = "TOML parse error at line 1, column 9\n  |\n1 | [package\n  |         ^\nunclosed table, expected `]`\n"
+2026-11-26T14:08:00.9630540Z unclosed header: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 1, column 9: unclosed table, expected `]`"
+2026-11-26T14:08:00.9633320Z missing value: Display has 5 lines; full = "TOML parse error at line 2, column 7\n  |\n2 | name =\n  |       ^\nstring values must be quoted, expected literal string\n"
+2026-11-26T14:08:00.9636130Z missing value: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 7: string values must be quoted, expected literal string"
+2026-11-26T14:08:00.9639200Z duplicate key: Display has 5 lines; full = "TOML parse error at line 3, column 1\n  |\n3 | name = \"b\"\n  | ^^^^\nduplicate key\n"
+2026-11-26T14:08:00.9641560Z duplicate key: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 3, column 1: duplicate key"
+2026-11-26T14:08:00.9643860Z unterminated string: Display has 5 lines; full = "TOML parse error at line 2, column 14\n  |\n2 | name = \"airsl\n  |              ^\ninvalid basic string, expected `\"`\n"
+2026-11-26T14:08:00.9649720Z unterminated string: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 14: invalid basic string, expected `\"`"
+2026-11-26T14:08:00.9652590Z error on line 3: Display has 5 lines; full = "TOML parse error at line 3, column 21\n  |\n3 | version.workspace = = true\n  |                     ^\nextra `=`, expected nothing\n"
+2026-11-26T14:08:00.9655900Z error on line 3: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 3, column 21: extra `=`, expected nothing"
+2026-11-26T14:08:00.9663300Z duplicate table: Display has 5 lines; full = "TOML parse error at line 2, column 2\n  |\n2 | [package]\n  |  ^^^^^^^\nduplicate key\n"
+2026-11-26T14:08:00.9665200Z duplicate table: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 2: duplicate key"
+2026-11-26T14:08:00.9671480Z crlf unclosed header: Display has 5 lines; full = "TOML parse error at line 1, column 9\n  |\n1 | [package\r\n  |         ^\nunclosed table, expected `]`\n"
+2026-11-26T14:08:00.9676110Z crlf unclosed header: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 1, column 9: unclosed table, expected `]`"
+2026-11-26T14:08:00.9677680Z dotted key of 100 parts: Display has 1 lines; full = "recursion limit\n"
+2026-11-26T14:08:00.9683060Z dotted key of 100 parts: message = "crates/airsl/Cargo.toml: is not valid TOML: recursion limit"
+2026-11-26T14:08:00.9684960Z arrays nested 100 deep: Display has 5 lines; full = "TOML parse error at line 1, column 85\n  |\n1 | x = [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\n  |                                                                                     ^\ncannot recurse further; max recursion depth met\n"
+2026-11-26T14:08:00.9695940Z arrays nested 100 deep: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 1, column 85: cannot recurse further; max recursion depth met"
+2026-11-26T14:08:00.9701240Z invalid date-time: Display has 5 lines; full = "TOML parse error at line 2, column 8\n  |\n2 | date = 2026-13-45\n  |        ^^^^^^^^^^\ninvalid date, expected month between 01 and 12\n"
+2026-11-26T14:08:00.9703820Z invalid date-time: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 8: invalid date, expected month between 01 and 12"
+2026-11-26T14:08:00.9707780Z two values on one line: Display has 5 lines; full = "TOML parse error at line 2, column 12\n  |\n2 | name = \"a\" version = \"b\"\n  |            ^\nunexpected key or value, expected newline, `#`\n"
+2026-11-26T14:08:00.9711210Z two values on one line: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 12: unexpected key or value, expected newline, `#`"
+2026-11-26T14:08:00.9721900Z bare carriage return: Display has 5 lines; full = "TOML parse error at line 2, column 12\n  |\n2 | name = \"a\"\r\r\n  |            ^\ncarriage return must be followed by newline, expected newline\n"
+2026-11-26T14:08:00.9724940Z bare carriage return: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 12: carriage return must be followed by newline, expected newline"
+2026-11-26T14:08:00.9728010Z invalid escape: Display has 5 lines; full = "TOML parse error at line 2, column 10\n  |\n2 | name = \"\\q\"\n  |          ^\nmissing escaped value, expected `b`, `e`, `f`, `n`, `r`, `\\`, `\"`, `x`, `u`, `U`\n"
+2026-11-26T14:08:00.9731060Z invalid escape: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 10: missing escaped value, expected `b`, `e`, `f`, `n`, `r`, `\\`, `\"`, `x`, `u`, `U`"
+2026-11-26T14:08:00.9733880Z end of file, no newline: Display has 5 lines; full = "TOML parse error at line 2, column 7\n  |\n2 | name =\n  |       ^\nstring values must be quoted, expected literal string\n"
+2026-11-26T14:08:00.9736620Z end of file, no newline: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 7: string values must be quoted, expected literal string"
+2026-11-26T14:08:00.9739510Z dotted key extends a value: Display has 5 lines; full = "TOML parse error at line 3, column 1\n  |\n3 | version.workspace = true\n  | ^^^^^^^\ncannot extend value of type integer with a dotted key\n"
+2026-11-26T14:08:00.9742240Z dotted key extends a value: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 3, column 1: cannot extend value of type integer with a dotted key"
+2026-11-26T14:08:00.9745450Z [exit 0]
+2026-11-26T14:08:00.9746150Z $ cargo tree --locked
+2026-11-26T14:08:01.0875580Z p249 v0.0.0 (/Users/runner/work/airsl/airsl/probe/249)
+2026-11-26T14:08:01.0922450Z └── toml v1.2.2+spec-1.1.0
+2026-11-26T14:08:01.0937720Z     ├── serde_core v1.0.229
+2026-11-26T14:08:01.0941330Z     ├── serde_spanned v1.1.3
+2026-11-26T14:08:01.0944700Z     │   └── serde_core v1.0.229
+2026-11-26T14:08:01.0963250Z     ├── toml_datetime v1.1.3+spec-1.1.0
+2026-11-26T14:08:01.1002890Z     │   └── serde_core v1.0.229
+2026-11-26T14:08:01.1006620Z     ├── toml_parser v1.1.6+spec-1.1.0
+2026-11-26T14:08:01.1009240Z     │   └── winnow v1.0.5
+2026-11-26T14:08:01.1010770Z     └── winnow v1.0.5
+2026-11-26T14:08:01.1641100Z Post job cleanup.
+2026-11-26T14:08:01.9457050Z [command]/opt/homebrew/bin/git version
+2026-11-26T14:08:02.0302060Z git version 2.56.1
+2026-11-26T14:08:02.0359270Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/489716be-ea60-4096-b518-e33ce19fe0c0/.gitconfig'
+2026-11-26T14:08:02.0375020Z Temporarily overriding HOME='/Users/runner/work/_temp/489716be-ea60-4096-b518-e33ce19fe0c0' before making global git config changes
+2026-11-26T14:08:02.0377640Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T14:08:02.0379980Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/airsl/airsl
+2026-11-26T14:08:02.0556430Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T14:08:02.0714750Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-26T14:08:02.2366670Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T14:08:02.2441220Z http.https://github.com/.extraheader
+2026-11-26T14:08:02.2450030Z [command]/opt/homebrew/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-26T14:08:02.2535310Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-26T14:08:02.4412060Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T14:08:02.4445260Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-26T14:08:02.6686880Z Cleaning up orphan processes
+# --- raw job log: rust (windows-latest) (139964266843) ---
+﻿2026-11-26T14:07:27.5299670Z Current runner version: '2.338.2'
+2026-11-26T14:07:27.5332192Z ##[group]Runner Image Provisioner
+2026-11-26T14:07:27.5333131Z Hosted Compute Agent
+2026-11-26T14:07:27.5333749Z Version: 20261111.635
+2026-11-26T14:07:27.5334339Z Commit: b8a594ea514ff44cadb5342986c68b1eac6e22ed
+2026-11-26T14:07:27.5335054Z Build Date: 2026-11-11T01:49:01Z
+2026-11-26T14:07:27.5335691Z Worker ID: {71de9eb9-5943-4464-81a7-4fba081fbe29}
+2026-11-26T14:07:27.5336356Z Region: eastus3
+2026-11-26T14:07:27.5336877Z Cloud: Azure
+2026-11-26T14:07:27.5337373Z ##[endgroup]
+2026-11-26T14:07:27.5338597Z ##[group]Operating System
+2026-11-26T14:07:27.5339198Z Microsoft Windows Server 2025
+2026-11-26T14:07:27.5339764Z 10.0.26100
+2026-11-26T14:07:27.5340325Z Datacenter
+2026-11-26T14:07:27.5340821Z ##[endgroup]
+2026-11-26T14:07:27.5341337Z ##[group]Runner Image
+2026-11-26T14:07:27.5341891Z Image: windows-2025-vs2026
+2026-11-26T14:07:27.5342444Z Version: 20261116.315.1
+2026-11-26T14:07:27.5343941Z Included Software: https://github.com/actions/runner-images/blob/win25-vs2026/20261116.315/images/windows/Windows2025-VS2026-Readme.md
+2026-11-26T14:07:27.5345692Z Image Release: https://github.com/actions/runner-images/releases/tag/win25-vs2026%2F20261116.315
+2026-11-26T14:07:27.5347179Z ##[endgroup]
+2026-11-26T14:07:27.5348270Z ##[group]GITHUB_TOKEN Permissions
+2026-11-26T14:07:27.5350254Z Contents: read
+2026-11-26T14:07:27.5350790Z Metadata: read
+2026-11-26T14:07:27.5351327Z ##[endgroup]
+2026-11-26T14:07:27.5353243Z Secret source: Actions
+2026-11-26T14:07:27.5354110Z Cache mode: write
+2026-11-26T14:07:27.5354756Z Prepare workflow directory
+2026-11-26T14:07:27.5812342Z Prepare all required actions
+2026-11-26T14:07:27.5861919Z Getting action download info
+2026-11-26T14:07:27.7986396Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-11-26T14:07:28.0070731Z Complete job name: rust (windows-latest)
+2026-11-26T14:07:28.1476104Z ##[group]Run actions/checkout@v5
+2026-11-26T14:07:28.1477655Z with:
+2026-11-26T14:07:28.1478123Z   repository: airsstack/airsl
+2026-11-26T14:07:28.1482701Z   token: ***
+2026-11-26T14:07:28.1483255Z   ssh-strict: true
+2026-11-26T14:07:28.1483812Z   ssh-user: git
+2026-11-26T14:07:28.1484295Z   persist-credentials: true
+2026-11-26T14:07:28.1484893Z   clean: true
+2026-11-26T14:07:28.1485368Z   sparse-checkout-cone-mode: true
+2026-11-26T14:07:28.1485906Z   fetch-depth: 1
+2026-11-26T14:07:28.1486354Z   fetch-tags: false
+2026-11-26T14:07:28.1486854Z   show-progress: true
+2026-11-26T14:07:28.1487322Z   lfs: false
+2026-11-26T14:07:28.1487748Z   submodules: false
+2026-11-26T14:07:28.1488233Z   set-safe-directory: true
+2026-11-26T14:07:28.1488752Z   allow-unsafe-pr-checkout: false
+2026-11-26T14:07:28.1489620Z env:
+2026-11-26T14:07:28.1490090Z   CARGO_BUILD_JOBS: 2
+2026-11-26T14:07:28.1490553Z ##[endgroup]
+2026-11-26T14:07:28.2920355Z Syncing repository: airsstack/airsl
+2026-11-26T14:07:28.2922225Z ##[group]Getting Git version info
+2026-11-26T14:07:28.2922841Z Working directory is 'D:\a\airsl\airsl'
+2026-11-26T14:07:28.3591647Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-11-26T14:07:28.6183197Z git version 2.56.1.windows.1
+2026-11-26T14:07:28.6239887Z ##[endgroup]
+2026-11-26T14:07:28.6264483Z Temporarily overriding HOME='D:\a\_temp\3ef3b82d-58cc-4587-830e-d6dbff0de67a' before making global git config changes
+2026-11-26T14:07:28.6267151Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T14:07:28.6276350Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\airsl\airsl
+2026-11-26T14:07:28.6922722Z Deleting the contents of 'D:\a\airsl\airsl'
+2026-11-26T14:07:28.6928997Z ##[group]Initializing the repository
+2026-11-26T14:07:28.6938734Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\airsl\airsl
+2026-11-26T14:07:28.7703839Z Initialized empty Git repository in D:/a/airsl/airsl/.git/
+2026-11-26T14:07:28.7759401Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/airsstack/airsl
+2026-11-26T14:07:28.8419516Z ##[endgroup]
+2026-11-26T14:07:28.8420592Z ##[group]Disabling automatic garbage collection
+2026-11-26T14:07:28.8428411Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-11-26T14:07:28.8804764Z ##[endgroup]
+2026-11-26T14:07:28.8805739Z ##[group]Setting up auth
+2026-11-26T14:07:28.8816161Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T14:07:28.9190700Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-11-26T14:07:30.1408265Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T14:07:30.1799788Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-11-26T14:07:30.7447099Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T14:07:30.7823861Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-11-26T14:07:31.3409338Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-11-26T14:07:31.3788702Z ##[endgroup]
+2026-11-26T14:07:31.3789408Z ##[group]Fetching the repository
+2026-11-26T14:07:31.3802887Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +c1a6f7a3c7fe9daf4aeca11b8c5147ed1288ea4d:refs/remotes/origin/probe-ci-rocks-2
+2026-11-26T14:07:32.4406800Z From https://github.com/airsstack/airsl
+2026-11-26T14:07:32.4408123Z  * [new ref]         c1a6f7a3c7fe9daf4aeca11b8c5147ed1288ea4d -> origin/probe-ci-rocks-2
+2026-11-26T14:07:32.4455998Z ##[endgroup]
+2026-11-26T14:07:32.4456656Z ##[group]Determining the checkout info
+2026-11-26T14:07:32.4457639Z ##[endgroup]
+2026-11-26T14:07:32.4466603Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-11-26T14:07:32.4982067Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-11-26T14:07:32.5378581Z ##[group]Checking out the ref
+2026-11-26T14:07:32.5388113Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force -B probe-ci-rocks-2 refs/remotes/origin/probe-ci-rocks-2
+2026-11-26T14:07:32.6051381Z Switched to a new branch 'probe-ci-rocks-2'
+2026-11-26T14:07:32.6070802Z branch 'probe-ci-rocks-2' set up to track 'origin/probe-ci-rocks-2'.
+2026-11-26T14:07:32.6123910Z ##[endgroup]
+2026-11-26T14:07:32.6654621Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-11-26T14:07:32.7005927Z c1a6f7a3c7fe9daf4aeca11b8c5147ed1288ea4d
+2026-11-26T14:07:32.7446884Z ##[group]Run echo "\$ rustup show active-toolchain; rustc --version; cargo --version   (in probe/245 and probe/249)"
+2026-11-26T14:07:32.7447954Z [36;1mecho "\$ rustup show active-toolchain; rustc --version; cargo --version   (in probe/245 and probe/249)"[0m
+2026-11-26T14:07:32.7448713Z [36;1mrustup show active-toolchain; rustc --version; cargo --version[0m
+2026-11-26T14:07:32.7449271Z [36;1mcd ../249 && rustup show active-toolchain && rustc --version && cargo --version[0m
+2026-11-26T14:07:32.7467312Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-26T14:07:32.7467841Z env:
+2026-11-26T14:07:32.7468160Z   CARGO_BUILD_JOBS: 2
+2026-11-26T14:07:32.7468468Z ##[endgroup]
+2026-11-26T14:07:32.8789297Z $ rustup show active-toolchain; rustc --version; cargo --version   (in probe/245 and probe/249)
+2026-11-26T14:07:33.4031217Z info: syncing channel updates for 1.94-x86_64-pc-windows-msvc
+2026-11-26T14:07:33.8424436Z info: latest update on 2026-03-26 for version 1.94.1 (e408947bf 2026-03-25)
+2026-11-26T14:07:33.8543865Z info: downloading 5 components
+2026-11-26T14:07:42.9720177Z warn: the missing active toolchain `1.94-x86_64-pc-windows-msvc` has been auto-installed
+2026-11-26T14:07:42.9721582Z 1.94-x86_64-pc-windows-msvc (overridden by 'D:\a\airsl\airsl\probe\245\rust-toolchain.toml')
+2026-11-26T14:07:42.9723308Z warn: auto-installation is deprecated for most `rustup` commands
+2026-11-26T14:07:42.9731588Z warn: scripts relying on this behavior in `rustup` may stop working in the future
+2026-11-26T14:07:42.9732801Z warn: to install the active toolchain, use `rustup install` instead
+2026-11-26T14:07:42.9733736Z warn: see <https://github.com/rust-lang/rustup/issues/4836> for more info
+2026-11-26T14:07:43.5589267Z rustc 1.94.1 (e408947bf 2026-03-25)
+2026-11-26T14:07:44.0516877Z cargo 1.94.1 (29ea6fb6a 2026-03-24)
+2026-11-26T14:07:44.1137302Z 1.94-x86_64-pc-windows-msvc (overridden by 'D:\a\airsl\airsl\probe\249\rust-toolchain.toml')
+2026-11-26T14:07:44.1830164Z rustc 1.94.1 (e408947bf 2026-03-25)
+2026-11-26T14:07:44.2540583Z cargo 1.94.1 (29ea6fb6a 2026-03-24)
+2026-11-26T14:07:44.2827718Z ##[group]Run set +e   # each command's exit is printed, as in the local probes
+2026-11-26T14:07:44.2828514Z [36;1mset +e   # each command's exit is printed, as in the local probes[0m
+2026-11-26T14:07:44.2828975Z [36;1mEXE=; [ "$RUNNER_OS" = Windows ] && EXE=.exe[0m
+2026-11-26T14:07:44.2829570Z [36;1mecho "\$ rustc --edition 2024 entries.rs -o entries$EXE && rustc --edition 2024 control.rs -o control$EXE"[0m
+2026-11-26T14:07:44.2830320Z [36;1mrustc --edition 2024 entries.rs -o "entries$EXE" && rustc --edition 2024 control.rs -o "control$EXE"; echo "[exit $?]"[0m
+2026-11-26T14:07:44.2842528Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-26T14:07:44.2843226Z env:
+2026-11-26T14:07:44.2843541Z   CARGO_BUILD_JOBS: 2
+2026-11-26T14:07:44.2843862Z ##[endgroup]
+2026-11-26T14:07:44.3196390Z $ rustc --edition 2024 entries.rs -o entries.exe && rustc --edition 2024 control.rs -o control.exe
+2026-11-26T14:07:46.1722212Z [exit 0]
+2026-11-26T14:07:46.1963299Z ##[group]Run set +e   # each command's exit is printed, as in the local probes
+2026-11-26T14:07:46.1963959Z [36;1mset +e   # each command's exit is printed, as in the local probes[0m
+2026-11-26T14:07:46.1964603Z [36;1mecho "\$ rustc --edition 2024 fixtures_windows.rs -o fixtures_windows.exe && fixtures_windows <F>"[0m
+2026-11-26T14:07:46.1965376Z [36;1mrustc --edition 2024 fixtures_windows.rs -o fixtures_windows.exe && ./fixtures_windows.exe "$RUNNER_TEMP/F"; echo "[exit $?]"[0m
+2026-11-26T14:07:46.1976507Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-26T14:07:46.1977110Z env:
+2026-11-26T14:07:46.1977453Z   CARGO_BUILD_JOBS: 2
+2026-11-26T14:07:46.1977828Z ##[endgroup]
+2026-11-26T14:07:46.2344505Z $ rustc --edition 2024 fixtures_windows.rs -o fixtures_windows.exe && fixtures_windows <F>
+2026-11-26T14:07:46.5375672Z fixtures built under D:\a\_temp/F
+2026-11-26T14:07:46.5407859Z [exit 0]
+2026-11-26T14:07:46.5631640Z ##[group]Run for d in A B C D; do echo "\$ ls -la <F>/$d"; ls -la "$RUNNER_TEMP/F/$d"; done
+2026-11-26T14:07:46.5632352Z [36;1mfor d in A B C D; do echo "\$ ls -la <F>/$d"; ls -la "$RUNNER_TEMP/F/$d"; done[0m
+2026-11-26T14:07:46.5643750Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-26T14:07:46.5644215Z env:
+2026-11-26T14:07:46.5644491Z   CARGO_BUILD_JOBS: 2
+2026-11-26T14:07:46.5644816Z ##[endgroup]
+2026-11-26T14:07:46.6013149Z $ ls -la <F>/A
+2026-11-26T14:07:46.6397458Z total 4
+2026-11-26T14:07:46.6398061Z drwxr-xr-x 1 runneradmin 197121 0 Nov 26 14:07 .
+2026-11-26T14:07:46.6398688Z drwxr-xr-x 1 runneradmin 197121 0 Nov 26 14:07 ..
+2026-11-26T14:07:46.6399543Z -rw-r--r-- 1 runneradmin 197121 0 Nov 26 14:07 .DS_Store
+2026-11-26T14:07:46.6400692Z -rw-r--r-- 1 runneradmin 197121 0 Nov 26 14:07 .airsstack-0.2.0-1.rockspec
+2026-11-26T14:07:46.6402298Z drwxr-xr-x 1 runneradmin 197121 0 Nov 26 14:07 .hidden-dir
+2026-11-26T14:07:46.6403018Z -rw-r--r-- 1 runneradmin 197121 0 Nov 26 14:07 .rockspec
+2026-11-26T14:07:46.6404338Z drwxr-xr-x 1 runneradmin 197121 0 Nov 26 14:07 airsstack-0.2.0-1.rockspec
+2026-11-26T14:07:46.6405349Z drwxr-xr-x 1 runneradmin 197121 0 Nov 26 14:07 notes
+2026-11-26T14:07:46.6406270Z -rw-r--r-- 1 runneradmin 197121 0 Nov 26 14:07 notes.txt
+2026-11-26T14:07:46.6407305Z $ ls -la <F>/B
+2026-11-26T14:07:46.6601880Z total 0
+2026-11-26T14:07:46.6602486Z drwxr-xr-x 1 runneradmin 197121  0 Nov 26 14:07 .
+2026-11-26T14:07:46.6603265Z drwxr-xr-x 1 runneradmin 197121  0 Nov 26 14:07 ..
+2026-11-26T14:07:46.6604267Z lrwxrwxrwx 1 runneradmin 197121 16 Nov 26 14:07 airsstack-0.2.0-1.rockspec -> ../real.rockspec
+2026-11-26T14:07:46.6605398Z lrwxrwxrwx 1 runneradmin 197121 12 Nov 26 14:07 airsstack-luajit-0.2.0-1.rockspec -> ../targetdir
+2026-11-26T14:07:46.6608779Z $ ls -la <F>/C
+2026-11-26T14:07:46.6794972Z total 1
+2026-11-26T14:07:46.6795463Z drwxr-xr-x 1 runneradmin 197121  0 Nov 26 14:07 .
+2026-11-26T14:07:46.6796018Z drwxr-xr-x 1 runneradmin 197121  0 Nov 26 14:07 ..
+2026-11-26T14:07:46.6796688Z lrwxrwxrwx 1 runneradmin 197121 19 Nov 26 14:07 airsstack-0.2.0-1.rockspec -> ../no-such.rockspec
+2026-11-26T14:07:46.6797467Z -rw-r--r-- 1 runneradmin 197121 14 Nov 26 14:07 airsstack-luajit-0.2.0-1.rockspec
+2026-11-26T14:07:46.6802706Z $ ls -la <F>/D
+2026-11-26T14:07:46.6982933Z total 0
+2026-11-26T14:07:46.6983713Z drwxr-xr-x 1 runneradmin 197121 0 Nov 26 14:07 .
+2026-11-26T14:07:46.6984535Z drwxr-xr-x 1 runneradmin 197121 0 Nov 26 14:07 ..
+2026-11-26T14:07:46.6985247Z -rw-r--r-- 1 runneradmin 197121 0 Nov 26 14:07 .DS_Store
+2026-11-26T14:07:46.6985933Z -rw-r--r-- 1 runneradmin 197121 0 Nov 26 14:07 .gitkeep
+2026-11-26T14:07:46.7176338Z ##[group]Run set +e   # each command's exit is printed, as in the local probes
+2026-11-26T14:07:46.7177016Z [36;1mset +e   # each command's exit is printed, as in the local probes[0m
+2026-11-26T14:07:46.7177477Z [36;1mEXE=; [ "$RUNNER_OS" = Windows ] && EXE=.exe[0m
+2026-11-26T14:07:46.7178060Z [36;1mfor d in A B C D; do echo "\$ entries <F>/$d"; "./entries$EXE" "$RUNNER_TEMP/F/$d" 2>&1; echo "[exit $?]"; done[0m
+2026-11-26T14:07:46.7178907Z [36;1mecho "\$ control <F>/A/airsstack-0.2.0-1.rockspec   (a directory)"[0m
+2026-11-26T14:07:46.7179645Z [36;1m"./control$EXE" "$RUNNER_TEMP/F/A/airsstack-0.2.0-1.rockspec" 2>&1; echo "[exit $?]"[0m
+2026-11-26T14:07:46.7190517Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-26T14:07:46.7191017Z env:
+2026-11-26T14:07:46.7191313Z   CARGO_BUILD_JOBS: 2
+2026-11-26T14:07:46.7191606Z ##[endgroup]
+2026-11-26T14:07:46.7529924Z $ entries <F>/A
+2026-11-26T14:07:46.7730993Z trace: skipped ".DS_Store" (hidden)
+2026-11-26T14:07:46.7731854Z trace: skipped ".airsstack-0.2.0-1.rockspec" (hidden)
+2026-11-26T14:07:46.7732360Z trace: skipped ".hidden-dir" (hidden)
+2026-11-26T14:07:46.7732820Z trace: skipped ".rockspec" (hidden)
+2026-11-26T14:07:46.7733511Z crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec: is not a regular file, so it cannot be a rockspec
+2026-11-26T14:07:46.7734528Z crates/airsl-lua/rockspecs/notes: is not a rockspec; only the two rockspecs live here
+2026-11-26T14:07:46.7735235Z crates/airsl-lua/rockspecs/notes.txt: is not a rockspec; only the two rockspecs live here
+2026-11-26T14:07:46.7736211Z crates/airsl-lua/rockspecs: has no `airsstack-luajit-0.2.0-1.rockspec`, which the workspace version 0.2.0 needs; a version bump renames both rockspecs
+2026-11-26T14:07:46.7755717Z [exit 0]
+2026-11-26T14:07:46.7756190Z $ entries <F>/B
+2026-11-26T14:07:46.7910628Z trace: crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec read, 22 bytes; the per-line checks run
+2026-11-26T14:07:46.7911932Z crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec: is not a regular file, so it cannot be a rockspec
+2026-11-26T14:07:46.7992184Z [exit 0]
+2026-11-26T14:07:46.7992564Z $ entries <F>/C
+2026-11-26T14:07:46.8151309Z crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec: could not be read: The system cannot find the file specified. (os error 2)
+2026-11-26T14:07:46.8152678Z crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec: could not be read: stream did not contain valid UTF-8
+2026-11-26T14:07:46.8174984Z [exit 0]
+2026-11-26T14:07:46.8175653Z $ entries <F>/D
+2026-11-26T14:07:46.8327078Z trace: skipped ".DS_Store" (hidden)
+2026-11-26T14:07:46.8328514Z trace: skipped ".gitkeep" (hidden)
+2026-11-26T14:07:46.8329971Z crates/airsl-lua/rockspecs: has no `airsstack-0.2.0-1.rockspec`, which the workspace version 0.2.0 needs; a version bump renames both rockspecs
+2026-11-26T14:07:46.8331384Z crates/airsl-lua/rockspecs: has no `airsstack-luajit-0.2.0-1.rockspec`, which the workspace version 0.2.0 needs; a version bump renames both rockspecs
+2026-11-26T14:07:46.8350194Z [exit 0]
+2026-11-26T14:07:46.8351598Z $ control <F>/A/airsstack-0.2.0-1.rockspec   (a directory)
+2026-11-26T14:07:46.8545495Z Err(Os { code: 5, kind: PermissionDenied, message: "Access is denied." })
+2026-11-26T14:07:46.8590078Z [exit 0]
+2026-11-26T14:07:46.8818551Z ##[group]Run set +e   # each command's exit is printed, as in the local probes
+2026-11-26T14:07:46.8819270Z [36;1mset +e   # each command's exit is printed, as in the local probes[0m
+2026-11-26T14:07:46.8819745Z [36;1mecho "\$ cargo run --locked --quiet"[0m
+2026-11-26T14:07:46.8820153Z [36;1mcargo run --locked --quiet 2>&1; echo "[exit $?]"[0m
+2026-11-26T14:07:46.8820577Z [36;1mecho "\$ cargo tree --locked"[0m
+2026-11-26T14:07:46.8820934Z [36;1mcargo tree --locked 2>&1[0m
+2026-11-26T14:07:46.8832204Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-26T14:07:46.8832673Z env:
+2026-11-26T14:07:46.8832946Z   CARGO_BUILD_JOBS: 2
+2026-11-26T14:07:46.8833273Z ##[endgroup]
+2026-11-26T14:07:46.9192229Z $ cargo run --locked --quiet
+2026-11-26T14:07:52.0774195Z unclosed header: Display has 5 lines; full = "TOML parse error at line 1, column 9\n  |\n1 | [package\n  |         ^\nunclosed table, expected `]`\n"
+2026-11-26T14:07:52.0775906Z unclosed header: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 1, column 9: unclosed table, expected `]`"
+2026-11-26T14:07:52.0777173Z missing value: Display has 5 lines; full = "TOML parse error at line 2, column 7\n  |\n2 | name =\n  |       ^\nstring values must be quoted, expected literal string\n"
+2026-11-26T14:07:52.0778145Z missing value: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 7: string values must be quoted, expected literal string"
+2026-11-26T14:07:52.0779057Z duplicate key: Display has 5 lines; full = "TOML parse error at line 3, column 1\n  |\n3 | name = \"b\"\n  | ^^^^\nduplicate key\n"
+2026-11-26T14:07:52.0779942Z duplicate key: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 3, column 1: duplicate key"
+2026-11-26T14:07:52.0781097Z unterminated string: Display has 5 lines; full = "TOML parse error at line 2, column 14\n  |\n2 | name = \"airsl\n  |              ^\ninvalid basic string, expected `\"`\n"
+2026-11-26T14:07:52.0782437Z unterminated string: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 14: invalid basic string, expected `\"`"
+2026-11-26T14:07:52.0783719Z error on line 3: Display has 5 lines; full = "TOML parse error at line 3, column 21\n  |\n3 | version.workspace = = true\n  |                     ^\nextra `=`, expected nothing\n"
+2026-11-26T14:07:52.0784639Z error on line 3: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 3, column 21: extra `=`, expected nothing"
+2026-11-26T14:07:52.0785521Z duplicate table: Display has 5 lines; full = "TOML parse error at line 2, column 2\n  |\n2 | [package]\n  |  ^^^^^^^\nduplicate key\n"
+2026-11-26T14:07:52.0786350Z duplicate table: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 2: duplicate key"
+2026-11-26T14:07:52.0788134Z crlf unclosed header: Display has 5 lines; full = "TOML parse error at line 1, column 9\n  |\n1 | [package\r\n  |         ^\nunclosed table, expected `]`\n"
+2026-11-26T14:07:52.0789053Z crlf unclosed header: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 1, column 9: unclosed table, expected `]`"
+2026-11-26T14:07:52.0790119Z dotted key of 100 parts: Display has 1 lines; full = "recursion limit\n"
+2026-11-26T14:07:52.0790943Z dotted key of 100 parts: message = "crates/airsl/Cargo.toml: is not valid TOML: recursion limit"
+2026-11-26T14:07:52.0792087Z arrays nested 100 deep: Display has 5 lines; full = "TOML parse error at line 1, column 85\n  |\n1 | x = [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\n  |                                                                                     ^\ncannot recurse further; max recursion depth met\n"
+2026-11-26T14:07:52.0795931Z arrays nested 100 deep: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 1, column 85: cannot recurse further; max recursion depth met"
+2026-11-26T14:07:52.0797487Z invalid date-time: Display has 5 lines; full = "TOML parse error at line 2, column 8\n  |\n2 | date = 2026-13-45\n  |        ^^^^^^^^^^\ninvalid date, expected month between 01 and 12\n"
+2026-11-26T14:07:52.0798538Z invalid date-time: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 8: invalid date, expected month between 01 and 12"
+2026-11-26T14:07:52.0799660Z two values on one line: Display has 5 lines; full = "TOML parse error at line 2, column 12\n  |\n2 | name = \"a\" version = \"b\"\n  |            ^\nunexpected key or value, expected newline, `#`\n"
+2026-11-26T14:07:52.0800747Z two values on one line: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 12: unexpected key or value, expected newline, `#`"
+2026-11-26T14:07:52.0801942Z bare carriage return: Display has 5 lines; full = "TOML parse error at line 2, column 12\n  |\n2 | name = \"a\"\r\r\n  |            ^\ncarriage return must be followed by newline, expected newline\n"
+2026-11-26T14:07:52.0803048Z bare carriage return: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 12: carriage return must be followed by newline, expected newline"
+2026-11-26T14:07:52.0804194Z invalid escape: Display has 5 lines; full = "TOML parse error at line 2, column 10\n  |\n2 | name = \"\\q\"\n  |          ^\nmissing escaped value, expected `b`, `e`, `f`, `n`, `r`, `\\`, `\"`, `x`, `u`, `U`\n"
+2026-11-26T14:07:52.0805564Z invalid escape: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 10: missing escaped value, expected `b`, `e`, `f`, `n`, `r`, `\\`, `\"`, `x`, `u`, `U`"
+2026-11-26T14:07:52.0806876Z end of file, no newline: Display has 5 lines; full = "TOML parse error at line 2, column 7\n  |\n2 | name =\n  |       ^\nstring values must be quoted, expected literal string\n"
+2026-11-26T14:07:52.0808618Z end of file, no newline: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 2, column 7: string values must be quoted, expected literal string"
+2026-11-26T14:07:52.0810232Z dotted key extends a value: Display has 5 lines; full = "TOML parse error at line 3, column 1\n  |\n3 | version.workspace = true\n  | ^^^^^^^\ncannot extend value of type integer with a dotted key\n"
+2026-11-26T14:07:52.0811407Z dotted key extends a value: message = "crates/airsl/Cargo.toml: is not valid TOML: TOML parse error at line 3, column 1: cannot extend value of type integer with a dotted key"
+2026-11-26T14:07:52.0899725Z [exit 0]
+2026-11-26T14:07:52.0900742Z $ cargo tree --locked
+2026-11-26T14:07:52.1742489Z p249 v0.0.0 (D:\a\airsl\airsl\probe\249)
+2026-11-26T14:07:52.1744682Z └── toml v1.2.2+spec-1.1.0
+2026-11-26T14:07:52.1745148Z     ├── serde_core v1.0.229
+2026-11-26T14:07:52.1745615Z     ├── serde_spanned v1.1.3
+2026-11-26T14:07:52.1746076Z     │   └── serde_core v1.0.229
+2026-11-26T14:07:52.1746509Z     ├── toml_datetime v1.1.3+spec-1.1.0
+2026-11-26T14:07:52.1746964Z     │   └── serde_core v1.0.229
+2026-11-26T14:07:52.1747355Z     ├── toml_parser v1.1.6+spec-1.1.0
+2026-11-26T14:07:52.1747708Z     │   └── winnow v1.0.5
+2026-11-26T14:07:52.1748077Z     └── winnow v1.0.5
+2026-11-26T14:07:52.2135519Z Post job cleanup.
+2026-11-26T14:07:52.3834228Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-11-26T14:07:52.4222833Z git version 2.56.1.windows.1
+2026-11-26T14:07:52.4302494Z Temporarily overriding HOME='D:\a\_temp\1372163e-9dda-4d58-a55e-df6eee7a9058' before making global git config changes
+2026-11-26T14:07:52.4303880Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-26T14:07:52.4316314Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\airsl\airsl
+2026-11-26T14:07:52.4781800Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-11-26T14:07:52.5176019Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-11-26T14:07:53.1236132Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-26T14:07:53.1629753Z http.https://github.com/.extraheader
+2026-11-26T14:07:53.1694887Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-11-26T14:07:53.2159666Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-11-26T14:07:53.7902989Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-26T14:07:53.8289756Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-11-26T14:07:54.4196959Z Cleaning up orphan processes
+2026-11-26T14:07:54.4592302Z Terminate orphan process: pid (5580) (vctip)

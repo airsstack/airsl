@@ -1,0 +1,194 @@
+question: draft 7.2 #17: in a git copy, dist-workspace.toml with both precise-builds = true and publish-jobs = ["./publish-rocks"] plus a stub reusable .github/workflows/publish-rocks.yml (on: workflow_call: inputs: plan) -- 'dist generate' diff of the release workflow, then 'dist generate --check' and 'dist plan' exit codes. Kept: 150-dist-precise-publish/{dist-workspace.toml.diff, airsl-cli-release.yml.diff, .github/workflows/publish-rocks.yml}.
+commands: each `$ ...` line below, run in the stated cwd, followed by its raw output and `[exit N]`
+versions: rustc 1.94.1 (e408947bf 2026-03-25), cargo 1.94.1 (29ea6fb6a 2026-03-24) via R/rust-toolchain.toml channel 1.94; mlua 0.12.0, mlua-sys 0.11.0, mlua_derive 0.12.0, syn 2.0.119 (copy's Cargo.lock); cargo-deny 0.20.2; cargo-dist 0.33.1; luarocks 3.12.2 (/opt/homebrew/bin/luarocks, runs on Lua 5.4); Lua 5.4.8 (/opt/homebrew/bin/lua5.4); LuaJIT 2.1.1770848219 (/opt/homebrew/opt/luajit); luarocks-build-rust-mlua 0.2.7-1; macOS 26.3.1 arm64
+setup: S=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad; copy = S/probes-L/repo = rsync of R at 9d054c4 (minus target/, .git, .claudestacks, book/book), with the draft's feature table applied: root mlua features ["serialize"], members += crates/airsl-lua; crates/airsl [features] default=[lua54,vendored,send], lua54/luajit/vendored/send/module -> mlua/*; crates/airsl-lua cdylib (lib name airsstack, airsl path dep default-features=false + module, features lua54/luajit, build.rs dynamic_lookup, lib.rs `mod entry;`, entry.rs #[mlua::lua_module]); probe-only `ModuleSet::open` added to crates/airsl/src/modules/registry.rs so the toy installs airsl's real Json module. Sources and diffs: 140-lua-module-private-mod/. Env: CARGO_BUILD_JOBS=2, CARGO_TARGET_DIR=S/probes-L/target (luarocks' backend passes --target-dir=target, i.e. S/probes-L/repo/target). Every command ran under zsh `setopt pipefail`, so [exit N] is the pipeline's real status.
+date: 2026-11-26 (probe agent L)
+--- raw output ---
+$ dist --version   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+cargo-dist 0.33.1
+[exit 0]
+
+=== baseline (copy of R config + airsl-lua member with [package.metadata.dist] dist = false)
+$ dist generate --check 2>&1   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+[exit 0]
+
+$ git status --short   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+[exit 0]
+
+=== after: dist-workspace.toml gains precise-builds + publish-jobs; .github/workflows/publish-rocks.yml stub added
+$ git diff dist-workspace.toml; cat .github/workflows/publish-rocks.yml   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+diff --git a/dist-workspace.toml b/dist-workspace.toml
+index a33e189..61cd4e1 100644
+--- a/dist-workspace.toml
++++ b/dist-workspace.toml
+@@ -33,6 +33,10 @@ global-artifacts-jobs = ["./airsl-cli-smoke"]
+ # gate in ci.yml never builds musl or this profile, so without this a change that
+ # breaks a release target would first fail on the release tag itself.
+ pr-run-mode = "upload"
++# probe L: build only the packages dist ships
++precise-builds = true
++# probe L: custom publish job
++publish-jobs = ["./publish-rocks"]
+ 
+ # dist's defaults name fixed images (macos-14, ubuntu-22.04, windows-2022). GitHub retires
+ # those, and the macos-14 retirement broke every release. The `-latest` labels move with GitHub
+# Probe stub: dist custom publish job (reusable workflow).
+name: publish-rocks
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+jobs:
+  stub:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "stub publish-rocks"
+[exit 0]
+
+$ dist generate --check 2>&1   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+  × /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-
+  │ ba456a144f29/scratchpad/probes-L/repo/.github/workflows/airsl-cli-release.yml has out of date contents and needs
+  │ to be regenerated:
+  │ --- /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-
+  │ ba456a144f29/scratchpad/probes-L/repo/.github/workflows/airsl-cli-release.yml
+  │ +++ /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-
+  │ ba456a144f29/scratchpad/probes-L/repo/.github/workflows/airsl-cli-release.yml
+  │ @@ -300,14 +300,29 @@
+  │ 
+  │            gh release create "${{ needs.plan.outputs.tag }}" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title
+  │ "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.txt" artifacts/*
+  │ 
+  │ +  custom-publish-rocks:
+  │ +    needs:
+  │ +      - plan
+  │ +      - host
+  │ +    if: ${{ !fromJson(needs.plan.outputs.val).announcement_is_prerelease ||
+  │ fromJson(needs.plan.outputs.val).publish_prereleases }}
+  │ +    uses: ./.github/workflows/publish-rocks.yml
+  │ +    with:
+  │ +      plan: ${{ needs.plan.outputs.val }}
+  │ +    secrets: inherit
+  │ +    # publish jobs get escalated permissions
+  │ +    permissions:
+  │ +      "id-token": "write"
+  │ +      "packages": "write"
+  │ +
+  │    announce:
+  │      needs:
+  │        - plan
+  │        - host
+  │ +      - custom-publish-rocks
+  │      # use "always() && ..." to allow us to wait for all publish jobs while
+  │      # still allowing individual publish jobs to skip themselves (for prereleases).
+  │      # "host" however must run to completion, no skipping allowed!
+  │ -    if: ${{ always() && needs.host.result == 'success' }}
+  │ +    if: ${{ always() && needs.host.result == 'success' && (needs.custom-publish-rocks.result == 'skipped' ||
+  │ needs.custom-publish-rocks.result == 'success') }}
+  │      runs-on: "ubuntu-latest"
+  │      env:
+  │        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  │ 
+  help: run 'dist init' to update the file
+        ('allow-dirty' in Cargo.toml to ignore out of date contents)
+
+[exit 255]
+
+$ dist generate 2>&1   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+generated Github CI to /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo/.github/workflows/airsl-cli-release.yml
+[exit 0]
+
+$ git status --short; git diff --stat   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+ M .github/workflows/airsl-cli-release.yml
+ M dist-workspace.toml
+?? .github/workflows/publish-rocks.yml
+ .github/workflows/airsl-cli-release.yml | 17 ++++++++++++++++-
+ dist-workspace.toml                     |  4 ++++
+ 2 files changed, 20 insertions(+), 1 deletion(-)
+[exit 0]
+
+$ git diff .github/workflows/airsl-cli-release.yml   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+diff --git a/.github/workflows/airsl-cli-release.yml b/.github/workflows/airsl-cli-release.yml
+index aa2c9ef..64e4a2c 100644
+--- a/.github/workflows/airsl-cli-release.yml
++++ b/.github/workflows/airsl-cli-release.yml
+@@ -300,14 +300,29 @@ jobs:
+ 
+           gh release create "${{ needs.plan.outputs.tag }}" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.txt" artifacts/*
+ 
++  custom-publish-rocks:
++    needs:
++      - plan
++      - host
++    if: ${{ !fromJson(needs.plan.outputs.val).announcement_is_prerelease || fromJson(needs.plan.outputs.val).publish_prereleases }}
++    uses: ./.github/workflows/publish-rocks.yml
++    with:
++      plan: ${{ needs.plan.outputs.val }}
++    secrets: inherit
++    # publish jobs get escalated permissions
++    permissions:
++      "id-token": "write"
++      "packages": "write"
++
+   announce:
+     needs:
+       - plan
+       - host
++      - custom-publish-rocks
+     # use "always() && ..." to allow us to wait for all publish jobs while
+     # still allowing individual publish jobs to skip themselves (for prereleases).
+     # "host" however must run to completion, no skipping allowed!
+-    if: ${{ always() && needs.host.result == 'success' }}
++    if: ${{ always() && needs.host.result == 'success' && (needs.custom-publish-rocks.result == 'skipped' || needs.custom-publish-rocks.result == 'success') }}
+     runs-on: "ubuntu-latest"
+     env:
+       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+[exit 0]
+
+$ dist generate --check 2>&1   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+[exit 0]
+
+$ dist plan 2>&1   (cwd=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-L/repo)
+  note: Forcing needs_coherence=true, because pr-run-mode="upload" is set.
+        If this causes you problems, let us know here:
+          https://github.com/axodotdev/cargo-dist/issues/1554
+
+announcing v0.2.0
+  airsl-cli 0.2.0
+    source.tar.gz
+      [checksum] source.tar.gz.sha256
+    airsl-cli-installer.sh
+    airsl-cli-installer.ps1
+    sha256.sum
+    airsl-cli-aarch64-apple-darwin.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-aarch64-apple-darwin.tar.xz.sha256
+    airsl-cli-aarch64-unknown-linux-gnu.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-aarch64-unknown-linux-gnu.tar.xz.sha256
+    airsl-cli-aarch64-unknown-linux-musl.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-aarch64-unknown-linux-musl.tar.xz.sha256
+    airsl-cli-x86_64-apple-darwin.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-x86_64-apple-darwin.tar.xz.sha256
+    airsl-cli-x86_64-pc-windows-msvc.zip
+      [bin] airsl.exe
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-x86_64-pc-windows-msvc.zip.sha256
+    airsl-cli-x86_64-unknown-linux-gnu.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-x86_64-unknown-linux-gnu.tar.xz.sha256
+    airsl-cli-x86_64-unknown-linux-musl.tar.xz
+      [bin] airsl
+      [misc] CHANGELOG.md, LICENSE, README.md
+      [checksum] airsl-cli-x86_64-unknown-linux-musl.tar.xz.sha256
+
+[exit 0]
+

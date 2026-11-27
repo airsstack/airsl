@@ -1,0 +1,74 @@
+# Probe 237 — the rocks task's lookups in cargo-make @duckscript: luarocks by `which`, each package's rockspec by an anchored glob, <version> from the name
+question: plan-set review findings 1 and 8 (spec §9.3 rocks row): (a) control: does the old pattern `airsstack-*-1.rockspec` match
+  both of probe 235's real rockspecs? (b) does `glob_array <dir>/<package>-[0-9]*-1.rockspec` find exactly one file per package in
+  that directory, and does cutting `<package>-` and `-1.rockspec` (11 characters) off the base name give `0.2.0` for both?
+  (c) a leftover older rockspec beside the current one: two matches, and the many-match message; (d) an empty directory and a
+  directory of names that do not split (airsstack.rockspec, airsstack-0.2.0.rockspec, airsstack-luajit-0.2.0.rockspec): no match,
+  and the no-match message; (e) a luarocks given as a bare name or a path that does not exist: `which` answers empty and the
+  missing-tool message prints; an absolute path that exists is found. Every failure exits 1 from cargo make.
+versions: cargo-make 0.37.24 (repo min_version 0.37.0, Makefile.toml:27); macOS 26.3.1 arm64; /opt/homebrew/bin/luarocks 3.12.2.
+  Not run on Linux or Windows.
+setup: Makefile in 237-rocks-task-lookup/Makefile.toml (first run of rocks-lookup used `substring name start -11`, which duckscript
+  refused with "End index cannot be smaller than start index."; the file now computes the end with `calc`, and the output below is
+  that version's). Fixtures in a scratch directory <F> (deleted): real/ = copies of
+  235-rockspec-only-install-and-docs/src/crates/airsl-lua/rockspecs/*; leftover/ = real/ plus a copy named airsstack-0.1.0-1.rockspec;
+  empty/; malformed/ = copies under the three names shown. PROBE_DIR stands for crates/airsl-lua/rockspecs. [cargo-make] INFO lines removed.
+date: 2026-11-26
+--- raw output ---
+$ cargo make --version
+cargo-make 0.37.24
+$ ls <F>/real
+airsstack-0.2.0-1.rockspec
+airsstack-luajit-0.2.0-1.rockspec
+$ ls <F>/leftover
+airsstack-0.1.0-1.rockspec
+airsstack-0.2.0-1.rockspec
+airsstack-luajit-0.2.0-1.rockspec
+$ ls <F>/empty
+$ ls <F>/malformed
+airsstack-0.2.0.rockspec
+airsstack-luajit-0.2.0.rockspec
+airsstack.rockspec
+$ PROBE_DIR=<F>/real cargo make --makefile Makefile.toml old-glob
+old airsstack-*-1.rockspec -> 2: <F>/real/airsstack-0.2.0-1.rockspec <F>/real/airsstack-luajit-0.2.0-1.rockspec 
+[exit 0]
+$ PROBE_DIR=<F>/real cargo make --makefile Makefile.toml rocks-lookup
+which luarocks -> [/opt/homebrew/bin/luarocks] 
+airsstack: rockspec <F>/real/airsstack-0.2.0-1.rockspec version [0.2.0] 
+airsstack-luajit: rockspec <F>/real/airsstack-luajit-0.2.0-1.rockspec version [0.2.0] 
+[exit 0]
+$ PROBE_DIR=<F>/leftover cargo make --makefile Makefile.toml rocks-lookup
+which luarocks -> [/opt/homebrew/bin/luarocks] 
+rocks: 2 files match `airsstack-<version>-1.rockspec` in `<F>/leftover` (<F>/leftover/airsstack-0.1.0-1.rockspec, <F>/leftover/airsstack-0.2.0-1.rockspec); docs-check allows one per package 
+[cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 25 - Exit with error code: 1
+[cargo-make] WARN - Build Failed.
+[exit 1]
+$ PROBE_DIR=<F>/empty cargo make --makefile Makefile.toml rocks-lookup
+which luarocks -> [/opt/homebrew/bin/luarocks] 
+rocks: no `airsstack-<version>-1.rockspec` in `<F>/empty` 
+[cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 20 - Exit with error code: 1
+[cargo-make] WARN - Build Failed.
+[exit 1]
+$ PROBE_DIR=<F>/malformed cargo make --makefile Makefile.toml rocks-lookup
+which luarocks -> [/opt/homebrew/bin/luarocks] 
+rocks: no `airsstack-<version>-1.rockspec` in `<F>/malformed` 
+[cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 20 - Exit with error code: 1
+[cargo-make] WARN - Build Failed.
+[exit 1]
+$ AIRSL_LUAROCKS=nope-luarocks PROBE_DIR=<F>/real cargo make --makefile Makefile.toml rocks-lookup
+which nope-luarocks -> [] 
+rocks: `nope-luarocks` was not found; install LuaRocks or set AIRSL_LUAROCKS to its path 
+[cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 11 - Exit with error code: 1
+[cargo-make] WARN - Build Failed.
+[exit 1]
+$ AIRSL_LUAROCKS=/no/such/luarocks PROBE_DIR=<F>/real cargo make --makefile Makefile.toml rocks-lookup
+which /no/such/luarocks -> [] 
+rocks: `/no/such/luarocks` was not found; install LuaRocks or set AIRSL_LUAROCKS to its path 
+[cargo-make] ERROR - Error while running duckscript: Source: Unknown Line: 11 - Exit with error code: 1
+[cargo-make] WARN - Build Failed.
+[exit 1]
+$ AIRSL_LUAROCKS=/opt/homebrew/bin/luarocks PROBE_DIR=<F>/real cargo make --makefile Makefile.toml rocks-lookup
+which /opt/homebrew/bin/luarocks -> [/opt/homebrew/bin/luarocks] 
+airsstack: rockspec <F>/real/airsstack-0.2.0-1.rockspec version [0.2.0] 
+airsstack-luajit: rockspec <F>/real/airsstack-luajit-0.2.0-1.rockspec version [0.2.0] 
+[exit 0]

@@ -1,0 +1,72 @@
+# Probe 245 — how docs-check's fifth check treats hidden entries, a directory, a FIFO, symlinks and a non-UTF-8 file in crates/airsl-lua/rockspecs/
+question: spec review round 2, findings R1 and R7 (spec §5.6.3 "Directory edges"): with the rule "skip an entry whose name starts
+  with `.`; classify the rest by name (steps 1-5); for a current name take `fs::metadata` (follows a symlink) before opening it --
+  an error is `could not be read`, anything but a regular file gets its own message, a regular file is read with
+  `fs::read_to_string`, whose error is `could not be read`", what does each kind of entry print? Control: what does
+  `read_to_string` alone do with a directory so named (the round-1 text's reading)? The FIFO case also shows the metadata check
+  runs before any open: reading a FIFO with no writer blocks, and the run below finished.
+versions: rustc 1.94.1 (rust-toolchain.toml channel 1.94; std only); macOS 26.3.1 arm64 (APFS). Linux and Windows not run.
+sources: 245-rockspecs-dir-entries/entries.rs (the rule), control.rs, fixtures.sh (builds the fixture directories A-D under <F>).
+  Names are sorted in entries.rs only to make the output stable; "trace:" lines are the probe's, not messages. Binaries and <F>
+  were built in the scratchpad and deleted. `ls -la` columns other than the mode and the name are cut.
+date: 2026-11-26
+--- raw output ---
+$ rustc --version
+rustc 1.94.1 (e408947bf 2026-03-25)
+$ rustc --edition 2024 entries.rs -o <scratch>/entries && rustc --edition 2024 control.rs -o <scratch>/control
+[exit 0]
+$ bash fixtures.sh <F>
+[exit 0]
+$ ls -la <F>/A
+drwxr-xr-x@ .
+drwxr-xr-x@ ..
+-rw-r--r--@ .airsstack-0.2.0-1.rockspec
+-rw-r--r--@ .DS_Store
+drwxr-xr-x@ .hidden-dir
+-rw-r--r--@ .rockspec
+drwxr-xr-x@ airsstack-0.2.0-1.rockspec
+prw-r--r--@ airsstack-luajit-0.2.0-1.rockspec
+drwxr-xr-x@ notes
+-rw-r--r--@ notes.txt
+$ ls -la <F>/B
+drwxr-xr-x@ .
+drwxr-xr-x@ ..
+lrwxr-xr-x@ airsstack-0.2.0-1.rockspec -> ../real.rockspec
+lrwxr-xr-x@ airsstack-luajit-0.2.0-1.rockspec -> ../targetdir
+$ ls -la <F>/C
+drwxr-xr-x@ .
+drwxr-xr-x@ ..
+lrwxr-xr-x@ airsstack-0.2.0-1.rockspec -> ../no-such.rockspec
+-rw-r--r--@ airsstack-luajit-0.2.0-1.rockspec
+$ ls -la <F>/D
+drwxr-xr-x@ .
+drwxr-xr-x@ ..
+-rw-r--r--@ .DS_Store
+-rw-r--r--@ .gitkeep
+$ entries <F>/A
+trace: skipped ".DS_Store" (hidden)
+trace: skipped ".airsstack-0.2.0-1.rockspec" (hidden)
+trace: skipped ".hidden-dir" (hidden)
+trace: skipped ".rockspec" (hidden)
+crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec: is not a regular file, so it cannot be a rockspec
+crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec: is not a regular file, so it cannot be a rockspec
+crates/airsl-lua/rockspecs/notes: is not a rockspec; only the two rockspecs live here
+crates/airsl-lua/rockspecs/notes.txt: is not a rockspec; only the two rockspecs live here
+[exit 0]
+$ entries <F>/B
+trace: crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec read, 22 bytes; the per-line checks run
+crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec: is not a regular file, so it cannot be a rockspec
+[exit 0]
+$ entries <F>/C
+crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec: could not be read: No such file or directory (os error 2)
+crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec: could not be read: stream did not contain valid UTF-8
+[exit 0]
+$ entries <F>/D
+trace: skipped ".DS_Store" (hidden)
+trace: skipped ".gitkeep" (hidden)
+crates/airsl-lua/rockspecs: has no `airsstack-0.2.0-1.rockspec`, which the workspace version 0.2.0 needs; a version bump renames both rockspecs
+crates/airsl-lua/rockspecs: has no `airsstack-luajit-0.2.0-1.rockspec`, which the workspace version 0.2.0 needs; a version bump renames both rockspecs
+[exit 0]
+$ control <F>/A/airsstack-0.2.0-1.rockspec   (a directory)
+Err(Os { code: 21, kind: IsADirectory, message: "Is a directory" })
+[exit 0]

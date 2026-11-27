@@ -1,0 +1,102 @@
+# Probe 189 — luarocks.org: are `airsstack` / `airsstack-luajit` taken; API answers to a bad/empty key; upload JSON shape
+Question (P13, no credentials): (1) do the module names `airsstack` and `airsstack-luajit` already exist on luarocks.org?
+(2) what does the API answer for an invalid key, an empty key, and `bearer` without/with a bogus header? (3) which JSON fields
+do /api/1/:key/upload and /api/1/:key/upload_rock/:version_id return (source), incl. the version id the client reads?
+Tools: curl 8.x (macOS system curl, User-Agent "probe-client"), Lua 5.4.8. Date-stamped below; luarocks.org answers are a snapshot.
+Source cited: probe 40 (luarocks-site at commit 7849c0a3f8bdc5613672e0e2e472ba44414fef34, files byte-for-byte in 40-luarocks-site/):
+ applications/api.moon:36-39 INVALID_KEY = 401 { errors: {"Invalid key"} }; :108-125 key from the path, or for key "bearer" from
+   `Authorization: Bearer <key>` (401 "Missing or malformed Authorization header" when absent); :127-138 revoked key -> 403 with the
+   September 2026 incident text or "The API key you provided has been revoked"; :143-147 suspended -> 403;
+ :78-97 tfa_gated: if the account `requires_tfa_for_uploads` (models/users.moon:181-183 = a TOTP secret with require_for_uploads),
+   upload and upload_rock need an x-tfa-token header (or tfa_token param) minted by /api/1/:key/verify_tfa from a TOTP `code`
+   (:230-262; token TTL 15 min :48; 5 failures per 5 min -> 429 :49-50), else 403 { errors: {"Two-factor authentication required"},
+   two_factor_required: true } — so an unattended CI job cannot upload for an account that requires TFA for uploads;
+ :264-287 POST /api/1/:key/upload -> json { module, version, module_url, manifests, is_new } (module/version = the model rows;
+   `version.id` is models/versions.moon:20 `id integer`, also version_name, revision, lua_version, rockspec_fname, ... :19-39);
+ :289-321 POST /api/1/:key/upload_rock/:version_id (version_id must be an integer; 404 { errors: {"invalid version"} } when unknown)
+   -> json { rock, module_url } (rock row: models/rocks.moon:10-23 id, version_id, arch, rock_fname, revision, ...; unique
+   (version_id, arch) :28).
+ The 3.12.2 client reads exactly these: 41-luarocks-upload/upload.lua:124 `res.is_new and #res.manifests == 0`, :128 `res.module_url`,
+   :131-136 `res.version.id` -> `upload_rock/<id>`.
+Search pages saved in 189-luarocks-org-names-api/ (search.html, search-luajit.html); count.lua loads the downloaded `manifest`
+(a Lua table file) into an empty environment table and tests env.repository[<name>]. The manifests themselves (4.5 MB / 1.6 MB) are not kept.
+Date: 2026-11-26T07:23Z
+
+=== (1) names
+$ curl -sS -A probe-client -o search.html -w '%{http_code} %{content_type} %{size_download}\n' 'https://luarocks.org/search?q=airsstack'
+200 text/html 3322
+[exit 0]
+$ curl -sS -A probe-client -o search-luajit.html -w '%{http_code} %{content_type} %{size_download}\n' 'https://luarocks.org/search?q=airsstack-luajit'
+200 text/html 3343
+[exit 0]
+$ curl -sS -A probe-client -o manifest.lua -w '%{http_code} %{content_type} %{size_download}\n' 'https://luarocks.org/manifest'
+200 text/x-lua 4559736
+[exit 0]
+$ curl -sS -A probe-client -o manifest-5.4.json -w '%{http_code} %{content_type} %{size_download}\n' 'https://luarocks.org/manifest-5.4.json'
+200 application/json 1649298
+[exit 0]
+$ curl -sS -A probe-client -o manifest-5.1.json -w '%{http_code} %{content_type} %{size_download}\n' 'https://luarocks.org/manifest-5.1.json'
+200 application/json 1694051
+[exit 0]
+$ grep -c -i airsstack manifest.lua manifest-5.4.json manifest-5.1.json
+manifest-5.1.json:0
+manifest-5.4.json:0
+manifest.lua:0
+$ lua5.4 count.lua manifest.lua   (count.lua: loadfile the manifest into an env table, count env.repository, test three keys)
+repository entries:	5810
+airsstack:	false
+airsstack-luajit:	false
+luafilesystem:	true
+[exit 0]
+--- search pages, tags stripped, lines mentioning results/airsstack:
+[search.html]
+Search &#039;airsstack&#039; - LuaRocks
+Modules
+No modules
+Modules
+[search-luajit.html]
+Search &#039;airsstack-luajit&#039; - LuaRocks
+Modules
+No modules
+Modules
+
+=== (2) API with no valid key (the [exit] after a piped curl is head's)
+$ curl -sS -A probe-client -w '
+[http %{http_code} %{content_type}]
+' 'https://luarocks.org/api/tool_version'
+{"version":"1.0.0"}
+[http 200 application/json]
+[exit 0]
+$ curl -sS -A probe-client -w '
+[http %{http_code} %{content_type}]
+' 'https://luarocks.org/api/1/not-a-real-key/status'
+{"errors":["Invalid key"]}
+[http 401 application/json]
+[exit 0]
+$ curl -sS -A probe-client -w '
+[http %{http_code} %{content_type}]
+' 'https://luarocks.org/api/1/bearer/status'
+{"errors":["Missing or malformed Authorization header"]}
+[http 401 application/json]
+[exit 0]
+$ curl -sS -A probe-client -w '
+[http %{http_code} %{content_type}]
+' 'https://luarocks.org/api/1//status'
+<!DOCTYPE HTML><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>LuaRocks - The Lua package manager</title><link type="text/css" rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:400italic,400,700"/><link type="text/css" rel="stylesheet" href="/static/icons/style.css"/><link title="LuaRocks" rel="search" type="application/opensearchdescription+xml" href="/static/opensearch.xml"/><link href="/static/style.css?1793760979" rel="stylesheet"/>          <script type="text/javascript">
+            if (window[exit 0]
+$ curl -sS -A probe-client -X POST -w '
+[http %{http_code} %{content_type}]
+' 'https://luarocks.org/api/1/not-a-real-key/upload'   (no body)
+{"errors":["Invalid key"]}
+[http 401 application/json]
+[exit 0]
+$ curl -sS -A probe-client -o /dev/null -w '[http %{http_code} %{content_type}]
+' 'https://luarocks.org/api/1//status'   (status of the HTML page above; the [exit] lines above are head's, curl's own exit is below)
+[http 404 text/html]
+[exit 0]
+$ curl -sS -A probe-client -H 'Authorization: Bearer not-a-real-key' -w '
+[http %{http_code} %{content_type}]
+' 'https://luarocks.org/api/1/bearer/status'
+{"errors":["Invalid key"]}
+[http 401 application/json]
+[exit 0]

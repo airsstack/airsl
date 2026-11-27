@@ -7,7 +7,9 @@ A sandbox is only useful if you know exactly where its edges are. Here they are.
 - **A script reaches only what its policy allows.** Every module checks its grant in Rust before it
   acts, and Lua's own ways around the modules (`io`, `os.execute`, `load` and the rest) are removed
   below `trusted`.
-- **A script cannot run forever or use unlimited memory**, as long as the limits are on.
+- **A script cannot run forever or use unlimited memory**, as long as the limits are on. The limits
+  hold inside `airsl`. A script run in stock Lua through the native module has none; see
+  [Running Scripts in Stock Lua](ch01-05-stock-lua.md).
 - **You can see the whole surface.** `airsl doctor` and `engine.policy()` describe exactly what a
   script gets, and there is no way to add to an engine except through `HostModule`, which those
   reports include.

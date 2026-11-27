@@ -1,0 +1,232 @@
+# Probe 235 — install from the rockspec alone (no source rock), and keeping CLAUDE.md out of the binary rock
+question: author decisions for review finding 4 (2026-11-26). (1) With no .src.rock published, does `luarocks install` of a version whose
+  server holds only the real-shaped rockspec clone the git source at the tag, build `--package airsl-lua --locked` with cargo, install,
+  and `require` in lua5.4? What does it print with git off PATH, and with cargo off PATH? (2) Why does `doc/CLAUDE.md` land in the
+  binary rock, which rockspec field controls it, and does `copy_directories = { "crates/airsl-lua/doc" }` keep it out (make + pack +
+  unzip -l), with a control run of the same rockspec without that line? Both rockspecs stay `luarocks lint` clean.
+why (2), source: probes/29-luarocks-3.12.2-src/build.lua (luarocks 3.12.2 release tarball): :314-330 install_default_docs (patterns :315) copies every
+  file of the build directory whose lower-cased name matches ^readme, ^license, ^copying or ^.*%.md into <install>/doc; :342-347
+  copy_directories defaults to { "doc" }; :350-355 each named directory that exists is copied to the same relative path and sets any_docs;
+  :357-358 a named, missing directory fails ("Directory '...' not found") unless it is the default; :362-364 the defaults run only
+  `if not any_docs`. The repository root has no doc/ directory, so the defaults copied LICENSE, CHANGELOG.md, README.md and CLAUDE.md
+  (probe 146's listing; the control below).
+versions: luarocks 3.12.2 (/opt/homebrew/bin/luarocks on Lua 5.4), Lua 5.4.8, git 2.39.3 (Apple Git-146), cargo 1.94.1 inside the source
+  (its rust-toolchain.toml), luarocks-build-rust-mlua 0.2.7-1 (installed from luarocks.org into the probe tree), macOS 26.3.1 arm64.
+setup: S=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/fix-01;
+  Q=S/p235. Q/src = probe 230's work copy (R at 9d054c4 + the spec's manifests, airsl-lua with the real entry, default-members,
+  Cargo.lock with mlua_derive) plus crates/airsl-lua/doc/LICENSE (a copy of the root LICENSE) and the two rockspecs of
+  235-rockspec-only-install-and-docs/src/ (probe 202's text + the copy_directories line); `git init`, one commit 87c7020, tag
+  airsl-cli-v0.2.0; `git clone --bare` to Q/bare.git. Q/server holds only airsstack-0.2.0-1.rockspec, identical to the repo's except
+  source.url = git+file://Q/bare.git (the public repo has no airsl-lua yet); `luarocks-admin make_manifest` indexes it.
+  The control rockspec (235-rockspec-only-install-and-docs/control/) is the repo's without the copy_directories line.
+  NOGIT: a directory of symlinks to every /usr/bin entry except git, first on PATH (no other git on this machine: /usr/bin/git only).
+  Env CARGO_BUILD_JOBS=2, CARGO_TARGET_DIR unset; Compiling/Checking lines removed by the grep shown; [exit N] is the command's status
+  (for a piped luarocks line, grep's: luarocks' own result is the "is now installed" or "Error:" line).
+date: 2026-11-26
+--- raw output ---
+NOGIT=<S>/p235/nogit-usrbin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:~/.cargo/bin
+NOCARGO=/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin
+
+$ luarocks --version | head -1; git --version; lua5.4 -v; (cd src && cargo --version)
+/opt/homebrew/bin/luarocks 3.12.2
+git version 2.39.3 (Apple Git-146)
+Lua 5.4.8  Copyright (C) 1994-2025 Lua.org, PUC-Rio
+cargo 1.94.1 (29ea6fb6a 2026-03-24)
+[exit 0]
+
+$ (cd src && luarocks lint crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec && luarocks lint crates/airsl-lua/rockspecs/airsstack-luajit-0.2.0-1.rockspec && echo both-lint-clean)
+both-lint-clean
+[exit 0]
+
+$ luarocks-admin make_manifest server && ls -1 server
+Making manifest for server
+Generating index.html for server
+airsstack-0.2.0-1.rockspec
+index.html
+manifest
+manifest-5.1
+manifest-5.2
+manifest-5.3
+manifest-5.4
+[exit 0]
+
+$ luarocks --lua-version 5.4 --tree tree install luarocks-build-rust-mlua 0.2.7
+Installing https://luarocks.org/luarocks-build-rust-mlua-0.2.7-1.src.rock
+
+
+No existing manifest. Attempting to rebuild...
+luarocks-build-rust-mlua 0.2.7-1 is now installed in <S>/p235/tree (license: MIT)
+
+[exit 0]
+
+$ env PATH="$NOGIT" sh -c "command -v git"
+[exit 1]
+
+$ env PATH="$NOGIT" luarocks --lua-version 5.4 --tree tree install --only-server="$PWD/server" airsstack 0.2.0-1
+
+Error: 'git' program not found. Make sure Git is installed and is available in your PATH (or you may want to edit the 'variables.GIT' value in file '/opt/homebrew/etc/luarocks/config-5.4.lua')
+Installing <S>/p235/server/airsstack-0.2.0-1.rockspec
+[exit 1]
+
+$ env PATH="$NOCARGO" sh -c "command -v cargo"
+[exit 1]
+
+$ env PATH="$NOCARGO" luarocks --lua-version 5.4 --tree tree install --only-server="$PWD/server" airsstack 0.2.0-1
+Installing <S>/p235/server/airsstack-0.2.0-1.rockspec
+Cloning into 'bare'...
+warning: --depth is ignored in local clones; use file:// instead.
+done.
+Note: switching to '87c7020eef1b201e2fe661c3f89ade47e1b7182c'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+
+Error: Build error: 'cargo' is not installed.
+This rock is written in Rust: make sure you have a Rust
+development environment installed and try again.
+
+airsstack 0.2.0-1 depends on luarocks-build-rust-mlua 0.2.7 (0.2.7-1 installed: success)
+
+airsstack 0.2.0-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+[exit 1]
+
+$ luarocks --lua-version 5.4 --tree tree install --only-server="$PWD/server" airsstack 0.2.0-1 2>&1 | grep -vE "^ *(Compiling|Checking) "
+Installing <S>/p235/server/airsstack-0.2.0-1.rockspec
+Cloning into 'bare'...
+warning: --depth is ignored in local clones; use file:// instead.
+done.
+Note: switching to '87c7020eef1b201e2fe661c3f89ade47e1b7182c'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+    Finished `release` profile [optimized] target(s) in 46.97s
+
+airsstack 0.2.0-1 depends on luarocks-build-rust-mlua 0.2.7 (0.2.7-1 installed: success)
+
+airsstack 0.2.0-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+airsstack 0.2.0-1 is now installed in <S>/p235/tree (license: Apache-2.0)
+
+[exit 0]
+
+$ eval "$(luarocks --lua-version 5.4 --tree tree path)"; lua5.4 -e "local a = require(\"airsstack\"); local n = 0; for _ in pairs(a) do n = n + 1 end; print(package.searchpath(\"airsstack\", package.cpath), n, a.json.encode({2, 2.0}), a.ext)"
+<S>/p235/tree/lib/lua/5.4/airsstack.so	11	[2,2.0]	nil
+[exit 0]
+
+$ find tree/lib/luarocks/rocks-5.4/airsstack -type f | sort
+tree/lib/luarocks/rocks-5.4/airsstack/0.2.0-1/airsstack-0.2.0-1.rockspec
+tree/lib/luarocks/rocks-5.4/airsstack/0.2.0-1/crates/airsl-lua/doc/LICENSE
+tree/lib/luarocks/rocks-5.4/airsstack/0.2.0-1/rock_manifest
+[exit 0]
+
+$ (cd dist-install && luarocks --lua-version 5.4 --tree "$OLDPWD/tree" pack airsstack 0.2.0-1)
+Packed: <S>/p235/dist-install/airsstack-0.2.0-1.macosx-aarch64.rock
+[exit 0]
+
+$ unzip -l dist-install/airsstack-0.2.0-1.macosx-aarch64.rock
+Archive:  dist-install/airsstack-0.2.0-1.macosx-aarch64.rock
+  Length      Date    Time    Name
+---------  ---------- -----   ----
+      741  11-26-2026 16:22   airsstack-0.2.0-1.rockspec
+        0  11-26-2026 16:22   crates/
+        0  11-26-2026 16:22   crates/airsl-lua/
+        0  11-26-2026 16:22   crates/airsl-lua/doc/
+    11357  11-26-2026 16:22   crates/airsl-lua/doc/LICENSE
+        0  11-26-2026 16:22   lib/
+  2642944  11-26-2026 16:22   lib/airsstack.so
+      305  11-26-2026 16:22   rock_manifest
+---------                     -------
+  2655347                     8 files
+[exit 0]
+
+$ (cd src && luarocks --lua-version 5.4 --tree "$OLDPWD/tree" make crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec 2>&1 | grep -vE "^ *(Compiling|Checking) ")
+
+airsstack 0.2.0-1 depends on luarocks-build-rust-mlua 0.2.7 (0.2.7-1 installed: success)
+
+airsstack 0.2.0-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+    Finished `release` profile [optimized] target(s) in 41.75s
+airsstack 0.2.0-1 is now installed in <S>/p235/tree (license: Apache-2.0)
+
+[exit 0]
+
+$ (cd dist-make && luarocks --lua-version 5.4 --tree "$OLDPWD/tree" pack airsstack 0.2.0-1)
+Packed: <S>/p235/dist-make/airsstack-0.2.0-1.macosx-aarch64.rock
+[exit 0]
+
+$ unzip -l dist-make/airsstack-0.2.0-1.macosx-aarch64.rock
+Archive:  dist-make/airsstack-0.2.0-1.macosx-aarch64.rock
+  Length      Date    Time    Name
+---------  ---------- -----   ----
+      618  11-26-2026 16:24   airsstack-0.2.0-1.rockspec
+        0  11-26-2026 16:24   crates/
+        0  11-26-2026 16:24   crates/airsl-lua/
+        0  11-26-2026 16:24   crates/airsl-lua/doc/
+    11357  11-26-2026 16:21   crates/airsl-lua/doc/LICENSE
+        0  11-26-2026 16:24   lib/
+  2642944  11-26-2026 16:24   lib/airsstack.so
+      305  11-26-2026 16:24   rock_manifest
+---------                     -------
+  2655224                     8 files
+[exit 0]
+
+$ diff src/crates/airsl-lua/rockspecs/airsstack-0.2.0-1.rockspec control/airsstack-0.2.0-1.rockspec
+23d22
+<    copy_directories = { "crates/airsl-lua/doc" },
+[exit 1]
+
+$ (cd src && luarocks --lua-version 5.4 --tree "$OLDPWD/tree" make "$OLDPWD/control/airsstack-0.2.0-1.rockspec" 2>&1 | grep -vE "^ *(Compiling|Checking) ")
+
+airsstack 0.2.0-1 depends on luarocks-build-rust-mlua 0.2.7 (0.2.7-1 installed: success)
+
+airsstack 0.2.0-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+    Finished `release` profile [optimized] target(s) in 0.13s
+airsstack 0.2.0-1 is now installed in <S>/p235/tree (license: Apache-2.0)
+
+[exit 0]
+
+$ (cd dist-control && luarocks --lua-version 5.4 --tree "$OLDPWD/tree" pack airsstack 0.2.0-1)
+Packed: <S>/p235/dist-control/airsstack-0.2.0-1.macosx-aarch64.rock
+[exit 0]
+
+$ unzip -l dist-control/airsstack-0.2.0-1.macosx-aarch64.rock
+Archive:  dist-control/airsstack-0.2.0-1.macosx-aarch64.rock
+  Length      Date    Time    Name
+---------  ---------- -----   ----
+      568  11-26-2026 16:24   airsstack-0.2.0-1.rockspec
+        0  11-26-2026 16:24   doc/
+    11357  11-26-2026 16:24   doc/LICENSE
+    18145  11-26-2026 16:24   doc/CHANGELOG.md
+     4180  11-26-2026 16:24   doc/README.md
+    13664  11-26-2026 16:24   doc/CLAUDE.md
+        0  11-26-2026 16:24   lib/
+  2642944  11-26-2026 16:24   lib/airsstack.so
+      413  11-26-2026 16:24   rock_manifest
+---------                     -------
+  2691271                     9 files
+[exit 0]
+

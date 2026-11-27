@@ -1,0 +1,80 @@
+# 45 cargo-deny with the toy airsl-lua member (deny.toml [graph] all-features = true)
+Question: C3 - does R's deny policy accept a mlua 'module' member? Does cargo metadata --all-features still resolve?
+Setup: same repo copy + toy member as 44 (toy Cargo.toml: 44-dist-toy-member/Cargo.toml). deny.toml = R's, unchanged unless stated.
+Versions: cargo-deny 0.20.2; cargo 1.94.1 (29ea6fb6a 2026-03-24). Date: 2026-11-26. Network fetch of the advisory DB allowed (no credentials).
+
+=================== A. R itself, unmodified
+$ cargo deny check   (in R, unmodified workspace, for comparison)
+advisories ok, bans ok, licenses ok, sources ok
+exit=0
+
+=================== B. copy + toy member
+$ cargo deny --version
+cargo-deny 0.20.2
+$ cargo deny check   (baseline = R as-is is NOT this copy; this copy has toy member crates/airsl-lua)
+error[duplicate]: found 2 duplicate entries for crate 'syn'
+   ┌─ /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-C/repo-copy/Cargo.lock:82:1
+   │  
+82 │ ╭ syn 2.0.119 registry+https://github.com/rust-lang/crates.io-index
+83 │ │ syn 3.0.3 registry+https://github.com/rust-lang/crates.io-index
+   │ ╰───────────────────────────────────────────────────────────────┘ lock entries
+   │  
+   ├ syn v2.0.119
+     └── mlua_derive v0.12.0
+         └── mlua v0.12.0
+             ├── airsl v0.2.0
+             │   └── airsl-cli v0.2.0
+             ├── airsl-cli v0.2.0 (*)
+             └── airsl-lua v0.2.0
+   ├ syn v3.0.3
+     ├── clap_derive v4.6.4
+     │   └── clap v4.6.6
+     │       └── airsl-cli v0.2.0
+     ├── serde_derive v1.0.229
+     │   └── serde v1.0.229
+     │       ├── airsl v0.2.0
+     │       │   └── airsl-cli v0.2.0 (*)
+     │       ├── mlua v0.12.0
+     │       │   ├── airsl v0.2.0 (*)
+     │       │   ├── airsl-cli v0.2.0 (*)
+     │       │   └── airsl-lua v0.2.0
+     │       └── serde-value v0.7.0
+     │           └── mlua v0.12.0 (*)
+     └── thiserror-impl v2.0.20
+         └── thiserror v2.0.20
+             └── airsl v0.2.0 (*)
+
+advisories ok, bans FAILED, licenses ok, sources ok
+exit=2
+$ cargo metadata --all-features --format-version 1 >/dev/null; echo $?
+0
+
+=================== C. copy + toy member, deny.toml [graph] gains exclude = ["airsl-lua"] (variant, not R's file)
+### variant: deny.toml [graph] gains exclude = ["airsl-lua"]
+[graph]
+# Deliberately no `targets` list. Restricting it would silence findings on
+# platforms this workspace has not ruled out, and the whole-graph view costs
+# nothing while every license present resolves to something permissive.
+all-features = true
+exclude = ["airsl-lua"]
+$ cargo deny check
+advisories ok, bans ok, licenses ok, sources ok
+exit=0
+
+=================== D. why: mlua 0.12.0 'module' pulls mlua_derive (=0.12.0), which needs syn 2
+--- $CARGO_HOME/registry/src/.../mlua-0.12.0/Cargo.toml
+91:module = [
+92:    "mlua_derive",
+93:    "ffi/module",
+94:]
+305:[dependencies.mlua_derive]
+306:version = "=0.12.0"
+307:optional = true
+--- mlua_derive-0.12.0/Cargo.toml
+48:[dependencies.syn]
+49:version = "2.0"
+50:features = ["full"]
+--- mlua_derive-0.12.2/Cargo.toml (newest mlua_derive in the local registry cache; also syn 2)
+48:[dependencies.syn]
+49:version = "2.0"
+50:features = ["full"]

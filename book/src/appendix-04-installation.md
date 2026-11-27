@@ -41,6 +41,11 @@ download one by hand instead of running the installer.
 On Linux, the installer picks the glibc build when your system's glibc is new enough, and the musl
 build otherwise. Both run the same scripts in the same way.
 
+## Scripts outside airsl
+
+The archives are for the `airsl` command. The native module that runs scripts in stock Lua is a
+separate LuaRocks package, covered in [Running Scripts in Stock Lua](ch01-05-stock-lua.md).
+
 ## Verifying a download
 
 Every archive has a `.sha256` file next to it. The installer checks the archive against it when

@@ -1,0 +1,81 @@
+question: A2 follow-up: once StdLib::UTF8 and StdLib::COROUTINE are removed from LanguageSurface (repo copy only), are there further compile errors under LuaJIT, in non-module and module mode, lib and all targets?
+commands: patch language_surface.rs in the copy (diff below); cargo check -p airsl --lib for [luajit,vendored,serialize,send] then [luajit,module,serialize]; then [luajit,vendored,serialize,send]: cargo check -p airsl --all-targets; cargo check -p airsl-cli --all-targets
+tools: rustc 1.94.1 (e408947bf 2026-03-25); cargo 1.94.1 (29ea6fb6a 2026-03-24); mlua =0.12.0, mlua-sys 0.11.0; Lua 5.4.8  Copyright (C) 1994-2025 Lua.org, PUC-Rio; LuaJIT 2.1.1770848219 -- Copyright (C) 2005-2026 Mike Pall. https://luajit.org/; macOS 26.3.1 arm64
+date: 2026-11-26T06:13:37Z
+--- raw output ---
+patch applied to the repo copy only (diff -u):
+--- ls.bak	2026-11-26 13:12:49
++++ crates/airsl/src/sandbox/language_surface.rs	2026-11-26 13:12:49
+@@ -96,11 +96,11 @@
+                 StdLib::STRING
+                     | StdLib::TABLE
+                     | StdLib::MATH
+-                    | StdLib::UTF8
+-                    | StdLib::COROUTINE
++
++
+                     | StdLib::OS
+             }
+-            Self::Minimal => StdLib::STRING | StdLib::TABLE | StdLib::MATH | StdLib::UTF8,
++            Self::Minimal => StdLib::STRING | StdLib::TABLE | StdLib::MATH,
+         }
+     }
+ 
+--- runs ---
+$ grep -n ^mlua Cargo.toml
+21:mlua       = { version = "0.12", features = ["luajit", "vendored", "serialize", "send"] }
+=== $ cargo check -p airsl --lib
+    Checking airsl v0.2.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/repo-copy/crates/airsl)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.50s
+exit=0
+$ grep -n ^mlua Cargo.toml
+21:mlua       = { version = "0.12", features = ["luajit", "module", "serialize"] }
+=== $ cargo check -p airsl --lib
+     Locking 1 package to latest Rust 1.94 compatible version
+      Adding mlua_derive v0.12.0 (available: v0.12.2)
+    Checking airsl v0.2.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/repo-copy/crates/airsl)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.00s
+exit=0
+$ grep -n ^mlua Cargo.toml
+21:mlua       = { version = "0.12", features = ["luajit", "vendored", "serialize", "send"] }
+=== $ cargo check -p airsl --all-targets
+     Locking 3 packages to latest Rust 1.94 compatible versions
+      Adding lua-src v550.1.1
+      Adding luajit-src v210.7.5+63c8f1a
+      Adding which v8.0.6
+    Checking airsl v0.2.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/repo-copy/crates/airsl)
+error[E0599]: no associated item named `COROUTINE` found for struct `LuaStdLib` in the current scope
+   --> crates/airsl/src/sandbox/language_surface.rs:157:45
+    |
+157 |         assert!(restricted.contains(StdLib::COROUTINE));
+    |                                             ^^^^^^^^^ associated item not found in `LuaStdLib`
+
+error[E0599]: no associated item named `COROUTINE` found for struct `LuaStdLib` in the current scope
+   --> crates/airsl/src/sandbox/language_surface.rs:161:43
+    |
+161 |         assert!(!minimal.contains(StdLib::COROUTINE));
+    |                                           ^^^^^^^^^ associated item not found in `LuaStdLib`
+
+error[E0599]: no associated item named `UTF8` found for struct `LuaStdLib` in the current scope
+   --> crates/airsl/src/sandbox/language_surface.rs:176:43
+    |
+176 |             assert!(libs.contains(StdLib::UTF8), "{surface}");
+    |                                           ^^^^ associated item not found in `LuaStdLib`
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `airsl` (lib test) due to 3 previous errors
+exit=101
+=== $ cargo check -p airsl-cli --all-targets
+   Compiling syn v3.0.3
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.20
+   Compiling clap_derive v4.6.4
+    Checking thiserror v2.0.20
+    Checking clap v4.6.6
+    Checking serde v1.0.229
+    Checking serde-value v0.7.0
+    Checking mlua v0.12.0
+    Checking airsl v0.2.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/repo-copy/crates/airsl)
+    Checking airsl-cli v0.2.0 (/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-A/repo-copy/crates/airsl-cli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 17.72s
+exit=0

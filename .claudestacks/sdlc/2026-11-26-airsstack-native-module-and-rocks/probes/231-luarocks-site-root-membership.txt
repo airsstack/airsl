@@ -1,0 +1,92 @@
+# Probe 231 — luarocks.org: which /upload answer tells that our module is (or is not) in the root manifest, on every upload
+question: review finding 1 (spec §10.3 step 5 / §5.6.4 / §6.4): `is_new and #manifests == 0` (the 3.12.2 client's warning) is true only on the
+  upload that creates the module. Which signal in the server's answer holds on a re-run and on every later release, and is there a
+  pre-upload endpoint that names a module's owner?
+source: github.com/luarocks/luarocks-site at commit 7849c0a3f8bdc5613672e0e2e472ba44414fef34 (the commit of probe 40). Files of probe 40
+  (40-luarocks-site/, byte for byte) plus two fetched now into 231-luarocks-site-root-membership/:
+  curl -sS -A probe-client -o spec/api_spec.moon https://raw.githubusercontent.com/luarocks/luarocks-site/7849c0a3f8bdc5613672e0e2e472ba44414fef34/spec/api_spec.moon   -> 200
+  curl -sS -A probe-client -o luarocks.lock     https://raw.githubusercontent.com/luarocks/luarocks-site/7849c0a3f8bdc5613672e0e2e472ba44414fef34/luarocks.lock         -> 200
+  Route list: grep over 40-luarocks-site/applications/*.moon (below). No request was sent to luarocks.org's API (no key exists yet).
+tools: curl 8.x (macOS), grep -n. Date: 2026-11-26.
+--- raw output ---
+$ grep -n "lapis = " luarocks.lock
+11:      lapis = "1.20.0-1",
+$ grep -n "/api/1/" 40-luarocks-site/applications/api.moon
+211:  "/api/1/:key/status": api_request =>
+215:  "/api/1/:key/modules": api_request =>
+218:  "/api/1/:key/check_rockspec": api_request =>
+230:  "/api/1/:key/verify_tfa": api_request =>
+265:  "/api/1/:key/upload": api_request tfa_gated =>
+292:  "/api/1/:key/upload_rock/:version_id": api_request tfa_gated =>
+--- the /upload answer: manifests is recomputed from manifest_modules on EVERY upload (api.moon:265-290)
+266:    module, version, is_new = handle_rockspec_upload @
+285:    manifest_modules = ManifestModules\select "where module_id = ?", module.id
+286:    Manifests\include_in manifest_modules, "manifest_id"
+288:    manifests = [m.manifest for m in *manifest_modules]
+290:    json: { :module, :version, :module_url, :manifests, :is_new }
+--- root insertion is attempted only when the module is new for this user (uploaders.moon:115-121, 156-160)
+115:  new_module = false
+116:  mod = Modules\find user_id: user.id, name: spec.package\lower!
+119:    new_module = true
+133:    mod\delete! if new_module
+157:  if new_module
+158:    root_manifest = Manifests\root!
+159:    unless ManifestModules\find manifest_id: root_manifest.id, module_id: mod.id
+160:      ManifestModules\create root_manifest, mod
+--- a root entry is unique per name; a taken name returns an error the uploader ignores (manifest_modules.moon:14, 25-27)
+14:-- CREATE UNIQUE INDEX manifest_modules_manifest_id_module_name_idx ON manifest_modules USING btree (manifest_id, module_name);
+25:  @create: (manifest, mod) =>
+26:    if @check_unique_constraint manifest_id: manifest.id, module_name: mod.name
+27:      return nil, "Manifest already has a module named `#{mod.name}`"
+--- a manifest row carries its name; the root is the one named "root" (manifests.moon:11, 22, 43-44, 160-161; modules.moon:238-243)
+11:--   name character varying(255) NOT NULL,
+22:-- CREATE UNIQUE INDEX manifests_name_idx ON manifests USING btree (name);
+43:  @root: =>
+44:    root = Manifests\find name: "root"
+160:  is_root: =>
+161:    @name == "root"
+235:      if m.name == "root"
+238:  in_root_manifest: =>
+240:      if m.name == "root"
+--- model rows are serialized with their columns: the site test reads res.module.id / res.version.id, and asserts the root count
+135:    it "uploads rockspec", ->
+145:      assert.truthy res.is_new
+150:      assert.same version.id, res.version.id
+155:      assert.same mod.id, res.module.id
+157:      -- adds to root manifest
+158:      assert.same 1, #res.manifests
+303:        assert.truthy res.is_new
+342:        assert.truthy res.is_new
+--- pre-upload endpoints only look at the callers own modules (api.moon:215-228)
+215:  "/api/1/:key/modules": api_request =>
+216:    json: { modules: @current_user\get_modules! }
+218:  "/api/1/:key/check_rockspec": api_request =>
+224:    module = Modules\find user_id: @current_user.id, name: @params.package\lower!
+--- the site test for a never-uploaded name: check_rockspec answers {} (api_spec.moon:125-134)
+125:    it "checks nonexistent rockspec", ->
+133:      assert.same {}, res
+--- every route in the two kept route files that names a module or manifest (each module route takes :user; none maps a bare module name to its owner)
+$ grep -nE "^\s*\[?[a-z_]*:? *\"/(modules|m|manifest|manifests|module|dev)" 40-luarocks-site/applications/{modules,manifest}.moon | cut -c1-120
+40-luarocks-site/applications/modules.moon:67:  [module: "/modules/:user/:module"]: capture_errors_404 =>
+40-luarocks-site/applications/modules.moon:168:  [module_version: "/modules/:user/:module/:version"]: capture_errors_404
+40-luarocks-site/applications/modules.moon:199:  [follow_module: "/module/:module_id/follow/:type"]: require_login captu
+40-luarocks-site/applications/modules.moon:211:  [unfollow_module: "/module/:module_id/unfollow/:type"]: require_login c
+40-luarocks-site/applications/manifest.moon:122:  [root_manifest: "/manifest(-:a.:b)(.:format)"]: zipable is_stable serv
+40-luarocks-site/applications/manifest.moon:123:  [root_manifest_dev: "/dev/manifest(-:a.:b)(.:format)"]: zipable is_dev
+40-luarocks-site/applications/manifest.moon:124:  [user_manifest: "/manifests/:user/manifest(-:a.:b)(.:format)"]: zipabl
+40-luarocks-site/applications/manifest.moon:125:  [sub_manifest: "/m/:manifest/manifest(-:a.:b)(.:format)"]: zipable is_
+40-luarocks-site/applications/manifest.moon:126:  [sub_manifest_dev: "/m/:manifest/dev/manifest(-:a.:b)(.:format)"]: zip
+40-luarocks-site/applications/manifest.moon:128:  "/dev": => redirect_to: @url_for "root_manifest_dev"
+40-luarocks-site/applications/manifest.moon:129:  "/manifests/:user": => redirect_to: @url_for("user_manifest", user: @p
+40-luarocks-site/applications/manifest.moon:131:  [edit_manifest: "/m/:manifest/edit"]: capture_errors_404 require_login
+40-luarocks-site/applications/manifest.moon:161:  [manifests: "/manifests"]: capture_errors_404 =>
+(probe 40 kept applications/api.moon, manifest.moon and modules.moon only; the site's other route files were not fetched)
+--- /manifest is built from the root manifest's own modules only (manifest.moon:80, 97-104; manifests.moon:99-102)
+$ grep -n "Manifests\root!\|find_modules {\|build_manifest modules" 40-luarocks-site/applications/manifest.moon; grep -n "where manifest_id = ?" 40-luarocks-site/models/manifests.moon
+80:    Manifests\root!
+97:  pager = thing\find_modules {
+104:  manifest = build_manifest modules, @version, @development
+72:    ManifestAdmins\paginated "where manifest_id = ?", @id, opts
+95:        where manifest_id = ? and has_dev_version
+100:        where manifest_id = ?
+117:      where module_id in (select module_id from manifest_modules where manifest_id = ?)

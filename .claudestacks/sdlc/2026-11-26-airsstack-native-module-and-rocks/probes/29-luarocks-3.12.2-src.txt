@@ -1,0 +1,26 @@
+Fetched source: luarocks 3.12.2 release tarball, kept files cited by 20-28 under 29-luarocks-3.12.2-src/ (path relative to src/luarocks/).
+Versions: luarocks 3.12.2 (/opt/homebrew/bin/luarocks, runs on Lua 5.4), Lua 5.4.8 (/opt/homebrew/bin/lua5.4), LuaJIT 2.1.1770848219 (/opt/homebrew/opt/luajit), cargo 1.94.1 / rustc 1.94.1, mlua =0.12.0 (mlua-sys 0.11.0), luarocks-build-rust-mlua 0.2.7-1, macOS Darwin 25.3.0 arm64 (arch macosx-aarch64).
+Date: 2026-11-26. Probe agent B.
+S = /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B (scratch; deleted after recording). Raw output below is unedited; paths appear in full.
+Commands:
+  curl -sS -L https://luarocks.github.io/luarocks/releases/luarocks-3.12.2.tar.gz -o luarocks-3.12.2.tar.gz
+  file luarocks-3.12.2.tar.gz; tar xzf luarocks-3.12.2.tar.gz
+
+$ file luarocks-3.12.2.tar.gz
+luarocks-3.12.2.tar.gz: gzip compressed data, last modified: Fri Jun 27 06:32:53 2025, from Unix, original size modulo 2^32 2437120
+$ shasum -a 256 luarocks-3.12.2.tar.gz
+b0e0c85205841ddd7be485f53d6125766d18a81d226588d2366931e9a1484492  luarocks-3.12.2.tar.gz
+$ (cd 29-luarocks-3.12.2-src; find . -type f | sort)
+./build.lua
+./cmd.lua
+./cmd/config.lua
+./cmd/make.lua
+./deps.lua
+./fetch.lua
+./fs/lua.lua
+./manif.lua
+./manif/writer.lua
+./queries.lua
+./rockspecs.lua
+./type/rockspec.lua
+./util.lua

@@ -1,0 +1,20 @@
+[package]
+name    = "hostlib"
+version = "0.0.0"
+edition.workspace      = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+mlua = { workspace = true }
+
+[features]
+default  = ["lua54", "vendored", "send"]
+lua54    = ["mlua/lua54"]
+luajit   = ["mlua/luajit"]
+vendored = ["mlua/vendored"]
+send     = ["mlua/send"]
+module   = ["mlua/module"]

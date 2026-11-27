@@ -1,0 +1,12 @@
+[package]
+name = "p249"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+# The workspace's own declaration (Cargo.toml:48), pinned to the Cargo.lock version (1.2.2+spec-1.1.0); Cargo.lock beside
+# this file pins toml_parser 1.1.6+spec-1.1.0 and toml_datetime 1.1.3+spec-1.1.0, the workspace's Cargo.lock:860,869.
+toml = { version = "=1.2.2", default-features = false, features = ["std", "serde", "parse"] }

@@ -1,0 +1,315 @@
+# 47 CI tooling for a real Lua 5.4 / LuaJIT / LuaRocks
+Question: C4. Date: 2026-11-26. All sources fetched with curl -sS -L into 47-ci-lua-tooling/ and quoted with grep -n.
+Sources:
+  https://raw.githubusercontent.com/leafo/gh-actions-lua/v13.1.0/{action.yml,README.md,main.js,.github/workflows/test.yml}  (latest release v13.1.0, published 2026-10-23 per api.github.com/repos/leafo/gh-actions-lua/releases/latest)
+  https://raw.githubusercontent.com/leafo/gh-actions-luarocks/v6.1.1/{action.yml,README.md,main.js,.github/workflows/test.yml}  (latest release v6.1.1, published 2026-10-24)
+  https://packages.ubuntu.com/noble/<pkg> and /noble-updates/<pkg> (404-'Error' pages for noble-updates not kept)
+  https://raw.githubusercontent.com/actions/runner-images/main/{README.md,images/ubuntu/Ubuntu2404-Readme.md,images/ubuntu/Ubuntu2604-Readme.md,images/macos/macos-26-arm64-Readme.md,images/windows/Windows2025-VS2026-Readme.md}
+  https://formulae.brew.sh/api/formula/{lua,lua@5.4,luajit,luarocks}.json
+
+## leafo/gh-actions-lua v13.1.0
+--- action.yml (inputs; no outputs declared)
+9:inputs:
+10:  luaVersion:
+11:    description: "The version of Lua to install, must be available on https://lua.org/ftp/ or https://luajit.org/download.html"
+12:    required: false
+13:    default: "5.5"
+14:  luaCompileFlags:
+15:    description: "Command line flags passed to make when building Lua"
+16:    required: false
+17:  buildCache:
+18:    description: "Set to 'false' to skip restoring .lua from cache and always compile it"
+19:    required: false
+20:    default: 'true'
+21:
+22:runs:
+23:  using: 'node24'
+24:  main: 'main.js'
+--- README.md (accepted versions, Windows prerequisite)
+10:Builds and installs Lua into the `.lua/` directory in the working directory.
+11:Adds the `.lua/bin` to the `PATH` environment variable so `lua` can be called
+12:directly in workflows.
+44:When using Windows the following prerequisite action must be run before
+45:building Lua: [`step-security/msvc-dev-cmd@v1`](https://github.com/step-security/msvc-dev-cmd). It is safe to
+46:include this line on non-Windows platforms, as the action will do nothing in those cases.
+47:
+48:```yaml
+49:- uses: step-security/msvc-dev-cmd@v1
+50:- uses: leafo/gh-actions-lua@v13
+51:```
+59:Specifies the version of Lua to install. The version name instructs the action
+60:where to download the source from.
+61:
+62:Examples of versions:
+63:
+64:* `"5.1.5"`
+65:* `"5.2.4"`
+66:* `"5.3.6"`
+67:* `"5.4.9"`
+68:* `"5.5.1"`
+69:* `"luajit-2.0"`
+70:* `"luajit-2.1"`
+71:* `"luajit-master"`
+72:* `"luajit-openresty"`
+73:
+74:The version specifies where the source is downloaded from:
+75:
+76:* `luajit-openresty` — will always pull master from https://github.com/openresty/luajit2
+77:* `luajit-2.0`, `luajit-2.1`, `luajit-master` — pulls that branch from https://github.com/luajit/luajit
+78:* Anything else starting with `luajit-` (eg. `luajit-2.0.5`) — pulls the `v`-prefixed release tag from https://github.com/openresty/luajit2, since upstream LuaJIT no longer publishes tags
+79:* Anything else — from https://lua.org/ftp/
+80:
+81:**Version aliases**
+82:
+83:You can use shorthand `5.1`, `5.2`, `5.3`, `5.4`, `5.5`, `luajit` version aliases to point to the
+84:latest (or recent) version of Lua for that version.
+--- main.js (aliases, LuaJIT sources, Windows build path, env set)
+13:const BUILD_PREFIX = ".lua-build" // this is a temporary folder where lua will be built
+14:const LUA_PREFIX = ".lua" // this is where Lua will be installed
+15:
+16:const VERSION_ALIASES = {
+17:  "5.1": "5.1.5",
+18:  "5.2": "5.2.4",
+19:  "5.3": "5.3.6",
+20:  "5.4": "5.4.9",
+21:  "5.5": "5.5.1",
+22:  "luajit": "luajit-2.1",
+23:}
+24:
+25:const LUAJIT_REPOS = {
+26:  "luajit-2.0": {
+27:    "url": "https://github.com/luajit/luajit.git",
+28:    "branch": "v2.0",
+29:    "binary": "luajit"
+30:  },
+31:  "luajit-2.1": {
+32:    "url": "https://github.com/luajit/luajit.git",
+33:    "branch": "v2.1",
+34:    "binary": "luajit"
+35:  },
+36:  // upstream deleted its release tags, the openresty fork still has them
+37:  "luajit-2.1.0-beta3": {
+38:    "url": "https://github.com/openresty/luajit2.git",
+39:    "branch": "v2.1.0-beta3",
+40:    "binary": "luajit-2.1.0-beta3"
+41:  },
+42:  "luajit-master": {
+43:    "url": "https://github.com/luajit/luajit.git",
+44:    "branch": "master",
+45:    "binary": "luajit"
+46:  },
+47:  "luajit-openresty": {
+48:    "url": "https://github.com/openresty/luajit2.git",
+49:    "branch": "v2.1-agentzh",
+50:    "binary": "luajit"
+51:  },
+52:}
+67:async function finish_luajit_install(src, dst, luajit) {
+68:  if (isWindows()) {
+69:    await fsp.copyFile(pathJoin(src, "lua51.dll"), pathJoin(dst, "bin", "lua51.dll"))
+70:    await fsp.copyFile(pathJoin(src, "lua51.dll"), pathJoin(dst, "lib", "lua51.dll"))
+71:
+72:    await exec.exec(`ln -s ${luajit} lua.exe`, undefined, {
+73:      cwd: pathJoin(dst, "bin")
+74:    })
+75:  } else {
+76:    await exec.exec(`ln -s ${luajit} lua`, undefined, {
+77:      cwd: pathJoin(dst, "bin")
+78:    })
+79:  }
+80:}
+109:  let finalCompileFlags = "-j"
+110:
+111:  if (isMacOS()) {
+112:    finalCompileFlags += " MACOSX_DEPLOYMENT_TARGET=10.15"
+113:  }
+114:
+115:  if (luaCompileFlags) {
+116:    finalCompileFlags += ` ${luaCompileFlags}`
+117:  }
+118:
+119:  await exec.exec(`make ${finalCompileFlags}`, undefined, {
+120:    cwd: pathJoin(buildPath, baseDir),
+121:    ...(isWindows() ? { env: { SHELL: 'cmd' }} : {})
+122:  })
+151:async function install_plain_lua_windows(luaExtractPath, luaInstallPath, luaVersion) {
+152:  // The Windows build invokes cl/link directly instead of make, so there is
+153:  // nothing to pass luaCompileFlags to
+154:  if (core.getInput('luaCompileFlags')) {
+155:    warning("luaCompileFlags is ignored when building Lua on Windows")
+156:  }
+157:
+158:  let cl = "cl /nologo /MD /O2 /W3 /c /D_CRT_SECURE_NO_DEPRECATE"
+197:  let luaXYZ = luaVersion.split(".")
+198:  let libFile = "lua" + luaXYZ[0] + luaXYZ[1] + ".lib"
+199:  let dllFile = "lua" + luaXYZ[0] + luaXYZ[1] + ".dll"
+200:
+201:  objs["lua"] = [ ...objs["lua"], libFile ]
+202:  objs["luac"] = [ ...objs["luac"], ...objs["lib"] ]
+203:
+204:  await msvc_link(luaExtractPath, "link /nologo /DLL", dllFile, objs["lib"]);
+205:  await msvc_link(luaExtractPath, "link /nologo", "luac.exe", objs["luac"]);
+206:  await msvc_link(luaExtractPath, "link /nologo", "lua.exe", objs["lua"]);
+207:
+208:  const luaHpp = (await exists(pathJoin(src, "lua.hpp"))) ? "lua.hpp" : "../etc/lua.hpp"
+209:  const headers = [ "lua.h", "luaconf.h", "lualib.h", "lauxlib.h", luaHpp ]
+210:
+211:  await install_files(pathJoin(luaInstallPath, "bin"), luaExtractPath, [ "lua.exe", "luac.exe", dllFile ])
+212:  await install_files(pathJoin(luaInstallPath, "lib"), luaExtractPath, [ dllFile, libFile ])
+213:  await install_files(pathJoin(luaInstallPath, "include"), src, headers)
+220:  const luaSourceTar = await tc.downloadTool(`https://lua.org/ftp/lua-${luaVersion}.tar.gz`)
+221:  await io.mkdirP(luaExtractPath)
+222:  await tc.extractTar(luaSourceTar, path.join(process.env["RUNNER_TEMP"], BUILD_PREFIX))
+223:
+224:  if (isWindows()) {
+225:    return await install_plain_lua_windows(luaExtractPath, luaInstallPath, luaVersion);
+226:  }
+246:  let finalCompileFlags = `-j ${isMacOS() ? "macosx" : "linux"}`
+247:
+248:  if (luaCompileFlags) {
+249:    finalCompileFlags += ` ${luaCompileFlags}`
+250:  }
+251:
+252:  await exec.exec(`make ${finalCompileFlags}`, undefined, {
+253:    cwd: luaExtractPath
+254:  })
+255:
+256:  await exec.exec(`make -j INSTALL_TOP="${luaInstallPath}" install`, undefined, {
+311:  core.addPath(pathJoin(luaInstallPath, "bin"))
+--- test.yml (CI matrix incl. windows-latest, msvc-dev-cmd)
+13:        luaVersion: ["5.1.5", "5.2.4", "5.3.6", "5.4.9", "5.5.1", "luajit", "luajit-2.0", "luajit-2.1", "luajit-2.0.5", "luajit-2.1.0-beta3", "luajit-openresty", "5.1", "5.4", "5.5"]
+14:        machineTag: ["ubuntu-latest", "macos-latest", "windows-latest"]
+15:        exclude:
+16:          - luaVersion: "luajit-2.0"
+17:            machineTag: "macos-latest"
+18:          - luaVersion: "luajit-2.0.5"
+19:            machineTag: "macos-latest"
+20:          - luaVersion: "luajit-2.0.5"
+21:            machineTag: "windows-latest"
+22:          - luaVersion: "luajit-2.1.0-beta3"
+23:            machineTag: "windows-latest"
+24:
+25:    runs-on: ${{ matrix.machineTag }}
+26:
+27:    steps:
+28:    - uses: actions/checkout@v7
+29:
+30:    - uses: step-security/msvc-dev-cmd@v1
+
+## leafo/gh-actions-luarocks v6.1.1
+--- action.yml
+9:inputs:
+10:  luaRocksVersion:
+11:    description: "The version of LuaRocks to install, must be available on https://luarocks.github.io/luarocks/releases/"
+12:    required: false
+13:    default: "3.13.0"
+14:  withLuaPath:
+15:    description: "Directly specify existing version of Lua to use (as ./configure --with-lua)"
+16:    required: false
+17:
+18:runs:
+19:  using: 'node24'
+20:  main: 'main.js'
+--- README.md
+7:Builds and installs LuaRocks from source into the `.luarocks/` directory in the working directory. Configures `PATH`, `LUA_PATH`, and `LUA_CPATH` environment variables to be able to use the `luarocks` command directly in workflows, and require installed modules in Lua.
+8:
+9:[`leafo/gh-actions-lua`](https://github.com/marketplace/actions/install-lua-luajit) can be used to install Lua, which is required for LuaRocks to build and run. (This action will use any Lua installed in `.lua/`).
+--- main.js (./configure + make: no Windows branch)
+11:const LUA_PREFIX = ".lua" // default location for existing Lua installation
+12:const LUAROCKS_PREFIX = ".luarocks" // default location for LuaRocks installation
+13:
+14:async function main() {
+15:  const luaRocksVersion = core.getInput('luaRocksVersion', { required: true })
+16:
+17:  const luaRocksExtractPath = path.join(process.env["RUNNER_TEMP"], BUILD_PREFIX, `luarocks-${luaRocksVersion}`)
+18:  const luaRocksInstallPath = path.join(process.cwd(), LUAROCKS_PREFIX)
+19:
+20:  const sourceTar = await tc.downloadTool(`https://luarocks.org/releases/luarocks-${luaRocksVersion}.tar.gz`)
+21:  await io.mkdirP(luaRocksExtractPath)
+22:  await tc.extractTar(sourceTar, path.join(process.env["RUNNER_TEMP"], BUILD_PREFIX))
+23:
+24:  const configureArgs = []
+25:  if (core.getInput("withLuaPath")) {
+26:    configureArgs.push(`--with-lua="${core.getInput("withLuaPath")}"`)
+27:  } else {
+28:    // NOTE: this is the default install path provided by gh-actions-lua
+29:    const luaInstallPath = path.join(process.cwd(), LUA_PREFIX)
+30:    configureArgs.push(`--with-lua="${luaInstallPath}"`)
+31:  }
+32:
+33:  configureArgs.push(`--prefix="${luaRocksInstallPath}"`)
+34:
+35:  await exec.exec(`./configure ${configureArgs.join(" ")}`, undefined, {
+36:    cwd: luaRocksExtractPath
+37:  })
+38:
+39:  await exec.exec("make", undefined, {
+40:    cwd: luaRocksExtractPath
+41:  })
+50:  await exec.exec("make install", undefined, {
+51:    cwd: luaRocksExtractPath
+52:  })
+57:  await exec.exec(`${path.join(luaRocksInstallPath, "bin", "luarocks")} path --lr-bin`, undefined, {
+58:    listeners: {
+59:      stdout: (data) => {
+60:        lrPath += data.toString()
+61:      }
+62:    }
+63:  })
+64:
+65:  if (lrPath != "") {
+66:    core.addPath(lrPath.trim());
+94:    core.exportVariable("LUA_PATH", ";;" + luaPath)
+95:  }
+96:
+97:  if (luaCpath != "") {
+98:    core.exportVariable("LUA_CPATH", ";;" + luaCpath)
+$ grep -c -i win main.js
+0
+--- test.yml (ubuntu-latest + one macos-latest job; no windows)
+10:    runs-on: ubuntu-latest
+25:        luaVersion: ["5.1.5", "5.2.4", "5.3.6", "5.5", "luajit-2.1", "luajit-master", "luajit-openresty", "5.1", "5.4"]
+27:    runs-on: ubuntu-latest
+35:        luaVersion: ${{ matrix.luaVersion }}
+52:    runs-on: ubuntu-latest
+60:        luaVersion: "5.2"
+74:    runs-on: macos-latest
+82:        luaVersion: "5.4"
+95:    runs-on: ubuntu-latest
+
+## Ubuntu noble (24.04) packages
+ubuntu-noble/noble-liblua5.4-dev.html: 84:<h1>Package: liblua5.4-dev (5.4.6-3build2)
+ubuntu-noble/noble-libluajit-5.1-dev.html: 86:<h1>Package: libluajit-5.1-dev (2.1.0+git20231223.c525bcb+dfsg-1ubuntu0.1 and others)
+ubuntu-noble/noble-lua5.1.html: 84:<h1>Package: lua5.1 (5.1.5-9build2)
+ubuntu-noble/noble-lua5.4.html: 84:<h1>Package: lua5.4 (5.4.6-3build2)
+ubuntu-noble/noble-luajit.html: 86:<h1>Package: luajit (2.1.0+git20231223.c525bcb+dfsg-1ubuntu0.1 and others)
+ubuntu-noble/noble-luarocks.html: 84:<h1>Package: luarocks (3.8.0+dfsg1-1)
+ubuntu-noble/noble-updates-libluajit-5.1-dev.html: 86:<h1>Package: libluajit-5.1-dev (2.1.0+git20231223.c525bcb+dfsg-1ubuntu0.1)
+ubuntu-noble/noble-updates-luajit.html: 86:<h1>Package: luajit (2.1.0+git20231223.c525bcb+dfsg-1ubuntu0.1)
+
+## GitHub runner images: labels and preinstalled Lua
+23:| Ubuntu 26.04<br>![Endpoint Badge](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fhosted-runners-images-bot%2F79267492faab096d04cdd25ce7014cec%2Fraw%2Fubuntu26.json) | x64 | `ubuntu-latest` or `ubuntu-26.04` | [ubuntu-26.04] |
+25:| Ubuntu 24.04<br>![Endpoint Badge](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fhosted-runners-images-bot%2F79267492faab096d04cdd25ce7014cec%2Fraw%2Fubuntu24.json) | x64 | `ubuntu-24.04` | [ubuntu-24.04] |
+32:| macOS 26 Arm64<br>![Endpoint Badge](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fhosted-runners-images-bot%2F79267492faab096d04cdd25ce7014cec%2Fraw%2Fmacos-26-arm64.json) | arm64 | `macos-latest`, `macos-26` or `macos-26-xlarge` | [macOS-26-arm64] |
+36:| Windows Server 2025<br>![Endpoint Badge](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fhosted-runners-images-bot%2F79267492faab096d04cdd25ce7014cec%2Fraw%2Fwin25-vs2026.json) | x64 | `windows-latest`, `windows-2025`, or `windows-2025-vs2026` | [windows-2025-vs2026] |
+$ grep -n -i lua runner-images/Ubuntu2404-Readme.md; echo exit=$?
+exit=1
+10:- Image Version: 20261116.376.1
+$ grep -n -i lua runner-images/Ubuntu2604-Readme.md; echo exit=$?
+exit=1
+10:- Image Version: 20261116.202.1
+$ grep -n -i lua runner-images/macos-26-arm64-Readme.md; echo exit=$?
+exit=1
+12:- Image Version: 20261117.0516.1
+$ grep -n -i lua runner-images/Windows2025-VS2026-Readme.md; echo exit=$?
+exit=1
+9:- Image Version: 20261116.315.1
+75:- gcc 15.2.0
+221:| Visual Studio Enterprise 2026 | 18.12.12405.243 | C:\Program Files\Microsoft Visual Studio\18\Enterprise |
+
+## Homebrew (macOS runner options)
+lua 5.5.1 deps= [] keg_only= False bottles= ['arm64_golden_gate', 'arm64_linux', 'arm64_sequoia', 'arm64_sonoma', 'arm64_tahoe', 'sonoma', 'x86_64_linux']
+lua@5.4 5.4.9 deps= [] keg_only= True bottles= ['arm64_golden_gate', 'arm64_linux', 'arm64_sequoia', 'arm64_sonoma', 'arm64_tahoe', 'sonoma', 'x86_64_linux']
+luajit 2.1.1795119671 deps= [] keg_only= False bottles= ['arm64_golden_gate', 'arm64_linux', 'arm64_sequoia', 'arm64_tahoe', 'x86_64_linux']
+luarocks 3.13.0 deps= ['lua'] keg_only= False bottles= ['all']
+(local machine, for contrast: Homebrew 7.0.16; brew list --versions: lua 5.4.8;luajit 2.1.1770848219;luarocks 3.12.2;)

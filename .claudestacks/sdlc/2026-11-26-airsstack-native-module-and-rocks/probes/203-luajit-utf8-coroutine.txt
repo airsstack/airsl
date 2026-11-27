@@ -1,0 +1,13 @@
+# Probe 203 — which of Lua's own libraries stock LuaJIT and stock Lua 5.4 provide (book: "no utf8 on LuaJIT"; check.lua's utf8 assertion)
+# Question: in stock LuaJIT 2.1 and Lua 5.4, are the globals utf8, coroutine and jit present, and what does _VERSION read?
+# Versions: Lua 5.4.8  Copyright (C) 1994-2025 Lua.org, PUC-Rio; LuaJIT 2.1.1770848219 -- Copyright (C) 2005-2026 Mike Pall. https://luajit.org/ (both Homebrew); macOS 26.3.1 arm64
+# Date: 2026-11-26
+--- raw output ---
+$ lua5.4 -e 'print(_VERSION, type(utf8), type(coroutine), type(rawget(_G, "jit")))'
+Lua 5.4	table	table	nil
+[exit 0]
+
+$ luajit -e 'print(_VERSION, type(utf8), type(coroutine), type(rawget(_G, "jit")))'
+Lua 5.1	nil	table	table
+[exit 0]
+

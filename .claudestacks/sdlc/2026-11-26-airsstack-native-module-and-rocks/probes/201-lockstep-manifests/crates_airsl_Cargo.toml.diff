@@ -1,0 +1,26 @@
+--- orig/crates/airsl/Cargo.toml	2026-11-26 14:46:13
++++ repo/crates/airsl/Cargo.toml	2026-11-26 14:46:13
+@@ -1,7 +1,7 @@
+ [package]
+ name        = "airsl"
+ description = "Embeddable Lua 5.4 runtime with a capability-gated sandbox and a host standard library"
+-version     = "0.2.0"
++version.workspace      = true
+ 
+ edition.workspace      = true
+ rust-version.workspace = true
+@@ -28,6 +28,14 @@
+ path = "examples/notes-module/setup.rs"
+ test = true
+ 
++[features]
++default  = ["lua54", "vendored", "send"]
++lua54    = ["mlua/lua54"]
++luajit   = ["mlua/luajit"]
++vendored = ["mlua/vendored"]
++send     = ["mlua/send"]
++module   = ["mlua/module"]
++
+ [dependencies]
+ mlua       = { workspace = true }
+ serde      = { workspace = true }

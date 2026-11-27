@@ -1,0 +1,187 @@
+Q: D4 — how does mlua =0.12.0 / mlua-sys 0.11.0 link a module-mode cdylib on Windows, and which Windows module tests does mlua's own CI run (msvc or gnu)?
+Date: 2026-11-26. Sources fetched raw:
+  curl -sS -L https://static.crates.io/crates/mlua/mlua-0.12.0.crate      sha256 ad72ffa037cf5970c9860674f32f703fda25d86cf217475fe7a79c5f9961bcaa
+  curl -sS -L https://static.crates.io/crates/mlua-sys/mlua-sys-0.11.0.crate sha256 92136787b906d4e55cfe96cd6c62e010bb1a56889d0d6cf83eb016dbad07576b
+  git ls-remote https://github.com/mlua-rs/mlua.git v0.12.0 -> 8eddf85de0e1576f07145d04201d07ca108d963c (peeled commit)
+  curl -sS -L https://raw.githubusercontent.com/mlua-rs/mlua/v0.12.0/.github/workflows/main.yml  sha256 fb1fc645db7b1c309b4c3241581d486b24929f0410acaa9da469f507e30d1fd9
+  curl -sS -L https://raw.githubusercontent.com/mlua-rs/mlua/v0.12.0/tests/module/loader/{Cargo.toml,tests/load.rs}
+Copies of every cited file are under probes/63-windows-module-linking/.
+
+== 1. mlua-sys-0.11.0/build/main_inner.rs (whole file): on Windows + module, emits cfg raw_dylib unless LUA_LIB_NAME is non-empty; module mode calls probe_lua only in that LUA_LIB_NAME branch
+     1	use std::env;
+     2	
+     3	cfg_if::cfg_if! {
+     4	    if #[cfg(any(feature = "luau", feature = "vendored"))] {
+     5	        #[path = "find_vendored.rs"]
+     6	        mod find;
+     7	    } else {
+     8	        #[path = "find_normal.rs"]
+     9	        mod find;
+    10	    }
+    11	}
+    12	
+    13	fn main() {
+    14	    #[cfg(all(feature = "luau", feature = "module", windows))]
+    15	    compile_error!("Luau does not support `module` mode on Windows");
+    16	
+    17	    #[cfg(any(
+    18	        all(feature = "vendored", any(feature = "external", feature = "module")),
+    19	        all(feature = "external", any(feature = "vendored", feature = "module")),
+    20	        all(feature = "module", any(feature = "vendored", feature = "external"))
+    21	    ))]
+    22	    compile_error!("`vendored`, `external` and `module` features are mutually exclusive");
+    23	
+    24	    println!("cargo:rerun-if-changed=build");
+    25	
+    26	    // Check if compilation and linking is handled by external crate
+    27	    if cfg!(not(feature = "external")) {
+    28	        let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+    29	        if target_os == "windows" && cfg!(feature = "module") {
+    30	            if !std::env::var("LUA_LIB_NAME").unwrap_or_default().is_empty() {
+    31	                // Don't use raw-dylib linking
+    32	                find::probe_lua();
+    33	                return;
+    34	            }
+    35	
+    36	            println!("cargo:rustc-cfg=raw_dylib");
+    37	        }
+    38	
+    39	        #[cfg(not(feature = "module"))]
+    40	        find::probe_lua();
+    41	    }
+    42	}
+
+== 2. mlua-sys-0.11.0/build/find_normal.rs:13-30 (the LUA_LIB_NAME / LUA_LIB / LUA_LINK path)
+    13	    let lib_dir = env::var("LUA_LIB").unwrap_or_default();
+    14	    let lua_lib = env::var("LUA_LIB_NAME").unwrap_or_default();
+    15	
+    16	    println!("cargo:rerun-if-env-changed=LUA_LIB");
+    17	    println!("cargo:rerun-if-env-changed=LUA_LIB_NAME");
+    18	    println!("cargo:rerun-if-env-changed=LUA_LINK");
+    19	
+    20	    if !lua_lib.is_empty() {
+    21	        if !lib_dir.is_empty() {
+    22	            println!("cargo:rustc-link-search=native={lib_dir}");
+    23	        }
+    24	        let mut link_lib = "";
+    25	        if env::var("LUA_LINK").as_deref() == Ok("static") {
+    26	            link_lib = "static=";
+    27	        };
+    28	        println!("cargo:rustc-link-lib={link_lib}{lua_lib}");
+    29	        return;
+    30	    }
+
+== 3. raw-dylib link names per Lua ABI (grep 'raw-dylib' in mlua-sys-0.11.0/src/{lua54,lua51}, link names counted)
+src/lua54:
+  13 "lua54"
+src/lua51:
+   8 "lua51"
+examples:
+mlua-sys-0.11.0/src/lua54/lua.rs:106:#[cfg_attr(all(windows, raw_dylib), link(name = "lua54", kind = "raw-dylib"))]
+mlua-sys-0.11.0/src/lua51/lauxlib.rs:20:#[cfg_attr(all(windows, raw_dylib), link(name = "lua51", kind = "raw-dylib"))]
+mlua-sys-0.11.0/src/lib.rs (luajit uses the lua51 bindings):
+mlua-sys-0.11.0/src/lib.rs:23:#[cfg(any(feature = "lua51", feature = "luajit", doc))]
+mlua-sys-0.11.0/src/lib.rs:33:#[cfg(any(feature = "lua51", feature = "luajit"))]
+mlua-sys-0.11.0/src/lib.rs:109:#[cfg(any(feature = "lua51", feature = "luajit", doc))]
+mlua-sys-0.11.0/src/lib.rs:110:#[cfg_attr(docsrs, doc(cfg(any(feature = "lua51", feature = "luajit"))))]
+
+== 4. mlua-0.12.0/README.md:25 and :213-218
+    25	`mlua` is tested on Windows/macOS/Linux including module mode in [GitHub Actions] on `x86_64` platforms and cross-compilation to `aarch64` (other targets are also supported).
+   213	On Linux you can build modules normally with `cargo build --release`.
+   214	
+   215	On Windows the target module will be linked with the `lua5x.dll` library (depending on your feature flags).
+   216	Your main application should provide this library.
+   217	
+   218	Module builds don't require Lua binaries or headers to be installed on the system.
+
+== 5. mlua v0.12.0 .github/workflows/main.yml:173-219 (the two module-test jobs)
+   173	  test_modules:
+   174	    name: Test modules
+   175	    runs-on: ${{ matrix.os }}
+   176	    needs: build
+   177	    strategy:
+   178	      matrix:
+   179	        os: [ubuntu-latest, macos-latest]
+   180	        rust: [stable]
+   181	        lua: [lua55, lua54, lua53, lua52, lua51, luajit]
+   182	        include:
+   183	          - os: ubuntu-latest
+   184	            target: x86_64-unknown-linux-gnu
+   185	          - os: macos-latest
+   186	            target: aarch64-apple-darwin
+   187	    steps:
+   188	      - uses: actions/checkout@main
+   189	      - uses: dtolnay/rust-toolchain@stable
+   190	        with:
+   191	          toolchain: ${{ matrix.rust }}
+   192	          target: ${{ matrix.target }}
+   193	      - uses: Swatinem/rust-cache@v2
+   194	      - name: Run ${{ matrix.lua }} module tests
+   195	        run: |
+   196	          (cd tests/module && cargo build --release --features "${{ matrix.lua }}")
+   197	          (cd tests/module/loader && cargo test --release --features "${{ matrix.lua }},vendored")
+   198	        shell: bash
+   199	
+   200	  test_modules_windows:
+   201	    name: Test modules on Windows
+   202	    runs-on: windows-latest
+   203	    needs: build
+   204	    strategy:
+   205	      matrix:
+   206	        lua: [lua55, lua54, luajit]
+   207	    defaults:
+   208	      run:
+   209	        shell: msys2 {0}
+   210	    steps:
+   211	      - uses: msys2/setup-msys2@v2
+   212	      - uses: actions/checkout@main
+   213	      - name: Install Rust & Lua
+   214	        run: |
+   215	          pacman -S --noconfirm mingw-w64-x86_64-rust mingw-w64-x86_64-lua54 mingw-w64-x86_64-lua mingw-w64-x86_64-luajit mingw-w64-x86_64-pkg-config
+   216	      - name: Run ${{ matrix.lua }} module tests
+   217	        run: |
+   218	          (cd tests/module && cargo build --release --features "${{ matrix.lua }}")
+   219	          (cd tests/module/loader && cargo test --release --features "${{ matrix.lua }}")
+main.yml:84-99 (the non-module Test job; the only job that uses x86_64-pc-windows-msvc besides Build)
+    84	  test:
+    85	    name: Test
+    86	    runs-on: ${{ matrix.os }}
+    87	    needs: build
+    88	    strategy:
+    89	      matrix:
+    90	        os: [ubuntu-latest, macos-latest, windows-latest]
+    91	        rust: [stable, nightly]
+    92	        lua: [lua55, lua54, lua53, lua52, lua51, luajit, luajit52, luau, luau-jit, luau-vector4]
+    93	        include:
+    94	          - os: ubuntu-latest
+    95	            target: x86_64-unknown-linux-gnu
+    96	          - os: macos-latest
+    97	            target: aarch64-apple-darwin
+    98	          - os: windows-latest
+    99	            target: x86_64-pc-windows-msvc
+
+== 6. tests/module/loader/Cargo.toml:7-17 at v0.12.0 (the Windows job runs the loader without 'vendored', so mlua-sys find_normal links the MSYS2 mingw Lua via pkg-config)
+     7	[features]
+     8	lua55 = ["mlua/lua55"]
+     9	lua54 = ["mlua/lua54"]
+    10	lua53 = ["mlua/lua53"]
+    11	lua52 = ["mlua/lua52"]
+    12	lua51 = ["mlua/lua51"]
+    13	luajit = ["mlua/luajit"]
+    14	vendored = ["mlua/vendored"]
+    15	
+    16	[dependencies]
+    17	mlua = { path = "../../.." }
+
+== 7. What these citations establish, and what stays unproven (nothing was built or run on Windows by this probe)
+- mlua-sys 0.11.0 module mode on Windows links each Lua C API function with #[link(name = "lua54"|"lua51", kind = "raw-dylib")]
+  (section 1 lines 29-36, section 3): no import library and no Lua headers are needed at build time; the DLL must be named
+  lua54.dll (Lua 5.4) or lua51.dll (LuaJIT, which uses the lua51 bindings) and be loaded in the host process at run time.
+  A non-empty LUA_LIB_NAME switches to an ordinary rustc-link-lib against that library instead (section 2).
+- mlua's own CI at v0.12.0 runs Windows module tests only under MSYS2 with mingw-w64-x86_64-rust, i.e. x86_64-pc-windows-gnu,
+  for lua55, lua54 and luajit (section 5, lines 200-219). The x86_64-pc-windows-msvc target appears only in the Build and Test
+  jobs, which do not build module mode. So no mlua CI job builds or loads an MSVC module.
+- Unproven: that an x86_64-pc-windows-msvc build of the module loads in any real Windows Lua 5.4 or LuaJIT (which DLL names
+  and CRTs those distributions ship, e.g. lua54.dll vs lua5.4.dll, and whether LuaRocks' Windows Lua exports from lua54.dll);
+  that Neovim on Windows exposes lua51.dll to modules. A Windows cross-compile probe here was started and stopped on the
+  coordinator's instruction (host overload); Windows is to be proven on a GitHub Actions windows runner by another agent.

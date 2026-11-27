@@ -1,0 +1,229 @@
+Question B1: latest luarocks-build-rust-mlua release; how it picks the Lua feature, the cargo command line and its cwd, --target-dir, --no-default-features, --locked, the rockspec build fields it reads, how it copies the library (Windows naming), the missing-cargo message.
+Versions: luarocks 3.12.2 (/opt/homebrew/bin/luarocks, runs on Lua 5.4), Lua 5.4.8 (/opt/homebrew/bin/lua5.4), LuaJIT 2.1.1770848219 (/opt/homebrew/opt/luajit), cargo 1.94.1 / rustc 1.94.1, mlua =0.12.0 (mlua-sys 0.11.0), luarocks-build-rust-mlua 0.2.7-1, macOS Darwin 25.3.0 arm64 (arch macosx-aarch64).
+Date: 2026-11-26. Probe agent B.
+S = /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B (scratch; deleted after recording). Raw output below is unedited; paths appear in full.
+Commands:
+  curl -sS -L https://api.github.com/repos/mlua-rs/luarocks-build-rust-mlua/tags -o tags.json; grep '"name"' tags.json | head
+  curl -sS -L https://luarocks.org/manifest-5.4 -o manifest-5.4; awk 'NR>=95630 && NR<=95720' manifest-5.4 | grep -E '\["[0-9]'
+  curl -sS -L https://luarocks.org/manifests/khvzak/luarocks-build-rust-mlua-0.2.7-1.rockspec -o luarocks-build-rust-mlua-0.2.7-1.rockspec
+  curl -sS -L https://github.com/mlua-rs/luarocks-build-rust-mlua/archive/refs/tags/0.2.7.tar.gz -o lbrm-0.2.7.tar.gz; tar xzf
+Kept: 20-luarocks-build-rust-mlua/{rust-mlua.lua,README.md,CHANGELOG.md,luarocks-build-rust-mlua-0.2.7-1.rockspec} (from the 0.2.7 tag tarball).
+
+=== raw: GitHub tags (first 10 names)
+    "name": "0.2.7",
+    "name": "0.2.6",
+    "name": "0.2.5",
+    "name": "0.2.4",
+    "name": "0.2.3",
+    "name": "0.2.2",
+    "name": "0.2.1",
+    "name": "0.2.0",
+    "name": "0.1.2",
+    "name": "0.1.1",
+
+=== raw: luarocks.org manifest-5.4, luarocks-build-rust-mlua versions (awk NR 95630-95720, first 10 version keys belong to it)
+      ["0.1.0-1"] = {
+      ["0.1.1-1"] = {
+      ["0.1.2-1"] = {
+      ["0.2.0-1"] = {
+      ["0.2.2-1"] = {
+      ["0.2.3-1"] = {
+      ["0.2.4-1"] = {
+      ["0.2.5-1"] = {
+      ["0.2.6-1"] = {
+      ["0.2.7-1"] = {
+
+=== raw: luarocks.org rockspec 0.2.7-1
+rockspec_format = "3.0"
+package = "luarocks-build-rust-mlua"
+version = "0.2.7-1"
+
+source = {
+    url = "git+https://github.com/mlua-rs/luarocks-build-rust-mlua",
+    tag = "0.2.7",
+}
+
+description = {
+    summary = "A LuaRocks build backend for Lua modules written in Rust using mlua",
+    homepage = "https://github.com/mlua-rs/luarocks-build-rust-mlua",
+    license = "MIT",
+}
+
+=== citations (file:line: text), paths relative to probes/
+--- 20-luarocks-build-rust-mlua/rust-mlua.lua:9-13
+20-luarocks-build-rust-mlua/rust-mlua.lua:9: function mlua.run(rockspec, no_install)
+20-luarocks-build-rust-mlua/rust-mlua.lua:10:     if not fs.is_tool_available("cargo", "Cargo") then
+20-luarocks-build-rust-mlua/rust-mlua.lua:11:         return nil, "'cargo' is not installed.\n" .. "This rock is written in Rust: make sure you have a Rust\n" ..
+20-luarocks-build-rust-mlua/rust-mlua.lua:12:             "development environment installed and try again."
+20-luarocks-build-rust-mlua/rust-mlua.lua:13:     end
+--- 20-luarocks-build-rust-mlua/rust-mlua.lua:15-36
+20-luarocks-build-rust-mlua/rust-mlua.lua:15:     local features = {}
+20-luarocks-build-rust-mlua/rust-mlua.lua:16:     local lua_version = cfg.lua_version
+20-luarocks-build-rust-mlua/rust-mlua.lua:17: 
+20-luarocks-build-rust-mlua/rust-mlua.lua:18:     -- Activate features depending on Lua version
+20-luarocks-build-rust-mlua/rust-mlua.lua:19:     if lua_version == "5.5" then
+20-luarocks-build-rust-mlua/rust-mlua.lua:20:         table.insert(features, "lua55")
+20-luarocks-build-rust-mlua/rust-mlua.lua:21:     elseif lua_version == "5.4" then
+20-luarocks-build-rust-mlua/rust-mlua.lua:22:         table.insert(features, "lua54")
+20-luarocks-build-rust-mlua/rust-mlua.lua:23:     elseif lua_version == "5.3" then
+20-luarocks-build-rust-mlua/rust-mlua.lua:24:         table.insert(features, "lua53")
+20-luarocks-build-rust-mlua/rust-mlua.lua:25:     elseif lua_version == "5.2" then
+20-luarocks-build-rust-mlua/rust-mlua.lua:26:         table.insert(features, "lua52")
+20-luarocks-build-rust-mlua/rust-mlua.lua:27:     elseif lua_version == "5.1" then
+20-luarocks-build-rust-mlua/rust-mlua.lua:28:         -- cfg.luajit_version exists in 3.1.x but not 3.9.x
+20-luarocks-build-rust-mlua/rust-mlua.lua:29:         if (util.get_luajit_version and util.get_luajit_version() ~= nil) or cfg.luajit_version then
+20-luarocks-build-rust-mlua/rust-mlua.lua:30:             table.insert(features, "luajit")
+20-luarocks-build-rust-mlua/rust-mlua.lua:31:         else
+20-luarocks-build-rust-mlua/rust-mlua.lua:32:             table.insert(features, "lua51")
+20-luarocks-build-rust-mlua/rust-mlua.lua:33:         end
+20-luarocks-build-rust-mlua/rust-mlua.lua:34:     else
+20-luarocks-build-rust-mlua/rust-mlua.lua:35:         return nil, "Lua version " .. lua_version .. " is not supported"
+20-luarocks-build-rust-mlua/rust-mlua.lua:36:     end
+--- 20-luarocks-build-rust-mlua/rust-mlua.lua:38-71
+20-luarocks-build-rust-mlua/rust-mlua.lua:38:     local envs = {}
+20-luarocks-build-rust-mlua/rust-mlua.lua:39:     for _, key in ipairs({ "package", "version" }) do
+20-luarocks-build-rust-mlua/rust-mlua.lua:40:         envs[("LUA_ROCKSPEC_%s"):format(key:upper())] = fs.Q(rockspec[key])
+20-luarocks-build-rust-mlua/rust-mlua.lua:41:     end
+20-luarocks-build-rust-mlua/rust-mlua.lua:42: 
+20-luarocks-build-rust-mlua/rust-mlua.lua:43:     local cmd = {"cargo build --release"}
+20-luarocks-build-rust-mlua/rust-mlua.lua:44: 
+20-luarocks-build-rust-mlua/rust-mlua.lua:45:     for _, extra_arg in ipairs(rockspec.build.cargo_extra_args or {}) do
+20-luarocks-build-rust-mlua/rust-mlua.lua:46:         table.insert(cmd, extra_arg)
+20-luarocks-build-rust-mlua/rust-mlua.lua:47:     end
+20-luarocks-build-rust-mlua/rust-mlua.lua:48: 
+20-luarocks-build-rust-mlua/rust-mlua.lua:49:     local target_path = rockspec.build and rockspec.build.target_path or "target"
+20-luarocks-build-rust-mlua/rust-mlua.lua:50:     table.insert(cmd, "--target-dir=" .. fs.Q(target_path))
+20-luarocks-build-rust-mlua/rust-mlua.lua:51: 
+20-luarocks-build-rust-mlua/rust-mlua.lua:52:     if rockspec.build then
+20-luarocks-build-rust-mlua/rust-mlua.lua:53:         -- Check if default features not required
+20-luarocks-build-rust-mlua/rust-mlua.lua:54:         if rockspec.build.default_features == false then
+20-luarocks-build-rust-mlua/rust-mlua.lua:55:             table.insert(cmd, "--no-default-features")
+20-luarocks-build-rust-mlua/rust-mlua.lua:56:         end
+20-luarocks-build-rust-mlua/rust-mlua.lua:57:         -- Add additional features
+20-luarocks-build-rust-mlua/rust-mlua.lua:58:         if type(rockspec.build.features) == "table" then
+20-luarocks-build-rust-mlua/rust-mlua.lua:59:             for _, feature in ipairs(rockspec.build.features) do
+20-luarocks-build-rust-mlua/rust-mlua.lua:60:                 table.insert(features, feature)
+20-luarocks-build-rust-mlua/rust-mlua.lua:61:             end
+20-luarocks-build-rust-mlua/rust-mlua.lua:62:         elseif type(rockspec.build.features) == "string" then
+20-luarocks-build-rust-mlua/rust-mlua.lua:63:             table.insert(features, rockspec.build.features)
+20-luarocks-build-rust-mlua/rust-mlua.lua:64:         end
+20-luarocks-build-rust-mlua/rust-mlua.lua:65:     end
+20-luarocks-build-rust-mlua/rust-mlua.lua:66:     table.insert(cmd, "--features")
+20-luarocks-build-rust-mlua/rust-mlua.lua:67:     table.insert(cmd, table.concat(features, ","))
+20-luarocks-build-rust-mlua/rust-mlua.lua:68: 
+20-luarocks-build-rust-mlua/rust-mlua.lua:69:     if not fs.execute_env(envs, table.concat(cmd, " ")) then
+20-luarocks-build-rust-mlua/rust-mlua.lua:70:         return nil, "Failed building."
+20-luarocks-build-rust-mlua/rust-mlua.lua:71:     end
+--- 20-luarocks-build-rust-mlua/rust-mlua.lua:73-98
+20-luarocks-build-rust-mlua/rust-mlua.lua:73:     if rockspec.build and rockspec.build.modules and not (no_install) then
+20-luarocks-build-rust-mlua/rust-mlua.lua:74:         local libdir = path.lib_dir(rockspec.name, rockspec.version)
+20-luarocks-build-rust-mlua/rust-mlua.lua:75: 
+20-luarocks-build-rust-mlua/rust-mlua.lua:76:         fs.make_dir(dir.dir_name(libdir))
+20-luarocks-build-rust-mlua/rust-mlua.lua:77:         for k, rustlib_name in pairs(rockspec.build.modules) do
+20-luarocks-build-rust-mlua/rust-mlua.lua:78:             -- Make loop variable mutable in Lua 5.5
+20-luarocks-build-rust-mlua/rust-mlua.lua:79:             local mod = k
+20-luarocks-build-rust-mlua/rust-mlua.lua:80: 
+20-luarocks-build-rust-mlua/rust-mlua.lua:81:             -- If `mod` is a number, then it's an array entry
+20-luarocks-build-rust-mlua/rust-mlua.lua:82:             if type(mod) == "number" then
+20-luarocks-build-rust-mlua/rust-mlua.lua:83:                 mod = rustlib_name
+20-luarocks-build-rust-mlua/rust-mlua.lua:84:             end
+20-luarocks-build-rust-mlua/rust-mlua.lua:85: 
+20-luarocks-build-rust-mlua/rust-mlua.lua:86:             local rustlib = "lib" .. rustlib_name .. "." .. cfg.external_lib_extension
+20-luarocks-build-rust-mlua/rust-mlua.lua:87:             if cfg.is_platform("windows") then
+20-luarocks-build-rust-mlua/rust-mlua.lua:88:                 rustlib = mod .. "." .. cfg.external_lib_extension
+20-luarocks-build-rust-mlua/rust-mlua.lua:89:             end
+20-luarocks-build-rust-mlua/rust-mlua.lua:90: 
+20-luarocks-build-rust-mlua/rust-mlua.lua:91:             local src = dir.path(target_path, "release", rustlib)
+20-luarocks-build-rust-mlua/rust-mlua.lua:92:             local dst = dir.path(libdir, mod .. "." .. cfg.lib_extension)
+20-luarocks-build-rust-mlua/rust-mlua.lua:93: 
+20-luarocks-build-rust-mlua/rust-mlua.lua:94:             local ok, err = fs.copy(src, dst, "exec")
+20-luarocks-build-rust-mlua/rust-mlua.lua:95:             if not ok then
+20-luarocks-build-rust-mlua/rust-mlua.lua:96:                 return nil, "Failed installing " .. src .. " in " .. dst .. ": " .. err
+20-luarocks-build-rust-mlua/rust-mlua.lua:97:             end
+20-luarocks-build-rust-mlua/rust-mlua.lua:98:         end
+--- 20-luarocks-build-rust-mlua/rust-mlua.lua:100-117
+20-luarocks-build-rust-mlua/rust-mlua.lua:100:         if rockspec.build.include then
+20-luarocks-build-rust-mlua/rust-mlua.lua:101:             local cwd = dir.path(dir.dir_name(rockspec.local_abs_filename), rockspec.name)
+20-luarocks-build-rust-mlua/rust-mlua.lua:102:             local luadir = path.lua_dir(rockspec.name, rockspec.version)
+20-luarocks-build-rust-mlua/rust-mlua.lua:103: 
+20-luarocks-build-rust-mlua/rust-mlua.lua:104:             fs.make_dir(dir.dir_name(luadir))
+20-luarocks-build-rust-mlua/rust-mlua.lua:105:             for f, to in pairs(rockspec.build.include) do
+20-luarocks-build-rust-mlua/rust-mlua.lua:106:                 -- Make loop variable mutable in Lua 5.5
+20-luarocks-build-rust-mlua/rust-mlua.lua:107:                 local from = f
+20-luarocks-build-rust-mlua/rust-mlua.lua:108:                 if type(from) == "number" then
+20-luarocks-build-rust-mlua/rust-mlua.lua:109:                     from = to
+20-luarocks-build-rust-mlua/rust-mlua.lua:110:                 end
+20-luarocks-build-rust-mlua/rust-mlua.lua:111:                 to = dir.path(luadir, to)
+20-luarocks-build-rust-mlua/rust-mlua.lua:112:                 local ok, err = fs.copy(dir.path(cwd, from), to, "exec")
+20-luarocks-build-rust-mlua/rust-mlua.lua:113:                 if not ok then
+20-luarocks-build-rust-mlua/rust-mlua.lua:114:                     return nil, "Failed copying " .. from .. " in " .. to .. ": " .. err
+20-luarocks-build-rust-mlua/rust-mlua.lua:115:                 end
+20-luarocks-build-rust-mlua/rust-mlua.lua:116:             end
+20-luarocks-build-rust-mlua/rust-mlua.lua:117:         end
+--- 20-luarocks-build-rust-mlua/README.md:41-66
+20-luarocks-build-rust-mlua/README.md:41:         ["my_module"] = "alt_name",
+20-luarocks-build-rust-mlua/README.md:42:     },
+20-luarocks-build-rust-mlua/README.md:43: 
+20-luarocks-build-rust-mlua/README.md:44:     -- Optional: target_path if cargo "target" directory not in the module root
+20-luarocks-build-rust-mlua/README.md:45:     target_path = "path/to/cargo/target/directory"
+20-luarocks-build-rust-mlua/README.md:46: 
+20-luarocks-build-rust-mlua/README.md:47:     -- Optional: if set to `false` pass `--no-default-features` to cargo
+20-luarocks-build-rust-mlua/README.md:48:     default_features = false,
+20-luarocks-build-rust-mlua/README.md:49: 
+20-luarocks-build-rust-mlua/README.md:50:     -- Optional: additional flags to be passed in the cargo invocation
+20-luarocks-build-rust-mlua/README.md:51:     cargo_extra_args = {"--package, foo", "--locked"},
+20-luarocks-build-rust-mlua/README.md:52: 
+20-luarocks-build-rust-mlua/README.md:53:     -- Optional: copy additional files to lua dir, can specify source path
+20-luarocks-build-rust-mlua/README.md:54:     include = {
+20-luarocks-build-rust-mlua/README.md:55:         "file.lua",
+20-luarocks-build-rust-mlua/README.md:56:         ["path/to/another/file.lua"] = "another-file.lua",
+20-luarocks-build-rust-mlua/README.md:57:     },
+20-luarocks-build-rust-mlua/README.md:58: 
+20-luarocks-build-rust-mlua/README.md:59:     -- Optional: pass additional features
+20-luarocks-build-rust-mlua/README.md:60:     features = {"extra", "features"}
+20-luarocks-build-rust-mlua/README.md:61: }
+20-luarocks-build-rust-mlua/README.md:62: ```
+--- 20-luarocks-build-rust-mlua/CHANGELOG.md:1-30
+20-luarocks-build-rust-mlua/CHANGELOG.md:1: ## v0.2.7
+20-luarocks-build-rust-mlua/CHANGELOG.md:2: 
+20-luarocks-build-rust-mlua/CHANGELOG.md:3: - Added Lua 5.5 support
+20-luarocks-build-rust-mlua/CHANGELOG.md:4: 
+20-luarocks-build-rust-mlua/CHANGELOG.md:5: ## v0.2.5
+20-luarocks-build-rust-mlua/CHANGELOG.md:6: 
+20-luarocks-build-rust-mlua/CHANGELOG.md:7: - Support `cargo_extra_args` option to pass additional flags to cargo
+20-luarocks-build-rust-mlua/CHANGELOG.md:8: 
+20-luarocks-build-rust-mlua/CHANGELOG.md:9: ## v0.2.4
+20-luarocks-build-rust-mlua/CHANGELOG.md:10: 
+20-luarocks-build-rust-mlua/CHANGELOG.md:11: - Luarocks 3.12 compatibility
+20-luarocks-build-rust-mlua/CHANGELOG.md:12: 
+20-luarocks-build-rust-mlua/CHANGELOG.md:13: ## v0.2.3
+20-luarocks-build-rust-mlua/CHANGELOG.md:14: 
+20-luarocks-build-rust-mlua/CHANGELOG.md:15: - Add option to include lua files
+20-luarocks-build-rust-mlua/CHANGELOG.md:16: - Set `LUA_ROCKSPEC_PACKAGE`/`LUA_ROCKSPEC_VERSION` environment variables during build
+20-luarocks-build-rust-mlua/CHANGELOG.md:17: 
+20-luarocks-build-rust-mlua/CHANGELOG.md:18: ## v0.2.2
+20-luarocks-build-rust-mlua/CHANGELOG.md:19: 
+20-luarocks-build-rust-mlua/CHANGELOG.md:20: - Pass correct `target-dir` arg to cargo instead of `target` (mlua-rs/luarocks-build-rust-mlua#12)
+20-luarocks-build-rust-mlua/CHANGELOG.md:21: 
+20-luarocks-build-rust-mlua/CHANGELOG.md:22: ## v0.2.1 (yanked)
+20-luarocks-build-rust-mlua/CHANGELOG.md:23: 
+20-luarocks-build-rust-mlua/CHANGELOG.md:24: - Pass `target_path` to cargo if it's set (mlua-rs/luarocks-build-rust-mlua#9)
+20-luarocks-build-rust-mlua/CHANGELOG.md:25: - Re-enable support for LuaRocks 3.1.x (mlua-rs/luarocks-build-rust-mlua#10)
+20-luarocks-build-rust-mlua/CHANGELOG.md:26: 
+20-luarocks-build-rust-mlua/CHANGELOG.md:27: ## v0.2.0
+20-luarocks-build-rust-mlua/CHANGELOG.md:28: 
+20-luarocks-build-rust-mlua/CHANGELOG.md:29: This release lines up with the mlua v0.9 changes
+20-luarocks-build-rust-mlua/CHANGELOG.md:30: 
+
+=== findings
+- Latest release: 0.2.7 (GitHub tag 0.2.7; luarocks.org 0.2.7-1). Adds Lua 5.5 (CHANGELOG.md:3).
+- Lua feature: from cfg.lua_version only (rust-mlua.lua:16-36): 5.4 -> lua54; 5.1 -> luajit when util.get_luajit_version() (or cfg.luajit_version) is non-nil, else lua51. Any other version -> 'Lua version X is not supported'. There is no rockspec knob to choose it; build.features only APPENDS (rust-mlua.lua:58-64).
+- Command: 'cargo build --release' + each cargo_extra_args entry verbatim + '--target-dir=<target_path or "target">' + optional '--no-default-features' (only when build.default_features == false) + '--features <lua feature>[,extra features]' (rust-mlua.lua:43-67). Joined with spaces and run through fs.execute_env with LUA_ROCKSPEC_PACKAGE / LUA_ROCKSPEC_VERSION set (rust-mlua.lua:38-41,69). No --locked unless put in cargo_extra_args. No -p/--package unless put in cargo_extra_args.
+- cwd: whatever directory luarocks is in when the driver runs (no chdir in the backend). See 21 for measured cwd (make: invocation dir; src rock: the unpacked source dir).
+- Build fields read: cargo_extra_args, target_path, default_features, features, modules, include. Not read: source.dir (luarocks core uses it), any lua-version selection.
+- Copy: for each modules entry, src = <target_path>/release/lib<name>.<external_lib_extension> (Windows: <modname>.<external_lib_extension>, i.e. no 'lib' prefix and named after the MODULE key, not the crate lib name), dst = <lib_dir>/<mod>.<lib_extension> (rust-mlua.lua:86-94). Error: 'Failed installing <src> in <dst>: <err>'.
+- Missing cargo: fs.is_tool_available("cargo", "Cargo") fails -> "'cargo' is not installed.
+This rock is written in Rust: make sure you have a Rust
+development environment installed and try again." (rust-mlua.lua:10-13); luarocks prefixes 'Error: Build error: ' (observed in 24).
+- Build failure: 'Failed building.' (rust-mlua.lua:70) -> 'Error: Build error: Failed building.'
+- The backend does NOT set skip_lua_inc_lib_check, so luarocks still checks Lua headers (29: build.lua:239-243).

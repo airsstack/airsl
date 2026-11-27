@@ -1,0 +1,209 @@
+Question B6: luarocks config keys under the default (5.4) config and under LuaJIT flags — lua_version, arch, lua_interpreter, rocks_provided, variables.LUA, a missing key — outputs and exit codes; can a rockspec depend on 'luajit >= 2.1' (pass under LuaJIT, fail under 5.4)? How luarocks detects LuaJIT.
+Versions: luarocks 3.12.2 (/opt/homebrew/bin/luarocks, runs on Lua 5.4), Lua 5.4.8 (/opt/homebrew/bin/lua5.4), LuaJIT 2.1.1770848219 (/opt/homebrew/opt/luajit), cargo 1.94.1 / rustc 1.94.1, mlua =0.12.0 (mlua-sys 0.11.0), luarocks-build-rust-mlua 0.2.7-1, macOS Darwin 25.3.0 arm64 (arch macosx-aarch64).
+Date: 2026-11-26. Probe agent B.
+S = /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B (scratch; deleted after recording). Raw output below is unedited; paths appear in full.
+Sources: 25-luarocks-config-keys/ljdep-0.0.1-1.rockspec (rockspec_format 3.0, dependencies = { "luajit >= 2.1" }, build.type none); ljdep2-0.0.1-1.rockspec (same without rockspec_format, i.e. 1.0). LuaJIT flags: --lua-version 5.1 --lua-dir /opt/homebrew/opt/luajit. cwd = $S.
+
+################ mode=default flags: 
+$ luarocks  config lua_version
+5.4
+exit=0
+$ luarocks  config arch
+macosx-aarch64
+exit=0
+$ luarocks  config lua_interpreter
+
+Error: Unknown entry lua_interpreter
+exit=1
+$ luarocks  config rocks_provided
+
+Error: Unknown entry rocks_provided
+exit=1
+$ luarocks  config variables.LUA
+/opt/homebrew/opt/lua/bin/lua5.4
+exit=0
+$ luarocks  config no_such_key
+
+Error: Unknown entry no_such_key
+exit=1
+$ luarocks  config | grep -n -A6 'rocks_provided\|luajit'
+4:   luajit_version_checked = true
+$ luarocks  --tree $S/tree-ljdep-default make ljdep/ljdep-0.0.1-1.rockspec   (rockspec_format 3.0, dependencies = { "luajit >= 2.1" })
+
+Error: Could not satisfy dependency luajit >= 2.1: No results matching query were found for Lua 5.4.
+
+Missing dependencies for ljdep 0.0.1-1:
+   luajit >= 2.1 (not installed)
+
+ljdep 0.0.1-1 depends on luajit >= 2.1 (not installed)
+exit=1
+$ luarocks  --tree $S/tree-ljdep-default make --only-server=$S/empty-server ljdep/ljdep-0.0.1-1.rockspec
+Warning: Failed searching manifest: Failed loading manifest for /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/empty-server: /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/empty-server/manifest-5.4: No such file or directory
+
+Error: Could not satisfy dependency luajit >= 2.1: No results matching query were found for Lua 5.4.
+
+Missing dependencies for ljdep 0.0.1-1:
+   luajit >= 2.1 (not installed)
+
+ljdep 0.0.1-1 depends on luajit >= 2.1 (not installed)
+exit=1
+$ luarocks  --tree $S/tree-ljdep-default make --only-server=$S/empty-server ljdep/ljdep2-0.0.1-1.rockspec   (no rockspec_format: 1.0)
+Warning: Failed searching manifest: Failed loading manifest for /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/empty-server: /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/empty-server/manifest-5.4: No such file or directory
+
+Error: Could not satisfy dependency luajit >= 2.1: No results matching query were found for Lua 5.4.
+
+Missing dependencies for ljdep2 0.0.1-1:
+   luajit >= 2.1 (not installed)
+
+ljdep2 0.0.1-1 depends on luajit >= 2.1 (not installed)
+exit=1
+################ mode=luajit flags: --lua-version 5.1 --lua-dir /opt/homebrew/opt/luajit
+$ luarocks --lua-version 5.1 --lua-dir /opt/homebrew/opt/luajit config lua_version
+5.1
+exit=0
+$ luarocks --lua-version 5.1 --lua-dir /opt/homebrew/opt/luajit config arch
+macosx-aarch64
+exit=0
+$ luarocks --lua-version 5.1 --lua-dir /opt/homebrew/opt/luajit config lua_interpreter
+
+Error: Unknown entry lua_interpreter
+exit=1
+$ luarocks --lua-version 5.1 --lua-dir /opt/homebrew/opt/luajit config rocks_provided
+
+Error: Unknown entry rocks_provided
+exit=1
+$ luarocks --lua-version 5.1 --lua-dir /opt/homebrew/opt/luajit config variables.LUA
+/opt/homebrew/opt/luajit/bin/luajit
+exit=0
+$ luarocks --lua-version 5.1 --lua-dir /opt/homebrew/opt/luajit config no_such_key
+
+Error: Unknown entry no_such_key
+exit=1
+$ luarocks --lua-version 5.1 --lua-dir /opt/homebrew/opt/luajit config | grep -n -A6 'rocks_provided\|luajit'
+4:   luajit_version = "2.1.1770848219",
+5:   luajit_version_checked = true
+147:   LUA = "/opt/homebrew/opt/luajit/bin/luajit",
+148:   LUALIB = "libluajit-5.1.a",
+149:   LUA_BINDIR = "/opt/homebrew/opt/luajit/bin",
+150:   LUA_DIR = "/opt/homebrew/opt/luajit",
+151:   LUA_INCDIR = "/opt/homebrew/opt/luajit/include/luajit-2.1",
+153:   LUA_LIBDIR = "/opt/homebrew/opt/luajit/lib",
+154:   LUA_LIBDIR_FILE = "libluajit-5.1.a",
+$ luarocks --lua-version 5.1 --lua-dir /opt/homebrew/opt/luajit --tree $S/tree-ljdep-luajit make ljdep/ljdep-0.0.1-1.rockspec   (rockspec_format 3.0, dependencies = { "luajit >= 2.1" })
+
+
+ljdep 0.0.1-1 depends on luajit >= 2.1 (2.1.1770848219-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+ljdep 0.0.1-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-ljdep-luajit (license: MIT)
+
+exit=0
+$ luarocks --lua-version 5.1 --lua-dir /opt/homebrew/opt/luajit --tree $S/tree-ljdep-luajit make --only-server=$S/empty-server ljdep/ljdep-0.0.1-1.rockspec
+
+
+ljdep 0.0.1-1 depends on luajit >= 2.1 (2.1.1770848219-1 provided by VM: success)
+ljdep 0.0.1-1 is now installed in /private/tmp/claude-501/-Users-hiraq--herdr-worktrees-airsl-luarocks-integrations/4060dc68-5ed5-4b9d-947b-ba456a144f29/scratchpad/probes-B/tree-ljdep-luajit (license: MIT)
+
+exit=0
+$ luarocks --lua-version 5.1 --lua-dir /opt/homebrew/opt/luajit --tree $S/tree-ljdep-luajit make --only-server=$S/empty-server ljdep/ljdep2-0.0.1-1.rockspec   (no rockspec_format: 1.0)
+
+Error: Could not satisfy dependency luajit >= 2.1: Rock luajit 2.1.1770848219-1 is already provided by VM or via 'rocks_provided' in the config file.
+
+Missing dependencies for ljdep2 0.0.1-1:
+   luajit >= 2.1 (not installed)
+
+ljdep2 0.0.1-1 depends on luajit >= 2.1 (not installed)
+exit=1
+
+=== luarocks source
+--- 29-luarocks-3.12.2-src/util.lua:435-455
+29-luarocks-3.12.2-src/util.lua:435:    function util.get_luajit_version()
+29-luarocks-3.12.2-src/util.lua:436:       if cfg.cache.luajit_version_checked then
+29-luarocks-3.12.2-src/util.lua:437:          return cfg.cache.luajit_version
+29-luarocks-3.12.2-src/util.lua:438:       end
+29-luarocks-3.12.2-src/util.lua:439:       cfg.cache.luajit_version_checked = true
+29-luarocks-3.12.2-src/util.lua:440: 
+29-luarocks-3.12.2-src/util.lua:441:       if not cfg.variables.LUA then
+29-luarocks-3.12.2-src/util.lua:442:          return nil
+29-luarocks-3.12.2-src/util.lua:443:       end
+29-luarocks-3.12.2-src/util.lua:444: 
+29-luarocks-3.12.2-src/util.lua:445:       local ljv
+29-luarocks-3.12.2-src/util.lua:446:       if cfg.lua_version == "5.1" then
+29-luarocks-3.12.2-src/util.lua:447: 
+29-luarocks-3.12.2-src/util.lua:448:          ljv = util.popen_read(Q(cfg.variables.LUA) .. ' -e "io.write(tostring(jit and jit.version:gsub([[^%S+ (%S+).*]], [[%1]])))"')
+29-luarocks-3.12.2-src/util.lua:449:          if ljv == "nil" then
+29-luarocks-3.12.2-src/util.lua:450:             ljv = nil
+29-luarocks-3.12.2-src/util.lua:451:          end
+29-luarocks-3.12.2-src/util.lua:452:       end
+29-luarocks-3.12.2-src/util.lua:453:       cfg.cache.luajit_version = ljv
+29-luarocks-3.12.2-src/util.lua:454:       return ljv
+29-luarocks-3.12.2-src/util.lua:455:    end
+--- 29-luarocks-3.12.2-src/util.lua:537-576
+29-luarocks-3.12.2-src/util.lua:537: function util.get_rocks_provided(rockspec)
+29-luarocks-3.12.2-src/util.lua:538: 
+29-luarocks-3.12.2-src/util.lua:539:    if not rockspec and cfg.cache.rocks_provided then
+29-luarocks-3.12.2-src/util.lua:540:       return cfg.cache.rocks_provided
+29-luarocks-3.12.2-src/util.lua:541:    end
+29-luarocks-3.12.2-src/util.lua:542: 
+29-luarocks-3.12.2-src/util.lua:543:    local rocks_provided = {}
+29-luarocks-3.12.2-src/util.lua:544: 
+29-luarocks-3.12.2-src/util.lua:545:    local lv = cfg.lua_version
+29-luarocks-3.12.2-src/util.lua:546: 
+29-luarocks-3.12.2-src/util.lua:547:    rocks_provided["lua"] = lv .. "-1"
+29-luarocks-3.12.2-src/util.lua:548: 
+29-luarocks-3.12.2-src/util.lua:549:    if lv == "5.2" then
+29-luarocks-3.12.2-src/util.lua:550:       rocks_provided["bit32"] = lv .. "-1"
+29-luarocks-3.12.2-src/util.lua:551:    end
+29-luarocks-3.12.2-src/util.lua:552: 
+29-luarocks-3.12.2-src/util.lua:553:    if lv == "5.3" or lv == "5.4" then
+29-luarocks-3.12.2-src/util.lua:554:       rocks_provided["utf8"] = lv .. "-1"
+29-luarocks-3.12.2-src/util.lua:555:    end
+29-luarocks-3.12.2-src/util.lua:556: 
+29-luarocks-3.12.2-src/util.lua:557:    if lv == "5.1" then
+29-luarocks-3.12.2-src/util.lua:558:       local ljv = util.get_luajit_version()
+29-luarocks-3.12.2-src/util.lua:559:       if ljv then
+29-luarocks-3.12.2-src/util.lua:560:          rocks_provided["luabitop"] = ljv .. "-1"
+29-luarocks-3.12.2-src/util.lua:561:          if (not rockspec) or rockspec:format_is_at_least("3.0") then
+29-luarocks-3.12.2-src/util.lua:562:             rocks_provided["luajit"] = ljv .. "-1"
+29-luarocks-3.12.2-src/util.lua:563:          end
+29-luarocks-3.12.2-src/util.lua:564:       end
+29-luarocks-3.12.2-src/util.lua:565:    end
+29-luarocks-3.12.2-src/util.lua:566: 
+29-luarocks-3.12.2-src/util.lua:567:    if cfg.rocks_provided then
+29-luarocks-3.12.2-src/util.lua:568:       util.deep_merge_under(rocks_provided, cfg.rocks_provided)
+29-luarocks-3.12.2-src/util.lua:569:    end
+29-luarocks-3.12.2-src/util.lua:570: 
+29-luarocks-3.12.2-src/util.lua:571:    if not rockspec then
+29-luarocks-3.12.2-src/util.lua:572:       cfg.cache.rocks_provided = rocks_provided
+29-luarocks-3.12.2-src/util.lua:573:    end
+29-luarocks-3.12.2-src/util.lua:574: 
+29-luarocks-3.12.2-src/util.lua:575:    return rocks_provided
+29-luarocks-3.12.2-src/util.lua:576: end
+--- 29-luarocks-3.12.2-src/cmd/config.lua:106-115
+29-luarocks-3.12.2-src/cmd/config.lua:106:    if k then
+29-luarocks-3.12.2-src/cmd/config.lua:107:       if not tbl[k] and missing_parent then
+29-luarocks-3.12.2-src/cmd/config.lua:108:          missing_parent(tbl, k)
+29-luarocks-3.12.2-src/cmd/config.lua:109:       end
+29-luarocks-3.12.2-src/cmd/config.lua:110: 
+29-luarocks-3.12.2-src/cmd/config.lua:111:       if tbl[k] then
+29-luarocks-3.12.2-src/cmd/config.lua:112:          return traverse_varstring(r, tbl[k], fn, missing_parent)
+29-luarocks-3.12.2-src/cmd/config.lua:113:       else
+29-luarocks-3.12.2-src/cmd/config.lua:114:          return nil, "Unknown entry " .. tostring(k)
+29-luarocks-3.12.2-src/cmd/config.lua:115:       end
+--- 29-luarocks-3.12.2-src/cmd/config.lua:131-136
+29-luarocks-3.12.2-src/cmd/config.lua:131: local function print_entry(var, tbl, is_json)
+29-luarocks-3.12.2-src/cmd/config.lua:132:    return traverse_varstring(var, tbl, function(t, k)
+29-luarocks-3.12.2-src/cmd/config.lua:133:       if not t[k] then
+29-luarocks-3.12.2-src/cmd/config.lua:134:          return nil, "Unknown entry " .. k
+29-luarocks-3.12.2-src/cmd/config.lua:135:       end
+29-luarocks-3.12.2-src/cmd/config.lua:136:       local val = t[k]
+
+=== findings
+- lua_version: '5.4' (default) / '5.1' (LuaJIT); exit 0. This is the only key that names the Lua version; it does not tell LuaJIT from PUC 5.1.
+- arch: 'macosx-aarch64' in both; exit 0.
+- variables.LUA: '/opt/homebrew/opt/lua/bin/lua5.4' / '/opt/homebrew/opt/luajit/bin/luajit'; exit 0.
+- lua_interpreter, rocks_provided, no_such_key: '
+Error: Unknown entry <key>' on stderr+stdout capture, exit 1 (cmd/config.lua:131-134: any key whose value is nil or false is 'Unknown entry'). rocks_provided is computed (util.get_rocks_provided), not a config entry.
+- LuaJIT detection: util.get_luajit_version runs '$LUA -e "io.write(tostring(jit and jit.version:gsub(...)))"' only when cfg.lua_version == "5.1" (util.lua:435-455). The full 'luarocks config' dump under LuaJIT shows luajit_version = "2.1.1770848219" (absent under 5.4).
+- VM-provided rocks under LuaJIT: lua = 5.1-1, luabitop and luajit = <ljv>-1, but luajit only for rockspec_format >= 3.0 (util.lua:557-564).
+- 'luajit >= 2.1' with rockspec_format 3.0: LuaJIT -> 'ljdep 0.0.1-1 depends on luajit >= 2.1 (2.1.1770848219-1 provided by VM: success)', exit 0. Under 5.4 -> 'Error: Could not satisfy dependency luajit >= 2.1: No results matching query were found for Lua 5.4.' exit 1 (searched luarocks.org/the given server).
+- Without rockspec_format 3.0 under LuaJIT: 'Error: Could not satisfy dependency luajit >= 2.1: Rock luajit 2.1.1770848219-1 is already provided by VM or via 'rocks_provided' in the config file.' exit 1.

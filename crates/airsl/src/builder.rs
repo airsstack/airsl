@@ -16,7 +16,7 @@ use mlua::Table;
 
 use crate::engine::Engine;
 use crate::error::{Error, Result};
-use crate::modules::{InstallContext, ModuleSet, stdlib};
+use crate::modules::{ModuleSet, stdlib};
 use crate::sandbox::Policy;
 use crate::sandbox::language_surface::{
     CHUNK_LOADERS, MINIMAL_RANDOM_SEED, MINIMAL_WITHHELD_GLOBALS, UNSAFE_OS_FUNCTIONS,
@@ -243,21 +243,12 @@ fn install_modules(
     policy: &Policy,
     root_table: &RootTable,
 ) -> Result<()> {
-    let fail = |e: mlua::Error| Error::ModuleInstall {
-        module: root_table.to_string(),
-        reason: e.to_string(),
-    };
-
-    let context = InstallContext::new(policy, root_table);
-    let root = lua.create_table().map_err(fail)?;
-    for module in modules.iter() {
-        let table = lua.create_table().map_err(fail)?;
-        module.install(lua, &table, &context)?;
-        root.set(module.name().as_str(), table).map_err(fail)?;
-    }
+    let root = modules.install(lua, policy, root_table)?;
     // Before the global is set, because setting it moves `root`.
     crate::require::root::register(lua, root_table, &root, policy.language())?;
-    lua.globals().set(root_table.as_str(), root).map_err(fail)?;
+    lua.globals()
+        .set(root_table.as_str(), root)
+        .map_err(|e| Error::root_table_install(root_table, &e))?;
     Ok(())
 }
 
