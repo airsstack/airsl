@@ -165,22 +165,22 @@ Run LuaRocks from the clone, and give it a tree to install into. This builds the
 $ git clone https://github.com/airsstack/airsl
 $ cd airsl
 $ luarocks --lua-version 5.4 make --tree lua54-tree crates/airsl-lua/rockspecs/airsstack-[0-9]*-1.rockspec
-Missing dependencies for airsstack 0.3.0-1:
+Missing dependencies for airsstack 0.3.1-1:
    luarocks-build-rust-mlua 0.2.7 (not installed)
 
-airsstack 0.3.0-1 depends on luarocks-build-rust-mlua 0.2.7 (not installed)
+airsstack 0.3.1-1 depends on luarocks-build-rust-mlua 0.2.7 (not installed)
 Installing https://luarocks.org/luarocks-build-rust-mlua-0.2.7-1.src.rock
 
 
 No existing manifest. Attempting to rebuild...
-   Compiling airsl-lua v0.3.0 (~/airsl/crates/airsl-lua)
-   Compiling airsl v0.3.0 (~/airsl/crates/airsl)
-    Finished `release` profile [optimized] target(s) in 16.30s
+   Compiling airsl-lua v0.3.1 (~/airsl/crates/airsl-lua)
+   Compiling airsl v0.3.1 (~/airsl/crates/airsl)
+    Finished `release` profile [optimized] target(s) in 18.53s
 luarocks-build-rust-mlua 0.2.7-1 is now installed in ~/airsl/lua54-tree (license: MIT)
 
 
-airsstack 0.3.0-1 depends on lua 5.4 (5.4-1 provided by VM: success)
-airsstack 0.3.0-1 is now installed in ~/airsl/lua54-tree (license: Apache-2.0)
+airsstack 0.3.1-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+airsstack 0.3.1-1 is now installed in ~/airsl/lua54-tree (license: Apache-2.0)
 ```
 
 The first lines are LuaRocks fetching the build tool for the package. This run had Rust's build
@@ -206,26 +206,26 @@ implements:
 
 ```console
 $ luarocks --lua-version 5.1 make --tree luajit-tree crates/airsl-lua/rockspecs/airsstack-luajit-[0-9]*-1.rockspec
-Missing dependencies for airsstack-luajit 0.3.0-1:
+Missing dependencies for airsstack-luajit 0.3.1-1:
    luarocks-build-rust-mlua 0.2.7 (not installed)
 
-airsstack-luajit 0.3.0-1 depends on luarocks-build-rust-mlua 0.2.7 (not installed)
+airsstack-luajit 0.3.1-1 depends on luarocks-build-rust-mlua 0.2.7 (not installed)
 Installing https://luarocks.org/luarocks-build-rust-mlua-0.2.7-1.src.rock
 
 
 No existing manifest. Attempting to rebuild...
-   Compiling airsl-lua v0.3.0 (~/airsl/crates/airsl-lua)
-   Compiling airsl v0.3.0 (~/airsl/crates/airsl)
-    Finished `release` profile [optimized] target(s) in 17.45s
+   Compiling airsl-lua v0.3.1 (~/airsl/crates/airsl-lua)
+   Compiling airsl v0.3.1 (~/airsl/crates/airsl)
+    Finished `release` profile [optimized] target(s) in 17.62s
 luarocks-build-rust-mlua 0.2.7-1 is now installed in ~/airsl/luajit-tree (license: MIT)
 
 
-airsstack-luajit 0.3.0-1 depends on lua 5.1 (5.1-1 provided by VM: success)
-airsstack-luajit 0.3.0-1 depends on luajit >= 2.1 (2.1.1770848219-1 provided by VM: success)
+airsstack-luajit 0.3.1-1 depends on lua 5.1 (5.1-1 provided by VM: success)
+airsstack-luajit 0.3.1-1 depends on luajit >= 2.1 (2.1.1770848219-1 provided by VM: success)
 No existing manifest. Attempting to rebuild...
-airsstack-luajit 0.3.0-1 is now installed in ~/airsl/luajit-tree (license: Apache-2.0)
+airsstack-luajit 0.3.1-1 is now installed in ~/airsl/luajit-tree (license: Apache-2.0)
 
-Missing dependencies for airsstack-luajit 0.3.0-1:
+Missing dependencies for airsstack-luajit 0.3.1-1:
    lua 5.1 (not installed)
    luajit >= 2.1 (not installed)
 ```
@@ -511,8 +511,8 @@ starts LuaRocks:
 ```text
 airsl: this `airsl` is built for musl Linux, and `airsstack` has no package for musl: the glibc package `luarocks` installs cannot load there
        on a glibc system, install the package with `luarocks` yourself:
-       luarocks --lua-version 5.4 install --local airsstack 0.3.0
-       luarocks --lua-version 5.1 install --local airsstack-luajit 0.3.0
+       luarocks --lua-version 5.4 install --local airsstack 0.3.1
+       luarocks --lua-version 5.1 install --local airsstack-luajit 0.3.1
        https://airsstack.github.io/airsl/ch01-05-stock-lua.html#no-binary-package says what works on musl and where no package exists
 ```
 

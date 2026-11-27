@@ -10,7 +10,7 @@
 //! Non-responsibilities: the binary's `--version` output. `airsl-cli` reports its own package
 //! version.
 
-/// The version of the `airsl` crate this program was built against, such as `"0.3.0"`.
+/// The version of the `airsl` crate this program was built against, such as `"0.3.1"`.
 ///
 /// Taken from Cargo at compile time, so it always names the library actually linked in, never the
 /// one a manifest asked for.

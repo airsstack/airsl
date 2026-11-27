@@ -10,7 +10,7 @@ default-members = ["crates/airsl", "crates/airsl-cli", "crates/docs-check"]
 [workspace.package]
 # One number for airsl, airsl-cli and airsl-lua, so the crates and the LuaRocks packages built
 # from one commit carry the same version.
-version       = "0.3.0"
+version       = "0.3.1"
 edition       = "2024"
 rust-version  = "1.94"
 license       = "Apache-2.0"
@@ -61,7 +61,7 @@ clap       = { version = "4", features = ["derive"] }
 # Internal workspace member — path for local builds, version for publish-readiness.
 # `airsl-cli` inherits this with `{ workspace = true }`. Cargo strips the path and
 # keeps the version when packaging, so the published crate depends on crates.io.
-airsl      = { version = "0.3.0", path = "crates/airsl" }
+airsl      = { version = "0.3.1", path = "crates/airsl" }
 
 [workspace.lints.rust]
 unsafe_code        = "forbid"
