@@ -505,6 +505,12 @@ description = "Build, pack and load both LuaRocks packages of the native module 
 # back to the root after, which is also what makes the relative rockspec and `check.lua` paths
 # resolve for the next step. duckscript's `cd` answers empty and stays where it was when it cannot
 # change directory, so each answer is tested rather than let `pack` or `check.lua` run elsewhere.
+#
+# Every run starts from an empty `target/rocks`. CI's rust-cache restores `target/` with the
+# directories of a luarocks tree but none of its files, and luarocks reads a rock's directory
+# without its manifest as an inconsistent repository and refuses to build. Clearing `dist` too
+# means it holds only the rocks this run packed, never one left by an earlier version, and a
+# repeated local run does exactly what the first did.
 script_runner = "@duckscript"
 script = '''
 root = pwd
@@ -606,6 +612,11 @@ rockspec_luajit = find_rockspec airsstack-luajit
 version_lua54 = rockspec_version airsstack ${rockspec_lua54}
 version_luajit = rockspec_version airsstack-luajit ${rockspec_luajit}
 
+removed = rm -r ${root}/target/rocks
+if not ${removed}
+    echo "rocks: could not remove `${root}/target/rocks`"
+    exit 1
+end
 mkdir ${root}/target/rocks/dist
 
 build_package airsstack ${rockspec_lua54} ${version_lua54} lua54 5.4 AIRSL_LUA54_DIR ${luarocks} ${lua54} ${root}
