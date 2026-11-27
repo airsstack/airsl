@@ -1,0 +1,317 @@
+name: Build rocks
+
+# Builds both binary rocks of the native module on the five supported platforms, packs
+# them, and loads each from its own tree before anything is published.
+#
+# Not triggered on its own: airsl-cli-release.yml calls it through dist's
+# `global-artifacts-jobs` hook, on pull requests and at release. dist makes `host` wait
+# for it, so a rock that cannot be built, packed or loaded stops the GitHub Release, and
+# on a pull request in `pr-run-mode = "upload"` the same legs run against the PR.
+#
+# This file is written by hand, unlike the release workflow, so `dist generate` never
+# touches it.
+#
+# The rockspecs are named from the plan, never found by a glob: the `version` job reads
+# the release version from dist's plan, checks that both rockspecs for it exist, and every
+# leg builds exactly those files. A version bump that forgot to rename them stops there,
+# before any leg builds a toolchain.
+#
+# The artifacts are named `rocks-<arch>`, not `artifacts-*`, so dist's `host` job, which
+# attaches every `artifacts-*` artifact to the GitHub Release, never sees them. Nothing
+# here uploads outside this run.
+on:
+  workflow_call:
+    inputs:
+      plan:
+        description: The dist manifest the release's plan step produced
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Read the release version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      # The checkout is only for the file test below: the rockspecs a leg builds must be
+      # in this commit under the names the plan's version gives them.
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      # dist writes `app_version` into the plan for a pull request as for a tag, so one
+      # read serves both. The plan is untrusted input to `jq`, so each shape it could have
+      # is named in a message rather than left to a jq error that names none of them.
+      - name: Read the airsl-cli version from the plan and find both rockspecs
+        id: version
+        shell: bash
+        env:
+          PLAN: ${{ inputs.plan }}
+        run: |
+          set -euo pipefail
+          read=$(jq -r -s '
+            def word: {"null": "null", "boolean": "a boolean", "number": "a number", "string": "a string",
+                       "array": "an array", "object": "an object"}[type];
+            if length == 0 then "none"
+            elif length > 1 then "many \(length)"
+            else .[0]
+              | if type != "object" then "type the top level is \(word), not an object"
+                elif .releases == null then "none"
+                elif (.releases | type) != "array" then "type releases is \(.releases | word), not an array"
+                else .releases
+                  | ([to_entries[] | select(.value | type != "object")] | first) as $bad
+                  | if $bad != null then "type releases[\($bad.key)] is \($bad.value | word), not an object"
+                    else [.[] | select(.app_name == "airsl-cli")]
+                      | if length != 1 then "none"
+                        elif (.[0].app_version | type) != "string" then "type the airsl-cli release'"'"'s app_version is \(.[0].app_version | word), not a string"
+                        elif .[0].app_version == "" then "type the airsl-cli release'"'"'s app_version is an empty string"
+                        else "version \(.[0].app_version)" end
+                    end
+                end
+            end' <<<"$PLAN") || { code=$?; echo "build-rocks: could not read the release plan: jq exit status $code"; exit 1; }
+          case $read in
+            none) echo "build-rocks: the release plan names no single airsl-cli release"; exit 1 ;;
+            "many "*) echo "build-rocks: the release plan holds ${read#many } JSON values, not one"; exit 1 ;;
+            "type "*) echo "build-rocks: in the release plan, ${read#type }"; exit 1 ;;
+          esac
+          version=${read#version }
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "build-rocks: the release plan's airsl-cli version $version is not <major>.<minor>.<patch>"; exit 1
+          fi
+          for package in airsstack airsstack-luajit; do
+            file="crates/airsl-lua/rockspecs/$package-$version-1.rockspec"
+            if [ ! -f "$file" ]; then echo "build-rocks: $file is missing"; exit 1; fi
+          done
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "version=$version"
+
+  # Each leg builds on its own so one broken platform does not hide whether the others work.
+  linux:
+    name: ${{ matrix.arch }}
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: linux-x86_64
+            runner: ubuntu-latest
+            image: quay.io/pypa/manylinux2014_x86_64
+          - arch: linux-aarch64
+            runner: ubuntu-24.04-arm
+            image: quay.io/pypa/manylinux2014_aarch64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      # `docker run` and not a job `container:`: GitHub's node-based actions (checkout,
+      # upload-artifact) cannot run on the manylinux image's glibc 2.17. The image is what
+      # keeps the module's glibc floor low, so the build happens inside it and the actions
+      # stay outside. The checkout is mounted read-only; the rocks come back through /out.
+      - name: Build, pack and load both rocks in manylinux2014
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          IMAGE: ${{ matrix.image }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/out"
+          docker run --rm -v "$PWD:/src:ro" -v "$RUNNER_TEMP/out:/out" "$IMAGE" \
+            bash /src/crates/airsl-lua/ci/manylinux.sh /src /out "$VERSION"
+
+      # One script for all five legs, so the check cannot drift between them.
+      - name: Both rocks are present
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+        run: bash crates/airsl-lua/ci/rocks-present.sh "$RUNNER_TEMP/out" "$VERSION" "$ARCH"
+
+      - name: Upload the rocks
+        uses: actions/upload-artifact@v7
+        with:
+          name: rocks-${{ matrix.arch }}
+          path: ${{ runner.temp }}/out/*.rock
+          if-no-files-found: error
+
+  macos:
+    name: ${{ matrix.arch }}
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: macosx-aarch64
+            runner: macos-latest
+          - arch: macosx-x86_64
+            runner: macos-26-intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
+      HOMEBREW_NO_INSTALL_CLEANUP: 1
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      # `rustup show` resolves the override in rust-toolchain.toml and installs it, as in
+      # ci.yml. The versions printed are the record of which toolchain built the rocks.
+      - name: Install the pinned Rust toolchain
+        run: |
+          rustup show
+          cargo --version
+
+      # Homebrew's `lua@5.4` is keg-only and its luarocks defaults to Lua 5.5, so each
+      # package names the Lua version and the interpreter's prefix to luarocks, and the
+      # same interpreter then loads what was built. Homebrew's versions are not pinned;
+      # check.lua refuses an interpreter that is not the ABI it was told to check.
+      - name: Install Lua 5.4, LuaJIT and LuaRocks
+        run: brew install lua@5.4 luajit luarocks
+
+      # The version arrives through `env` on every leg, never as an expression inside a
+      # script, so what a shell runs cannot depend on what the plan said.
+      - name: Build, pack and load both rocks
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          out=$RUNNER_TEMP/out
+          mkdir -p "$out"
+          lua54=$(brew --prefix lua@5.4)
+          luajit=$(brew --prefix luajit)
+
+          # $1 package, $2 Lua version luarocks targets, $3 that interpreter's prefix,
+          # $4 the interpreter, $5 the ABI name check.lua takes.
+          build_rock() {
+            local package=$1 lua_version=$2 lua_dir=$3 interpreter=$4 abi=$5
+            local tree=$RUNNER_TEMP/tree-$abi
+            luarocks --lua-version "$lua_version" --lua-dir "$lua_dir" make --tree "$tree" \
+              "crates/airsl-lua/rockspecs/$package-$VERSION-1.rockspec"
+            (cd "$out" && luarocks --lua-version "$lua_version" --lua-dir "$lua_dir" --tree "$tree" \
+              pack "$package" "$VERSION-1")
+            "$interpreter" crates/airsl-lua/lua/check.lua "$tree/lib/lua/$lua_version" "$abi"
+          }
+
+          build_rock airsstack 5.4 "$lua54" "$lua54/bin/lua5.4" lua54
+          build_rock airsstack-luajit 5.1 "$luajit" "$luajit/bin/luajit" luajit
+
+      # One script for all five legs, so the check cannot drift between them.
+      - name: Both rocks are present
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+        run: bash crates/airsl-lua/ci/rocks-present.sh "$RUNNER_TEMP/out" "$VERSION" "$ARCH"
+
+      - name: Upload the rocks
+        uses: actions/upload-artifact@v7
+        with:
+          name: rocks-${{ matrix.arch }}
+          path: ${{ runner.temp }}/out/*.rock
+          if-no-files-found: error
+
+  windows:
+    name: win32-x86_64
+    needs: version
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install the pinned Rust toolchain
+        shell: bash
+        run: |
+          rustup show
+          cargo --version
+
+      # The same MSVC-built interpreters ci.yml's gate uses, from the same script, so the
+      # rocks are loaded against the interpreters the gate tested. The pin is the commit
+      # the build was proven with.
+      - name: Enter the MSVC developer environment
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: x64
+
+      - name: Build Lua 5.4 and LuaJIT
+        shell: cmd
+        run: call crates\airsl-lua\ci\msvc-lua.cmd
+
+      # The official zip, which needs no installer. Its checksum is checked before anything
+      # from it runs, and its directory goes on PATH for the steps after this one.
+      - name: Install LuaRocks 3.12.2
+        shell: pwsh
+        run: |
+          $want = 'd3f4ddda6926618cadf560170a7c18a5ceead5997ba10832cd0e3b624c7de886'
+          $zip = Join-Path $env:RUNNER_TEMP 'luarocks.zip'
+          Invoke-WebRequest -Uri 'https://luarocks.github.io/luarocks/releases/luarocks-3.12.2-windows-64.zip' -OutFile $zip
+          $got = (Get-FileHash -Path $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($got -ne $want) {
+            throw "luarocks-3.12.2-windows-64.zip has SHA-256 $got, expected $want"
+          }
+          Expand-Archive -Path $zip -DestinationPath 'C:\luarocks-dl'
+          'C:\luarocks-dl\luarocks-3.12.2-windows-64' | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      # `cmd` does not stop at a failed command, so each one that can fail ends in
+      # `|| exit /b 1`. The version reaches the script through `env`, as on every leg, so
+      # no expression is ever expanded into a shell's text.
+      - name: Build, pack and load both rocks
+        shell: cmd
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          mkdir %RUNNER_TEMP%\out || exit /b 1
+          luarocks --lua-version 5.4 --lua-dir C:\lua54 make --tree %RUNNER_TEMP%\tree-lua54 crates\airsl-lua\rockspecs\airsstack-%VERSION%-1.rockspec || exit /b 1
+          cd /d %RUNNER_TEMP%\out || exit /b 1
+          luarocks --lua-version 5.4 --lua-dir C:\lua54 --tree %RUNNER_TEMP%\tree-lua54 pack airsstack %VERSION%-1 || exit /b 1
+          cd /d %GITHUB_WORKSPACE% || exit /b 1
+          C:\lua54\bin\lua.exe crates\airsl-lua\lua\check.lua %RUNNER_TEMP%\tree-lua54\lib\lua\5.4 lua54 || exit /b 1
+          luarocks --lua-version 5.1 --lua-dir C:\luajit make --tree %RUNNER_TEMP%\tree-luajit crates\airsl-lua\rockspecs\airsstack-luajit-%VERSION%-1.rockspec || exit /b 1
+          cd /d %RUNNER_TEMP%\out || exit /b 1
+          luarocks --lua-version 5.1 --lua-dir C:\luajit --tree %RUNNER_TEMP%\tree-luajit pack airsstack-luajit %VERSION%-1 || exit /b 1
+          cd /d %GITHUB_WORKSPACE% || exit /b 1
+          C:\luajit\bin\luajit.exe crates\airsl-lua\lua\check.lua %RUNNER_TEMP%\tree-luajit\lib\lua\5.1 luajit || exit /b 1
+
+      # The Windows way to use a packed rock: install it with `--local`, then apply
+      # `luarocks path` through a batch file. `--local` installs under %APPDATA%, which
+      # `lua` does not search until that file has put it on LUA_CPATH, so this is where a
+      # change that breaks the cmd hint fails. The home is a fresh one, so a pass cannot
+      # come from something an earlier step left behind.
+      - name: A --local install loads after `luarocks path`
+        shell: cmd
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set H=%RUNNER_TEMP%\home
+          mkdir %H%\AppData\Roaming %H%\AppData\Local || exit /b 1
+          set HOME=%H%
+          set USERPROFILE=%H%
+          set APPDATA=%H%\AppData\Roaming
+          set LOCALAPPDATA=%H%\AppData\Local
+          set PATH=C:\lua54\bin;%PATH%
+          cd /d %RUNNER_TEMP%\out || exit /b 1
+          luarocks --lua-version 5.4 install --local airsstack-%VERSION%-1.win32-x86_64.rock || exit /b 1
+          luarocks --lua-version 5.4 path > %RUNNER_TEMP%\lrpath.bat || exit /b 1
+          call %RUNNER_TEMP%\lrpath.bat
+          lua -e "require('airsstack')" || exit /b 1
+          echo require airsstack: ok
+
+      - name: Both rocks are present
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: bash crates/airsl-lua/ci/rocks-present.sh "$RUNNER_TEMP/out" "$VERSION" win32-x86_64
+
+      - name: Upload the rocks
+        uses: actions/upload-artifact@v7
+        with:
+          name: rocks-win32-x86_64
+          path: ${{ runner.temp }}/out/*.rock
+          if-no-files-found: error

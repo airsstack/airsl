@@ -139,6 +139,79 @@ jobs:
       - name: cargo make examples
         run: cargo make examples
 
+  rocks:
+    name: Rocks (${{ matrix.os }})
+    # `cargo make rocks` is outside the gate because it needs luarocks and the network, so
+    # nothing else runs it. This is the only place a break in the task itself shows before a
+    # release. build-rocks.yml builds the same rockspecs with direct `luarocks` calls, on every
+    # pull request as well as at release time, so a break in a rockspec shows there too.
+    #
+    # Ubuntu and macOS only: on Windows the interpreters come from msvc-lua.cmd and
+    # build-rocks.yml already builds, packs and loads both rocks there.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install the pinned Rust toolchain
+        run: |
+          rustup show
+          cargo --version
+
+      - name: Cache cargo registry and target dir
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rocks-${{ matrix.os }}
+
+      - name: Install cargo-make
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-make
+
+      # The interpreters the dod job installs, plus luarocks and the Lua development
+      # packages, so luarocks finds a complete installation of each. apt and Homebrew follow
+      # the runner image and are not pinned; `check.lua` refuses an interpreter that is
+      # not the ABI it was told to check, so drift fails loudly.
+      - name: Install LuaRocks, Lua 5.4 and LuaJIT (Ubuntu)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y luarocks lua5.4 liblua5.4-dev luajit libluajit-5.1-dev
+
+      # apt's luarocks runs on PUC Lua 5.1 and only looks for a build backend in its own
+      # Lua 5.1 user tree, so a backend fetched into a 5.4 `--tree` is never found: install
+      # it there first. With `--lua-version 5.1` luarocks also picks `lua5.1`, not LuaJIT, so
+      # the LuaJIT rock gets a `--lua-dir` that holds only `bin/luajit`, the luajit-2.1
+      # headers and the library directory. Pointing it at `/usr` fails the same way.
+      - name: Prepare LuaRocks for the apt layout (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          luarocks --lua-version 5.1 install --local luarocks-build-rust-mlua 0.2.7
+          ljdir="$RUNNER_TEMP/ljdir"
+          mkdir -p "$ljdir/bin"
+          ln -sf /usr/bin/luajit "$ljdir/bin/luajit"
+          ln -sfn /usr/include/luajit-2.1 "$ljdir/include"
+          ln -sfn "/usr/lib/$(gcc -print-multiarch)" "$ljdir/lib"
+          echo "AIRSL_LUAJIT_DIR=$ljdir" >> "$GITHUB_ENV"
+
+      # `lua@5.4` is keg-only and Homebrew's luarocks defaults to Lua 5.5, so the task is
+      # told each interpreter and the prefix luarocks must use for it, as build-rocks.yml
+      # does.
+      - name: Install LuaRocks, Lua 5.4 and LuaJIT (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install lua@5.4 luajit luarocks
+          {
+            echo "AIRSL_LUA54=$(brew --prefix lua@5.4)/bin/lua5.4"
+            echo "AIRSL_LUA54_DIR=$(brew --prefix lua@5.4)"
+            echo "AIRSL_LUAJIT_DIR=$(brew --prefix luajit)"
+          } >> "$GITHUB_ENV"
+
+      - name: cargo make rocks
+        run: cargo make rocks
+
   deny:
     name: Supply chain
     runs-on: ubuntu-latest

@@ -232,6 +232,15 @@ jobs:
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
+
+  custom-build-rocks:
+    needs:
+      - plan
+      - build-local-artifacts
+    uses: ./.github/workflows/build-rocks.yml
+    with:
+      plan: ${{ needs.plan.outputs.val }}
+    secrets: inherit
   # Determines if we should publish/announce
   host:
     needs:
@@ -239,8 +248,9 @@ jobs:
       - build-local-artifacts
       - build-global-artifacts
       - custom-airsl-cli-smoke
+      - custom-build-rocks
     # Only run if we're "publishing", and only if plan, local and global didn't fail (skipped is fine)
-    if: ${{ always() && needs.plan.result == 'success' && needs.plan.outputs.publishing == 'true' && (needs.build-global-artifacts.result == 'skipped' || needs.build-global-artifacts.result == 'success') && (needs.custom-airsl-cli-smoke.result == 'skipped' || needs.custom-airsl-cli-smoke.result == 'success') && (needs.build-local-artifacts.result == 'skipped' || needs.build-local-artifacts.result == 'success') }}
+    if: ${{ always() && needs.plan.result == 'success' && needs.plan.outputs.publishing == 'true' && (needs.build-global-artifacts.result == 'skipped' || needs.build-global-artifacts.result == 'success') && (needs.custom-airsl-cli-smoke.result == 'skipped' || needs.custom-airsl-cli-smoke.result == 'success') && (needs.custom-build-rocks.result == 'skipped' || needs.custom-build-rocks.result == 'success') && (needs.build-local-artifacts.result == 'skipped' || needs.build-local-artifacts.result == 'success') }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     runs-on: "ubuntu-latest"
