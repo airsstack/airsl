@@ -4,10 +4,11 @@
 //! argument list that asks luarocks, and the words of every refusal. It spawns nothing, so each
 //! refusal is tested with a scripted [`Luarocks`] and on every OS through [`Flavour`].
 //!
-//! Responsibilities: [`Package`], [`NativeRequest`], [`Flavour`], reading luarocks' answer to
-//! `config lua_version` ([`setup_native`]), the `install --local` call ([`install_native`]), the
-//! `luarocks path` hint ([`hint`]) and [`NativeError`], whose text is what the user reads after
-//! `airsl: `.
+//! Responsibilities: [`Package`], [`NativeRequest`], [`Flavour`], [`Libc`], [`Host`] and the
+//! refusal of a musl build ([`refuse_musl`]), reading luarocks' answers to
+//! `config lua_version` and, for Lua 5.1, `config cache` ([`setup_native`]), the `install --local`
+//! call ([`install_native`]), the `luarocks path` hint ([`hint`]) and [`NativeError`], whose text
+//! is what the user reads after `airsl: `.
 //!
 //! Non-responsibilities: spawning a process (`luarocks`), and printing and the order of the
 //! stages (`command`).
@@ -27,6 +28,19 @@ const CONFIG: &str = "config";
 
 /// The configuration key that holds the Lua version luarocks targets, such as `5.4`.
 const LUA_VERSION_KEY: &str = "lua_version";
+
+/// The configuration key that holds what luarocks has found out about the interpreter it targets.
+/// Printing it is how luarocks reports whether it found a `LuaJIT` for Lua 5.1: the table holds
+/// [`LUAJIT_VERSION_KEY`] only when it did, and holds [`LUAJIT_CHECKED_KEY`] once it looked.
+const CACHE_KEY: &str = "cache";
+
+/// The entry of the `cache` table that is the `LuaJIT` version, present only for `LuaJIT`.
+const LUAJIT_VERSION_KEY: &str = "luajit_version";
+
+/// The entry of the `cache` table that says luarocks has looked for a `LuaJIT`, present whatever
+/// it found. luarocks sets it before it checks that an interpreter exists at all, so it is also
+/// present when there is no Lua 5.1 interpreter to ask.
+const LUAJIT_CHECKED_KEY: &str = "luajit_version_checked";
 
 /// The luarocks flag that chooses the Lua to target for one invocation, in place of the
 /// configured one. Every call puts it before the subcommand, where luarocks reads its global
@@ -54,8 +68,12 @@ const PATH: &str = "path";
 /// The batch file the Windows hint has `luarocks path` write, for `cmd` to run.
 const LRPATH_BAT: &str = "lrpath.bat";
 
-/// The book page that explains how to point luarocks at Lua 5.4 or `LuaJIT`.
-const BOOK_PAGE: &str = "https://airsstack.github.io/airsl/ch01-05-stock-lua.html";
+/// The book section that explains how to point luarocks at Lua 5.4 or `LuaJIT`.
+const BOOK_POINTING: &str = "https://airsstack.github.io/airsl/ch01-05-stock-lua.html#pointing-luarocks-at-lua-54-or-luajit";
+
+/// The book section that says what works on musl Linux and where no package exists.
+const BOOK_NO_PACKAGE: &str =
+    "https://airsstack.github.io/airsl/ch01-05-stock-lua.html#no-binary-package";
 
 /// The width of `airsl: `, which continuation lines of a message are indented by so they line up
 /// under its first word.
@@ -129,6 +147,48 @@ impl Flavour {
     }
 }
 
+/// The C library this binary was built for, which decides whether a package for the machine's
+/// own Lua can be expected to load. The caller passes it in, so both answers are tested on every
+/// OS.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Libc {
+    /// A build for a musl target, such as the static Linux release archives.
+    Musl,
+    /// Any other build, whatever C library it uses, or none.
+    Other,
+}
+
+impl Libc {
+    /// The C library this binary was built for.
+    pub(crate) const fn host() -> Self {
+        if cfg!(target_env = "musl") {
+            Self::Musl
+        } else {
+            Self::Other
+        }
+    }
+}
+
+/// What this binary knows about the machine it was built for, which the wording and the musl
+/// refusal depend on. The caller passes it in, so every combination is tested on every OS.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Host {
+    /// Whose wording a message uses.
+    pub flavour: Flavour,
+    /// The C library the binary was built for.
+    pub libc: Libc,
+}
+
+impl Host {
+    /// The operating system and C library this binary was built for.
+    pub(crate) const fn current() -> Self {
+        Self {
+            flavour: Flavour::host(),
+            libc: Libc::host(),
+        }
+    }
+}
+
 /// Why the native module could not be installed. `Display` is the message without the
 /// `airsl: ` prefix, which the caller adds.
 #[derive(Debug, thiserror::Error)]
@@ -179,11 +239,29 @@ pub(crate) enum NativeError {
         /// visible. A backtick is not touched by that, so one in the answer shows as it is.
         shown: String,
     },
+    /// This binary is built for musl, where the package luarocks would pick cannot load.
+    #[error("{}", musl_text(*lua))]
+    Musl {
+        /// The `--lua` the user gave, which narrows the install lines to one.
+        lua: Option<LuaAbi>,
+    },
+    /// luarocks found no `LuaJIT` for Lua 5.1: the Lua 5.1 it targets is not `LuaJIT`, or there is
+    /// no Lua 5.1 interpreter. Either way the 5.1 package has nothing to load into.
+    #[error(
+        "`luarocks` found no LuaJIT for Lua 5.1: its Lua 5.1 is not LuaJIT, or it has none, and \
+         `airsstack-luajit` needs LuaJIT\n\
+         {CONTINUATION}install Lua 5.4 and run again with `--lua {LUA54_FLAG}` to install it for \
+         Lua 5.4\n\
+         {CONTINUATION}or run `{PROGRAM} {LUA_VERSION_FLAG} {LUA51_VERSION} config --scope user \
+         lua_dir <LuaJIT prefix>` to point `luarocks` at LuaJIT\n\
+         {CONTINUATION}{BOOK_POINTING} shows how to point `luarocks` at Lua 5.4 or LuaJIT"
+    )]
+    NoLuajit,
     /// luarocks targets a Lua that no native package supports.
     #[error(
         "`luarocks` installs for Lua {version}, and `airsstack` is built for Lua 5.4 and LuaJIT\n\
          {CONTINUATION}run again with `--lua {LUA54_FLAG}` to install it for Lua 5.4\n\
-         {CONTINUATION}{BOOK_PAGE} shows how to point `luarocks` at Lua 5.4 or LuaJIT"
+         {CONTINUATION}{BOOK_POINTING} shows how to point `luarocks` at Lua 5.4 or LuaJIT"
     )]
     Unsupported {
         /// The version luarocks reported.
@@ -241,6 +319,37 @@ fn missing_text(flavour: Flavour, lua: Option<LuaAbi>) -> String {
     }
     let indented = rest.iter().map(|line| format!("\n{CONTINUATION}{line}"));
     std::iter::once(first).chain(indented).collect()
+}
+
+/// The text for a musl build: why `--native` is refused, and the `luarocks` lines that work on a
+/// glibc system, narrowed to the one for `lua` when the user named a Lua.
+fn musl_text(lua: Option<LuaAbi>) -> String {
+    let installs = lua.map_or_else(
+        || {
+            vec![
+                install_command(Some(LuaAbi::Lua54), Package::Airsstack),
+                install_command(Some(LuaAbi::LuaJit), Package::AirsstackLuajit),
+            ]
+        },
+        |abi| vec![install_command(Some(abi), Package::from(abi))],
+    );
+    let mut text = String::from(
+        "this `airsl` is built for musl Linux, and `airsstack` has no package for musl: the glibc \
+         package `luarocks` installs cannot load there",
+    );
+    let lines = std::iter::once(
+        "on a glibc system, install the package with `luarocks` yourself:".to_owned(),
+    )
+    .chain(installs)
+    .chain([format!(
+        "{BOOK_NO_PACKAGE} says what works on musl and where no package exists"
+    )]);
+    for line in lines {
+        text.push('\n');
+        text.push_str(CONTINUATION);
+        text.push_str(&line);
+    }
+    text
 }
 
 /// Maps a failure to start luarocks to the refusal that names it.
@@ -301,13 +410,20 @@ fn install_args(lua: Option<LuaAbi>, package: Package) -> Vec<&'static str> {
 /// is judged in this order: a spawn error, a signal, a non-zero status, and only then the text
 /// luarocks printed, so a failed command is never read for a version.
 ///
+/// A Lua 5.1 takes the `LuaJIT` package only when luarocks found a `LuaJIT` for it, which it
+/// reports by printing `config cache`. The refusal is made here, before the caller writes any
+/// file, because the `LuaJIT` package's own dependency on `luajit` fails the install later. A
+/// `config cache` answer that cannot be read as that table leaves the choice as it was, so a
+/// luarocks that reports less than this one does is no worse off than before.
+///
 /// # Errors
 ///
 /// [`NativeError::Missing`] or [`NativeError::Spawn`] when luarocks cannot be started,
 /// [`NativeError::Signal`] or [`NativeError::Failed`] when it ends badly,
 /// [`NativeError::NoVersion`] or [`NativeError::NotAVersion`] when its answer is not a version,
-/// [`NativeError::Unsupported`] when no package matches the version, and
-/// [`NativeError::Disagrees`] when `--lua` named another Lua than the one it answered.
+/// [`NativeError::Unsupported`] when no package matches the version,
+/// [`NativeError::Disagrees`] when `--lua` named another Lua than the one it answered, and
+/// [`NativeError::NoLuajit`] when luarocks found no `LuaJIT` for the Lua 5.1 it targets.
 pub(crate) fn setup_native<L: Luarocks>(
     luarocks: &L,
     request: NativeRequest,
@@ -318,11 +434,70 @@ pub(crate) fn setup_native<L: Luarocks>(
     let captured = luarocks
         .query(&args)
         .map_err(|error| launch_error(error, request, flavour))?;
-    match captured.code {
-        None => Err(NativeError::Signal { command }),
-        Some(code) if code != 0 => Err(NativeError::Failed { command, code }),
-        Some(_) => choose_package(&captured.stdout, request, command),
+    let package = match captured.code {
+        None => return Err(NativeError::Signal { command }),
+        Some(code) if code != 0 => return Err(NativeError::Failed { command, code }),
+        Some(_) => choose_package(&captured.stdout, request, command)?,
+    };
+    if package == Package::AirsstackLuajit {
+        require_luajit(luarocks, request, flavour)?;
     }
+    Ok(package)
+}
+
+/// Refuses `--native` before anything runs when this binary is built for musl.
+///
+/// No package is built for musl, and luarocks cannot tell musl from glibc Linux, so it would
+/// install the glibc package, which cannot load there, and exit 0. The build target is the only
+/// signal available without running anything, so a musl build of airsl on a glibc system is
+/// refused too; the message names the `luarocks` lines that work there, one when the request
+/// names a Lua.
+///
+/// # Errors
+///
+/// [`NativeError::Musl`] when `libc` is [`Libc::Musl`].
+pub(crate) const fn refuse_musl(libc: Libc, request: NativeRequest) -> Result<(), NativeError> {
+    match libc {
+        Libc::Musl => Err(NativeError::Musl { lua: request.lua }),
+        Libc::Other => Ok(()),
+    }
+}
+
+/// Refuses a Lua 5.1 for which luarocks found no `LuaJIT`.
+///
+/// Runs `config cache`. Only a table that holds [`LUAJIT_CHECKED_KEY`] and not
+/// [`LUAJIT_VERSION_KEY`] is a refusal: luarocks looked, and either its Lua 5.1 is not `LuaJIT` or
+/// there is no Lua 5.1 interpreter. Anything else says nothing about the interpreter, so the
+/// install goes on: a command that ran and failed, or printed a table without the check. A command
+/// that cannot start is the exception, and is refused as `config lua_version` is.
+fn require_luajit<L: Luarocks>(
+    luarocks: &L,
+    request: NativeRequest,
+    flavour: Flavour,
+) -> Result<(), NativeError> {
+    let args = argv(request.lua, &[CONFIG, CACHE_KEY]);
+    let captured = luarocks
+        .query(&args)
+        .map_err(|error| launch_error(error, request, flavour))?;
+    if captured.code != Some(0) {
+        return Ok(());
+    }
+    let text = String::from_utf8_lossy(&captured.stdout);
+    let has = |wanted: &str| text.lines().any(|line| entry_key(line) == wanted);
+    if has(LUAJIT_CHECKED_KEY) && !has(LUAJIT_VERSION_KEY) {
+        return Err(NativeError::NoLuajit);
+    }
+    Ok(())
+}
+
+/// The key a line of a printed Lua table sets: the identifier it starts with, after any
+/// indentation, and nothing when the line does not start with one.
+fn entry_key(line: &str) -> &str {
+    let line = line.trim_start();
+    let end = line
+        .find(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+        .unwrap_or(line.len());
+    &line[..end]
 }
 
 /// Installs `package` for the user with luarocks, at airsl's own version.
@@ -430,16 +605,34 @@ mod tests {
 
     use std::io;
 
-    use super::{Flavour, NativeError, NativeRequest, Package, hint, install_native, setup_native};
+    use super::{
+        Flavour, Host, Libc, NativeError, NativeRequest, Package, hint, install_native,
+        refuse_musl, setup_native,
+    };
     use crate::cli::LuaAbi;
     use crate::lua::luarocks::scripted::Scripted;
     use crate::lua::luarocks::{Captured, LuarocksError, Outcome};
 
     const VERSION: &str = airsl::VERSION;
-    const BOOK_PAGE: &str = "https://airsstack.github.io/airsl/ch01-05-stock-lua.html";
+    const BOOK_POINTING: &str = "https://airsstack.github.io/airsl/ch01-05-stock-lua.html#pointing-luarocks-at-lua-54-or-luajit";
+    const BOOK_NO_PACKAGE: &str =
+        "https://airsstack.github.io/airsl/ch01-05-stock-lua.html#no-binary-package";
+
+    /// What `luarocks config cache` prints when the Lua it targets is `LuaJIT`.
+    const LUAJIT_CACHE: &[u8] =
+        b"{\n   luajit_version = \"2.1.1770848219\",\n   luajit_version_checked = true\n}\n";
+
+    /// What `luarocks config cache` prints when it found no `LuaJIT` for Lua 5.1: the Lua 5.1 it
+    /// targets is not `LuaJIT`, or there is no Lua 5.1 interpreter at all.
+    const PUC_CACHE: &[u8] = b"{\n   luajit_version_checked = true\n}\n";
 
     fn request(lua: Option<LuaAbi>) -> NativeRequest {
         NativeRequest { lua }
+    }
+
+    /// A luarocks that targets Lua 5.1 and then answers `config cache` with `cache`.
+    fn lua51_with(cache: &[u8]) -> Scripted {
+        Scripted::default().then_stdout(b"5.1\n").then_stdout(cache)
     }
 
     fn detect(stdout: &[u8], lua: Option<LuaAbi>) -> Result<Package, NativeError> {
@@ -465,9 +658,133 @@ mod tests {
     }
 
     #[test]
-    fn lua_5_1_chooses_airsstack_luajit() {
-        assert_eq!(detect(b"5.1\n", None).unwrap(), Package::AirsstackLuajit);
+    fn lua_5_1_that_is_luajit_chooses_airsstack_luajit() {
+        let luarocks = lua51_with(LUAJIT_CACHE);
+
+        let package = setup_native(&luarocks, request(None), Flavour::Unix).unwrap();
+
+        assert_eq!(package, Package::AirsstackLuajit);
         assert_eq!(Package::AirsstackLuajit.as_str(), "airsstack-luajit");
+        assert_eq!(luarocks.calls(), ["config lua_version", "config cache"]);
+    }
+
+    fn no_luajit_refusal(lua_version_flag: &str) -> String {
+        format!(
+            "`luarocks` found no LuaJIT for Lua 5.1: its Lua 5.1 is not LuaJIT, or it has none, \
+             and `airsstack-luajit` needs LuaJIT\n\
+             {pad}install Lua 5.4 and run again with `--lua 5.4` to install it for Lua 5.4\n\
+             {pad}or run `luarocks {lua_version_flag}config --scope user lua_dir <LuaJIT prefix>` \
+             to point `luarocks` at LuaJIT\n\
+             {pad}{BOOK_POINTING} shows how to point `luarocks` at Lua 5.4 or LuaJIT",
+            pad = "       "
+        )
+    }
+
+    #[test]
+    fn lua_5_1_without_luajit_is_refused_naming_both_ways_out() {
+        let luarocks = lua51_with(PUC_CACHE);
+
+        let error = setup_native(&luarocks, request(None), Flavour::Unix);
+
+        assert_eq!(refusal(error), no_luajit_refusal("--lua-version 5.1 "));
+        assert_eq!(luarocks.calls(), ["config lua_version", "config cache"]);
+    }
+
+    #[test]
+    fn luajit_named_with_the_lua_flag_is_refused_the_same_way_without_luajit() {
+        let luarocks = Scripted::default()
+            .then_stdout(b"5.1\n")
+            .then_stdout(PUC_CACHE);
+
+        let error = setup_native(&luarocks, request(Some(LuaAbi::LuaJit)), Flavour::Unix);
+
+        assert_eq!(refusal(error), no_luajit_refusal("--lua-version 5.1 "));
+        assert_eq!(
+            luarocks.calls(),
+            [
+                "--lua-version 5.1 config lua_version",
+                "--lua-version 5.1 config cache"
+            ]
+        );
+    }
+
+    #[test]
+    fn lua_5_4_is_never_asked_whether_it_is_luajit() {
+        let luarocks = Scripted::default().then_stdout(b"5.4\n");
+
+        setup_native(&luarocks, request(None), Flavour::Unix).unwrap();
+
+        assert_eq!(luarocks.calls(), ["config lua_version"]);
+    }
+
+    #[test]
+    fn a_cache_answer_that_cannot_be_read_does_not_stop_a_lua_5_1_install() {
+        let unreadable: [Scripted; 4] = [
+            Scripted::default().then_stdout(b"5.1\n").then_stdout(b""),
+            Scripted::default()
+                .then_stdout(b"5.1\n")
+                .then_stdout(b"{\n   something_else = true\n}\n"),
+            Scripted::default()
+                .then_stdout(b"5.1\n")
+                .then_query(Ok(Captured {
+                    stdout: PUC_CACHE.to_vec(),
+                    code: Some(1),
+                })),
+            Scripted::default()
+                .then_stdout(b"5.1\n")
+                .then_query(Ok(Captured {
+                    stdout: PUC_CACHE.to_vec(),
+                    code: None,
+                })),
+        ];
+
+        for luarocks in unreadable {
+            let package = setup_native(&luarocks, request(None), Flavour::Unix).unwrap();
+
+            assert_eq!(package, Package::AirsstackLuajit);
+        }
+    }
+
+    #[test]
+    fn the_luajit_keys_are_read_whole_whatever_the_spacing() {
+        // The checked key starts with the version key, so a prefix match would find a version in
+        // a table that has none; luarocks prints spaces around `=`, but nothing here depends on it.
+        let spaced = b"{\n   luajit_version_checked = true\n}\n";
+        let unspaced = b"{\n   luajit_version_checked=true\n}\n";
+
+        for cache in [&spaced[..], &unspaced[..]] {
+            let error = setup_native(&lua51_with(cache), request(None), Flavour::Unix);
+
+            assert!(
+                matches!(error, Err(NativeError::NoLuajit)),
+                "{:?}: {error:?}",
+                String::from_utf8_lossy(cache)
+            );
+        }
+    }
+
+    #[test]
+    fn a_luajit_table_written_without_spaces_is_still_luajit() {
+        let json_like = b"{\n   luajit_version=\"2.1\",\n   luajit_version_checked=true\n}\n";
+        let luarocks = lua51_with(json_like);
+
+        let package = setup_native(&luarocks, request(None), Flavour::Unix).unwrap();
+
+        assert_eq!(package, Package::AirsstackLuajit);
+    }
+
+    #[test]
+    fn a_cache_query_that_cannot_start_is_refused_like_detection() {
+        let luarocks = Scripted::default()
+            .then_stdout(b"5.1\n")
+            .then_query(Err(LuarocksError::Missing));
+
+        let error = setup_native(&luarocks, request(None), Flavour::Unix);
+
+        assert!(
+            matches!(error, Err(NativeError::Missing { .. })),
+            "{error:?}"
+        );
     }
 
     #[test]
@@ -531,11 +848,11 @@ mod tests {
     }
 
     #[test]
-    fn lua_5_5_is_refused_naming_the_flag_and_the_book_page() {
+    fn lua_5_5_is_refused_naming_the_flag_and_the_book_section() {
         let expected = format!(
             "`luarocks` installs for Lua 5.5, and `airsstack` is built for Lua 5.4 and LuaJIT\n\
              {pad}run again with `--lua 5.4` to install it for Lua 5.4\n\
-             {pad}{BOOK_PAGE} shows how to point `luarocks` at Lua 5.4 or LuaJIT",
+             {pad}{BOOK_POINTING} shows how to point `luarocks` at Lua 5.4 or LuaJIT",
             pad = "       "
         );
 
@@ -736,10 +1053,8 @@ mod tests {
     }
 
     #[test]
-    fn the_lua_flag_passes_lua_version_to_both_calls() {
-        let luarocks = Scripted::default()
-            .then_stdout(b"5.1\n")
-            .then_run(Ok(Outcome { code: Some(0) }));
+    fn the_lua_flag_passes_lua_version_to_every_call() {
+        let luarocks = lua51_with(LUAJIT_CACHE).then_run(Ok(Outcome { code: Some(0) }));
         let request = request(Some(LuaAbi::LuaJit));
 
         let package = setup_native(&luarocks, request, Flavour::Unix).unwrap();
@@ -749,6 +1064,7 @@ mod tests {
             luarocks.calls(),
             [
                 "--lua-version 5.1 config lua_version".to_owned(),
+                "--lua-version 5.1 config cache".to_owned(),
                 format!("--lua-version 5.1 install --local airsstack-luajit {VERSION}"),
             ]
         );
@@ -833,6 +1149,78 @@ mod tests {
              In PowerShell:\n  \
              $env:LUA_PATH = luarocks --lua-version 5.1 path --lr-path\n  \
              $env:LUA_CPATH = luarocks --lua-version 5.1 path --lr-cpath"
+        );
+    }
+
+    #[test]
+    fn musl_is_refused_naming_the_glibc_install_lines_and_the_book_section() {
+        let expected = format!(
+            "this `airsl` is built for musl Linux, and `airsstack` has no package for musl: \
+             the glibc package `luarocks` installs cannot load there\n\
+             {pad}on a glibc system, install the package with `luarocks` yourself:\n\
+             {pad}luarocks --lua-version 5.4 install --local airsstack {VERSION}\n\
+             {pad}luarocks --lua-version 5.1 install --local airsstack-luajit {VERSION}\n\
+             {pad}{BOOK_NO_PACKAGE} says what works on musl and where no package exists",
+            pad = "       "
+        );
+
+        let error = refuse_musl(Libc::Musl, request(None));
+
+        assert_eq!(refusal_of(error), expected);
+    }
+
+    #[test]
+    fn musl_with_the_lua_flag_names_only_the_install_line_for_that_lua() {
+        let expected = |install: &str| {
+            format!(
+                "this `airsl` is built for musl Linux, and `airsstack` has no package for musl: \
+                 the glibc package `luarocks` installs cannot load there\n\
+                 {pad}on a glibc system, install the package with `luarocks` yourself:\n\
+                 {pad}{install}\n\
+                 {pad}{BOOK_NO_PACKAGE} says what works on musl and where no package exists",
+                pad = "       "
+            )
+        };
+
+        assert_eq!(
+            refusal_of(refuse_musl(Libc::Musl, request(Some(LuaAbi::Lua54)))),
+            expected(&format!(
+                "luarocks --lua-version 5.4 install --local airsstack {VERSION}"
+            ))
+        );
+        assert_eq!(
+            refusal_of(refuse_musl(Libc::Musl, request(Some(LuaAbi::LuaJit)))),
+            expected(&format!(
+                "luarocks --lua-version 5.1 install --local airsstack-luajit {VERSION}"
+            ))
+        );
+    }
+
+    fn refusal_of(result: Result<(), NativeError>) -> String {
+        result.unwrap_err().to_string()
+    }
+
+    #[test]
+    fn any_other_libc_is_not_refused() {
+        refuse_musl(Libc::Other, request(None)).unwrap();
+    }
+
+    #[test]
+    fn the_host_libc_is_musl_only_when_the_binary_is_built_for_musl() {
+        #[cfg(target_env = "musl")]
+        assert_eq!(Libc::host(), Libc::Musl);
+        #[cfg(not(target_env = "musl"))]
+        assert_eq!(Libc::host(), Libc::Other);
+    }
+
+    #[test]
+    fn the_current_host_is_the_flavour_and_libc_of_this_build() {
+        assert_eq!(
+            Host::current(),
+            Host {
+                flavour: Flavour::host(),
+                libc: Libc::host()
+            }
         );
     }
 

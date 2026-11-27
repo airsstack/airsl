@@ -186,3 +186,37 @@ jobs:
           mkdir -p .smoke/granted
           printf 'visible\n' > .smoke/granted/visible.txt
           "$AIRSL" run --allow-read .smoke/granted crates/airsl/examples/denials-are-data/denials.lua .smoke/granted
+
+      # `lua setup --native` cannot install a package that loads on musl, and
+      # luarocks cannot tell musl from glibc, so a musl build refuses before it
+      # writes a file or starts luarocks. Alpine has no luarocks at all, so a
+      # refusal that went missing would print a different first line here. The
+      # directory lives in the workspace, which the container mounts at the
+      # same path.
+      - name: A musl build refuses `lua setup --native` and writes nothing
+        if: matrix.alpine
+        run: |
+          project="$PWD/.smoke/native-refusal"
+          mkdir -p "$project"
+          status=0
+          "$AIRSL" lua setup --native "$project" >.smoke/native.out 2>.smoke/native.err || status=$?
+          cat .smoke/native.out .smoke/native.err
+
+          expected='airsl: this `airsl` is built for musl Linux, and `airsstack` has no package for musl: the glibc package `luarocks` installs cannot load there'
+          first=$(head -n 1 .smoke/native.err)
+          if [ "$status" -ne 1 ]; then
+            echo "::error::airsl lua setup --native exited $status, expected 1"
+            exit 1
+          fi
+          if [ "$first" != "$expected" ]; then
+            echo "::error::the refusal's first line was '$first', expected '$expected'"
+            exit 1
+          fi
+          if [ -s .smoke/native.out ]; then
+            echo "::error::the refusal printed on stdout"
+            exit 1
+          fi
+          if [ -n "$(ls -A "$project")" ]; then
+            echo "::error::the refusal wrote into the project: $(ls -A "$project")"
+            exit 1
+          fi

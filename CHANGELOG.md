@@ -10,6 +10,22 @@ lockstep release of both crates, tagged `airsl-v<version>` and `airsl-cli-v<vers
 commit, and there is no library-only release. Older entries keep their per-crate headings, from when
 each crate had a number of its own and one commit could ship them under two different numbers.
 
+## Unreleased
+
+### Fixed
+
+- **`airsl lua setup --native` on a Lua 5.1 without LuaJIT stops before it writes anything.** When
+  LuaRocks targets Lua 5.1 and finds no LuaJIT there, as with the `luarocks` package from Ubuntu's
+  apt, whose Lua 5.1 is not LuaJIT, the command used to write the editor files and then fail inside
+  LuaRocks with `Could not satisfy dependency luajit >= 2.1`. It now refuses first, and the message
+  names the two ways out: `--lua 5.4`, or pointing LuaRocks at a LuaJIT. The same goes for
+  `--lua luajit` on such a Lua.
+- **`airsl lua setup --native` refuses on musl.** LuaRocks cannot tell musl from glibc Linux, so
+  on Alpine the command installed the glibc package and exited 0, and `require` then failed. An
+  `airsl` built for musl now refuses before it writes any file or starts LuaRocks, and prints the
+  `luarocks` lines to use on a glibc system, since the check goes by how `airsl` was built and a
+  musl build also runs on glibc systems.
+
 ## airsl 0.3.0 — airsl-cli 0.3.0 — 2026-11-27
 
 A breaking release that takes the `airsstack` modules beyond `airsl`: into the Lua you already have,

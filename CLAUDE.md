@@ -30,6 +30,7 @@ cargo make dod          # the gate: fmt-check, clippy, rustdoc, tests, doctests 
 cargo make dod-crate airsl   # the same five steps scoped to one crate, while iterating
 cargo make fmt-check    # the formatting step alone: fails on a diff, rewrites nothing
 cargo make rocks        # build, pack and load both LuaRocks packages (not part of dod, by design)
+cargo make nvim-examples  # the Neovim example of the native module (needs nvim, plus lua5.4 and luajit through native-load; not part of dod)
 cargo make fmt          # the only task that rewrites the tree
 cargo make clippy-fix   # apply machine-applicable clippy suggestions
 cargo make deny         # advisories, licenses, duplicates, sources (not part of dod, by design)
@@ -46,11 +47,12 @@ module is a `cdylib` built against the interpreter's Lua (`mlua`'s `module` feat
 `vendored` and `send`) and cannot share a Cargo build with the rest. So `cargo make clippy` and
 `cargo make doc` run the workspace without `airsl-lua`, then `airsl-lua` once with
 `--features lua54` and once with `--features luajit`. The `cargo make test` step runs
-`cargo make test-cargo` (the workspace without `airsl-lua`, plus a bare
-`cargo test --all-targets --no-run` that proves `default-members` still leaves it out), then
-`cargo make native-load`, then `cargo make native-refusals`. `native-load` builds the module per
+`cargo make native-load`, then `cargo make test-cargo` (the workspace without `airsl-lua`, plus a
+bare `cargo test --all-targets --no-run` that proves `default-members` still leaves it out), then
+`cargo make native-refusals`. `native-load` builds the module per
 ABI, copies it to `target/native/<abi>/`, and runs `crates/airsl-lua/lua/check.lua` under the real
-interpreter, which is the module's test because a module-mode build cannot link a Rust test.
+interpreter, which is the module's test because a module-mode build cannot link a Rust test. It
+runs first because `docs-check` runs the Lua examples against those copies.
 `native-refusals` makes `native-load` and `check.lua` refuse a missing or mismatched interpreter and
 requires both a non-zero exit and the message, so a refusal that turned into a pass cannot leave
 `dod` green. Doctests (`cargo make test-doc`) skip `airsl-lua` too, since rustdoc cannot test a
@@ -78,9 +80,17 @@ checks these seven things and nothing else:
   something else (a path that starts with a drive), the first block under a `### Windows`
   sub-heading inside `## Output` is what Windows must print instead. An example with no block
   must carry a `no-output` marker file holding the reason, and be named in `EXPECTED_NO_OUTPUT` in
-  `crates/docs-check/src/examples.rs`; an example with a `unix-only` marker file must be named in
-  `EXPECTED_UNIX_ONLY` there. The `examples` task of `Makefile.toml` may compare output with the
-  book appendix only, never with an example's README, which this check owns.
+  `crates/docs-check/src/examples/rust.rs`; an example with a `unix-only` marker file must be named
+  in `EXPECTED_UNIX_ONLY` there. The `examples` task of `Makefile.toml` may compare output with the
+  book appendix only, never with an example's README, which this check owns. The Lua examples of
+  the native module (`crates/airsl-lua/examples/{common,lua54,luajit,neovim}/<name>/main.lua`) are
+  held to the same blocks: `common` runs under Lua 5.4 and LuaJIT and both must print the one
+  block, `lua54` and `luajit` under their own, with the module from `target/native/<abi>/` put
+  on `LUA_CPATH` and the interpreters from `AIRSL_LUA54` and `AIRSL_LUAJIT`. A missing
+  interpreter or an unbuilt module fails and never skips, which is why `native-load` runs first.
+  The `neovim` group is compared by a test that is `#[ignore]`d, so that `dod` needs no editor;
+  `cargo make nvim-examples` runs it with `AIRSL_NVIM` (default `nvim`), and CI runs that on Linux
+  and macOS.
 - Every `.rs` path in a code span of `CLAUDE.md` or a README exists, and none carries a line-number
   suffix (cite the symbol in prose instead). A path resolves against the citing document's own
   crate; `CLAUDE.md` and the root README resolve from the repository root, so a path into a crate
@@ -121,7 +131,8 @@ checks these seven things and nothing else:
   `test` subcommand or `cargo test`.
 
 It does not check that a cited symbol is in the cited file, that the book's prose is true, or
-anything else written in backticks. `cargo make dod-crate docs-check` runs it alone.
+anything else written in backticks. `cargo make dod-crate docs-check` runs it alone, and needs
+`lua5.4` and `luajit` as `dod` does, because it runs `cargo make native-load` first.
 
 Single test / narrower runs:
 
@@ -267,11 +278,12 @@ The book is written for a reader using `airsl`, not for one maintaining it:
   written from memory.
 - A fact lives in one chapter; other chapters link to it rather than restate it.
 
-The three READMEs (root, `crates/airsl`, `crates/airsl-cli`) are short front doors into the book.
-Crate READMEs render on crates.io, so they link to the book with absolute
-`https://airsstack.github.io/airsl/…` URLs, and their Rust examples are complete programs rather
-than rustdoc snippets with hidden `#` lines. They are not doctested, so compile any example you
-change in them.
+The four READMEs (root, `crates/airsl`, `crates/airsl-cli` and `crates/airsl-lua`) are short front
+doors into the book. `crates/airsl` and `crates/airsl-cli` render on crates.io, and
+`crates/airsl-lua`, which is not published there, renders on GitHub; all of them link to the book
+with absolute `https://airsstack.github.io/airsl/…` URLs. The crates.io ones carry Rust examples that
+are complete programs rather than rustdoc snippets with hidden `#` lines. They are not doctested,
+so compile any example you change in them.
 
 Quoted measurements are a snapshot from `cargo bench -p airsl` on one machine, not a guarantee.
 

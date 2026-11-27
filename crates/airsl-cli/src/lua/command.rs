@@ -3,11 +3,12 @@
 //! Its own file because it is the one place that owns the streams and the exit code: the library
 //! and the native-flow decisions return values, and this turns them into output. It is a thin
 //! caller of [`airsl::luals::setup`]. With `--native` it also runs luarocks, through the
-//! [`Luarocks`] boundary, in a fixed order that stops at the first failure: read which Lua
-//! luarocks targets, write the type file and `.luarc.json`, print and flush the report, install
-//! the native package, then print the `luarocks path` hint. Detection comes first so a luarocks
-//! that cannot answer leaves the project untouched, and the report comes before the install so
-//! luarocks' own output lands below it. The streams are injected, the shape `ext_fire::run` has,
+//! [`Luarocks`] boundary, in a fixed order that stops at the first failure: refuse a musl build,
+//! read which Lua luarocks targets, write the type file and `.luarc.json`, print and flush the
+//! report, install the native package, then print the `luarocks path` hint. Detection comes first
+//! so a musl build, or a luarocks that cannot answer or targets a Lua the packages cannot serve,
+//! leaves the project untouched, and the report comes before the install so luarocks' own output
+//! lands below it. The streams are injected, the shape `ext_fire::run` has,
 //! so the tests assert on both.
 //!
 //! Responsibilities: [`run`], which dispatches a [`LuaCommand`], orders the stages, prints the
@@ -29,7 +30,7 @@ use airsl::luals::SetupReport;
 use airsl::modules::stdlib;
 
 use super::luarocks::{Luarocks, System};
-use super::native::{Flavour, NativeRequest, hint, install_native, setup_native};
+use super::native::{Host, NativeRequest, hint, install_native, refuse_musl, setup_native};
 use crate::cli::LuaCommand;
 
 /// Runs one `lua` subcommand, writing its report to `stdout` and any diagnostic to `stderr`, and
@@ -42,28 +43,29 @@ pub(crate) fn run(command: LuaCommand, stdout: &mut impl Write, stderr: &mut imp
     run_on_host(command, &System::default(), stdout, stderr)
 }
 
-/// [`run`] with the luarocks it uses chosen by the caller: the wording is always the running
-/// platform's, [`Flavour::host`].
+/// [`run`] with the luarocks it uses chosen by the caller: the wording and the C library are always
+/// the ones this binary was built for, [`Host::current`].
 fn run_on_host<L: Luarocks>(
     command: LuaCommand,
     luarocks: &L,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> i32 {
-    run_with(command, luarocks, Flavour::host(), stdout, stderr)
+    run_with(command, luarocks, Host::current(), stdout, stderr)
 }
 
-/// [`run`] with the luarocks it uses and the wording it prints chosen by the caller.
+/// [`run`] with the luarocks it uses, and the wording and C library it takes this binary to be
+/// built for, chosen by the caller.
 fn run_with<L: Luarocks>(
     command: LuaCommand,
     luarocks: &L,
-    flavour: Flavour,
+    host: Host,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> i32 {
     let LuaCommand::Setup { dir, native, lua } = command;
     match native.then_some(NativeRequest { lua }) {
-        Some(request) => setup_native_stages(&dir, request, luarocks, flavour, stdout, stderr),
+        Some(request) => setup_native_stages(&dir, request, luarocks, host, stdout, stderr),
         None => match setup(&dir) {
             Ok(report) => match writeln!(stdout, "{report}") {
                 Ok(()) => 0,
@@ -76,18 +78,21 @@ fn run_with<L: Luarocks>(
 
 /// Runs the `--native` stages in order, stopping at the first failure.
 ///
-/// Detection runs before anything is written, so a luarocks that cannot answer leaves the project
-/// as it was. The report is flushed before the install, so luarocks' own output, which goes
-/// straight to the terminal, appears below it.
+/// A musl build is refused first, and detection runs before anything is written, so neither it nor
+/// a luarocks that cannot answer leaves the project changed. The report is flushed before the
+/// install, so luarocks' own output, which goes straight to the terminal, appears below it.
 fn setup_native_stages<L: Luarocks>(
     dir: &Path,
     request: NativeRequest,
     luarocks: &L,
-    flavour: Flavour,
+    host: Host,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> i32 {
-    let package = match setup_native(luarocks, request, flavour) {
+    if let Err(error) = refuse_musl(host.libc, request) {
+        return fail(stderr, error);
+    }
+    let package = match setup_native(luarocks, request, host.flavour) {
         Ok(package) => package,
         Err(error) => return fail(stderr, error),
     };
@@ -98,10 +103,10 @@ fn setup_native_stages<L: Luarocks>(
     if let Err(error) = writeln!(stdout, "{report}").and_then(|()| stdout.flush()) {
         return fail(stderr, error);
     }
-    if let Err(error) = install_native(luarocks, request, package, flavour) {
+    if let Err(error) = install_native(luarocks, request, package, host.flavour) {
         return fail(stderr, error);
     }
-    match writeln!(stdout, "{}", hint(request, flavour)) {
+    match writeln!(stdout, "{}", hint(request, host.flavour)) {
         Ok(()) => 0,
         Err(error) => fail(stderr, error),
     }
@@ -134,7 +139,7 @@ mod tests {
     use crate::cli::{LuaAbi, LuaCommand};
     use crate::lua::luarocks::scripted::Scripted;
     use crate::lua::luarocks::{Captured, Luarocks, LuarocksError, Outcome};
-    use crate::lua::native::Flavour;
+    use crate::lua::native::{Flavour, Host, Libc};
 
     const VERSION: &str = airsl::VERSION;
     const REPORT: &str = "created .airsl/types/airsstack.lua\ncreated .luarc.json\n";
@@ -296,6 +301,14 @@ mod tests {
         }
     }
 
+    /// A host that is not musl, with the wording of `flavour`.
+    const fn host(flavour: Flavour) -> Host {
+        Host {
+            flavour,
+            libc: Libc::Other,
+        }
+    }
+
     fn lua54_then_install(code: Option<i32>) -> Scripted {
         Scripted::default()
             .then_stdout(b"5.4\n")
@@ -307,7 +320,7 @@ mod tests {
         let code = run_with(
             native_command(dir, None),
             luarocks,
-            flavour,
+            host(flavour),
             &mut stdout,
             &mut stderr,
         );
@@ -336,6 +349,83 @@ mod tests {
         assert_eq!(code, 1);
         assert!(!project.path().join(".airsl").exists());
         assert!(!project.path().join(".luarc.json").exists());
+    }
+
+    #[test]
+    fn native_on_musl_writes_nothing_and_never_starts_luarocks() {
+        let project = tempfile::tempdir().unwrap();
+        let luarocks = Scripted::default();
+        let (mut stdout, mut stderr) = (Vec::new(), Vec::new());
+
+        let code = run_with(
+            native_command(project.path(), None),
+            &luarocks,
+            Host {
+                flavour: Flavour::Unix,
+                libc: Libc::Musl,
+            },
+            &mut stdout,
+            &mut stderr,
+        );
+
+        let stderr = String::from_utf8(stderr).unwrap();
+        assert!(
+            stderr.starts_with(
+                "airsl: this `airsl` is built for musl Linux, and `airsstack` has no package \
+                 for musl:"
+            ),
+            "{stderr}"
+        );
+        assert!(stdout.is_empty());
+        assert_eq!(code, 1);
+        assert!(!project.path().join(".airsl").exists());
+        assert!(!project.path().join(".luarc.json").exists());
+        assert!(luarocks.calls().is_empty());
+    }
+
+    #[test]
+    fn without_native_a_musl_build_still_sets_the_project_up() {
+        let project = tempfile::tempdir().unwrap();
+        let luarocks = Scripted::default();
+        let (mut stdout, mut stderr) = (Vec::new(), Vec::new());
+
+        let code = run_with(
+            setup_command(project.path().to_path_buf()),
+            &luarocks,
+            Host {
+                flavour: Flavour::Unix,
+                libc: Libc::Musl,
+            },
+            &mut stdout,
+            &mut stderr,
+        );
+
+        assert_eq!(String::from_utf8(stdout).unwrap(), REPORT);
+        assert!(stderr.is_empty());
+        assert_eq!(code, 0);
+    }
+
+    #[test]
+    fn native_on_a_lua_5_1_without_luajit_writes_and_installs_nothing() {
+        let project = tempfile::tempdir().unwrap();
+        let luarocks = Scripted::default()
+            .then_stdout(b"5.1\n")
+            .then_stdout(b"{\n   luajit_version_checked = true\n}\n");
+
+        let (stdout, stderr, code) = run_native(&luarocks, project.path(), Flavour::Unix);
+
+        assert!(
+            stderr.starts_with(
+                "airsl: `luarocks` found no LuaJIT for Lua 5.1: its Lua 5.1 is not LuaJIT, or it \
+                 has none, and `airsstack-luajit` needs LuaJIT\n"
+            ),
+            "{stderr}"
+        );
+        assert!(stdout.is_empty());
+        assert_eq!(code, 1);
+        assert!(!project.path().join(".airsl").exists());
+        assert!(!project.path().join(".luarc.json").exists());
+        assert_eq!(luarocks.calls(), ["config lua_version", "config cache"]);
     }
 
     #[test]
@@ -369,7 +459,7 @@ mod tests {
         let code = run_with(
             native_command(project.path(), None),
             &spy,
-            Flavour::Unix,
+            host(Flavour::Unix),
             &mut out,
             &mut stderr,
         );
@@ -523,7 +613,7 @@ mod tests {
         let code = run_with(
             native_command(project.path(), None),
             &luarocks,
-            Flavour::Unix,
+            host(Flavour::Unix),
             &mut FailingWriter,
             &mut stderr,
         );
@@ -542,7 +632,7 @@ mod tests {
         let code = run_with(
             native_command(project.path(), None),
             &luarocks,
-            Flavour::Unix,
+            host(Flavour::Unix),
             &mut FailsToFlush,
             &mut stderr,
         );
@@ -561,7 +651,7 @@ mod tests {
         let code = run_with(
             native_command(project.path(), None),
             &luarocks,
-            Flavour::Unix,
+            host(Flavour::Unix),
             &mut FailsOn("require("),
             &mut stderr,
         );
@@ -580,7 +670,7 @@ mod tests {
         let code = run_with(
             setup_command(project.path().to_path_buf()),
             &luarocks,
-            Flavour::Unix,
+            host(Flavour::Unix),
             &mut stdout,
             &mut stderr,
         );

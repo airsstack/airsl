@@ -61,7 +61,8 @@ The API reference is on [docs.rs](https://docs.rs/airsl).
 nothing else installed. Building from source needs a C compiler, because Lua is compiled from its C
 source and linked in. The native module is also built for LuaJIT. To run `airsstack` scripts in
 the Lua you already have, see
-[Running Scripts in Stock Lua](https://airsstack.github.io/airsl/ch01-05-stock-lua.html).
+[Running Scripts in Stock Lua](https://airsstack.github.io/airsl/ch01-05-stock-lua.html),
+or run the scripts in [`crates/airsl-lua/examples`](crates/airsl-lua/examples).
 
 ## Development
 
@@ -79,9 +80,11 @@ pipeline mean the same thing.
 
 `cargo make dod` loads the native module into a real Lua 5.4 and a real LuaJIT, so it needs `lua5.4`
 and `luajit` on `PATH`, or `AIRSL_LUA54` and `AIRSL_LUAJIT` naming the interpreters. `cargo make
-rocks` is not part of the gate. It needs the network, because luarocks fetches the build backend,
-and luarocks on `PATH` or `AIRSL_LUAROCKS` naming it. Where luarocks cannot find an interpreter by
-itself, `AIRSL_LUA54_DIR` and `AIRSL_LUAJIT_DIR` name the directory of each.
+rocks` is not part of the gate. It builds the packages, so it needs Rust and cargo-make as well as
+the network, because luarocks fetches the build backend, and luarocks on `PATH` or `AIRSL_LUAROCKS`
+naming it. It then loads each package into its interpreter, so it needs the same `lua5.4` and
+`luajit` as the gate. Where luarocks cannot find an interpreter by itself, `AIRSL_LUA54_DIR` and
+`AIRSL_LUAJIT_DIR` name the directory of each.
 
 ## Releases
 
@@ -106,12 +109,13 @@ For maintainers:
 - The release does not wait for CI. Tag only a commit on `main` whose pull request passed.
 - Before tagging, rename `## Unreleased` in CHANGELOG.md to the heading form of the entries below
   it, `## airsl <version> — airsl-cli <version> — <date>`.
-- After the first release whose `publish-rocks` job succeeds, the maintainer who pushed the
-  `airsl-cli-v*` tag runs, against luarocks.org, the command lines that
-  `book/src/ch01-05-stock-lua.md` shows under "Installing": `airsl lua setup --native` and the two
-  `luarocks install --local` lines. They also run the Homebrew lines on macOS and the Windows lines
-  in "Pointing LuaRocks at Lua 5.4 or LuaJIT". Each output is pasted under its own command line, in
-  the chapter's `console` blocks, and merged as a `docs:` pull request.
+- The command lines in `book/src/ch01-05-stock-lua.md` under "Installing" and "Homebrew on macOS"
+  show real output, from the 0.3.0 rocks on macOS on Apple Silicon. After a release, run them
+  again against luarocks.org and update the transcripts where the output changed: the package
+  version, and the platform in the file name. The musl refusal under "No binary package" names the
+  same version in its `luarocks` lines. The Windows lines in "Pointing LuaRocks at Lua 5.4 or
+  LuaJIT" have not been run on Windows and show no output. Paste each output under its own command
+  line in the chapter's `console` blocks, and merge it as a `docs:` pull request.
 - Release notes stay in CHANGELOG.md. The GitHub Release carries install instructions only.
 - `.github/workflows/pages.yml` publishes the book and the `install/` scripts to GitHub Pages on
   every merge that touches them, so a change to `install/` is live as soon as it merges.

@@ -5,7 +5,9 @@ module for the Lua you already have: Lua 5.4 or LuaJIT, which includes the Lua i
 install it with LuaRocks, and then `require("airsstack")` works in that Lua.
 
 Use it when you want `json`, `fs`, `regex` and the rest in a script, a test, or a plugin that runs
-outside `airsl`.
+outside `airsl`. The scripts in this chapter, and a few more, are in the
+[examples folder](https://github.com/airsstack/airsl/tree/main/crates/airsl-lua/examples) of the
+repository, each with the output it prints.
 
 ## What the module is
 
@@ -16,11 +18,21 @@ exists inside `airsl`, which is the program that fires extension events.
 It sets no global, so keep the table in a local. Save this as `hello.lua`:
 
 ```lua
-local airsstack = require("airsstack")
+{{#include ../../crates/airsl-lua/examples/common/hello-require/main.lua}}
+```
 
-print(airsstack.json.encode({ name = "airsl", numbers = { 1, 2.5 } }))
-print(airsstack.path.join("src", "main.lua"))
-print(airsstack.hash.sha256("abc"))
+Once the module is installed, as the next sections show, Lua 5.4 and LuaJIT print the same lines:
+
+```console
+$ lua5.4 hello.lua
+modules: env, fs, glob, hash, hook, json, path, proc, regex, stdio, time
+ext: nil
+global airsstack: nil
+package.loaded holds the same table: true
+a second require returns it again: true
+{"name":"airsl","numbers":[1,2.5]}
+src/main.lua
+ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
 ```
 
 It runs with the same authority as the Lua that loaded it. There are no grants to give, and no
@@ -36,30 +48,79 @@ There is one package for each Lua, and a Lua loads only its own:
 | Lua 5.4 | `airsstack` |
 | LuaJIT, and Neovim | `airsstack-luajit` |
 
+LuaRocks files each package under the Lua it is for: `airsstack` under 5.4, and `airsstack-luajit`
+under 5.1, the version LuaJIT implements. That is why the commands below name the version.
+
 ## Installing
 
 If you have `airsl`, it can run LuaRocks for you:
 
 ```console
 $ airsl lua setup --native
+created .airsl/types/airsstack.lua
+created .luarc.json
+Installing https://luarocks.org/airsstack-0.3.0-1.macosx-aarch64.rock
+
+airsstack 0.3.0-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack 0.3.0-1 is now installed in ~/.luarocks (license: Apache-2.0)
+
+require("airsstack") works once you run: eval "$(luarocks path)"
+$ airsl lua setup --native --lua luajit
+unchanged .airsl/types/airsstack.lua
+unchanged .luarc.json
+Installing https://luarocks.org/airsstack-luajit-0.3.0-1.macosx-aarch64.rock
+
+airsstack-luajit 0.3.0-1 depends on lua 5.1 (5.1-1 provided by VM: success)
+airsstack-luajit 0.3.0-1 depends on luajit >= 2.1 (2.1.1770848219-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack-luajit 0.3.0-1 is now installed in ~/.luarocks (license: Apache-2.0)
+
+require("airsstack") works once you run: eval "$(luarocks --lua-version 5.1 path)"
 ```
 
-It asks LuaRocks which Lua it targets and installs the matching package into your own tree, which
-needs no administrator rights. Name the Lua with `--lua 5.4` or `--lua luajit` to choose one. The
-command also writes the editor files that [Editor Support](ch01-04-editor-support.md) describes.
+The first two lines are the editor files, then LuaRocks prints its own install output, and the last
+line is `airsl`'s hint for `luarocks path`. Both commands ran in the same folder, so the second one
+finds the editor files already written and reports them as `unchanged`. The transcripts in this
+chapter show your home folder as `~`, where LuaRocks prints the full path. They are from macOS on
+Apple Silicon, so the package file name ends in `macosx-aarch64`; yours names your platform. The
+command asks LuaRocks which Lua it targets and installs the matching package into your own tree,
+which needs no administrator rights. Name the Lua with `--lua 5.4` or `--lua luajit` to choose one.
+It installs the package version that matches your `airsl`, so run it again after you upgrade
+`airsl`.
 
-Without `airsl`, ask LuaRocks directly:
+The command also writes the editor files that [Editor Support](ch01-04-editor-support.md)
+describes, into the current folder or into `DIR` if you give one, and it writes them even if the
+install then fails. If you only want the module, use LuaRocks directly.
+
+Without `airsl`, ask LuaRocks directly. `--lua-version` names the Lua the package is for, and
+`airsstack-luajit` is only listed for 5.1, so the second line fails without it unless LuaRocks
+already targets 5.1:
 
 ```console
-$ luarocks install --local airsstack
-$ luarocks install --local airsstack-luajit
+$ luarocks --lua-version 5.4 install --local airsstack
+Installing https://luarocks.org/airsstack-0.3.0-1.macosx-aarch64.rock
+
+airsstack 0.3.0-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack 0.3.0-1 is now installed in ~/.luarocks (license: Apache-2.0)
+
+$ luarocks --lua-version 5.1 install --local airsstack-luajit
+Installing https://luarocks.org/airsstack-luajit-0.3.0-1.macosx-aarch64.rock
+
+airsstack-luajit 0.3.0-1 depends on lua 5.1 (5.1-1 provided by VM: success)
+airsstack-luajit 0.3.0-1 depends on luajit >= 2.1 (2.1.1770848219-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack-luajit 0.3.0-1 is now installed in ~/.luarocks (license: Apache-2.0)
+
 ```
 
 A `--local` install is outside the folders Lua searches. Tell your shell where it is. On macOS and
 Linux:
 
 ```console
-$ eval "$(luarocks path)"
+$ eval "$(luarocks --lua-version 5.4 path)"   # Lua 5.4
+$ eval "$(luarocks --lua-version 5.1 path)"   # LuaJIT
 ```
 
 On Windows, in `cmd`:
@@ -77,17 +138,28 @@ In PowerShell:
 ```
 
 These set the paths for the current terminal only. For LuaJIT, give luarocks the version it
-installed for: `luarocks --lua-version 5.1 path`.
+installed for, as in the Unix lines above: `luarocks --lua-version 5.1 path`.
 
 Where a binary package is published, LuaRocks installs it without compiling anything. That covers
-macOS on Apple Silicon and Intel, Windows on x64, and Linux with glibc on x86_64 and aarch64. See
-[No binary package](#no-binary-package) for everything else.
+macOS on Apple Silicon and Intel, Windows on x64, and Linux with glibc 2.17 or newer on x86_64 and
+aarch64. See [No binary package](#no-binary-package) for everything else, and
+[If `require` fails](#if-require-fails) if the module does not load.
 
 ## Building from the repository
 
-You can also build a package from a clone. This needs a Rust toolchain, a C compiler, and
-LuaRocks. Run LuaRocks from the clone, and give it a tree to install into. This builds the Lua 5.4
-package:
+You can also build a package from a clone. A build, from a clone or from LuaRocks' own recipe,
+needs:
+
+- git,
+- Rust 1.94 or newer, with `cargo`. If you use rustup, you need do nothing: the repository names
+  Rust 1.94 in its `rust-toolchain.toml`, and rustup fetches it for the build,
+- a C compiler,
+- the Lua headers for the Lua you target, and
+- LuaRocks. It fetches the build tool of the package, `luarocks-build-rust-mlua`, by itself, as
+  the output below shows. The exception is a LuaRocks that runs on Lua 5.1, such as the one on
+  Ubuntu: see [Ubuntu with apt](#ubuntu-with-apt).
+
+Run LuaRocks from the clone, and give it a tree to install into. This builds the Lua 5.4 package:
 
 ```console
 $ git clone https://github.com/airsstack/airsl
@@ -114,11 +186,16 @@ airsstack 0.3.0-1 is now installed in ~/airsl/lua54-tree (license: Apache-2.0)
 The first lines are LuaRocks fetching the build tool for the package. This run had Rust's build
 cache warm, so it shows two `Compiling` lines, one for `airsl-lua` and one for `airsl`. The first
 build in a fresh clone prints many more, one for each crate it compiles, and takes longer. Now
-point your shell at the tree, save `hello.lua` from above in the clone, and run it:
+point your shell at the tree and run the `hello-require` example from the clone:
 
 ```console
 $ eval "$(luarocks --lua-version 5.4 --tree lua54-tree path)"
-$ lua5.4 hello.lua
+$ lua5.4 crates/airsl-lua/examples/common/hello-require/main.lua
+modules: env, fs, glob, hash, hook, json, path, proc, regex, stdio, time
+ext: nil
+global airsstack: nil
+package.loaded holds the same table: true
+a second require returns it again: true
 {"name":"airsl","numbers":[1,2.5]}
 src/main.lua
 ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
@@ -153,11 +230,16 @@ Missing dependencies for airsstack-luajit 0.3.0-1:
    luajit >= 2.1 (not installed)
 ```
 
-Then point your shell at that tree and run the same script:
+Then point your shell at that tree and run the same example:
 
 ```console
 $ eval "$(luarocks --lua-version 5.1 --tree luajit-tree path)"
-$ luajit hello.lua
+$ luajit crates/airsl-lua/examples/common/hello-require/main.lua
+modules: env, fs, glob, hash, hook, json, path, proc, regex, stdio, time
+ext: nil
+global airsstack: nil
+package.loaded holds the same table: true
+a second require returns it again: true
 {"name":"airsl","numbers":[1,2.5]}
 src/main.lua
 ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
@@ -165,10 +247,6 @@ ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
 
 The `Missing dependencies` list at the end is a LuaRocks quirk on the first build into a tree. You
 can ignore it: the line before it says the package is installed, and it is.
-
-`cargo make rocks` does the same for both packages in one step. It builds each into `target/rocks`,
-packs a `.rock` file for each into `target/rocks/dist`, and loads each build in its own Lua to check
-that it works. It needs LuaRocks and a network connection, as the commands above do.
 
 ## How it differs from `airsl`
 
@@ -211,7 +289,11 @@ hello
 
 - **JSON of a whole-number float.** Lua 5.4 tells `2` from `2.0`, so `2.0` stays `2.0`. LuaJIT
   has one kind of number, so it writes `2`, and `2^53` as `9007199254740992`. `airsl` runs Lua 5.4,
-  so it writes the first form.
+  so it writes the first form. The examples
+  [`integers-and-json`](https://github.com/airsstack/airsl/tree/main/crates/airsl-lua/examples/lua54/integers-and-json)
+  and
+  [`numbers-and-json`](https://github.com/airsstack/airsl/tree/main/crates/airsl-lua/examples/luajit/numbers-and-json)
+  show this on its own for each Lua.
 - **No `utf8` in LuaJIT.** The `utf8` library is part of Lua 5.3 and later.
 - **No limits.** There is no memory or instruction ceiling, as described above.
 - **`env.set` and `os.getenv`.** `env.set` changes what `env.get` and the programs `proc.run`
@@ -250,21 +332,109 @@ support, or cannot find the Lua you named, tell LuaRocks where your Lua lives. T
 `--lua-version` names the version (`5.4`, or `5.1` for LuaJIT) and `--lua-dir` names the folder that
 holds the Lua's `bin` and `include` folders.
 
+`airsl lua setup --native` takes no `--lua-dir`, and it takes `--lua 5.4` or `--lua luajit` for the
+version. To have both work, store the folder in LuaRocks' configuration once, as the next section
+shows for Homebrew. The `config` command with `lua_dir` writes your user configuration for that
+version, so the flag is no longer needed for it.
+
 ### Homebrew on macOS
 
-`lua@5.4` is installed but not linked, so LuaRocks does not find it. LuaRocks itself targets the
-newest Lua Homebrew has, which can be Lua 5.5. Give it the folder:
+Homebrew's `lua` formula is Lua 5.5 or newer, and `lua@5.4` is keg-only: Homebrew installs it but
+does not link it onto your `PATH`. So on a new install LuaRocks targets the newer Lua and does not
+find Lua 5.4. A Mac whose `lua` is still a 5.4 that was never upgraded needs no `--lua-dir` for it,
+as the transcripts under [Installing](#installing) show. Where LuaRocks does not find the Lua, give
+it the folder:
 
 ```console
 $ luarocks --lua-version 5.4 --lua-dir "$(brew --prefix lua@5.4)" install --local airsstack
+Installing https://luarocks.org/airsstack-0.3.0-1.macosx-aarch64.rock
+
+airsstack 0.3.0-1 depends on lua 5.4 (5.4-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack 0.3.0-1 is now installed in ~/.luarocks (license: Apache-2.0)
+
 $ luarocks --lua-version 5.1 --lua-dir "$(brew --prefix luajit)" install --local airsstack-luajit
+Installing https://luarocks.org/airsstack-luajit-0.3.0-1.macosx-aarch64.rock
+
+airsstack-luajit 0.3.0-1 depends on lua 5.1 (5.1-1 provided by VM: success)
+airsstack-luajit 0.3.0-1 depends on luajit >= 2.1 (2.1.1770848219-1 provided by VM: success)
+No existing manifest. Attempting to rebuild...
+airsstack-luajit 0.3.0-1 is now installed in ~/.luarocks (license: Apache-2.0)
+
 ```
+
+Give `luarocks path` the same two flags, and run your script with the interpreter in that folder,
+because no `lua5.4` is on your `PATH`:
+
+```console
+$ eval "$(luarocks --lua-version 5.4 --lua-dir "$(brew --prefix lua@5.4)" path)"
+$ "$(brew --prefix lua@5.4)/bin/lua5.4" hello.lua
+modules: env, fs, glob, hash, hook, json, path, proc, regex, stdio, time
+ext: nil
+global airsstack: nil
+package.loaded holds the same table: true
+a second require returns it again: true
+{"name":"airsl","numbers":[1,2.5]}
+src/main.lua
+ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+```
+
+To stop repeating `--lua-dir`, store the folder once for each Lua:
+
+```console
+$ luarocks --lua-version 5.4 config --scope user lua_dir "$(brew --prefix lua@5.4)"
+Wrote
+	variables.LUA = "/opt/homebrew/opt/lua@5.4/bin/lua5.4"
+	variables.LUA_BINDIR = "/opt/homebrew/opt/lua@5.4/bin"
+	variables.LUA_DIR = "/opt/homebrew/opt/lua@5.4"
+	variables.LUA_INCDIR = "/opt/homebrew/opt/lua@5.4/include/lua5.4"
+	variables.LUA_LIBDIR = "/opt/homebrew/opt/lua@5.4/lib"
+to
+	~/.luarocks/config-5.4.lua
+$ luarocks --lua-version 5.1 config --scope user lua_dir "$(brew --prefix luajit)"
+Wrote
+	variables.LUA = "/opt/homebrew/opt/luajit/bin/luajit"
+	variables.LUA_BINDIR = "/opt/homebrew/opt/luajit/bin"
+	variables.LUA_DIR = "/opt/homebrew/opt/luajit"
+	variables.LUA_INCDIR = "/opt/homebrew/opt/luajit/include/luajit-2.1"
+	variables.LUA_LIBDIR = "/opt/homebrew/opt/luajit/lib"
+to
+	~/.luarocks/config-5.1.lua
+```
+
+LuaRocks lists what it stored. The folders above are the Apple Silicon ones: Homebrew's prefix is
+`/opt/homebrew` there and `/usr/local` on an Intel Mac. Each command makes LuaRocks remember the
+folder for that version, and also makes that version the
+one LuaRocks targets when you name none, so the last one you run decides. After that,
+`airsl lua setup --native --lua 5.4` or `--lua luajit` works without `--lua-dir`.
 
 ### Ubuntu with apt
 
-The `luarocks` package targets Lua 5.1 from the `lua5.1` package, not LuaJIT. For LuaJIT, point
-`--lua-dir` at a folder that holds only LuaJIT: a `bin/luajit` and the LuaJIT headers in `include`.
-For Lua 5.4, `--lua-version 5.4` is enough after `apt install lua5.4 liblua5.4-dev`.
+The `luarocks` package targets Lua 5.1 from the `lua5.1` package, not LuaJIT. A Lua 5.1 that is not
+LuaJIT cannot load `airsstack-luajit`, and the package needs LuaJIT 2.1, which LuaRocks does not
+find in that Lua. `airsl lua setup --native` sees this before it writes anything and refuses:
+
+```text
+airsl: `luarocks` found no LuaJIT for Lua 5.1: its Lua 5.1 is not LuaJIT, or it has none, and `airsstack-luajit` needs LuaJIT
+       install Lua 5.4 and run again with `--lua 5.4` to install it for Lua 5.4
+       or run `luarocks --lua-version 5.1 config --scope user lua_dir <LuaJIT prefix>` to point `luarocks` at LuaJIT
+       https://airsstack.github.io/airsl/ch01-05-stock-lua.html#pointing-luarocks-at-lua-54-or-luajit shows how to point `luarocks` at Lua 5.4 or LuaJIT
+```
+
+`luarocks install` on its own stops in the same place, later, with a LuaRocks error. LuaRocks 3.12
+prints:
+
+```text
+Error: Could not satisfy dependency luajit >= 2.1: No results matching query were found for Lua 5.1.
+```
+
+So on Ubuntu, name the Lua yourself: `airsl lua setup --native --lua 5.4`.
+
+For LuaJIT, point LuaRocks at a folder that holds only LuaJIT: a `bin/luajit` and the LuaJIT
+headers in `include`. Pass it as `--lua-dir`, or store it once with
+`luarocks --lua-version 5.1 config --scope user lua_dir <LuaJIT prefix>`, as
+[Homebrew on macOS](#homebrew-on-macos) does. After that, `airsl lua setup --native --lua luajit`
+works. For Lua 5.4, `--lua-version 5.4` is enough after `apt install lua5.4 liblua5.4-dev`.
 
 If you build from source, LuaRocks needs the build tool in its own Lua 5.1 tree first:
 
@@ -283,43 +453,89 @@ folder of your Lua build:
 > luarocks --lua-version 5.1 --lua-dir C:\luajit install --local airsstack-luajit
 ```
 
+Two more things matter on Windows.
+
+- The packages load the Lua library by its name: `lua54.dll` for `airsstack` and `lua51.dll` for
+  `airsstack-luajit`. They also need the Visual C++ 2015 or newer runtime. Use a Lua that ships
+  its DLL under that name. A Lua linked statically into its `lua.exe` has no DLL for the module to
+  find.
+- LuaRocks finds the interpreter through your `PATH`. Put the `bin` folder of your Lua on it, which
+  is the folder you gave to `--lua-dir` plus `\bin`, before you run `luarocks path`. Without it,
+  LuaRocks reports for LuaJIT that it could not find Lua 5.1 in `PATH`.
+
 ## Neovim
 
 Neovim embeds LuaJIT, so it needs `airsstack-luajit`. Neovim does not search LuaRocks' folders, so
-ask LuaRocks for them and add them to `package.cpath`. This works on every platform, because
-LuaRocks writes the folders with the right separators and file extension. Save this as
-`nvim-airsstack.lua`:
+the script asks LuaRocks for them and adds them to `package.cpath`, but only when `require` cannot
+already find the module. This works on every platform, because LuaRocks writes the folders with
+the right separators and file extension. Save this as `nvim-airsstack.lua`:
 
 ```lua
-local cpath = vim.fn.system({ "luarocks", "--lua-version", "5.1", "path", "--lr-cpath" })
-assert(vim.v.shell_error == 0, cpath)
-package.cpath = package.cpath .. ";" .. vim.trim(cpath)
-
-local airsstack = require("airsstack")
-print(airsstack.json.encode({ editor = "neovim" }))
+{{#include ../../crates/airsl-lua/examples/neovim/require-in-nvim/main.lua}}
 ```
 
-`luarocks` must be on your `PATH`, as it is when you install the package. On Windows, the `bin`
-folder of your LuaJIT must be on your `PATH` too: that is the folder you gave to `--lua-dir` when
-you installed the package, plus `\bin`. Without it, LuaRocks reports that it could not find
-Lua 5.1 in `PATH`. Run the file with Neovim's `-l` option:
+`luarocks` must be on your `PATH`, as it is when you install the package. On Windows, your Lua's
+`bin` folder must be on it too, as [Windows](#windows) says. Run the file with Neovim's `-l`
+option, which needs Neovim 0.9 or newer:
 
 ```console
 $ nvim -l nvim-airsstack.lua
-{"editor":"neovim"}
+{"editor":"neovim","jit":true,"lua":"Lua 5.1"}
+sha256: ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+path: lua/plugin/init.lua
+global airsstack: nil
 ```
+
+The script writes with `io.write`, not `print`. Under `nvim -l`, `print` writes to standard error,
+so a pipe or a redirect would not capture it, while `io.write` and `airsstack.stdio.write` write to
+standard output. Those two are separate buffers, so pick one of them and keep to it if the order of
+the lines matters.
+
+Official Neovim builds embed LuaJIT, but some distributions build Neovim with plain Lua 5.1, which
+cannot load the package. To check yours, run `:lua print(jit and jit.version)` in Neovim. It
+prints a LuaJIT version when the package can load, and `nil` when it cannot.
 
 ## No binary package
 
 Some platforms have no binary package. Those are musl Linux, such as Alpine, and any platform not
 listed under [Installing](#installing), such as 32-bit systems.
 
-The native module is not supported on musl Linux. No package is built for it, and LuaRocks there
-does not tell musl from glibc Linux, so it can fetch the glibc package.
+The native module is not supported on musl Linux. No package is built for it. LuaRocks there does
+not tell musl from glibc Linux, so `luarocks install` installs the glibc package, which cannot load
+on musl, and the failure shows only when you `require` the module.
 
-On any other platform without a binary package, LuaRocks builds the package from its recipe. That
-needs git, `cargo` with Rust 1.94 or newer, a C compiler, the Lua headers for the Lua you target,
-and the LuaRocks build tool.
+`airsl lua setup --native` stops you before that. An `airsl` from a musl
+[archive](appendix-04-installation.md#archives) refuses `--native` before it writes any file or
+starts LuaRocks:
+
+```text
+airsl: this `airsl` is built for musl Linux, and `airsstack` has no package for musl: the glibc package `luarocks` installs cannot load there
+       on a glibc system, install the package with `luarocks` yourself:
+       luarocks --lua-version 5.4 install --local airsstack 0.3.0
+       luarocks --lua-version 5.1 install --local airsstack-luajit 0.3.0
+       https://airsstack.github.io/airsl/ch01-05-stock-lua.html#no-binary-package says what works on musl and where no package exists
+```
+
+The refusal goes by how `airsl` was built, not by the system it runs on, so a musl `airsl` on a
+glibc system is refused too. The [archives](appendix-04-installation.md#archives) say when the
+installer picks that build. There the `luarocks` lines in the message work.
+
+On any other platform without a binary package, LuaRocks builds the package from its recipe. The
+requirements are the ones listed under [Building from the repository](#building-from-the-repository).
+
+## If `require` fails
+
+- **`module 'airsstack' not found`.** Lua is not looking where LuaRocks installed the package.
+  Lua prints the list of places it looked after that line. Run the `luarocks path` line for your
+  shell from [Installing](#installing), in the same terminal as the script.
+- **An error from the dynamic linker.** The package was built for another Lua. Loading `airsstack`,
+  the Lua 5.4 package, into Neovim on macOS ends with `symbol not found in flat namespace
+  '_luaL_tolstring'`. Other systems word it differently. Install the package for your Lua, as
+  [The two packages](#the-two-packages) shows, and run it with that Lua.
+- **A failure on Windows.** Check the Lua DLL name and the Visual C++ runtime under
+  [Windows](#windows).
+- **Alpine or another musl Linux.** There is no package for it, and `airsl lua setup --native`
+  refuses to install one, as [No binary package](#no-binary-package) says.
 
 ## Summary
 
@@ -330,4 +546,5 @@ and the LuaRocks build tool.
   your shell find it.
 - LuaJIT writes whole-number floats as integers, has no `utf8`, and can reorder `stdio.write`
   output against `print`.
-- Where LuaRocks targets the wrong Lua, pass `--lua-version` and `--lua-dir`.
+- Where LuaRocks targets the wrong Lua, pass `--lua-version` and `--lua-dir`, or store the folder
+  with `luarocks config`.
