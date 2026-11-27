@@ -10,7 +10,7 @@ lockstep release of both crates, tagged `airsl-v<version>` and `airsl-cli-v<vers
 commit, and there is no library-only release. Older entries keep their per-crate headings, from when
 each crate had a number of its own and one commit could ship them under two different numbers.
 
-## Unreleased
+## airsl 0.3.0 — airsl-cli 0.3.0 — 2026-11-27
 
 ### Breaking
 
