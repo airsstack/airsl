@@ -3,11 +3,11 @@
 //! Separate from `main.rs` so the parsed shape is a value the rest of the binary can be tested
 //! against without spawning a process. `clap`'s derive lives here and nowhere else.
 //!
-//! Responsibilities: [`Cli`], [`Command`] and [`PolicyName`], the complete argument surface; the
-//! parsers that turn a ceiling argument into a limit; [`resolve_policy`], which applies the
-//! caller's overrides to the preset they named; and [`resolve_ceiling`], the same resolution for
-//! `ext` subcommands, which negotiate against a [`airsl::extension::Ceiling`] rather than run
-//! directly under a [`Policy`].
+//! Responsibilities: [`Cli`], [`Command`], [`PolicyName`] and [`LuaAbi`], the complete argument
+//! surface; the parsers that turn a ceiling argument into a limit; [`resolve_policy`], which
+//! applies the caller's overrides to the preset they named; and [`resolve_ceiling`], the same
+//! resolution for `ext` subcommands, which negotiate against a [`airsl::extension::Ceiling`]
+//! rather than run directly under a [`Policy`].
 //!
 //! Non-responsibilities: acting on any of it. [`crate::run`] and [`crate::doctor`] do that.
 #![expect(
@@ -297,7 +297,50 @@ pub(crate) enum LuaCommand {
         /// Project directory to set up. Defaults to the working directory.
         #[arg(default_value = ".")]
         dir: PathBuf,
+
+        /// Also install the native module with LuaRocks.
+        #[arg(long)]
+        #[expect(
+            clippy::doc_markdown,
+            reason = "clap prints this doc as the help text, where backticks would show"
+        )]
+        native: bool,
+
+        /// The Lua to install the native module for, instead of the one luarocks targets.
+        #[arg(long, value_enum, requires = "native")]
+        lua: Option<LuaAbi>,
     },
+}
+
+/// The `--lua` value that names Lua 5.4.
+pub(crate) const LUA54_FLAG: &str = "5.4";
+
+/// The `--lua` value that names `LuaJIT`.
+const LUAJIT_FLAG: &str = "luajit";
+
+/// The Lua a native module is installed for, named by `--lua`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub(crate) enum LuaAbi {
+    /// Lua 5.4 (PUC-Rio).
+    #[value(name = LUA54_FLAG)]
+    Lua54,
+    /// LuaJIT 2.1 (the Lua 5.1 ABI).
+    #[value(name = LUAJIT_FLAG)]
+    #[expect(
+        clippy::doc_markdown,
+        reason = "clap prints this doc as the help text, where backticks would show"
+    )]
+    LuaJit,
+}
+
+impl LuaAbi {
+    /// The `--lua` value the user types for this Lua, the one clap accepts for it.
+    pub(crate) const fn flag_value(self) -> &'static str {
+        match self {
+            Self::Lua54 => LUA54_FLAG,
+            Self::LuaJit => LUAJIT_FLAG,
+        }
+    }
 }
 
 /// Parses a manifest variable of the form `NAME=VALUE`.
@@ -389,7 +432,7 @@ mod tests {
     )]
 
     use super::{
-        Cli, Command, ExtCommand, ExtFlags, Grants, LimitOverride, LuaCommand, PolicyName,
+        Cli, Command, ExtCommand, ExtFlags, Grants, LimitOverride, LuaAbi, LuaCommand, PolicyName,
         parse_instruction_limit, parse_memory_limit, parse_var, resolve_ceiling, resolve_policy,
     };
     use airsl::{HostAccess, InstructionLimit, LanguageSurface, MemoryLimit, Policy};
@@ -405,7 +448,7 @@ mod tests {
 
     #[test]
     fn lua_setup_defaults_to_the_working_directory() {
-        let Command::Lua(LuaCommand::Setup { dir }) = run_command(&["airsl", "lua", "setup"])
+        let Command::Lua(LuaCommand::Setup { dir, .. }) = run_command(&["airsl", "lua", "setup"])
         else {
             panic!("expected the lua setup subcommand");
         };
@@ -414,12 +457,146 @@ mod tests {
 
     #[test]
     fn lua_setup_takes_a_directory() {
-        let Command::Lua(LuaCommand::Setup { dir }) =
+        let Command::Lua(LuaCommand::Setup { dir, .. }) =
             run_command(&["airsl", "lua", "setup", "proj"])
         else {
             panic!("expected the lua setup subcommand");
         };
         assert_eq!(dir, std::path::PathBuf::from("proj"));
+    }
+
+    /// The `native` and `lua` fields of a parsed `lua setup`.
+    fn setup_flags(args: &[&str]) -> (bool, Option<LuaAbi>) {
+        let Command::Lua(LuaCommand::Setup { native, lua, .. }) = run_command(args) else {
+            panic!("expected the lua setup subcommand");
+        };
+        (native, lua)
+    }
+
+    #[test]
+    fn lua_setup_takes_native() {
+        assert_eq!(
+            setup_flags(&["airsl", "lua", "setup", "--native"]),
+            (true, None)
+        );
+    }
+
+    #[test]
+    fn lua_setup_takes_native_with_lua_5_4() {
+        assert_eq!(
+            setup_flags(&["airsl", "lua", "setup", "--native", "--lua", "5.4"]),
+            (true, Some(LuaAbi::Lua54))
+        );
+    }
+
+    #[test]
+    fn lua_setup_takes_native_with_luajit() {
+        assert_eq!(
+            setup_flags(&["airsl", "lua", "setup", "--native", "--lua", "luajit"]),
+            (true, Some(LuaAbi::LuaJit))
+        );
+    }
+
+    #[test]
+    fn lua_setup_without_native_has_no_lua() {
+        assert_eq!(setup_flags(&["airsl", "lua", "setup"]), (false, None));
+    }
+
+    #[test]
+    fn each_lua_names_the_value_clap_accepts_for_it() {
+        use clap::ValueEnum as _;
+
+        for abi in LuaAbi::value_variants() {
+            let accepted = abi.to_possible_value().unwrap();
+
+            assert_eq!(accepted.get_name(), abi.flag_value());
+            assert_eq!(
+                setup_flags(&[
+                    "airsl",
+                    "lua",
+                    "setup",
+                    "--native",
+                    "--lua",
+                    abi.flag_value()
+                ]),
+                (true, Some(*abi))
+            );
+        }
+    }
+
+    /// The text and the process exit status of the error clap raises for `args`.
+    fn refusal(args: &[&str]) -> (String, i32) {
+        let error = Cli::try_parse_from(args).unwrap_err();
+        (error.to_string(), error.exit_code())
+    }
+
+    #[test]
+    fn lua_setup_refuses_lua_without_native() {
+        let (text, code) = refusal(&["airsl", "lua", "setup", "--lua", "5.4"]);
+
+        assert_eq!(
+            text,
+            "error: the following required arguments were not provided:\n  \
+             --native\n\n\
+             Usage: airsl lua setup --native --lua <LUA> [DIR]\n\n\
+             For more information, try '--help'.\n"
+        );
+        assert_eq!(code, 2);
+    }
+
+    #[test]
+    fn lua_setup_refuses_an_unknown_lua() {
+        let (text, code) = refusal(&["airsl", "lua", "setup", "--native", "--lua", "5.1"]);
+
+        assert_eq!(
+            text,
+            "error: invalid value '5.1' for '--lua <LUA>'\n  \
+             [possible values: 5.4, luajit]\n\n  \
+             tip: a similar value exists: '5.4'\n\n\
+             For more information, try '--help'.\n"
+        );
+        assert_eq!(code, 2);
+    }
+
+    #[test]
+    fn lua_setup_refuses_a_wrongly_cased_lua_without_a_tip() {
+        let (text, code) = refusal(&["airsl", "lua", "setup", "--native", "--lua", "LuaJIT"]);
+
+        assert_eq!(
+            text,
+            "error: invalid value 'LuaJIT' for '--lua <LUA>'\n  \
+             [possible values: 5.4, luajit]\n\n\
+             For more information, try '--help'.\n"
+        );
+        assert_eq!(code, 2);
+    }
+
+    #[test]
+    fn lua_setup_refuses_lua_twice() {
+        let (text, code) = refusal(&[
+            "airsl", "lua", "setup", "--native", "--lua", "5.4", "--lua", "luajit",
+        ]);
+
+        assert_eq!(
+            text,
+            "error: the argument '--lua <LUA>' cannot be used multiple times\n\n\
+             Usage: airsl lua setup [OPTIONS] [DIR]\n\n\
+             For more information, try '--help'.\n"
+        );
+        assert_eq!(code, 2);
+    }
+
+    #[test]
+    fn lua_setup_refuses_lua_without_a_value() {
+        let expected = "error: a value is required for '--lua <LUA>' but none was supplied\n  \
+                        [possible values: 5.4, luajit]\n\n\
+                        For more information, try '--help'.\n";
+
+        let last = refusal(&["airsl", "lua", "setup", "--native", "--lua"]);
+        let empty = refusal(&["airsl", "lua", "setup", "--native", "--lua="]);
+
+        assert_eq!(last, (expected.to_owned(), 2));
+        assert_eq!(empty, (expected.to_owned(), 2));
     }
 
     #[test]

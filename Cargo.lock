@@ -38,6 +38,7 @@ dependencies = [
  "mlua",
  "serde_json",
  "tempfile",
+ "thiserror",
  "walkdir",
 ]
 
