@@ -4,7 +4,8 @@
 //! argument list that asks luarocks, and the words of every refusal. It spawns nothing, so each
 //! refusal is tested with a scripted [`Luarocks`] and on every OS through [`Flavour`].
 //!
-//! Responsibilities: [`Package`], [`NativeRequest`], [`Flavour`], reading luarocks' answers to
+//! Responsibilities: [`Package`], [`NativeRequest`], [`Flavour`], [`Libc`], [`Host`] and the
+//! refusal of a musl build ([`refuse_musl`]), reading luarocks' answers to
 //! `config lua_version` and, for Lua 5.1, `config cache` ([`setup_native`]), the `install --local`
 //! call ([`install_native`]), the `luarocks path` hint ([`hint`]) and [`NativeError`], whose text
 //! is what the user reads after `airsl: `.
@@ -67,11 +68,12 @@ const PATH: &str = "path";
 /// The batch file the Windows hint has `luarocks path` write, for `cmd` to run.
 const LRPATH_BAT: &str = "lrpath.bat";
 
-/// The book page that says what works on musl Linux and where no package exists.
-const BOOK_PAGE: &str = "https://airsstack.github.io/airsl/ch01-05-stock-lua.html";
-
 /// The book section that explains how to point luarocks at Lua 5.4 or `LuaJIT`.
 const BOOK_POINTING: &str = "https://airsstack.github.io/airsl/ch01-05-stock-lua.html#pointing-luarocks-at-lua-54-or-luajit";
+
+/// The book section that says what works on musl Linux and where no package exists.
+const BOOK_NO_PACKAGE: &str =
+    "https://airsstack.github.io/airsl/ch01-05-stock-lua.html#no-binary-package";
 
 /// The width of `airsl: `, which continuation lines of a message are indented by so they line up
 /// under its first word.
@@ -145,6 +147,48 @@ impl Flavour {
     }
 }
 
+/// The C library this binary was built for, which decides whether a package for the machine's
+/// own Lua can be expected to load. The caller passes it in, so both answers are tested on every
+/// OS.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Libc {
+    /// A build for a musl target, such as the static Linux release archives.
+    Musl,
+    /// Any other build, whatever C library it uses, or none.
+    Other,
+}
+
+impl Libc {
+    /// The C library this binary was built for.
+    pub(crate) const fn host() -> Self {
+        if cfg!(target_env = "musl") {
+            Self::Musl
+        } else {
+            Self::Other
+        }
+    }
+}
+
+/// What this binary knows about the machine it was built for, which the wording and the musl
+/// refusal depend on. The caller passes it in, so every combination is tested on every OS.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Host {
+    /// Whose wording a message uses.
+    pub flavour: Flavour,
+    /// The C library the binary was built for.
+    pub libc: Libc,
+}
+
+impl Host {
+    /// The operating system and C library this binary was built for.
+    pub(crate) const fn current() -> Self {
+        Self {
+            flavour: Flavour::host(),
+            libc: Libc::host(),
+        }
+    }
+}
+
 /// Why the native module could not be installed. `Display` is the message without the
 /// `airsl: ` prefix, which the caller adds.
 #[derive(Debug, thiserror::Error)]
@@ -194,6 +238,12 @@ pub(crate) enum NativeError {
         /// What it printed, escaped with `escape_debug` so control and invisible characters are
         /// visible. A backtick is not touched by that, so one in the answer shows as it is.
         shown: String,
+    },
+    /// This binary is built for musl, where the package luarocks would pick cannot load.
+    #[error("{}", musl_text(*lua))]
+    Musl {
+        /// The `--lua` the user gave, which narrows the install lines to one.
+        lua: Option<LuaAbi>,
     },
     /// luarocks found no `LuaJIT` for Lua 5.1: the Lua 5.1 it targets is not `LuaJIT`, or there is
     /// no Lua 5.1 interpreter. Either way the 5.1 package has nothing to load into.
@@ -269,6 +319,37 @@ fn missing_text(flavour: Flavour, lua: Option<LuaAbi>) -> String {
     }
     let indented = rest.iter().map(|line| format!("\n{CONTINUATION}{line}"));
     std::iter::once(first).chain(indented).collect()
+}
+
+/// The text for a musl build: why `--native` is refused, and the `luarocks` lines that work on a
+/// glibc system, narrowed to the one for `lua` when the user named a Lua.
+fn musl_text(lua: Option<LuaAbi>) -> String {
+    let installs = lua.map_or_else(
+        || {
+            vec![
+                install_command(Some(LuaAbi::Lua54), Package::Airsstack),
+                install_command(Some(LuaAbi::LuaJit), Package::AirsstackLuajit),
+            ]
+        },
+        |abi| vec![install_command(Some(abi), Package::from(abi))],
+    );
+    let mut text = String::from(
+        "this `airsl` is built for musl Linux, and `airsstack` has no package for musl: the glibc \
+         package `luarocks` installs cannot load there",
+    );
+    let lines = std::iter::once(
+        "on a glibc system, install the package with `luarocks` yourself:".to_owned(),
+    )
+    .chain(installs)
+    .chain([format!(
+        "{BOOK_NO_PACKAGE} says what works on musl and where no package exists"
+    )]);
+    for line in lines {
+        text.push('\n');
+        text.push_str(CONTINUATION);
+        text.push_str(&line);
+    }
+    text
 }
 
 /// Maps a failure to start luarocks to the refusal that names it.
@@ -362,6 +443,24 @@ pub(crate) fn setup_native<L: Luarocks>(
         require_luajit(luarocks, request, flavour)?;
     }
     Ok(package)
+}
+
+/// Refuses `--native` before anything runs when this binary is built for musl.
+///
+/// No package is built for musl, and luarocks cannot tell musl from glibc Linux, so it would
+/// install the glibc package, which cannot load there, and exit 0. The build target is the only
+/// signal available without running anything, so a musl build of airsl on a glibc system is
+/// refused too; the message names the `luarocks` lines that work there, one when the request
+/// names a Lua.
+///
+/// # Errors
+///
+/// [`NativeError::Musl`] when `libc` is [`Libc::Musl`].
+pub(crate) const fn refuse_musl(libc: Libc, request: NativeRequest) -> Result<(), NativeError> {
+    match libc {
+        Libc::Musl => Err(NativeError::Musl { lua: request.lua }),
+        Libc::Other => Ok(()),
+    }
 }
 
 /// Refuses a Lua 5.1 for which luarocks found no `LuaJIT`.
@@ -506,14 +605,18 @@ mod tests {
 
     use std::io;
 
-    use super::{Flavour, NativeError, NativeRequest, Package, hint, install_native, setup_native};
+    use super::{
+        Flavour, Host, Libc, NativeError, NativeRequest, Package, hint, install_native,
+        refuse_musl, setup_native,
+    };
     use crate::cli::LuaAbi;
     use crate::lua::luarocks::scripted::Scripted;
     use crate::lua::luarocks::{Captured, LuarocksError, Outcome};
 
     const VERSION: &str = airsl::VERSION;
-    const BOOK_PAGE: &str = "https://airsstack.github.io/airsl/ch01-05-stock-lua.html";
     const BOOK_POINTING: &str = "https://airsstack.github.io/airsl/ch01-05-stock-lua.html#pointing-luarocks-at-lua-54-or-luajit";
+    const BOOK_NO_PACKAGE: &str =
+        "https://airsstack.github.io/airsl/ch01-05-stock-lua.html#no-binary-package";
 
     /// What `luarocks config cache` prints when the Lua it targets is `LuaJIT`.
     const LUAJIT_CACHE: &[u8] =
@@ -1046,6 +1149,78 @@ mod tests {
              In PowerShell:\n  \
              $env:LUA_PATH = luarocks --lua-version 5.1 path --lr-path\n  \
              $env:LUA_CPATH = luarocks --lua-version 5.1 path --lr-cpath"
+        );
+    }
+
+    #[test]
+    fn musl_is_refused_naming_the_glibc_install_lines_and_the_book_section() {
+        let expected = format!(
+            "this `airsl` is built for musl Linux, and `airsstack` has no package for musl: \
+             the glibc package `luarocks` installs cannot load there\n\
+             {pad}on a glibc system, install the package with `luarocks` yourself:\n\
+             {pad}luarocks --lua-version 5.4 install --local airsstack {VERSION}\n\
+             {pad}luarocks --lua-version 5.1 install --local airsstack-luajit {VERSION}\n\
+             {pad}{BOOK_NO_PACKAGE} says what works on musl and where no package exists",
+            pad = "       "
+        );
+
+        let error = refuse_musl(Libc::Musl, request(None));
+
+        assert_eq!(refusal_of(error), expected);
+    }
+
+    #[test]
+    fn musl_with_the_lua_flag_names_only_the_install_line_for_that_lua() {
+        let expected = |install: &str| {
+            format!(
+                "this `airsl` is built for musl Linux, and `airsstack` has no package for musl: \
+                 the glibc package `luarocks` installs cannot load there\n\
+                 {pad}on a glibc system, install the package with `luarocks` yourself:\n\
+                 {pad}{install}\n\
+                 {pad}{BOOK_NO_PACKAGE} says what works on musl and where no package exists",
+                pad = "       "
+            )
+        };
+
+        assert_eq!(
+            refusal_of(refuse_musl(Libc::Musl, request(Some(LuaAbi::Lua54)))),
+            expected(&format!(
+                "luarocks --lua-version 5.4 install --local airsstack {VERSION}"
+            ))
+        );
+        assert_eq!(
+            refusal_of(refuse_musl(Libc::Musl, request(Some(LuaAbi::LuaJit)))),
+            expected(&format!(
+                "luarocks --lua-version 5.1 install --local airsstack-luajit {VERSION}"
+            ))
+        );
+    }
+
+    fn refusal_of(result: Result<(), NativeError>) -> String {
+        result.unwrap_err().to_string()
+    }
+
+    #[test]
+    fn any_other_libc_is_not_refused() {
+        refuse_musl(Libc::Other, request(None)).unwrap();
+    }
+
+    #[test]
+    fn the_host_libc_is_musl_only_when_the_binary_is_built_for_musl() {
+        #[cfg(target_env = "musl")]
+        assert_eq!(Libc::host(), Libc::Musl);
+        #[cfg(not(target_env = "musl"))]
+        assert_eq!(Libc::host(), Libc::Other);
+    }
+
+    #[test]
+    fn the_current_host_is_the_flavour_and_libc_of_this_build() {
+        assert_eq!(
+            Host::current(),
+            Host {
+                flavour: Flavour::host(),
+                libc: Libc::host()
+            }
         );
     }
 

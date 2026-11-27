@@ -20,6 +20,11 @@ each crate had a number of its own and one commit could ship them under two diff
   LuaRocks with `Could not satisfy dependency luajit >= 2.1`. It now refuses first, and the message
   names the two ways out: `--lua 5.4`, or pointing LuaRocks at a LuaJIT. The same goes for
   `--lua luajit` on such a Lua.
+- **`airsl lua setup --native` refuses on musl.** LuaRocks cannot tell musl from glibc Linux, so
+  on Alpine the command installed the glibc package and exited 0, and `require` then failed. An
+  `airsl` built for musl now refuses before it writes any file or starts LuaRocks, and prints the
+  `luarocks` lines to use on a glibc system, since the check goes by how `airsl` was built and a
+  musl build also runs on glibc systems.
 
 ## airsl 0.3.0 — airsl-cli 0.3.0 — 2026-11-27
 

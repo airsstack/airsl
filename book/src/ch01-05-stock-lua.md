@@ -501,9 +501,24 @@ Some platforms have no binary package. Those are musl Linux, such as Alpine, and
 listed under [Installing](#installing), such as 32-bit systems.
 
 The native module is not supported on musl Linux. No package is built for it. LuaRocks there does
-not tell musl from glibc Linux, so both `luarocks install` and `airsl lua setup --native` install
-the glibc package, which cannot load on musl. `airsl` does not stop you, so the failure shows only
-when you `require` the module.
+not tell musl from glibc Linux, so `luarocks install` installs the glibc package, which cannot load
+on musl, and the failure shows only when you `require` the module.
+
+`airsl lua setup --native` stops you before that. An `airsl` from a musl
+[archive](appendix-04-installation.md#archives) refuses `--native` before it writes any file or
+starts LuaRocks:
+
+```text
+airsl: this `airsl` is built for musl Linux, and `airsstack` has no package for musl: the glibc package `luarocks` installs cannot load there
+       on a glibc system, install the package with `luarocks` yourself:
+       luarocks --lua-version 5.4 install --local airsstack 0.3.0
+       luarocks --lua-version 5.1 install --local airsstack-luajit 0.3.0
+       https://airsstack.github.io/airsl/ch01-05-stock-lua.html#no-binary-package says what works on musl and where no package exists
+```
+
+The refusal goes by how `airsl` was built, not by the system it runs on, so a musl `airsl` on a
+glibc system is refused too. The [archives](appendix-04-installation.md#archives) say when the
+installer picks that build. There the `luarocks` lines in the message work.
 
 On any other platform without a binary package, LuaRocks builds the package from its recipe. The
 requirements are the ones listed under [Building from the repository](#building-from-the-repository).
@@ -519,8 +534,8 @@ requirements are the ones listed under [Building from the repository](#building-
   [The two packages](#the-two-packages) shows, and run it with that Lua.
 - **A failure on Windows.** Check the Lua DLL name and the Visual C++ runtime under
   [Windows](#windows).
-- **Alpine or another musl Linux.** There is no package for it, as
-  [No binary package](#no-binary-package) says.
+- **Alpine or another musl Linux.** There is no package for it, and `airsl lua setup --native`
+  refuses to install one, as [No binary package](#no-binary-package) says.
 
 ## Summary
 

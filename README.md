@@ -112,7 +112,8 @@ For maintainers:
 - The command lines in `book/src/ch01-05-stock-lua.md` under "Installing" and "Homebrew on macOS"
   show real output, from the 0.3.0 rocks on macOS on Apple Silicon. After a release, run them
   again against luarocks.org and update the transcripts where the output changed: the package
-  version, and the platform in the file name. The Windows lines in "Pointing LuaRocks at Lua 5.4 or
+  version, and the platform in the file name. The musl refusal under "No binary package" names the
+  same version in its `luarocks` lines. The Windows lines in "Pointing LuaRocks at Lua 5.4 or
   LuaJIT" have not been run on Windows and show no output. Paste each output under its own command
   line in the chapter's `console` blocks, and merge it as a `docs:` pull request.
 - Release notes stay in CHANGELOG.md. The GitHub Release carries install instructions only.
