@@ -8,7 +8,8 @@ local record = {
   count = tonumber(arg[2]),
 
   -- Lua 5.4 distinguishes integers from floats, and airsl runs 5.4 for exactly this reason: a
-  -- timestamp that silently became a float would encode as `1.7e9` and stop being a timestamp.
+  -- timestamp that silently became a float would encode as `1700000000.0` and stop being a
+  -- timestamp.
   observed_at = 1700000000,
 
   -- A sequence, so it encodes as a JSON array. Element order is the script's, not sorted --

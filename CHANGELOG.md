@@ -5,9 +5,19 @@ Notable changes to both crates in this workspace, newest first. The format follo
 [SemVer](https://semver.org/) — with the caveat that for a `0.y.z` version the *middle* number is
 the slot Cargo treats as breaking, so a compatible change ships as a `z` bump.
 
-The two crates are versioned independently, and each entry names every crate it releases. Every
-release is tagged per crate — `airsl-v0.1.4`, `airsl-cli-v0.1.3` — because one commit has shipped
-two crates under two different numbers, which a single `vX.Y.Z` tag cannot name.
+`airsl`, `airsl-cli` and the native module's LuaRocks packages share one version. Every release is a
+lockstep release of both crates, tagged `airsl-v<version>` and `airsl-cli-v<version>` on the same
+commit, and there is no library-only release. Older entries keep their per-crate headings, from when
+each crate had a number of its own and one commit could ship them under two different numbers.
+
+## Unreleased
+
+### Breaking
+
+- **`airsl` gains Cargo features.** With `default-features = false`, a dependent now has to enable
+  `lua54` or `luajit` itself, because no Lua is selected without one, and must also enable
+  `vendored`, or `mlua` looks for a system Lua through pkg-config. `Engine` is `Send + Sync` only
+  with the default `send` feature.
 
 ## airsl 0.2.0 — airsl-cli 0.2.0 — 2026-11-25
 

@@ -46,9 +46,11 @@ decoded back: name=widget observed_at=1700000000 tags=2
   same table are identical.
 - **An empty Lua table encodes as `{}`.** Lua has no distinct empty-sequence value, so there is
   nothing to disambiguate an empty object from an empty array with (`to_json` in `src/convert.rs`).
-- **Lua 5.4's integers survive the round trip.** `observed_at` stays `1700000000` rather than
-  becoming `1.7e9`. Only Lua 5.3+ distinguishes integers from floats, which is why the crate pins
-  5.4 rather than the more commonly embedded 5.1 or LuaJIT.
+- **Lua 5.4's integers survive the round trip.** `observed_at` stays `1700000000`. LuaJIT encodes
+  that value the same way; the difference is a float such as `2^53`, which encodes as
+  `9007199254740992` on LuaJIT and `9007199254740992.0` on Lua 5.4. Only Lua 5.3+ distinguishes
+  integers from floats, which is why the crate pins 5.4 for the engine rather than the more
+  commonly embedded 5.1 or LuaJIT.
 - **`encode_pretty` ends with a newline** (`to_json_pretty` in `src/convert.rs`, registered by
   `Json::install` in `src/modules/json.rs`), so a script can write it straight to a file without
   appending one.

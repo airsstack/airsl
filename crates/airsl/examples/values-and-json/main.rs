@@ -60,8 +60,9 @@ fn main() -> Result<(), airsl::Error> {
     // there is nothing to disambiguate it with.
     assert!(compact.contains(r#""meta":{}"#), "{compact}");
 
-    // Lua 5.4's integer subtype survives the round trip. On 5.1 or LuaJIT this would read
-    // `1.7e9`, which is why the crate pins 5.4.
+    // Lua 5.4's integer subtype survives the round trip, so a whole number stays whole. LuaJIT
+    // encodes `1700000000` the same way; the difference is a float such as `2^53`, which encodes
+    // as `9007199254740992` there and `9007199254740992.0` here. That is why the crate pins 5.4.
     assert!(compact.contains(r#""observed_at":1700000000"#), "{compact}");
 
     // `encode_pretty` indents and ends with a newline, so a script can write it straight to a file

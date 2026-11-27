@@ -55,15 +55,19 @@ The API reference is on [docs.rs](https://docs.rs/airsl).
 |---|---|
 | [`airsl`](crates/airsl) | The library: the engine, the sandbox, and the modules scripts use |
 | [`airsl-cli`](crates/airsl-cli) | The `airsl` command: `run`, `test`, `check`, `doctor`, `ext`, `lua` |
+| [`airsl-lua`](crates/airsl-lua) | The native module, shipped as the LuaRocks packages `airsstack` and `airsstack-luajit`, not on crates.io |
 
 `airsl` runs on Linux, macOS and Windows (`x86_64-pc-windows-msvc`). The prebuilt command needs
 nothing else installed. Building from source needs a C compiler, because Lua is compiled from its C
-source and linked in.
+source and linked in. The native module is also built for LuaJIT. To run `airsstack` scripts in
+the Lua you already have, see
+[Running Scripts in Stock Lua](https://airsstack.github.io/airsl/ch01-05-stock-lua.html).
 
 ## Development
 
 ```sh
 cargo make dod      # the gate: fmt, clippy, rustdoc, tests, doctests, all warnings as errors
+cargo make rocks    # build, pack and load both LuaRocks packages of the native module
 cargo make book     # serve the book locally with live reload
 cargo make deny     # advisories, licences, duplicates, sources
 cargo make install  # install the airsl command from this checkout
@@ -73,21 +77,41 @@ The tasks need [cargo-make](https://github.com/sagiegurari/cargo-make)
 (`cargo install --locked cargo-make`). CI runs `cargo make dod`, so a green local run and a green
 pipeline mean the same thing.
 
+`cargo make dod` loads the native module into a real Lua 5.4 and a real LuaJIT, so it needs `lua5.4`
+and `luajit` on `PATH`, or `AIRSL_LUA54` and `AIRSL_LUAJIT` naming the interpreters. `cargo make
+rocks` is not part of the gate. It needs the network, because luarocks fetches the build backend,
+and luarocks on `PATH` or `AIRSL_LUAROCKS` naming it. Where luarocks cannot find an interpreter by
+itself, `AIRSL_LUA54_DIR` and `AIRSL_LUAJIT_DIR` name the directory of each.
+
 ## Releases
 
-[CHANGELOG.md](CHANGELOG.md) covers both crates in one timeline. Each crate is tagged on its own,
-`airsl-v<version>` and `airsl-cli-v<version>`, because the two are versioned independently.
+[CHANGELOG.md](CHANGELOG.md) covers both crates in one timeline. `airsl`, `airsl-cli` and the
+LuaRocks packages share one version, and every release is a lockstep release of both crates: push
+`airsl-v<version>` and `airsl-cli-v<version>` on the same commit. There is no library-only release.
 
 For maintainers:
 
 - An `airsl-cli-v*` tag starts the binary release. [dist](https://github.com/axodotdev/cargo-dist)
   builds every platform, the installers, checksums and attestations, then publishes the GitHub
-  Release. An `airsl-v*` tag starts nothing.
+  Release. An `airsl-v*` tag starts nothing. The `airsl-cli-v*` tag also builds the rocks
+  of the native module before the GitHub Release, and uploads them to luarocks.org after it.
 - `.github/workflows/airsl-cli-release.yml` is generated from `dist-workspace.toml`. Change the
   config and run `dist generate`; never edit the workflow by hand, or the release's plan step fails.
 - `.github/workflows/airsl-cli-smoke.yml` is written by hand. It runs every archive on its own
   platform before anything is published, and on every pull request.
+- `.github/workflows/build-rocks.yml` and `.github/workflows/publish-rocks.yml` are written by hand
+  too. The release workflow calls them through dist's `global-artifacts-jobs` and `publish-jobs`
+  hooks. The upload needs the `LUAROCKS_API_KEY` secret, the API key of a luarocks.org account
+  without two-factor on uploads, because an account that asks for a code cannot upload unattended.
 - The release does not wait for CI. Tag only a commit on `main` whose pull request passed.
+- Before tagging, rename `## Unreleased` in CHANGELOG.md to the heading form of the entries below
+  it, `## airsl <version> — airsl-cli <version> — <date>`.
+- After the first release whose `publish-rocks` job succeeds, the maintainer who pushed the
+  `airsl-cli-v*` tag runs, against luarocks.org, the command lines that
+  `book/src/ch01-05-stock-lua.md` shows under "Installing": `airsl lua setup --native` and the two
+  `luarocks install --local` lines. They also run the Homebrew lines on macOS and the Windows lines
+  in "Pointing LuaRocks at Lua 5.4 or LuaJIT". Each output is pasted under its own command line, in
+  the chapter's `console` blocks, and merged as a `docs:` pull request.
 - Release notes stay in CHANGELOG.md. The GitHub Release carries install instructions only.
 - `.github/workflows/pages.yml` publishes the book and the `install/` scripts to GitHub Pages on
   every merge that touches them, so a change to `install/` is live as soon as it merges.
