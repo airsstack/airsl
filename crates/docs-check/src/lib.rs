@@ -20,6 +20,8 @@
 //!   task of `Makefile.toml` from comparing output with README text.
 //! - `citations`: requiring the source paths, module paths and book include targets that prose
 //!   cites to exist, and refusing line-number citations.
+//! - `rockspecs`: requiring the rockspec file names, the `package`, `version` and `tag` inside
+//!   them, and the published members' versions to follow the workspace version.
 //! - `workspace`: locating the workspace root, its crates and the documents the guards read.
 //!
 //! Non-responsibilities: the Lua transcripts of the book appendices and the compile-and-run sweep
@@ -30,5 +32,7 @@
 mod citations;
 #[cfg(test)]
 mod examples;
+#[cfg(test)]
+mod rockspecs;
 #[cfg(test)]
 mod workspace;
