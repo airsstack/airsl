@@ -89,7 +89,7 @@ jobs:
     steps:
       # The checkout supplies the Lua scripts the checks run, not a build: the
       # binary under test is the downloaded archive.
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
 

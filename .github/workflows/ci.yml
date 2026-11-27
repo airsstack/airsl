@@ -39,7 +39,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       # `rustup show` resolves the override in rust-toolchain.toml and installs it.
       # The versions printed below are the record of which toolchain the gate ran on.
@@ -220,7 +220,7 @@ jobs:
     # compiles nothing, and finishes in seconds, so it should not wait behind a
     # build to report a licence or advisory problem.
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       # cargo-deny shells out to `cargo metadata`, and `cargo` here is a rustup
       # shim that resolves rust-toolchain.toml, so the pinned toolchain gets
@@ -246,7 +246,7 @@ jobs:
     # pages.yml only builds the book after a merge, when a broken build would
     # already be on main. This is the same build, on every pull request.
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       # Pinned to the version the book is written against; keep in step with
       # pages.yml and min_version in Makefile.toml.
@@ -276,7 +276,7 @@ jobs:
       # the runner's environment stays as it was.
       AIRSL_CLI_UNMANAGED_INSTALL: ${{ github.workspace }}/.install-test
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: shellcheck
         if: runner.os == 'Linux'
