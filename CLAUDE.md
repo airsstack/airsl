@@ -60,6 +60,13 @@ requires both a non-zero exit and the message, so a refusal that turned into a p
 for luarocks and `AIRSL_LUA54` and `AIRSL_LUAJIT` for the interpreters, and `AIRSL_LUA54_DIR` and
 `AIRSL_LUAJIT_DIR` when luarocks cannot find an interpreter by itself.
 
+CI's rust-cache restores `target/` with every directory but none of the files outside cargo's own
+build profiles, so a task that keeps state under `target/` starts from an empty directory rather
+than trust what it finds there. That is why `cargo make rocks` removes `target/rocks` first. A
+change to such a task, or to a CI cache step, is tested on a second, warm run too, not only from a
+clean `target/`: simulate the restored cache with `find target/<dir> -type f -delete`, then run
+the task again.
+
 Because `airsl-lua` cannot share a build, a `--workspace` command, an editor's check included, must
 add `--exclude airsl-lua`. Bare `cargo build`, `test` and `check` already work, through
 `default-members`.
