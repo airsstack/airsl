@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-26
 depends-on: [01, 06]
 built-on: af7c0dcc7368
@@ -296,3 +296,25 @@ rockspec`.
 - `cargo test -p docs-check` passes, including `rockspecs_match_the_workspace_version` over the real
   tree.
 - `cargo make dod` is green.
+
+## Review findings
+
+(reviewer verdict: compliant with amendments, DoD green, blocking: none)
+- 🟡 module doc of `crates/docs-check/src/rockspecs.rs` claimed no other guard reads the manifests (`citations::module` does) — fixed: reworded to "the only guard that reads the `rockspecs/` directory and parses the manifests as TOML for the version"; `CARGO_BUILD_JOBS=2 cargo make dod-crate docs-check` → exit 0.
+- 🟡 test `an_unreadable_rockspec_is_reported` had been renamed `..._and_not_line_checked` — fixed: restored the plan's name; `cargo test -p docs-check rockspecs` → 32 passed.
+- 🟢 four tests added beyond the plan's list (cover behaviour the plan requires) — accepted.
+- 🟢 plan asks one commit per task; the four tasks are one diff — open: split or squash at the author's commit gate.
+- 🟢 nine minor items (untested error paths incl. four of six version type names; the FIFO test would hang rather than fail if the special-file fix were reverted) — open, accepted as nits. — fixed — 2026-11-27 findings-fix pass: tests added for the unlistable rockspecs dir, an unreadable member manifest, an empty-string version, the float/boolean/array/date-time type names plus three table variants, the case-sensitive `.rockspec` suffix and `toml_error_line`'s last non-blank line; the `toml_error_line` doc says "non-blank"; test consts grouped and imported (`use super::{MEMBERS, ROCKSPECS_DIR as DIR}`); the FIFO test runs the check on a worker thread with `recv_timeout(5s)`; the duplicate body of `a_rockspec_that_is_not_utf8_is_reported_as_unreadable` now has its own fixture (a valid `package` line, then bytes `0xff 0xfe`) — evidence: with the `metadata().is_file()` check removed the FIFO test failed in 5.01s ("the check blocked on the FIFO: …") and passed once restored; `CARGO_BUILD_JOBS=2 cargo make dod-crate docs-check` → exit 0, 125 passed.
+- 🟢 (fix-pass review nit 11) `a_rockspec_that_is_not_utf8_is_reported_as_unreadable` and `an_unreadable_rockspec_is_reported` had identical bodies; `a_member_version_of_another_type_is_named_by_its_type` overlaps the new type loop — fixed — the non-UTF-8 test was briefly deleted, then restored under the plan's name with a distinct fixture; the member-type test is kept because the plan names it and it covers two members reported together — evidence: docs-check 125 tests green.
+- 2026-11-27 findings-fix pass: CI round 3 (run 45942172171) all 10 ci.yml jobs green on ubuntu/macos/windows; local `CARGO_BUILD_JOBS=2 cargo make dod` exit 0.
+
+## Deviations
+
+- 2026-11-27 — The mismatch messages were first built with a literal `…` where the declared value belongs; corrected in the fix pass to print the declared value (e.g. ``declares `package = "airsstack-lua"` ``), the missing-key message keeps its literal `…`. Tests assert the real values; 4 failed before the fix, 32 passed after.
+- 2026-11-27 — The plan elides the full "sets its own version …" message; built as `{path}: sets its own version, which must come from the workspace (`version.workspace = true`) so airsl, airsl-cli and airsl-lua share one number`.
+- 2026-11-27 — `[workspace.package` parse error is reported at column 19 (test asserts the real output); the plan's `[package` column 9 matched.
+- 2026-11-27 — `toml` added as a docs-check dev-dependency (Cargo.lock updated).
+- 2026-11-27 — Execution process: one coder ran tasks 1–4 sequentially (they share `rockspecs.rs`) instead of one coder per task; no per-task briefer spawns.
+- 2026-11-27 — A sixth docs-check check, `crates/docs-check/src/book_links.rs` (every `https://airsstack.github.io/airsl/…` URL in CLAUDE.md, CHANGELOG.md, the READMEs and the `.rs` files resolves to a SUMMARY-listed chapter, a heading id or an `install/` file), was added beyond the spec's five; `CLAUDE.md` now says "six things". It is owned by plan 11's F11.
+- 2026-11-27 — `rockspecs.rs` gained seven tests beyond the plan's list (the error paths of the nine nits); the FIFO test runs the check on a worker thread with `recv_timeout(5s)` so a reverted special-file check fails instead of hanging.
+- 2026-11-27 — `a_rockspec_that_is_not_utf8_is_reported_as_unreadable` writes `package = "airsstack"` then bytes `0xff 0xfe`, a fixture distinct from `an_unreadable_rockspec_is_reported`'s lone `0xff`; the plan's text gives both the same shape.

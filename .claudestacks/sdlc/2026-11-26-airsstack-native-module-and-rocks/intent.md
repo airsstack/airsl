@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-26
 milestone: lua-ecosystem/03
 ---

@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-26
 depends-on: [09]
 built-on: af7c0dcc7368
@@ -226,3 +226,31 @@ A prerelease skips the publish job (§6.4).
 - `dist generate --check` and `dist plan` exit 0.
 - The check step's local runs and the jq fixture runs give the probes' results.
 - `cargo make dod` is green.
+
+## Review findings
+
+(reviewer verdict: compliant with amendments, code 1🟡 4🔵 1❓ · plan 2🔵, DoD not run (no Rust changed), blocking: none)
+- 🟡 F1 `.github/workflows/publish-rocks.yml` `send()`: curl had no `--connect-timeout`/`--max-time`, so a stalled upload ran into the 30-minute job timeout with no "{file}" message and no partial-state line — fixed: curl now has `--connect-timeout 30 --max-time 300`; stub curl exit 28 on request 3 → "could not reach luarocks.org to upload rocks/airsstack-1.2.3-1.linux-x86_64.rock: curl exit status 28", then the "uploaded before this failure" line listing both rockspecs, exit 1.
+- 🔵 F2 `.github/workflows/publish-rocks.yml` job `env:`: `LUAROCKS_API_KEY` is set at job level as the plan prescribes, so the download-artifact and checkout actions see it too; step-level `env` would narrow that (needs a plan amendment; GitHub masks it either way) — open, accepted as nit. — fixed — the job-level `env` is removed; `LUAROCKS_API_KEY` is set on the check step and the upload step only, both comments saying so — evidence: PyYAML parse ok; stub-curl happy path (12 requests in order) printed the key 0 times; reviewer read confirmed.
+- 🔵 F3 `.github/workflows/publish-rocks.yml` root-manifest check: a 2xx answer with a numeric id but no `manifests` key makes jq exit 5 and is reported as "the name belongs to another account", following the plan's wording literally — open, accepted; — fixed — a `jq -e '.manifests | arrays'` gate runs before the root test with its own message ("luarocks.org answered the upload of <file> without a manifests list: {...}") and the partial-state line; the root test tolerates non-object entries (`any(type == "object" and .name == "root")`) — evidence: stub curl no-manifests case → that message, "uploaded before this failure: <rockspec>", exit 1, 1 request; taken-name case still the root-manifest message; reviewer jq 1.7.1 over 6 answer shapes gave the expected exit codes; the cosmetic part (jq's stderr reaching the log on the no-id path) fixed: the id jq now has `2>/dev/null`, no plan-worded message changed.
+- 🔵 F4 `.github/workflows/publish-rocks.yml` checkout uses `actions/checkout@v6` as the plan, probe 220 and the dist-generated release file do, while every other hand-written workflow (including `build-rocks.yml`) uses `@v5` — open, accepted as nit. — fixed — every hand-written workflow now uses `actions/checkout@v6` — evidence: grep of `.github/workflows/` finds only `@v6` outside the dist-generated file; CI round 3 (run 45942172171) green.
+- 🔵 F5 `.github/workflows/publish-rocks.yml` header ("works ... because the repository is public"): true and backed by probe 220, but nothing catches it if the repository goes private until a release fails at checkout — open, accepted as nit. — fixed — a first step "Check that the repository is public" (`PRIVATE: ${{ github.event.repository.private }}`) fails only when the value is exactly `true`, and the header comment says so — evidence: local runs PRIVATE=true → exit 1 with the message, false/empty → exit 0.
+- ❓ F6 `.github/workflows/publish-rocks.yml`: a 2xx rockspec answer with no version id was not listed in "uploaded before this failure", although the server accepted it; the plan is silent — fixed: the rockspec is appended to `uploaded` right after `send` succeeds, before the version-id check; stub run (HTTP 200, body `{"ok":1}`) → the plan's "answered ... without a version id" message, then the partial-state line listing the airsstack rockspec, 1 request, exit 1, no jq error text in the log.
+- 🔵 P1 plan Task 1 step 3: `persist-credentials: false` added on the checkout although the plan says "no other input"; it does not change the fetch probe 220 proved and matches the other hand-written workflows — accepted addition (see Deviations).
+- 🔵 P2 plan Task 1 Job: job `name:` and `timeout-minutes: 30` have no basis in the plan; they match the house style — accepted addition (see Deviations).
+
+- plan Proof: `publish-rocks.yml` has never run for real — open: its proof is the first release, which needs the luarocks.org API key; so far only static checks (PyYAML, `bash -n`, shellcheck, `dist generate --check`, `dist plan`) and stub-curl runs.
+- 2026-11-27 findings-fix pass: CI round 3 (run 45942172171) all 10 ci.yml jobs green on ubuntu/macos/windows; local `CARGO_BUILD_JOBS=2 cargo make dod` exit 0.
+
+## Deviations
+
+- 2026-11-27 — `persist-credentials: false` added on `actions/checkout@v6` (the house rule of the other hand-written workflows); the plan's form was `path: src` and no other input. The checkout still uses the job token.
+- 2026-11-27 — Job `name` and `timeout-minutes: 30` added, not named by the plan, for consistency with the other hand-written workflows.
+- 2026-11-27 — No `permissions:` block in `publish-rocks.yml`: dist's job-level grant on `custom-publish-rocks` is id-token/packages only, and a called workflow can only narrow it, so asking for `contents: read` would exceed the caller's grant; the checkout works with Metadata: read because the repository is public (probe 220).
+- 2026-11-27 — F6 decision: the plan is silent on an accepted-but-no-version-id answer; decided the rockspec is listed as uploaded, since an HTTP success means luarocks.org stored it (closest to the partial-state line's purpose: tell the operator what is already on the server).
+- 2026-11-27 — F1 addition: curl timeouts not named by the plan.
+- 2026-11-27 — Plan Proof not yet run: the real proof is the first release run (R14); locally only static checks and stub-curl runs (dist generate --check exit 0, dist plan exit 0, YAML parse, bash -n, shellcheck).
+- 2026-11-27 — Execution process: one coder ran tasks 1–2; no briefer spawns; no cargo run (no Rust changed).
+- 2026-11-27 — `LUAROCKS_API_KEY` is scoped to the check step and the upload step instead of the job-level `env:` the plan prescribes (F2).
+- 2026-11-27 — A first step, "Check that the repository is public", guards the checkout's reliance on a public repository (F5); not in the plan.
+- 2026-11-27 — An upload answer with no `manifests` list gets its own message and the partial-state line, before the root-manifest test, instead of the plan's "the name belongs to another account" wording (F3).

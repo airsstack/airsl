@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-26
 depends-on: [07, 08, 10, 11]
 built-on: af7c0dcc7368
@@ -220,3 +220,34 @@ claim`.
 - `cargo make dod` is green, including docs-check's citation, module-path and example-output
   guards.
 - `grep -rn "versioned independently" CHANGELOG.md README.md crates/*/README.md` finds nothing.
+
+## Review findings
+
+(reviewer verdict: non-compliant, code 1🔴 3🟡 5🔵 1❓ · spec 1🟡, DoD green (`CARGO_BUILD_JOBS=2 cargo make dod` exit 0; `cargo make dod-crate docs-check`, 98 passed), blocking: C1, S1, C2)
+- C1 🔴 `CLAUDE.md` "What this is": "All of them share the one version in `[workspace.package]`" was false (`crates/docs-check/Cargo.toml` is `0.0.0`; docs-check's rockspecs guard covers only airsl, airsl-cli, airsl-lua) — fixed: the shared-version sentence is dropped; the rockspec bullet names airsl, airsl-cli, airsl-lua; `CARGO_BUILD_JOBS=2 cargo make dod-crate docs-check` → exit 0, 98 passed; `CARGO_BUILD_JOBS=2 cargo make dod` → exit 0.
+- C2 🟡 `README.md` maintainer list, first bullet: "The same tag also builds the rocks" read as the `airsl-v*` tag just said to start nothing — fixed: now "The `airsl-cli-v*` tag also builds the rocks"; `CARGO_BUILD_JOBS=2 cargo make dod-crate docs-check` → exit 0, 98 passed; `CARGO_BUILD_JOBS=2 cargo make dod` → exit 0.
+- C3 🟡 `CHANGELOG.md` `## Unreleased` › `### Breaking`: the item named `lua54`/`luajit` and `send` but not `vendored`, so a `default-features = false` dependent with only `lua54` gets mlua-sys 0.11.0's pkg-config probe for a system Lua — fixed: the item adds that `default-features = false` also needs `vendored`, or mlua looks for a system Lua through pkg-config, checked against `crates/airsl/Cargo.toml` `[features]` (default = lua54, vendored, send); `CARGO_BUILD_JOBS=2 cargo make dod-crate docs-check` → exit 0, 98 passed; `CARGO_BUILD_JOBS=2 cargo make dod` → exit 0.
+- C4 🟡 `crates/airsl/examples/values-and-json/encode.lua`, comment on `observed_at`: "would encode as `1.7e9`" was false and contradicted the corrected main.rs comment — fixed: the comment now says `1700000000.0`; `airsl run` printed `{"a":1700000000,"b":1700000000.0}`; example output unchanged; `CARGO_BUILD_JOBS=2 cargo make dod-crate docs-check` → exit 0, 98 passed; `CARGO_BUILD_JOBS=2 cargo make dod` → exit 0.
+- C5 🔵 `README.md` S17 maintainer step: "the output-less sections of `book/src/ch01-05-stock-lua.md`" was vague and paired output with command lines the chapter does not show — fixed: the step names the "Installing" blocks (`airsl lua setup --native`, the two `luarocks install --local` lines), the Homebrew lines and the Windows lines, and says each output goes under its own command line; `CARGO_BUILD_JOBS=2 cargo make dod-crate docs-check` → exit 0, 98 passed; `CARGO_BUILD_JOBS=2 cargo make dod` → exit 0.
+- C6 🔵 `README.md` "What is in this repository": the LuaJIT clause sat under the C-compiler "because" — fixed: split into two sentences; `CARGO_BUILD_JOBS=2 cargo make dod-crate docs-check` → exit 0, 98 passed; `CARGO_BUILD_JOBS=2 cargo make dod` → exit 0.
+- C7 🔵 `CLAUDE.md` airsl-lua bullet: `rockspecs/` was said to hold "packages" — fixed: it holds "the two rockspecs, the recipes for the two LuaRocks packages"; `CARGO_BUILD_JOBS=2 cargo make dod-crate docs-check` → exit 0, 98 passed; `CARGO_BUILD_JOBS=2 cargo make dod` → exit 0.
+- C8 🔵 `CLAUDE.md` Engine bullet: the added line was 106 columns — fixed: rewrapped to 100; `CARGO_BUILD_JOBS=2 cargo make dod-crate docs-check` → exit 0, 98 passed; `CARGO_BUILD_JOBS=2 cargo make dod` → exit 0.
+- C9 🔵 diff-wide: no reversion guard fails if the LuaJIT comment/bullet, the removed "versioned independently" or CLAUDE.md naming `native-refusals` is reverted — fixed for the CLAUDE.md part: the seventh docs-check check (`crates/docs-check/src/tasks.rs`) requires `CLAUDE.md` to write every step of `dod` and of its dependencies as `cargo make <step>`; with the sentence's `cargo make native-refusals` removed the check prints `CLAUDE.md: never names `native-refusals`, which `cargo make dod` runs through `test``, and `CARGO_BUILD_JOBS=2 cargo make dod-crate docs-check` → exit 0, 167 passed. The LuaJIT comment/bullet and the removed "versioned independently" stay unguarded: the plan accepts "No test" for them.
+- C10 ❓ `README.md` maintainer list: no step told the maintainer to rename `## Unreleased` at release — fixed: a maintainer step now says to rename `## Unreleased` to `## airsl <version> — airsl-cli <version> — <date>` before tagging; `CARGO_BUILD_JOBS=2 cargo make dod-crate docs-check` → exit 0, 98 passed; `CARGO_BUILD_JOBS=2 cargo make dod` → exit 0.
+- S1 🟡 plan Architecture ("`CLAUDE.md` does not describe releases, so it gains nothing for that rule"): CLAUDE.md "What this is" added "a release is a lockstep release of `airsl` and `airsl-cli`", an unauthorized addition — fixed: the lockstep/shared-version sentence is dropped from CLAUDE.md; the rockspec bullet names airsl, airsl-cli, airsl-lua; `CARGO_BUILD_JOBS=2 cargo make dod-crate docs-check` → exit 0, 98 passed; `CARGO_BUILD_JOBS=2 cargo make dod` → exit 0.
+- chain open finding — CLAUDE.md names `native-refusals` in the gate: closed by this plan (CLAUDE.md now says the `test` step runs `test-cargo`, `native-load`, `native-refusals`, matching Makefile.toml).
+
+- 🟢 (fix-pass review, report 20 area) `CLAUDE.md`'s docs-check paragraph after the sixth check — checked: "six things" matches the checks (examples, `.rs` paths, module paths, includes, rockspecs, book links), the new bullet matches `book_links.rs` (scanned files, chapter/SUMMARY rule, `install/` rule, root/`index.html` with the anchor caveat), and "It does not check … anything else written in backticks" still holds — evidence: reviewer read against the code; `CARGO_BUILD_JOBS=2 cargo make dod` → exit 0.
+- 2026-11-27 findings-fix pass: CI round 3 (run 45942172171) all 10 ci.yml jobs green on ubuntu/macos/windows; local `CARGO_BUILD_JOBS=2 cargo make dod` exit 0.
+
+## Deviations
+
+- 2026-11-27 — `CLAUDE.md` gained a paragraph describing the `dod` steps (clippy and doc per ABI, `test` = `test-cargo` + `native-load` + `native-refusals`, `test-doc` skipping airsl-lua, `rocks` outside dod, per Makefile.toml); this closes the chain's open finding.
+- 2026-11-27 — `CLAUDE.md`'s docs-check sentence changed from "four things" to "five things", with a rockspec/version bullet (Task 4).
+- 2026-11-27 — C4 edited `crates/airsl/examples/values-and-json/encode.lua`, a file Task 3 does not list: its comment's `1.7e9` claim was false (a Lua 5.4 float encodes as `1700000000.0`, probed with `airsl run`) and contradicted the corrected main.rs comment in the same example.
+- 2026-11-27 — C3 added the `vendored` clause to the Breaking item beyond the plan's wording (mlua-sys 0.11.0 probes pkg-config for a system Lua without it).
+- 2026-11-27 — C10 added a maintainer step the plan's Architecture/Risks describe but no task wrote.
+- 2026-11-27 — Execution process: one coder ran tasks 1–4; no briefer spawns.
+- 2026-11-27 — `CLAUDE.md`'s docs-check sentence now says "six things", not the "five things" of Task 4, with a bullet for the book-link check (`crates/docs-check/src/book_links.rs`, plan 11's F11) beyond the spec's five; the bullet names the scanned files (CLAUDE.md, CHANGELOG.md, the READMEs, `.rs` files outside docs-check) and the root/`index.html`/`print.html`/`404.html` rule.
+- 2026-11-27 — The workspace version was bumped to 0.3.0 (`Cargo.toml`, `Cargo.lock`, both rockspecs renamed to `-0.3.0-1`, the `ch01-05-stock-lua.md` transcripts re-run) because 0.2.0 had already been released on 2026-11-25.
+- 2026-11-27 — The seventh docs-check check, `tasks` (`crates/docs-check/src/tasks.rs`), has no basis in the spec: it was added to close C9. It requires every `cargo make <task>` in `CLAUDE.md`, the READMEs and the book chapters to name a task `Makefile.toml` declares, and `CLAUDE.md` to write every step of `dod` as `cargo make <step>`; `CLAUDE.md`'s docs-check sentence now says "seven things" with a bullet for it. Spec §2.5's "0.2.0 until release" is overtaken by the 0.3.0 bump recorded above.
